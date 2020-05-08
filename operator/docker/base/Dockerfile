@@ -58,3 +58,53 @@ ARG TARGETARCH
 COPY --from=builder /cass-operator/build/bin/cass-operator-linux-${TARGETARCH} bin/operator
 
 CMD [ "/go/bin/operator" ]
+
+# UBI Image
+
+
+
+#############################################################
+
+FROM registry.access.redhat.com/ubi7/ubi-minimal:7.9 AS builder-ubi
+
+# Update the builder layer and create user
+RUN microdnf update && rm -rf /var/cache/yum && \
+    microdnf install shadow-utils && microdnf clean all && \
+    useradd -r -s /bin/false -U -G root cassandra
+
+#############################################################
+FROM registry.access.redhat.com/ubi7/ubi-minimal:7.9 AS cass-operator-ubi
+
+ARG VERSION_STAMP=DEV
+ARG RELEASE=1
+
+LABEL maintainer="DataStax, Inc <info@datastax.com>" \
+      name="cass-operator" \
+      vendor="DataStax, Inc" \
+      version="${VERSION_STAMP}" \
+      release="${RELEASE}" \
+      summary="DataStax Kubernetes Operator for Apache Cassandra " \
+      description="The DataStax Kubernetes Operator for Apache Cassandra®. This operator handles the provisioning and day to day management of Apache Cassandra based clusters. Features include configuration deployment, node remediation, and automatic upgrades."
+
+# Update the builder layer and create user
+RUN microdnf update && rm -rf /var/cache/yum && \
+    microdnf install procps-ng && microdnf clean all
+
+# Copy user accounts information
+COPY --from=builder-ubi /etc/passwd /etc/passwd
+COPY --from=builder-ubi /etc/shadow /etc/shadow
+COPY --from=builder-ubi /etc/group /etc/group
+COPY --from=builder-ubi /etc/gshadow /etc/gshadow
+
+# Copy operator binary
+COPY --from=cass-operator /go/bin/operator /operator
+COPY ./operator/docker/ubi/LICENSE /licenses/
+
+RUN mkdir -p /var/lib/cass-operator/
+
+RUN chown cassandra:root /operator && \
+    chmod 0555 /operator
+
+USER cassandra:root
+
+ENTRYPOINT ["/operator"]

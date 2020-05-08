@@ -1,0 +1,10 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: k8ssandra-cass-operator-testing
+  namespace: openshift-marketplace
+spec:
+  displayName: K8ssandra Cass Operator Testing
+  publisher: Developer
+  sourceType: grpc
+  image: docker.io/k8ssandra/cass-operator-index:latest

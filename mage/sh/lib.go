@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/datastax/cass-operator/mage/util"
+	"github.com/k8ssandra/cass-operator/mage/util"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )

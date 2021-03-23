@@ -7,12 +7,12 @@ package reconciliation
 
 import (
 	"fmt"
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/httphelper"
-	"github.com/datastax/cass-operator/operator/pkg/images"
-	"github.com/datastax/cass-operator/operator/pkg/oplabels"
-	"github.com/datastax/cass-operator/operator/pkg/psp"
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/operator/pkg/psp"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "k8s.io/api/apps/v1"

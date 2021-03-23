@@ -6,7 +6,7 @@ package helm_util
 import (
 	"fmt"
 
-	shutil "github.com/datastax/cass-operator/mage/sh"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
 )
 
 func buildOverrideArgs(overrides map[string]string) []string {

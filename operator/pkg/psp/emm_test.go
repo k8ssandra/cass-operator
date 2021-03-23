@@ -14,8 +14,8 @@ import (
 	"github.com/go-logr/logr"
 	logrtesting "github.com/go-logr/logr/testing"
 
-	"github.com/datastax/cass-operator/operator/internal/result"
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	"github.com/k8ssandra/cass-operator/operator/internal/result"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 )
 
 func IsRequeue(t *testing.T, r result.ReconcileResult, msg string) {

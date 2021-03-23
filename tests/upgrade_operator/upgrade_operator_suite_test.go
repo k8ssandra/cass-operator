@@ -11,11 +11,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	cfgutil "github.com/datastax/cass-operator/mage/config"
-	ginkgo_util "github.com/datastax/cass-operator/mage/ginkgo"
-	helm_util "github.com/datastax/cass-operator/mage/helm"
-	"github.com/datastax/cass-operator/mage/kubectl"
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
+	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
+	helm_util "github.com/k8ssandra/cass-operator/mage/helm"
+	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 )
 
 var (

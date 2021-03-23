@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strconv"
 
-	cfgutil "github.com/datastax/cass-operator/mage/config"
-	"github.com/datastax/cass-operator/mage/kubectl"
-	shutil "github.com/datastax/cass-operator/mage/sh"
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
+	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 )
 
 const (

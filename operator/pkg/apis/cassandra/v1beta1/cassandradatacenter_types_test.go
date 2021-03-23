@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/datastax/cass-operator/operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/operator/pkg/images"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -13,8 +13,8 @@ import (
 
 	"golang.org/x/crypto/ssh/terminal"
 
-	shutil "github.com/datastax/cass-operator/mage/sh"
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 )
 
 const (

@@ -21,13 +21,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/datastax/cass-operator/operator/internal/result"
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/events"
-	"github.com/datastax/cass-operator/operator/pkg/httphelper"
-	"github.com/datastax/cass-operator/operator/pkg/oplabels"
-	"github.com/datastax/cass-operator/operator/pkg/utils"
-	"github.com/datastax/cass-operator/operator/pkg/psp"
+	"github.com/k8ssandra/cass-operator/operator/internal/result"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/events"
+	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
+	"github.com/k8ssandra/cass-operator/operator/pkg/psp"
 )
 
 var (

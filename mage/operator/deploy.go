@@ -9,9 +9,9 @@ import (
 	"regexp"
 	"strings"
 
-	dockerutil "github.com/datastax/cass-operator/mage/docker"
-	shutil "github.com/datastax/cass-operator/mage/sh"
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	dockerutil "github.com/k8ssandra/cass-operator/mage/docker"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 )
 
 const (

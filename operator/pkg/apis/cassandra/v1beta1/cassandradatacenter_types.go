@@ -13,9 +13,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/datastax/cass-operator/operator/pkg/images"
-	"github.com/datastax/cass-operator/operator/pkg/serverconfig"
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	"github.com/k8ssandra/cass-operator/operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/operator/pkg/serverconfig"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 )
 
 const (

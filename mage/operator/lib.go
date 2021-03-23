@@ -13,11 +13,11 @@ import (
 	"runtime"
 	"strings"
 
-	cfgutil "github.com/datastax/cass-operator/mage/config"
-	dockerutil "github.com/datastax/cass-operator/mage/docker"
-	gitutil "github.com/datastax/cass-operator/mage/git"
-	shutil "github.com/datastax/cass-operator/mage/sh"
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
+	dockerutil "github.com/k8ssandra/cass-operator/mage/docker"
+	gitutil "github.com/k8ssandra/cass-operator/mage/git"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 	"github.com/magefile/mage/mg"
 	"gopkg.in/yaml.v2"
 )
@@ -36,7 +36,7 @@ const (
 	mermaidJsImage             = "operator-mermaid-js"
 	generatedDseDataCentersCrd = "operator/deploy/crds/cassandra.datastax.com_cassandradatacenters_crd.yaml"
 	helmChartCrd               = "charts/cass-operator-chart/templates/customresourcedefinition.yaml"
-	packagePath                = "github.com/datastax/cass-operator/operator"
+	packagePath                = "github.com/k8ssandra/cass-operator/operator"
 	envGitBranch               = "MO_BRANCH"
 	envVersionString           = "MO_VERSION"
 	envGitHash                 = "MO_HASH"
@@ -108,7 +108,7 @@ func createTestSdkDockerImage() {
 func generateK8sAndOpenApi() {
 	cwd, _ := os.Getwd()
 	runArgs := []string{"-t", "--rm"}
-	repoPath := "/go/src/github.com/datastax/cass-operator"
+	repoPath := "/go/src/github.com/k8ssandra/cass-operator"
 	execArgs := []string{
 		"/bin/bash", "-c",
 		fmt.Sprintf("set -eufx; export GO111MODULE=on; cd %s/operator && operator-sdk generate k8s && operator-sdk generate crds && rm -rf build", repoPath),
@@ -355,7 +355,7 @@ func calcFullVersion(settings cfgutil.BuildSettings, git GitData) FullVersion {
 }
 
 func calcVersionAndTags(version FullVersion, ubiBase bool) (string, []string) {
-	repoPath := "datastax/cass-operator"
+	repoPath := "k8ssandra/cass-operator"
 	var versionedTag string
 	var tagsToPush []string
 
@@ -537,9 +537,9 @@ func doGenerateClient() {
 	usr, err := user.Current()
 	mageutil.PanicOnError(err)
 	runArgs := []string{"-t", "--rm", "-u", fmt.Sprintf("%s:%s", usr.Uid, usr.Gid)}
-	execArgs := []string{"client", "github.com/datastax/cass-operator/operator/pkg/generated",
-		"github.com/datastax/cass-operator/operator/pkg/apis", "cassandra:v1beta1"}
-	volumes := []string{fmt.Sprintf("%s:/go/src/github.com/datastax/cass-operator", cwd)}
+	execArgs := []string{"client", "github.com/k8ssandra/cass-operator/operator/pkg/generated",
+		"github.com/k8ssandra/cass-operator/operator/pkg/apis", "cassandra:v1beta1"}
+	volumes := []string{fmt.Sprintf("%s:/go/src/github.com/k8ssandra/cass-operator", cwd)}
 	dockerutil.Run(genClientImage, volumes, nil, nil, runArgs, execArgs).ExecVPanic()
 }
 

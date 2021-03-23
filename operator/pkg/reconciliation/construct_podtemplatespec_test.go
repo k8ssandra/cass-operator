@@ -9,8 +9,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/oplabels"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 )

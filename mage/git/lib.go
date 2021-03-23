@@ -6,8 +6,8 @@ package gitutil
 import (
 	"strings"
 
-	"github.com/datastax/cass-operator/mage/sh"
-	"github.com/datastax/cass-operator/mage/util"
+	"github.com/k8ssandra/cass-operator/mage/sh"
+	"github.com/k8ssandra/cass-operator/mage/util"
 )
 
 func GetUnstagedChanges() string {

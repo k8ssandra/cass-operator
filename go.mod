@@ -1,6 +1,6 @@
-module github.com/datastax/cass-operator
+module github.com/k8ssandra/cass-operator
 
-go 1.14
+go 1.16
 
 require (
 	github.com/Jeffail/gabs v1.4.0

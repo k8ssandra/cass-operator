@@ -10,11 +10,11 @@ import (
 	"reflect"
 	"sort"
 
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/httphelper"
-	"github.com/datastax/cass-operator/operator/pkg/images"
-	"github.com/datastax/cass-operator/operator/pkg/oplabels"
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

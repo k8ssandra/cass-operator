@@ -5,8 +5,8 @@ package reconciliation
 import (
 	"fmt"
 
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/httphelper"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 )

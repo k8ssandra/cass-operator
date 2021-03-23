@@ -6,9 +6,9 @@ package reconciliation
 // This file defines constructors for k8s objects
 
 import (
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/oplabels"
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"

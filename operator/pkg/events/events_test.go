@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/client-go/tools/record"
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 )
 
 type MockInfoLogger struct {

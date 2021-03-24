@@ -1,1 +1,5 @@
-* @bradfordcp @jimdickinson @johntrimble @respringer @sandoichi
+# These owners will be the default owners for everything in
+# the repo. Unless a later match takes precedence,
+# @k8ssandra/maintainers will be requested for
+# review when someone opens a pull request.
+* @k8ssandra/maintainers

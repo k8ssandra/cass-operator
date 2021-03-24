@@ -11,7 +11,7 @@ spec:
   size: 1
   storageConfig:
     cassandraDataVolumeClaimSpec: &storageclass_server_storage
-      storageClassName: server-storage
+      storageClassName: standard
       accessModes:
         - ReadWriteOnce
       resources:

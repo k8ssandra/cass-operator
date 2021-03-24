@@ -19,7 +19,7 @@ spec:
                 command: ["/bin/sleep", "6000s"]
   storageConfig:
       cassandraDataVolumeClaimSpec:
-        storageClassName: server-storage
+        storageClassName: standard
         accessModes:
           - ReadWriteOnce
         resources:

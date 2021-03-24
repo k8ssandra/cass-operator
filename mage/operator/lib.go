@@ -301,6 +301,7 @@ type GitData struct {
 	Branch                string
 	LongHash              string
 	HasUncommittedChanges bool
+	ShortHash             string
 }
 
 func getGitData() GitData {
@@ -308,6 +309,7 @@ func getGitData() GitData {
 		Branch:                gitutil.GetBranch(envGitBranch),
 		HasUncommittedChanges: gitutil.HasStagedChanges() || gitutil.HasUnstagedChanges(),
 		LongHash:              gitutil.GetLongHash(envGitHash),
+		ShortHash:             gitutil.GetShortHash(envGitHash),
 	}
 }
 
@@ -350,38 +352,31 @@ func calcFullVersion(settings cfgutil.BuildSettings, git GitData) FullVersion {
 		Core:        settings.Version,
 		Branch:      git.Branch,
 		Uncommitted: git.HasUncommittedChanges,
-		Hash:        git.LongHash,
+		Hash:        git.ShortHash,
 	}
 }
 
-func calcVersionAndTags(version FullVersion, ubiBase bool) (string, []string) {
+func calcVersionAndTags(version FullVersion, ubiBase bool) []string {
 	repoPath := "k8ssandra/cass-operator"
-	var versionedTag string
 	var tagsToPush []string
 
 	if ubiBase {
-		versionedTag = fmt.Sprintf("%s:%v-ubi", repoPath, version)
 		tagsToPush = []string{
-			versionedTag,
 			fmt.Sprintf("%s:%s-ubi", repoPath, version.Hash),
 			fmt.Sprintf("%s:latest-ubi", repoPath),
 		}
 	} else {
-		versionedTag = fmt.Sprintf("%s:%v", repoPath, version)
 		tagsToPush = []string{
-			versionedTag,
 			fmt.Sprintf("%s:%s", repoPath, version.Hash),
 			fmt.Sprintf("%s:latest", repoPath),
 		}
 	}
 
-	return versionedTag, tagsToPush
+	return tagsToPush
 }
 
-func runDockerBuild(versionedTag string, dockerTags []string, extraBuildArgs []string, target string) {
-	buildArgs := []string{fmt.Sprintf("VERSION_STAMP=%s", versionedTag)}
-	buildArgs = append(buildArgs, extraBuildArgs...)
-	dockerutil.Build(".", target, dockerBase, dockerTags, buildArgs).ExecVPanic()
+func runDockerBuild(dockerTags []string, extraBuildArgs []string, target string) {
+	dockerutil.Build(".", target, dockerBase, dockerTags, extraBuildArgs).ExecVPanic()
 }
 
 func runGoBuild(version string) {
@@ -459,14 +454,14 @@ func BuildDocker() {
 	version := calcFullVersion(settings, git)
 
 	//build regular docker image
-	versionedTag, dockerTags := calcVersionAndTags(version, false)
-	runDockerBuild(versionedTag, dockerTags, nil, cassOperatorTarget)
+	dockerTags := calcVersionAndTags(version, false)
+	runDockerBuild(dockerTags, nil, cassOperatorTarget)
 
 	if baseOs := os.Getenv(EnvBaseOs); baseOs != "" {
 		//build ubi docker image
 		args := []string{fmt.Sprintf("BASE_OS=%s", baseOs)}
-		ubiVersionedTag, ubiDockerTags := calcVersionAndTags(version, true)
-		runDockerBuild(ubiVersionedTag, ubiDockerTags, args, cassOperatorUbiTarget)
+		ubiDockerTags := calcVersionAndTags(version, true)
+		runDockerBuild(ubiDockerTags, args, cassOperatorUbiTarget)
 		dockerTags = append(dockerTags, ubiDockerTags...)
 	}
 

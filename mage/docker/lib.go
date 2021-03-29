@@ -148,7 +148,7 @@ func Run(imageName string, volumes []string, dnsAddrs []string, env []string, ru
 }
 
 func Build(contextDir string, targetStage string, dockerFilePath string, namesAndTags []string, buildArgs []string) DockerCmd {
-	args := []string{"build", contextDir}
+	args := []string{"buildx", "build", contextDir}
 
 	if targetStage != "" {
 		args = append(args, "--target")
@@ -166,11 +166,17 @@ func Build(contextDir string, targetStage string, dockerFilePath string, namesAn
 		args = append(args, "--build-arg")
 		args = append(args, x)
 	}
+	args = append(args, "--load")
+	args = append(args, "--cache-from")
+	args = append(args, "type=local,src=/tmp/.buildx-cache")
+	args = append(args, "--cache-to")
+	args = append(args, "type=local,dest=/tmp/.buildx-cache")
+
 	c := FromArgs(args)
 	if c.Env == nil {
 		c.Env = map[string]string{}
 	}
-	c.Env["DOCKER_BUILDKIT"] = "1"
+
 	return c
 }
 

@@ -4,7 +4,7 @@
 #
 ##############################################
 
-FROM golang:1.14-stretch as install-operator-sdk
+FROM golang:1.16-stretch as install-operator-sdk
 
 # This Dockerfile sets up a clean go 1.14 environment with operator-sdk installed and tested.
 #

@@ -59,7 +59,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
       - name: Build and push
-        id: docker_build
         uses: docker/build-push-action@v2
         with:
           file: operator/docker/base/Dockerfile
@@ -69,9 +68,20 @@ jobs:
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          file: operator/docker/system-logger/Dockerfile
+          push: false
+          load: true
+          tags: k8ssandra/system-logger:latest
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=kind k8ssandra/cass-operator:latest
+          kind load docker-image --name=kind k8ssandra/system-logger:latest
       - name: Run integration test ( ${{ matrix.integration_test }} )
         uses: magefile/mage-action@v1
         with:

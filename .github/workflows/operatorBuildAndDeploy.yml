@@ -31,6 +31,13 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
       - name: Test Sdk Generate
         uses: magefile/mage-action@v1
         with:
@@ -82,6 +89,45 @@ jobs:
           file: operator/docker/base/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: k8ssandra/cass-operator:${{ steps.vars.outputs.sha_short }}, k8ssandra/cass-operator:latest
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+  build_system_logger:
+    name: Build System logger Docker Image
+    runs-on: ubuntu-latest
+    needs: testing
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: Login to GitHub Package Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login docker.pkg.github.com -u "${{ github.actor }}" --password-stdin
+      - name: Set git parsed values
+        id: vars
+        run: |
+          echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
+          echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          file: operator/docker/system-logger/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: k8ssandra/system-logger:${{ steps.vars.outputs.sha_short }}, k8ssandra/system-logger:latest
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache

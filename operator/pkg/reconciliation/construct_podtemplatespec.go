@@ -426,7 +426,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		MountPath: "/var/log/cassandra",
 	}
 
-	volumeMounts :=  combineVolumeMountSlices(volumeDefaults,
+	volumeMounts := combineVolumeMountSlices(volumeDefaults,
 		[]corev1.VolumeMount{
 			cassServerLogsMount,
 			{
@@ -437,7 +437,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 				Name:      "encryption-cred-storage",
 				MountPath: "/etc/encryption/",
 			},
-	})
+		})
 
 	volumeMounts = combineVolumeMountSlices(volumeMounts, cassContainer.VolumeMounts)
 	cassContainer.VolumeMounts = combineVolumeMountSlices(volumeMounts, generateStorageConfigVolumesMount(dc))
@@ -452,12 +452,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 			loggerContainer.Image = specImage
 		} else {
 			loggerContainer.Image = images.GetSystemLoggerImage()
-		}
-	}
-
-	if len(loggerContainer.Args) == 0 {
-		loggerContainer.Args = []string{
-			"/bin/sh", "-c", "tail -n+1 -F /var/log/cassandra/system.log",
+			loggerContainer.ImagePullPolicy = corev1.PullIfNotPresent
 		}
 	}
 

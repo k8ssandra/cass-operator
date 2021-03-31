@@ -23,7 +23,7 @@ spec:
           secretName: cass-operator-webhook-config
       containers:
       - name: cass-operator
-        image: datastax/cass-operator:latest
+        image: k8ssandra/cass-operator:latest
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - mountPath: /tmp/k8s-webhook-server/serving-certs

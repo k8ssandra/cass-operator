@@ -1,27 +1,26 @@
 # Cass Operator
-[![Gitter](https://badges.gitter.im/cass-operator/community.svg)](https://gitter.im/cass-operator/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-[![Go Report Card](https://goreportcard.com/badge/github.com/datastax/cass-operator)](https://goreportcard.com/report/github.com/datastax/cass-operator)
-[![License: Apache License 2.0](https://img.shields.io/github/license/datastax/cass-operator)](https://github.com/datastax/cass-operator/blob/master/LICENSE.txt)
+[![License: Apache License 2.0](https://img.shields.io/github/license/k8ssandra/cass-operator)](https://github.com/k8ssandra/cass-operator/blob/master/LICENSE.txt)
 
-The DataStax Kubernetes Operator for Apache Cassandra&reg;
+The DataStax Kubernetes Operator for Apache Cassandra&reg;. This repository replaces the old [datastax/cass-operator](https://github.com/datastax/cass-operator) for use-cases in the k8ssandra project. Some documentation is still out of date and will be modified in the future. Check [k8ssandra/k8ssandra](https://github.com/k8ssandra/k8ssandra) for more up to date information.
 
 ## Getting Started
+
+To create a full featured cluster, the recommend approach is to use the Helm charts from k8ssandra. Check the [Getting started](https://k8ssandra.io/docs/getting-started/) documentation at (k8ssandra.io)[https://k8ssandra.io/docs].
 
 Quick start:
 ```console
 # *** This is for GKE Regular Channel - k8s 1.16 -> Adjust based on your cloud or storage options
-kubectl create -f https://raw.githubusercontent.com/datastax/cass-operator/v1.6.0/docs/user/cass-operator-manifests-v1.16.yaml
-kubectl create -f https://raw.githubusercontent.com/datastax/cass-operator/v1.6.0/operator/k8s-flavors/gke/storage.yaml
-kubectl -n cass-operator create -f https://raw.githubusercontent.com/datastax/cass-operator/v1.6.0/operator/example-cassdc-yaml/cassandra-3.11.x/example-cassdc-minimal.yaml
+kubectl create -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/docs/user/cass-operator-manifests.yaml
+kubectl create -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/operator/k8s-flavors/gke/storage.yaml
+kubectl -n cass-operator create -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/operator/example-cassdc-yaml/cassandra-3.11.x/example-cassdc-minimal.yaml
 ```
 
 ### Loading the operator
 
-Installing the Cass Operator itself is straightforward. We have provided manifests for each Kubernetes version from 1.15 through 1.19. Apply the relevant manifest to your cluster as follows:
+Installing the Cass Operator itself is straightforward. Apply the relevant manifest to your cluster as follows:
 
 ```console
-K8S_VER=v1.16
-kubectl apply -f https://raw.githubusercontent.com/datastax/cass-operator/v1.6.0/docs/user/cass-operator-manifests-$K8S_VER.yaml
+kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/docs/user/cass-operator-manifests.yaml
 ```
 
 Note that since the manifest will install a [Custom Resource Definition](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/), the user running the above command will need cluster-admin privileges.
@@ -54,7 +53,7 @@ reclaimPolicy: Delete
 Apply the above as follows:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/datastax/cass-operator/v1.6.0/operator/k8s-flavors/gke/storage.yaml
+kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/operator/k8s-flavors/gke/storage.yaml
 ```
 
 ### Creating a CassandraDatacenter
@@ -94,7 +93,7 @@ spec:
 Apply the above as follows:
 
 ```console
-kubectl -n cass-operator apply -f https://raw.githubusercontent.com/datastax/cass-operator/v1.6.0/operator/example-cassdc-yaml/cassandra-3.11.x/example-cassdc-minimal.yaml
+kubectl -n cass-operator apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/operator/example-cassdc-yaml/cassandra-3.11.x/example-cassdc-minimal.yaml
 ```
 
 You can check the status of pods in the Cassandra cluster as follows:
@@ -154,64 +153,18 @@ cluster1-superuser@cqlsh> select * from system.peers;
 (2 rows)
 ```
 
-### (Optional) Loading the operator via Helm
+### Installing cluster via Helm
 
-Helm may be used to install the operator. Consider installing it from our Helm Charts repo
+To install a cluster with optional integrated backup/restore and repair utilities, check the [k8ssandra/k8ssandra](https://github.com/k8ssandra/k8ssandra) helm charts project. 
 
-```console
-helm repo add datastax https://datastax.github.io/charts
-helm repo update
+If you wish to install only the cass-operator, you can run the following command:
 
-# Helm 2
-helm install datastax/cass-operator
-
-# Helm 3
-helm install cass-operator datastax/cass-operator
+```
+helm repo add k8ssandra https://helm.k8ssandra.io/stable
+helm install k8ssandra k8ssandra/k8ssandra --set cassandra.enabled=false --set reaper.enabled=false --set reaper-operator.enabled=false --set stargate.enabled=false --set kube-prometheus-stack.enabled=false
 ```
 
-_or via a local checkout_
-
-```console
-kubectl create namespace cass-operator-system
-helm install --namespace=cass-operator-system cass-operator ./charts/cass-operator-chart
-```
-
-The following Helm default values may be overridden:
-
-```yaml
-clusterWideInstall: false
-serviceAccountName: cass-operator
-clusterRoleName: cass-operator-cr
-clusterRoleBindingName: cass-operator-crb
-roleName: cass-operator
-roleBindingName: cass-operator
-webhookClusterRoleName: cass-operator-webhook
-webhookClusterRoleBindingName: cass-operator-webhook
-deploymentName: cass-operator
-deploymentReplicas: 1
-defaultImage: "datastax/cass-operator:1.6.0"
-imagePullPolicy: IfNotPresent
-imagePullSecret: ""
-```
-
-NOTE: roleName and roleBindingName will be used for a clusterRole and clusterRoleBinding if clusterWideInstall is set to true.
-
-NOTE: Helm does not install a storage-class for the cassandra pods.
-
-If clusterWideInstall is set to true, then the operator will be able to administer `CassandraDatacenter`s in all namespaces of the kubernetes cluster.  A namespace must still be provided because some of the kubernetes resources for the operator require one.
-
-Example:
-
-```console
-kubectl create namespace cass-operator-system
-helm install --set clusterWideInstall=true --namespace=cass-operator-system cass-operator ./charts/cass-operator-chart
-```
-
-#### Using a custom Docker registry with the Helm Chart
-
-A custom Docker registry may be used as the source of the operator Docker image.  Before "helm install" is run, a Secret of type "docker-registry" should be created with the proper credentials.
-
-Then the "imagePullSecret" helm value may be set to the name of the ImagePullSecret to cause the custom Docker registry to be used.
+You can then apply your CassandraDatacenter.
 
 ##### Custom Docker registry example: Github packages
 
@@ -230,12 +183,6 @@ kubectl create secret docker-registry github-docker-registry --docker-username=U
 ```
 
 Replace USERNAME with the github username and ACCESSTOKEN with the personal access token.
-
-Now we can run "helm install" with the override value for imagePullSecret.  This is often used with an override value for image so that a specific tag can be chosen.  Note that the image value should include the full path to the custom registry.
-
-```console
-helm install --set image=docker.pkg.github.com/datastax/cass-operator/operator:latest-ubi --set imagePullSecrets=github-docker-registry cass-operator ./charts/cass-operator-chart
-```
 
 ## Features
 
@@ -315,22 +262,20 @@ spec:
 
 ## Requirements
 
-- Kubernetes cluster, 1.15 or newer.
+- Kubernetes cluster, 1.16 or newer.
 
 ## Contributing
 
-As of version 1.0, Cass Operator is maintained by a team at DataStax and it is
-part of what powers [DataStax
-Astra](https://www.datastax.com/cloud/datastax-astra). We would love for open
-source users to contribute bug reports, documentation updates, tests, and
-features.
+If you wish to file a bug, enhancement proposal or have other questions, use the issues in repository [k8ssandra/k8ssandra](https://github.com/k8ssandra/k8ssandra). PRs should target this repository and you can link the PR to issue repository with ``k8ssandra/k8ssandra#ticketNumber`` syntax.
+
+For other means of contacting, check [k8ssandra community](https://k8ssandra.io/community/) resources.
 
 ### Developer setup
 
 Almost every build, test, or development task requires the following
 pre-requisites...
 
-* Golang 1.14
+* Golang 1.15 or newer
 * Docker, either the docker.io packages on Ubuntu, Docker Desktop for Mac,
   or your preferred docker distribution.
 * [mage](https://magefile.org/): There are some tips for using mage in
@@ -388,15 +333,6 @@ The [user documentation](docs/user/README.md) also contains information on
 spinning up your first operator instance that is useful regardless of what
 Kubernetes distribution you're using to do so.
 
-
-## Not (Yet) Supported Features
-
-- Cassandra:
-  - Integrated data repair solution
-  - Integrated backup and restore solution
-- DSE:
-  - Advanced Workloads, like Search / Graph / Analytics
-
 ## Uninstall
 
 *This will destroy all of your data!*
@@ -408,14 +344,14 @@ kubectl delete cassdcs --all-namespaces --all
 
 Remove the operator Deployment, CRD, etc.
 ```
-kubectl delete -f https://raw.githubusercontent.com/datastax/cass-operator/v1.6.0/docs/user/cass-operator-manifests-v1.16.yaml
+kubectl delete -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/docs/user/cass-operator-manifests.yaml
 ```
 
 ## Contacts
 
-For development questions, please reach out on [Gitter](https://gitter.im/cass-operator/community), or by opening an issue on GitHub.
+For development questions, please reach out on [Development mailing list](https://groups.google.com/g/k8ssandra-developers), or by opening an issue on [k8ssandra/k8ssandra](https://github.com/k8ssandra/k8ssandra) GitHub repository.
 
-For usage questions, please visit our Community Forums: https://community.datastax.com
+For usage questions, please visit our [User mailing list](https://groups.google.com/g/k8ssandra-users).
 
 ## License
 

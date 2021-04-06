@@ -1,0 +1,20 @@
+ARG BASE_OS
+ARG VERSION_STAMP=DEV
+
+FROM ${BASE_OS} AS system-logger-ubi
+
+LABEL maintainer="DataStax, Inc <info@datastax.com>"
+LABEL name="cass-operator-system-logger"
+LABEL vendor="DataStax, Inc"
+LABEL release="${VERSION_STAMP}"
+LABEL summary="DataStax Kubernetes Operator for Apache Cassandra addon for system logs"
+LABEL description="The DataStax Kubernetes Operator for Apache Cassandra®. This additional image takes care of outputting system logs to stdout."
+
+# Add Tini
+ENV TINI_VERSION v0.19.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /sbin/tini
+RUN chmod +x /sbin/tini
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Run your program under Tini
+CMD ["tail", "-n+1", "-F", "/var/log/cassandra/system.log"]

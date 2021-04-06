@@ -103,6 +103,7 @@ var imageLookupMap map[Image]string = map[Image]string{
 	BusyBox:           "busybox:1.32.0-uclibc",
 	Reaper:            "thelastpickle/cassandra-reaper:2.0.5",
 	SystemLoggerImage: "k8ssandra/system-logger:latest",
+	SystemLoggerImageUbi: "k8ssandra/system-logger:latest-ubi7",
 }
 
 var versionToOSSCassandra map[string]Image = map[string]Image{
@@ -270,6 +271,9 @@ func GetReaperImage() string {
 }
 
 func GetSystemLoggerImage() string {
+	if shouldUseUBI() {
+		return GetImage(SystemLoggerImageUbi)
+	}
 	return GetImage(SystemLoggerImage)
 }
 

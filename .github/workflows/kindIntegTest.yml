@@ -11,6 +11,7 @@ jobs:
       matrix:
         integration_test:
         - smoke_test_oss
+        - canary_upgrade
       # let other tests continue to run
       # even if one fails
       fail-fast: false

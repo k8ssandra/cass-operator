@@ -13,11 +13,11 @@ import (
 	"runtime"
 	"strings"
 
-	cfgutil "github.com/datastax/cass-operator/mage/config"
-	dockerutil "github.com/datastax/cass-operator/mage/docker"
-	gitutil "github.com/datastax/cass-operator/mage/git"
-	shutil "github.com/datastax/cass-operator/mage/sh"
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
+	dockerutil "github.com/k8ssandra/cass-operator/mage/docker"
+	gitutil "github.com/k8ssandra/cass-operator/mage/git"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 	"github.com/magefile/mage/mg"
 	"gopkg.in/yaml.v2"
 )
@@ -36,7 +36,7 @@ const (
 	mermaidJsImage             = "operator-mermaid-js"
 	generatedDseDataCentersCrd = "operator/deploy/crds/cassandra.datastax.com_cassandradatacenters_crd.yaml"
 	helmChartCrd               = "charts/cass-operator-chart/templates/customresourcedefinition.yaml"
-	packagePath                = "github.com/datastax/cass-operator/operator"
+	packagePath                = "github.com/k8ssandra/cass-operator/operator"
 	envGitBranch               = "MO_BRANCH"
 	envVersionString           = "MO_VERSION"
 	envGitHash                 = "MO_HASH"
@@ -108,7 +108,7 @@ func createTestSdkDockerImage() {
 func generateK8sAndOpenApi() {
 	cwd, _ := os.Getwd()
 	runArgs := []string{"-t", "--rm"}
-	repoPath := "/go/src/github.com/datastax/cass-operator"
+	repoPath := "/go/src/github.com/k8ssandra/cass-operator"
 	execArgs := []string{
 		"/bin/bash", "-c",
 		fmt.Sprintf("set -eufx; export GO111MODULE=on; cd %s/operator && operator-sdk generate k8s && operator-sdk generate crds && rm -rf build", repoPath),
@@ -301,6 +301,7 @@ type GitData struct {
 	Branch                string
 	LongHash              string
 	HasUncommittedChanges bool
+	ShortHash             string
 }
 
 func getGitData() GitData {
@@ -308,6 +309,7 @@ func getGitData() GitData {
 		Branch:                gitutil.GetBranch(envGitBranch),
 		HasUncommittedChanges: gitutil.HasStagedChanges() || gitutil.HasUnstagedChanges(),
 		LongHash:              gitutil.GetLongHash(envGitHash),
+		ShortHash:             gitutil.GetShortHash(envGitHash),
 	}
 }
 
@@ -350,38 +352,31 @@ func calcFullVersion(settings cfgutil.BuildSettings, git GitData) FullVersion {
 		Core:        settings.Version,
 		Branch:      git.Branch,
 		Uncommitted: git.HasUncommittedChanges,
-		Hash:        git.LongHash,
+		Hash:        git.ShortHash,
 	}
 }
 
-func calcVersionAndTags(version FullVersion, ubiBase bool) (string, []string) {
-	repoPath := "datastax/cass-operator"
-	var versionedTag string
+func calcVersionAndTags(version FullVersion, ubiBase bool) []string {
+	repoPath := "k8ssandra/cass-operator"
 	var tagsToPush []string
 
 	if ubiBase {
-		versionedTag = fmt.Sprintf("%s:%v-ubi", repoPath, version)
 		tagsToPush = []string{
-			versionedTag,
 			fmt.Sprintf("%s:%s-ubi", repoPath, version.Hash),
 			fmt.Sprintf("%s:latest-ubi", repoPath),
 		}
 	} else {
-		versionedTag = fmt.Sprintf("%s:%v", repoPath, version)
 		tagsToPush = []string{
-			versionedTag,
 			fmt.Sprintf("%s:%s", repoPath, version.Hash),
 			fmt.Sprintf("%s:latest", repoPath),
 		}
 	}
 
-	return versionedTag, tagsToPush
+	return tagsToPush
 }
 
-func runDockerBuild(versionedTag string, dockerTags []string, extraBuildArgs []string, target string) {
-	buildArgs := []string{fmt.Sprintf("VERSION_STAMP=%s", versionedTag)}
-	buildArgs = append(buildArgs, extraBuildArgs...)
-	dockerutil.Build(".", target, dockerBase, dockerTags, buildArgs).ExecVPanic()
+func runDockerBuild(dockerTags []string, extraBuildArgs []string, target string) {
+	dockerutil.Build(".", target, dockerBase, dockerTags, extraBuildArgs).ExecVPanic()
 }
 
 func runGoBuild(version string) {
@@ -459,14 +454,14 @@ func BuildDocker() {
 	version := calcFullVersion(settings, git)
 
 	//build regular docker image
-	versionedTag, dockerTags := calcVersionAndTags(version, false)
-	runDockerBuild(versionedTag, dockerTags, nil, cassOperatorTarget)
+	dockerTags := calcVersionAndTags(version, false)
+	runDockerBuild(dockerTags, nil, cassOperatorTarget)
 
 	if baseOs := os.Getenv(EnvBaseOs); baseOs != "" {
 		//build ubi docker image
 		args := []string{fmt.Sprintf("BASE_OS=%s", baseOs)}
-		ubiVersionedTag, ubiDockerTags := calcVersionAndTags(version, true)
-		runDockerBuild(ubiVersionedTag, ubiDockerTags, args, cassOperatorUbiTarget)
+		ubiDockerTags := calcVersionAndTags(version, true)
+		runDockerBuild(ubiDockerTags, args, cassOperatorUbiTarget)
 		dockerTags = append(dockerTags, ubiDockerTags...)
 	}
 
@@ -537,9 +532,9 @@ func doGenerateClient() {
 	usr, err := user.Current()
 	mageutil.PanicOnError(err)
 	runArgs := []string{"-t", "--rm", "-u", fmt.Sprintf("%s:%s", usr.Uid, usr.Gid)}
-	execArgs := []string{"client", "github.com/datastax/cass-operator/operator/pkg/generated",
-		"github.com/datastax/cass-operator/operator/pkg/apis", "cassandra:v1beta1"}
-	volumes := []string{fmt.Sprintf("%s:/go/src/github.com/datastax/cass-operator", cwd)}
+	execArgs := []string{"client", "github.com/k8ssandra/cass-operator/operator/pkg/generated",
+		"github.com/k8ssandra/cass-operator/operator/pkg/apis", "cassandra:v1beta1"}
+	volumes := []string{fmt.Sprintf("%s:/go/src/github.com/k8ssandra/cass-operator", cwd)}
 	dockerutil.Run(genClientImage, volumes, nil, nil, runArgs, execArgs).ExecVPanic()
 }
 

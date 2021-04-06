@@ -9,13 +9,13 @@ import (
 	"os"
 	"regexp"
 
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 	"gopkg.in/yaml.v2"
 )
 
 const (
 	buildSettings        = "buildsettings.yaml"
-	defaultOperatorImage = "datastax/cass-operator:latest"
+	defaultOperatorImage = "k8ssandra/cass-operator:latest"
 	envOperatorImage     = "M_OPERATOR_IMAGE"
 )
 

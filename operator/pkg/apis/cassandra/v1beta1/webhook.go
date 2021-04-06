@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/datastax/cass-operator/operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/operator/pkg/images"
 	"k8s.io/apimachinery/pkg/runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"

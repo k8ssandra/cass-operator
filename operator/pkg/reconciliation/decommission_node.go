@@ -10,10 +10,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/datastax/cass-operator/operator/internal/result"
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/events"
-	"github.com/datastax/cass-operator/operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/operator/internal/result"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/events"
+	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
 	"k8s.io/apimachinery/pkg/types"
 )
 

@@ -6,10 +6,10 @@ package cassandradatacenter
 import (
 	"fmt"
 
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 
-	"github.com/datastax/cass-operator/operator/pkg/oplabels"
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -18,7 +18,7 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/datastax/cass-operator/operator/pkg/reconciliation"
+	"github.com/k8ssandra/cass-operator/operator/pkg/reconciliation"
 	corev1 "k8s.io/api/core/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller"

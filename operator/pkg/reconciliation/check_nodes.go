@@ -11,9 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 )
 
 func (rc *ReconciliationContext) GetPodPVC(podNamespace string, podName string) (*corev1.PersistentVolumeClaim, error) {

@@ -10,11 +10,11 @@ import (
 	"reflect"
 	"sort"
 
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/httphelper"
-	"github.com/datastax/cass-operator/operator/pkg/images"
-	"github.com/datastax/cass-operator/operator/pkg/oplabels"
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -426,7 +426,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		MountPath: "/var/log/cassandra",
 	}
 
-	volumeMounts :=  combineVolumeMountSlices(volumeDefaults,
+	volumeMounts := combineVolumeMountSlices(volumeDefaults,
 		[]corev1.VolumeMount{
 			cassServerLogsMount,
 			{
@@ -437,7 +437,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 				Name:      "encryption-cred-storage",
 				MountPath: "/etc/encryption/",
 			},
-	})
+		})
 
 	volumeMounts = combineVolumeMountSlices(volumeMounts, cassContainer.VolumeMounts)
 	cassContainer.VolumeMounts = combineVolumeMountSlices(volumeMounts, generateStorageConfigVolumesMount(dc))
@@ -452,12 +452,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 			loggerContainer.Image = specImage
 		} else {
 			loggerContainer.Image = images.GetSystemLoggerImage()
-		}
-	}
-
-	if len(loggerContainer.Args) == 0 {
-		loggerContainer.Args = []string{
-			"/bin/sh", "-c", "tail -n+1 -F /var/log/cassandra/system.log",
+			loggerContainer.ImagePullPolicy = corev1.PullIfNotPresent
 		}
 	}
 

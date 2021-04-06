@@ -8,11 +8,11 @@ import (
 	"os"
 	"strings"
 
-	cfgutil "github.com/datastax/cass-operator/mage/config"
-	dockerutil "github.com/datastax/cass-operator/mage/docker"
-	"github.com/datastax/cass-operator/mage/kubectl"
-	shutil "github.com/datastax/cass-operator/mage/sh"
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
+	dockerutil "github.com/k8ssandra/cass-operator/mage/docker"
+	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 )
 
 var ClusterActions = cfgutil.NewClusterActions(

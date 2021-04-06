@@ -13,8 +13,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	ginkgo_util "github.com/datastax/cass-operator/mage/ginkgo"
-	"github.com/datastax/cass-operator/mage/kubectl"
+	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
+	"github.com/k8ssandra/cass-operator/mage/kubectl"
 )
 
 var (

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/datastax/cass-operator/operator/pkg/mocks"
+	"github.com/k8ssandra/cass-operator/operator/pkg/mocks"
 )
 
 func TestReconcileHeadlessService(t *testing.T) {

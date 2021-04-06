@@ -28,10 +28,10 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 
-	"github.com/datastax/cass-operator/operator/internal/result"
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/internal/result"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 )
 
 const (

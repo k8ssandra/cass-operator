@@ -9,22 +9,22 @@ import (
 	"strings"
 	"time"
 
-	cfgutil "github.com/datastax/cass-operator/mage/config"
-	gcp "github.com/datastax/cass-operator/mage/gcloud"
-	ginkgo_util "github.com/datastax/cass-operator/mage/ginkgo"
-	integutil "github.com/datastax/cass-operator/mage/integ-tests"
-	k3d "github.com/datastax/cass-operator/mage/k3d"
-	kind "github.com/datastax/cass-operator/mage/kind"
-	"github.com/datastax/cass-operator/mage/kubectl"
-	"github.com/datastax/cass-operator/mage/operator"
-	shutil "github.com/datastax/cass-operator/mage/sh"
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
+	gcp "github.com/k8ssandra/cass-operator/mage/gcloud"
+	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
+	integutil "github.com/k8ssandra/cass-operator/mage/integ-tests"
+	k3d "github.com/k8ssandra/cass-operator/mage/k3d"
+	kind "github.com/k8ssandra/cass-operator/mage/kind"
+	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	"github.com/k8ssandra/cass-operator/mage/operator"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 	"github.com/magefile/mage/mg"
 )
 
 const (
-	OperatorImage    = "datastax/cass-operator:latest"
-	OperatorImageUBI = "datastax/cass-operator:latest-ubi"
+	OperatorImage    = "k8ssandra/cass-operator:latest"
+	OperatorImageUBI = "k8ssandra/cass-operator:latest-ubi"
 	envLoadDevImages = "M_LOAD_DEV_IMAGES"
 	envK8sFlavor     = "M_K8S_FLAVOR"
 )
@@ -41,9 +41,9 @@ var supportedFlavors = map[string]cfgutil.ClusterActions{
 func getOperatorImage() string {
 	var img string
 	if baseOs := os.Getenv(operator.EnvBaseOs); baseOs != "" {
-		img = "datastax/cass-operator:latest-ubi"
+		img = "k8ssandra/cass-operator:latest-ubi"
 	} else {
-		img = "datastax/cass-operator:latest"
+		img = "k8ssandra/cass-operator:latest"
 	}
 	return img
 }

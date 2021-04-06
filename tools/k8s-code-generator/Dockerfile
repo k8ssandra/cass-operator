@@ -1,6 +1,6 @@
 # We use the K8s code-generator to generate client boilerplate for our operator.
 # More information can be found at: https://github.com/kubernetes/code-generator
-FROM golang:1.14-stretch
+FROM golang:1.16-stretch
 
 ENV CGO_ENABLED=0
 ENV GOPROXY=https://proxy.golang.org,https://gocenter.io,direct
@@ -8,8 +8,8 @@ ENV GOPATH=/go
 ENV GO111MODULE=on
 
 # Assume that when this image gets run, the operator code directory
-# is mounted to /go/src/github.com/datastax/cass-operator/operator
-ENV OPERATOR_DIR=/go/src/github.com/datastax/cass-operator/operator
+# is mounted to /go/src/github.com/k8ssandra/cass-operator/operator
+ENV OPERATOR_DIR=/go/src/github.com/k8ssandra/cass-operator/operator
 
 # We download a version of the code-generator that matches the build-arg CODEGEN_VERSION.
 # For regular use, we would use the version here that is specified in the operator's go.mod file
@@ -32,7 +32,7 @@ RUN go install ./cmd/informer-gen
 
 # The code-generator wants to be executed while your working directory
 # is set to your repo location, in the GOPATH style.
-WORKDIR $GOPATH/src/github.com/datastax/cass-operator/operator
+WORKDIR $GOPATH/src/github.com/k8ssandra/cass-operator/operator
 
 
 # We don't want newly generated files to be owned by root

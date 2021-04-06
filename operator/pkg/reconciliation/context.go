@@ -16,12 +16,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/dynamicwatch"
-	"github.com/datastax/cass-operator/operator/pkg/events"
-	"github.com/datastax/cass-operator/operator/pkg/httphelper"
-	"github.com/datastax/cass-operator/operator/pkg/psp"
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/dynamicwatch"
+	"github.com/k8ssandra/cass-operator/operator/pkg/events"
+	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/operator/pkg/psp"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 )
 
 // ReconciliationContext contains all of the input necessary to calculate a list of ReconciliationActions

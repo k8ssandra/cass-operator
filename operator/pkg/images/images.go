@@ -69,6 +69,7 @@ const (
 	BusyBox
 	Reaper
 	BaseImageOS
+	SystemLoggerImage
 
 	// NOTE: This line MUST be last in the const expression
 	ImageEnumLength int = iota
@@ -99,8 +100,9 @@ var imageLookupMap map[Image]string = map[Image]string{
 	ConfigBuilder:    "datastax/cass-config-builder:1.0.3",
 	UBIConfigBuilder: "datastax/cass-config-builder:1.0.3-ubi7",
 
-	BusyBox: "busybox:1.32.0-uclibc",
-	Reaper:  "thelastpickle/cassandra-reaper:2.0.5",
+	BusyBox:           "busybox:1.32.0-uclibc",
+	Reaper:            "thelastpickle/cassandra-reaper:2.0.5",
+	SystemLoggerImage: "k8ssandra/system-logger:latest",
 }
 
 var versionToOSSCassandra map[string]Image = map[string]Image{
@@ -268,10 +270,7 @@ func GetReaperImage() string {
 }
 
 func GetSystemLoggerImage() string {
-	if shouldUseUBI() {
-		return GetImage(BaseImageOS)
-	}
-	return GetImage(BusyBox)
+	return GetImage(SystemLoggerImage)
 }
 
 func AddDefaultRegistryImagePullSecrets(podSpec *corev1.PodSpec) bool {

@@ -9,8 +9,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/oplabels"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -417,7 +417,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_after_config
 	// initContainer.
 
 	initContainer := corev1.Container{
-		Name: "test-container",
+		Name:  "test-container",
 		Image: "test-image",
 	}
 
@@ -464,19 +464,19 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
 						{
-							Name: "test",
+							Name:  "test",
 							Image: "test",
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name: "server-data",
+									Name:      "server-data",
 									MountPath: "/var/lib/cassandra",
 								},
 								{
-									Name: "server-config",
+									Name:      "server-config",
 									MountPath: "/config",
 								},
 								{
-									Name: "test-data",
+									Name:      "test-data",
 									MountPath: "/test",
 								},
 							},
@@ -559,19 +559,19 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name: "test",
+							Name:  "test",
 							Image: "test",
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name: "server-data",
+									Name:      "server-data",
 									MountPath: "/var/lib/cassandra",
 								},
 								{
-									Name: "server-config",
+									Name:      "server-config",
 									MountPath: "/config",
 								},
 								{
-									Name: "test-data",
+									Name:      "test-data",
 									MountPath: "/test",
 								},
 							},
@@ -580,7 +580,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 							Name: "cassandra",
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name: "test-data",
+									Name:      "test-data",
 									MountPath: "/test",
 								},
 							},
@@ -765,7 +765,6 @@ func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *te
 	// We use a contains check here because the ordering is not important
 	assert.True(t, volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config")))
 	assert.True(t, volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("extra")))
-
 
 	containers := spec.Spec.Containers
 	cassandraContainer := findContainer(containers, CassandraContainerName)

@@ -21,7 +21,7 @@ package versioned
 import (
 	"fmt"
 
-	cassandrav1beta1 "github.com/datastax/cass-operator/operator/pkg/generated/clientset/versioned/typed/cassandra/v1beta1"
+	cassandrav1beta1 "github.com/k8ssandra/cass-operator/operator/pkg/generated/clientset/versioned/typed/cassandra/v1beta1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"

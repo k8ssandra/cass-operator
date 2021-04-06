@@ -4,7 +4,7 @@
 package controller
 
 import (
-	"github.com/datastax/cass-operator/operator/pkg/controller/cassandradatacenter"
+	"github.com/k8ssandra/cass-operator/operator/pkg/controller/cassandradatacenter"
 )
 
 func init() {

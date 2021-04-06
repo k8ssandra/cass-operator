@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/datastax/cass-operator/operator/pkg/psp"
+	"github.com/k8ssandra/cass-operator/operator/pkg/psp"
 	"github.com/go-logr/logr"
 	mock "github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
@@ -29,9 +29,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/httphelper"
-	"github.com/datastax/cass-operator/operator/pkg/mocks"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/operator/pkg/mocks"
 )
 
 // MockSetControllerReference returns a method that will automatically reverse the mock

@@ -4,13 +4,13 @@
 package reconciliation
 
 import (
-	"github.com/datastax/cass-operator/operator/internal/result"
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/internal/result"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/datastax/cass-operator/operator/pkg/utils"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 )
 
 func (rc *ReconciliationContext) CreateHeadlessServices() result.ReconcileResult {

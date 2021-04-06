@@ -18,9 +18,9 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
 
-	webhook "github.com/datastax/cass-operator/operator/pkg/admissionwebhook"
-	"github.com/datastax/cass-operator/operator/pkg/apis"
-	"github.com/datastax/cass-operator/operator/pkg/controller"
+	webhook "github.com/k8ssandra/cass-operator/operator/pkg/admissionwebhook"
+	"github.com/k8ssandra/cass-operator/operator/pkg/apis"
+	"github.com/k8ssandra/cass-operator/operator/pkg/controller"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	kubemetrics "github.com/operator-framework/operator-sdk/pkg/kube-metrics"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -38,8 +38,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
-	api "github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/datastax/cass-operator/operator/pkg/images"
+	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/images"
 )
 
 // Change below variables to serve metrics on different host or port.

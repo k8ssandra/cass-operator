@@ -3,8 +3,6 @@ on:
   push:
     branches:
       - master
-      - "1.4.x"
-      - "1.5.x"
   pull_request:
     branches: [ master ]
 jobs:
@@ -12,7 +10,6 @@ jobs:
     strategy:
       matrix:
         integration_test:
-        - smoke_test_dse
         - smoke_test_oss
       # let other tests continue to run
       # even if one fails
@@ -21,7 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOPATH: /home/runner/go
-      GOROOT: /usr/local/go1.14
+      GOROOT: /usr/local/go1.16
+      M_LOAD_TEST_IMAGES: true
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_K8S_FLAVOR: kind
     steps:
       - uses: actions/checkout@v2
         if: github.event_name == 'pull_request'
@@ -29,43 +29,68 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/checkout@v2
         if: github.event_name != 'pull_request'
-      - name: Set up Go 1.14
+      - name: Set up Go 1.16
         uses: actions/setup-go@v1
         with:
-          go-version: 1.14
-      - name: Install Mage
+          go-version: 1.16
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.5.3
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.1.0
+        with:
+          image: kindest/node:v1.20.2
+          cluster_name: kind
+          config: tests/testdata/kind/kind_config_1_worker.yaml
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          file: operator/docker/base/Dockerfile
+          push: false
+          load: true
+          tags: k8ssandra/cass-operator:latest
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          file: operator/docker/system-logger/Dockerfile
+          push: false
+          load: true
+          tags: k8ssandra/system-logger:latest
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+      - name: Load image on the nodes of the cluster
         run: |
-          cd /tmp
-          wget https://github.com/magefile/mage/releases/download/v1.9.0/mage_1.9.0_Linux-64bit.tar.gz
-          tar -xvf mage_1.9.0_Linux-64bit.tar.gz
-          mkdir -p $GOPATH/bin
-          mv mage $GOPATH/bin/mage
-          chmod +x $GOPATH/bin/mage
-      - name: Install kind
-        env:
-          M_K8S_FLAVOR: kind
-        run: |
-          export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
-          mage k8s:installTool
-      - name: Setup cluster, build and load operator image
-        env:
-          M_K8S_FLAVOR: kind
-          M_KIND_CONFIG: tests/testdata/kind/kind_config_1_worker.yaml
-        run: |
-          export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
-          mage k8s:setupEmptyCluster
+          kind load docker-image --name=kind k8ssandra/cass-operator:latest
+          kind load docker-image --name=kind k8ssandra/system-logger:latest
       - name: Run integration test ( ${{ matrix.integration_test }} )
-        env:
-          M_K8S_FLAVOR: kind
-          M_LOAD_TEST_IMAGES: true
-          M_INTEG_DIR: ${{ matrix.integration_test }}
-        run: |
-          export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
-          mage integ:run
+        uses: magefile/mage-action@v1
+        with:
+          version: latest
+          args: integ:run
       - name: Archive k8s logs
         if: ${{ always() }}
         # actions/upload-artifact@v1
-        uses: actions/upload-artifact@3446296876d12d4e3a0f3145a3c87e67bf0a16b5
+        uses: actions/upload-artifact@v2
         with:
           name: k8s-logs
           path: ./build/kubectl_dump

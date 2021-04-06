@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	cfgutil "github.com/datastax/cass-operator/mage/config"
-	shutil "github.com/datastax/cass-operator/mage/sh"
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 	"github.com/magefile/mage/mg"
 	"gopkg.in/yaml.v2"
 )

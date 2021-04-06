@@ -6,8 +6,8 @@ package gitutil
 import (
 	"strings"
 
-	"github.com/datastax/cass-operator/mage/sh"
-	"github.com/datastax/cass-operator/mage/util"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 )
 
 func GetUnstagedChanges() string {
@@ -41,6 +41,15 @@ func GetBranch(env string) string {
 func GetLongHash(env string) string {
 	var gitFunc = func() string {
 		hash := shutil.OutputPanic("git", "rev-parse", "HEAD")
+		return hash
+	}
+	val := mageutil.FromEnvOrF(env, gitFunc)
+	return strings.TrimSpace(val)
+}
+
+func GetShortHash(env string) string {
+	var gitFunc = func() string {
+		hash := shutil.OutputPanic("git", "rev-parse", "--short=8", "HEAD")
 		return hash
 	}
 	val := mageutil.FromEnvOrF(env, gitFunc)

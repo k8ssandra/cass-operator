@@ -4,7 +4,7 @@
 package apis
 
 import (
-	"github.com/datastax/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 )
 
 func init() {

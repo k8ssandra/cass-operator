@@ -9,11 +9,11 @@ import (
 	"os"
 	"strings"
 
-	cfgutil "github.com/datastax/cass-operator/mage/config"
-	k3d "github.com/datastax/cass-operator/mage/k3d"
-	kind "github.com/datastax/cass-operator/mage/kind"
-	shutil "github.com/datastax/cass-operator/mage/sh"
-	mageutil "github.com/datastax/cass-operator/mage/util"
+	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
+	k3d "github.com/k8ssandra/cass-operator/mage/k3d"
+	kind "github.com/k8ssandra/cass-operator/mage/kind"
+	shutil "github.com/k8ssandra/cass-operator/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 )
 
 const (

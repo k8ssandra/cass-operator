@@ -4,8 +4,8 @@ metadata:
   name: dc1
 spec:
   clusterName: cluster1
-  serverType: dse
-  serverVersion: "6.8.4"
+  serverType: cassandra
+  serverVersion: "3.11.10"
   managementApiAuth:
     insecure: {}
   size: 1
@@ -20,7 +20,7 @@ spec:
   racks:
     - name: r1
   config:
-    jvm-server-options:
+    jvm-options:
       initial_heap_size: "800m"
       max_heap_size: "800m"
     cassandra-yaml:

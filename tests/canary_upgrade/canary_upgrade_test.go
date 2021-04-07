@@ -80,7 +80,7 @@ var _ = Describe(testName, func() {
 			images := []string{
 				"datastax/cassandra-mgmtapi-3_11_6:v0.1.5",
 				"datastax/cassandra-mgmtapi-3_11_6:v0.1.5",
-				"datastax/cassandra-mgmtapi-3_11_7:v0.1.13",
+				"datastax/cassandra-mgmtapi-3_11_7:v0.1.23",
 			}
 			ns.WaitForCassandraImages(dcName, images, 300)
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)

@@ -4,8 +4,8 @@ metadata:
   name: dc1
 spec:
   clusterName: cluster1
-  serverType: dse
-  serverVersion: "6.8.4"
+  serverType: cassandra
+  serverVersion: "3.11.10"
   managementApiAuth:
     insecure: {}
   networking:
@@ -25,7 +25,7 @@ spec:
     - name: r1
     - name: r2
   config:
-    jvm-server-options:
+    jvm-options:
       initial_heap_size: "800m"
       max_heap_size: "800m"
     cassandra-yaml:

@@ -17,7 +17,7 @@ spec:
         external-dns.alpha.kubernetes.io/hostname: localhost
   storageConfig:
       cassandraDataVolumeClaimSpec:
-        storageClassName: server-storage
+        storageClassName: standard
         accessModes:
           - ReadWriteOnce
         resources:

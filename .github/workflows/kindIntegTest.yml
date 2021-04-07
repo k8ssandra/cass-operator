@@ -11,9 +11,9 @@ jobs:
       matrix:
         integration_test:
         - smoke_test_oss
+        - smoke_test_dse
         - canary_upgrade
         - additional_serviceoptions
-        - stop_resume
       # let other tests continue to run
       # even if one fails
       fail-fast: false

@@ -30,5 +30,3 @@ spec:
         keystore_password: dc2
         truststore: /etc/encryption/node-keystore.jks
         truststore_password: dc2
-      file_cache_size_in_mb: 100
-      memtable_space_in_mb: 100

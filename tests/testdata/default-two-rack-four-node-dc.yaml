@@ -27,6 +27,3 @@ spec:
       additional-jvm-opts:
         - "-Ddse.system_distributed_replication_dc_names=dc1"
         - "-Ddse.system_distributed_replication_per_dc=1"
-    cassandra-yaml:
-      file_cache_size_in_mb: 100
-      memtable_space_in_mb: 100

@@ -12,8 +12,25 @@ jobs:
         integration_test:
         - smoke_test_oss
         - smoke_test_dse
-        - canary_upgrade
         - additional_serviceoptions
+        - additional_volumes
+        - delete_node_terminated_container
+        - podspec_simple
+        - terminate
+        - timeout_prestop_termination
+        - canary_upgrade
+        - config_change_condition
+        - delete_node_lost_readiness
+        - host_network
+        - internode-encryption-generated
+        - no_infinite_reconcile
+        - node_replace
+        - nodeport_service
+        - rolling_restart
+        - stop_resume
+        - superuser-secret-generated
+        - superuser-secret-provided
+        - test_mtls_mgmt_api
       # let other tests continue to run
       # even if one fails
       fail-fast: false

@@ -17,13 +17,12 @@ import (
 )
 
 var (
-	testName         = "Config change condition"
-	namespace        = "test-config-change-condition"
-	dcName           = "dc2"
-	dcYaml           = "../testdata/default-single-rack-2-node-dc.yaml"
-	dcResource       = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel          = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns               = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "Config change condition"
+	namespace  = "test-config-change-condition"
+	dcName     = "dc2"
+	dcYaml     = "../testdata/default-single-rack-2-node-dc.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -57,7 +56,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReady(dcName)
 
 			step = "change the config"
-			json := "{\"spec\": {\"config\": {\"cassandra-yaml\": {\"file_cache_size_in_mb\": 123}, \"jvm-server-options\": {\"garbage_collector\": \"CMS\"}}}}"
+			json := "{\"spec\": {\"config\": {\"cassandra-yaml\": {\"num_tokens\": 256}, \"jvm-options\": {\"garbage_collector\": \"CMS\"}}}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 

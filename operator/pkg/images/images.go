@@ -179,13 +179,14 @@ func applyDefaultRegistryOverride(image string) string {
 // This is meant to be used when the CassandraDatacenter does not
 // explicitly set the DockerImageRunsAsCassandra field.
 func CalculateDockerImageRunsAsCassandra(version string) bool {
-	if version == "3.11.6" || version == "3.11.7" || version == "4.0.0" {
-		return false
-	}
-
-	// Otherwise, we assume the image is running as the "cassandra" user
-
 	return true
+	// if version == "3.11.6" || version == "3.11.7" || version == "4.0.0" {
+	// 	return false
+	// }
+
+	// // Otherwise, we assume the image is running as the "cassandra" user
+
+	// return true
 }
 
 func GetImage(name Image) string {

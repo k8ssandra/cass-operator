@@ -80,11 +80,11 @@ const (
 
 var imageLookupMap map[Image]string = map[Image]string{
 	Cassandra_3_11_6:  "datastax/cassandra-mgmtapi-3_11_6:v0.1.5",
-	Cassandra_3_11_7:  "datastax/cassandra-mgmtapi-3_11_7:v0.1.23",
-	Cassandra_3_11_8:  "datastax/cassandra-mgmtapi-3_11_8:v0.1.23",
-	Cassandra_3_11_9:  "datastax/cassandra-mgmtapi-3_11_9:v0.1.23",
-	Cassandra_3_11_10: "datastax/cassandra-mgmtapi-3_11_10:v0.1.23",
-	Cassandra_4_0_0:   "datastax/cassandra-mgmtapi-4_0_0:v0.1.23",
+	Cassandra_3_11_7:  "k8ssandra/cass-management-api:3.11.7-v0.1.24",
+	Cassandra_3_11_8:  "k8ssandra/cass-management-api:3.11.8-v0.1.24",
+	Cassandra_3_11_9:  "k8ssandra/cass-management-api:3.11.9-v0.1.24",
+	Cassandra_3_11_10: "k8ssandra/cass-management-api:3.11.10-v0.1.24",
+	Cassandra_4_0_0:   "k8ssandra/cass-management-api:4.0.0-v0.1.24",
 
 	UBICassandra_3_11_6: "datastax/cassandra:3.11.6-ubi7",
 	UBICassandra_3_11_7: "datastax/cassandra:3.11.7-ubi7",

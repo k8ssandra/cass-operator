@@ -19,7 +19,7 @@ dev:
   dseImages:
     - datastax/dse-server:6.8.4
   ossImages:
-    - datastax/cassandra-mgmtapi-3_11_10:v0.1.23
+    - k8ssandra/cass-management-api:3.11.10-v0.1.24
   ubiDseImages:
     - datastax/dse-server:6.8.4-ubi7
   ubiOssImages:

@@ -22,7 +22,7 @@ var (
 	defaultSecretName = "cluster2-superuser"
 	secretResource    = fmt.Sprintf("secret/%s", defaultSecretName)
 	dcName            = "dc2"
-	dcYaml            = "../testdata/default-single-rack-2-node-dc.yaml"
+	dcYaml            = "../testdata/default-single-rack-2-node-dc-with-auth-enabled.yaml"
 	operatorYaml      = "../testdata/operator.yaml"
 	dcResource        = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel           = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)

@@ -9,7 +9,6 @@ spec:
   managementApiAuth:
     insecure: {}
   size: 2
-  superuserSecretName: my-superuser-secret
   storageConfig:
       cassandraDataVolumeClaimSpec:
         storageClassName: standard
@@ -18,9 +17,6 @@ spec:
         resources:
           requests:
             storage: 1Gi
-  users:
-    - secretName: bobby-secret
-      superuser: false
   racks:
     - name: r1
   config:

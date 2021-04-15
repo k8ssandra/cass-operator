@@ -14,13 +14,13 @@ jobs:
         - smoke_test_dse
         - additional_serviceoptions
         - additional_volumes
-        # - delete_node_terminated_container # DSE specific behavior
+        - delete_node_terminated_container
         - podspec_simple
         - timeout_prestop_termination
         - canary_upgrade
         # - terminate # Completes too fast, the test doesn't catch it
         - config_change_condition
-        - delete_node_lost_readiness
+        # - delete_node_lost_readiness # DSE specific behavior
         - host_network
         - internode-encryption-generated
         - no_infinite_reconcile

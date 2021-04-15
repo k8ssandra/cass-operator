@@ -29,5 +29,5 @@ spec:
     - name: r1
   config:
     jvm-options:
-      initial_heap_size: "800m"
-      max_heap_size: "800m"
+      initial_heap_size: "512m"
+      max_heap_size: "512m"

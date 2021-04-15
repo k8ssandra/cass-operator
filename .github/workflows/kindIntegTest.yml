@@ -37,20 +37,20 @@ jobs:
         - test_bad_config_and_fix
         - test_mtls_mgmt_api
         # More than 3 workers tests:
-        # - add_racks
-        # - additional_seeds
-        # - cluster_wide_install
-        # - config_change
-        # - internode_encryption
-        # - multi_cluster_management
-        # - oss_test_all_things
-        # - scale_down
-        # - scale_down_not_enough_space
-        # - scale_down_unbalanced_racks
-        # - scale_up
-        # - scale_up_stop_resume
-        # - seed_selection
-        # - stop_resume_scale_up
+        - add_racks
+        - additional_seeds
+        - cluster_wide_install
+        - config_change
+        - internode_encryption
+        - multi_cluster_management
+        - oss_test_all_things
+        - scale_down
+        - scale_down_not_enough_space
+        - scale_down_unbalanced_racks
+        - scale_up
+        - scale_up_stop_resume
+        - seed_selection
+        - stop_resume_scale_up
       # let other tests continue to run
       # even if one fails
       fail-fast: false
@@ -93,7 +93,7 @@ jobs:
           version: v0.10.0
           node_image: kindest/node:v1.20.2
           cluster_name: kind
-          config: tests/testdata/kind/kind_config_3_workers.yaml
+          config: tests/testdata/kind/kind_config_6_workers.yaml
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       - name: Cache Docker layers

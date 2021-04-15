@@ -10,15 +10,19 @@ jobs:
     strategy:
       matrix:
         integration_test:
-        - smoke_test_oss
-        - smoke_test_dse
+        # Single worker tests:
         - additional_serviceoptions
         - additional_volumes
         - delete_node_terminated_container
         - podspec_simple
-        - timeout_prestop_termination
-        - canary_upgrade
+        - smoke_test_oss
+        - smoke_test_dse
         # - terminate # Completes too fast, the test doesn't catch it
+        - timeout_prestop_termination
+        # - upgrade_operator # Should be updated to datastax 1.6.0 -> k8ssandra/latest test
+        - webhook_validation
+        # Three worker tests:
+        - canary_upgrade
         - config_change_condition
         # - delete_node_lost_readiness # DSE specific behavior
         - host_network
@@ -30,7 +34,23 @@ jobs:
         - stop_resume
         - superuser-secret-generated
         - superuser-secret-provided
+        - test_bad_config_and_fix
         - test_mtls_mgmt_api
+        # More than 3 workers tests:
+        # - add_racks
+        # - additional_seeds
+        # - cluster_wide_install
+        # - config_change
+        # - internode_encryption
+        # - multi_cluster_management
+        # - oss_test_all_things
+        # - scale_down
+        # - scale_down_not_enough_space
+        # - scale_down_unbalanced_racks
+        # - scale_up
+        # - scale_up_stop_resume
+        # - seed_selection
+        # - stop_resume_scale_up
       # let other tests continue to run
       # even if one fails
       fail-fast: false

@@ -45,7 +45,7 @@ jobs:
         - multi_cluster_management
         - oss_test_all_the_things
         - scale_down
-        - scale_down_not_enough_space
+        # - scale_down_not_enough_space # Not enough stable test
         - scale_down_unbalanced_racks
         - scale_up
         - scale_up_stop_resume

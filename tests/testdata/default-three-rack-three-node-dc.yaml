@@ -17,11 +17,18 @@ spec:
         resources:
           requests:
             storage: 1Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
   racks:
     - name: r1
     - name: r2
     - name: r3
   config:
     jvm-options:
-      initial_heap_size: "512m"
+      initial_heap_size: "256m"
       max_heap_size: "512m"

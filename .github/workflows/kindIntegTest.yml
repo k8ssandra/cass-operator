@@ -50,7 +50,7 @@ jobs:
         - scale_up
         - scale_up_stop_resume
         - seed_selection
-        - stop_resume_scale_up
+        # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
       # let other tests continue to run
       # even if one fails
       fail-fast: false
@@ -134,8 +134,7 @@ jobs:
           args: integ:run
       - name: Archive k8s logs
         if: ${{ always() }}
-        # actions/upload-artifact@v1
         uses: actions/upload-artifact@v2
         with:
-          name: k8s-logs
+          name: k8s-logs-${{ matrix.integration_test }}
           path: ./build/kubectl_dump

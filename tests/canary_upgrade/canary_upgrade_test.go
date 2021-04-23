@@ -14,6 +14,7 @@ import (
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	"github.com/k8ssandra/cass-operator/operator/pkg/images"
 )
 
 var (
@@ -70,17 +71,20 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			step = "perform canary upgrade"
-			json = "{\"spec\": {\"serverVersion\": \"3.11.7\"}}"
+			json = "{\"spec\": {\"serverVersion\": \"3.11.10\"}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)
 
+			old, _ := images.GetCassandraImage("cassandra", "3.11.7")
+			updated, _ := images.GetCassandraImage("cassandra", "3.11.10")
+
 			images := []string{
-				"datastax/cassandra-mgmtapi-3_11_6:v0.1.5",
-				"datastax/cassandra-mgmtapi-3_11_6:v0.1.5",
-				"datastax/cassandra-mgmtapi-3_11_7:v0.1.13",
+				old,
+				old,
+				updated,
 			}
 			ns.WaitForCassandraImages(dcName, images, 300)
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)

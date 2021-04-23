@@ -4,8 +4,8 @@ metadata:
   name: dc2
 spec:
   clusterName: cluster2
-  serverType: dse
-  serverVersion: "6.8.0"
+  serverType: cassandra
+  serverVersion: "3.11.10"
   managementApiAuth:
     insecure: {}
   size: 2
@@ -20,9 +20,9 @@ spec:
   racks:
     - name: r1
   config:
-    jvm-server-options:
-      initial_heap_size: "800m"
-      max_heap_size: "800m"
+    jvm-options:
+      initial_heap_size: "512m"
+      max_heap_size: "512m"
     cassandra-yaml:
       server_encryption_options:
         internode_encryption: all
@@ -30,5 +30,3 @@ spec:
         keystore_password: dc2
         truststore: /etc/encryption/node-keystore.jks
         truststore_password: dc2
-      file_cache_size_in_mb: 100
-      memtable_space_in_mb: 100

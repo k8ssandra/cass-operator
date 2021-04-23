@@ -4,8 +4,8 @@ metadata:
   name: dc1
 spec:
   clusterName: cluster1
-  serverType: dse
-  serverVersion: "6.8.3"
+  serverType: cassandra
+  serverVersion: "3.11.10"
   managementApiAuth:
     insecure: {}
   size: 4
@@ -21,12 +21,9 @@ spec:
     - name: r1
     - name: r2
   config:
-    jvm-server-options:
-      initial_heap_size: "800m"
-      max_heap_size: "800m"
+    jvm-options:
+      initial_heap_size: "512m"
+      max_heap_size: "512m"
       additional-jvm-opts:
         - "-Ddse.system_distributed_replication_dc_names=dc1"
         - "-Ddse.system_distributed_replication_per_dc=1"
-    cassandra-yaml:
-      file_cache_size_in_mb: 100
-      memtable_space_in_mb: 100

@@ -83,11 +83,11 @@ const (
 
 func getTestType(testDir string) testType {
 	lower := strings.ToLower(testDir)
-	isOss := false
+	isOss := true
 	isUbi := false
 
-	if strings.Contains(lower, "_oss") || strings.Contains(lower, "oss_") {
-		isOss = true
+	if strings.Contains(lower, "_dse") || strings.Contains(lower, "dse_") {
+		isOss = false
 	}
 
 	if strings.Contains(lower, "_ubi") || strings.Contains(lower, "ubi_") {

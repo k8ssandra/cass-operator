@@ -77,7 +77,7 @@ var _ = Describe(testName, func() {
 			json = "{\"spec\": {\"serverType\": \"dse\", \"serverVersion\": \"4.8.0\"}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLogAndExpectErrorString(step, k,
-				`spec.serverVersion: Invalid value: "": spec.serverVersion in body should match '(6\.8\.\d+)|(3\.11\.\d+)|(4\.0\.\d+)'`)
+				`spec.serverVersion: Invalid value: "4.8.0": spec.serverVersion in body should match '(6\.8\.\d+)|(3\.11\.\d+)|(4\.0\.\d+)'`)
 			step = "attempt to change the dc name"
 			json = "{\"spec\": {\"clusterName\": \"NewName\"}}"
 			k = kubectl.PatchMerge(dcResource, json)

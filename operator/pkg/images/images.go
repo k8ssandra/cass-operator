@@ -43,8 +43,10 @@ type Image int
 // IMPORTANT: Only Image enum values (and ImageEnumLength) should go in this
 // const expression
 const (
-	Cassandra_3_11_6 Image = iota
-	Cassandra_3_11_7
+	Cassandra_3_11_7 Image = iota
+	Cassandra_3_11_8
+	Cassandra_3_11_9
+	Cassandra_3_11_10
 	Cassandra_4_0_0
 
 	UBICassandra_3_11_6
@@ -76,10 +78,11 @@ const (
 )
 
 var imageLookupMap map[Image]string = map[Image]string{
-
-	Cassandra_3_11_6: "datastax/cassandra-mgmtapi-3_11_6:v0.1.5",
-	Cassandra_3_11_7: "datastax/cassandra-mgmtapi-3_11_7:v0.1.13",
-	Cassandra_4_0_0:  "datastax/cassandra-mgmtapi-4_0_0:v0.1.12",
+	Cassandra_3_11_7:  "k8ssandra/cass-management-api:3.11.7-v0.1.24",
+	Cassandra_3_11_8:  "k8ssandra/cass-management-api:3.11.8-v0.1.24",
+	Cassandra_3_11_9:  "k8ssandra/cass-management-api:3.11.9-v0.1.24",
+	Cassandra_3_11_10: "k8ssandra/cass-management-api:3.11.10-v0.1.24",
+	Cassandra_4_0_0:   "k8ssandra/cass-management-api:4.0.0-v0.1.24",
 
 	UBICassandra_3_11_6: "datastax/cassandra:3.11.6-ubi7",
 	UBICassandra_3_11_7: "datastax/cassandra:3.11.7-ubi7",
@@ -106,9 +109,11 @@ var imageLookupMap map[Image]string = map[Image]string{
 }
 
 var versionToOSSCassandra map[string]Image = map[string]Image{
-	"3.11.6": Cassandra_3_11_6,
-	"3.11.7": Cassandra_3_11_7,
-	"4.0.0":  Cassandra_4_0_0,
+	"3.11.7":  Cassandra_3_11_7,
+	"3.11.8":  Cassandra_3_11_8,
+	"3.11.9":  Cassandra_3_11_9,
+	"3.11.10": Cassandra_3_11_10,
+	"4.0.0":   Cassandra_4_0_0,
 }
 
 var versionToUBIOSSCassandra map[string]Image = map[string]Image{
@@ -171,13 +176,14 @@ func applyDefaultRegistryOverride(image string) string {
 // This is meant to be used when the CassandraDatacenter does not
 // explicitly set the DockerImageRunsAsCassandra field.
 func CalculateDockerImageRunsAsCassandra(version string) bool {
-	if version == "3.11.6" || version == "3.11.7" || version == "4.0.0" {
-		return false
-	}
-
-	// Otherwise, we assume the image is running as the "cassandra" user
-
 	return true
+	// if version == "3.11.6" || version == "3.11.7" || version == "4.0.0" {
+	// 	return false
+	// }
+
+	// // Otherwise, we assume the image is running as the "cassandra" user
+
+	// return true
 }
 
 func GetImage(name Image) string {

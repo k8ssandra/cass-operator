@@ -74,12 +74,18 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 
 func addAdditionalOptions(service *corev1.Service, serviceConfig *api.ServiceConfigAdditions) {
 	if serviceConfig.Labels != nil && len(serviceConfig.Labels) > 0 {
+		if service.Labels == nil {
+			service.Labels = make(map[string]string, len(serviceConfig.Labels))
+		}
 		for k, v := range serviceConfig.Labels {
 			service.Labels[k] = v
 		}
 	}
 
 	if serviceConfig.Annotations != nil && len(serviceConfig.Annotations) > 0 {
+		if service.Annotations == nil {
+			service.Annotations = make(map[string]string, len(serviceConfig.Annotations))
+		}
 		for k, v := range serviceConfig.Annotations {
 			service.Annotations[k] = v
 		}

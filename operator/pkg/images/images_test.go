@@ -5,11 +5,12 @@ package images
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func tempSetEnv(name, value string) (func(), error) {
@@ -62,16 +63,12 @@ func Test_CalculateDockerImageRunsAsCassandra(t *testing.T) {
 		want    bool
 	}{
 		{
-			version: "3.11.6",
-			want:    false,
-		},
-		{
 			version: "3.11.7",
-			want:    false,
+			want:    true,
 		},
 		{
 			version: "4.0.0",
-			want:    false,
+			want:    true,
 		},
 		// We default to true
 		{

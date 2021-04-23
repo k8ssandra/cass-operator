@@ -5,7 +5,7 @@ metadata:
 spec:
   clusterName: cluster2
   serverType: cassandra
-  serverVersion: "3.11.7"
+  serverVersion: "3.11.10"
   managementApiAuth:
     insecure: {}
   size: 1
@@ -17,7 +17,7 @@ spec:
         external-dns.alpha.kubernetes.io/hostname: localhost
   storageConfig:
       cassandraDataVolumeClaimSpec:
-        storageClassName: server-storage
+        storageClassName: standard
         accessModes:
           - ReadWriteOnce
         resources:
@@ -27,5 +27,5 @@ spec:
     - name: r1
   config:
     jvm-options:
-      initial_heap_size: "800m"
-      max_heap_size: "800m"
+      initial_heap_size: "512m"
+      max_heap_size: "512m"

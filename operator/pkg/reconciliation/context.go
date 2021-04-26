@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 
 	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/pkg/dynamicwatch"
@@ -57,7 +56,7 @@ func CreateReconciliationContext(
 	rec record.EventRecorder,
 	secretWatches dynamicwatch.DynamicWatches,
 	reqLogger logr.Logger) (*ReconciliationContext, error) {
-	
+
 	rc := &ReconciliationContext{}
 	rc.Request = req
 	rc.Client = cli
@@ -75,7 +74,7 @@ func CreateReconciliationContext(
 	if utils.IsPSPEnabled() {
 		// Add PSP health status updater
 		// TODO: Feature gate this
-		operatorNs, err := k8sutil.GetOperatorNamespace()
+		operatorNs, err := utils.GetOperatorNamespace()
 		if err != nil {
 			return nil, err
 		}

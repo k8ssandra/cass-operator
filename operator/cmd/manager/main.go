@@ -21,7 +21,7 @@ import (
 	webhook "github.com/k8ssandra/cass-operator/operator/pkg/admissionwebhook"
 	"github.com/k8ssandra/cass-operator/operator/pkg/apis"
 	"github.com/k8ssandra/cass-operator/operator/pkg/controller"
-	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 	kubemetrics "github.com/operator-framework/operator-sdk/pkg/kube-metrics"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
@@ -100,7 +100,7 @@ func main() {
 
 	printVersion()
 
-	namespace, err := k8sutil.GetWatchNamespace()
+	namespace, err := utils.GetWatchNamespace()
 	if err != nil {
 		log.Error(err, "Failed to get watch namespace")
 		os.Exit(1)
@@ -246,9 +246,9 @@ func readBaseOsIntoEnv() error {
 // the Prometheus operator
 func addMetrics(ctx context.Context, cfg *rest.Config) {
 	// Get the namespace the operator is currently deployed in.
-	operatorNs, err := k8sutil.GetOperatorNamespace()
+	operatorNs, err := utils.GetOperatorNamespace()
 	if err != nil {
-		if errors.Is(err, k8sutil.ErrRunLocal) {
+		if errors.Is(err, utils.ErrRunLocal) {
 			log.Info("Skipping CR metrics server creation; not running in a cluster.")
 			return
 		}
@@ -292,7 +292,7 @@ func serveCRMetrics(cfg *rest.Config, operatorNs string) error {
 	// The function below returns a list of filtered operator/CR specific GVKs. For more control, override the GVK list below
 	// with your own custom logic. Note that if you are adding third party API schemas, probably you will need to
 	// customize this implementation to avoid permissions issues.
-	filteredGVK, err := k8sutil.GetGVKsFromAddToScheme(apis.AddToScheme)
+	filteredGVK, err := utils.GetGVKsFromAddToScheme(apis.AddToScheme)
 	if err != nil {
 		return err
 	}

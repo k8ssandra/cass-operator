@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -141,7 +142,7 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 			return result.Error(err)
 		}
 
-		if statefulSetFound == false {
+		if !statefulSetFound {
 			rc.ReqLogger.Info(
 				"Need to create new StatefulSet for",
 				"Rack", rackInfo.RackName)
@@ -154,7 +155,6 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 				return result.Error(err)
 			}
 		}
-
 		rc.statefulSets[idx] = statefulSet
 	}
 
@@ -216,14 +216,10 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			return result.Error(err)
 		}
 
-		needsUpdate := false
-
 		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) {
 			logger.
 				WithValues("rackName", rackName).
 				Info("statefulset needs an update")
-
-			needsUpdate = true
 
 			// "fix" the replica count, and maintain labels and annotations the k8s admin may have set
 			desiredSts.Spec.Replicas = statefulSet.Spec.Replicas
@@ -245,11 +241,14 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 				}
 				desiredSts.Spec.UpdateStrategy = strategy
 			}
+			stateMeta, err := meta.Accessor(statefulSet)
+			resVersion := stateMeta.GetResourceVersion()
+			if err != nil {
+				return result.Error(err)
+			}
 
 			desiredSts.DeepCopyInto(statefulSet)
-		}
 
-		if needsUpdate {
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.UpdatingRack,
 				"Updating rack %s", rackName)
 
@@ -273,6 +272,7 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 				"statefulSet", statefulSet,
 			)
 
+			statefulSet.SetResourceVersion(resVersion)
 			err = rc.Client.Update(rc.Ctx, statefulSet)
 			if err != nil {
 				logger.Error(
@@ -648,7 +648,7 @@ func hasPodPotentiallyBootstrapped(pod *corev1.Pod, nodeStatuses api.CassandraSt
 	// In effect, we want to know if 'nodetool status' would indicate the relevant cassandra node
 	// is part of the cluster
 
-	// Case 1: If we have a host ID for the pod, then we know it must be a member of the cluster 
+	// Case 1: If we have a host ID for the pod, then we know it must be a member of the cluster
 	// (even if the pod does not exist)
 	nodeStatus, ok := nodeStatuses[pod.Name]
 	if ok {
@@ -663,7 +663,7 @@ func hasPodPotentiallyBootstrapped(pod *corev1.Pod, nodeStatuses api.CassandraSt
 		state, ok := pod.Labels[api.CassNodeState]
 		if ok && state != stateReadyToStart {
 			return true
-		} 
+		}
 	}
 
 	return false
@@ -747,7 +747,7 @@ func allPodsBelongToSameNodeOrHaveNoNode(pods []*corev1.Pod) (string, bool) {
 		}
 	}
 
-	return nodeName, true	
+	return nodeName, true
 }
 
 // CheckRackScale loops over each statefulset and makes sure that it has the right
@@ -1407,7 +1407,6 @@ func (rc *ReconciliationContext) ReconcileNextRack(statefulSet *appsv1.StatefulS
 	if err := rc.Client.Create(rc.Ctx, statefulSet); err != nil {
 		return err
 	}
-
 	rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.CreatedResource,
 		"Created statefulset %s", statefulSet.Name)
 

@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1beta1 "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var cassandradatacentersResource = schema.GroupVersionResource{Group: "cassandra
 var cassandradatacentersKind = schema.GroupVersionKind{Group: "cassandra.datastax.com", Version: "v1beta1", Kind: "CassandraDatacenter"}
 
 // Get takes name of the cassandraDatacenter, and returns the corresponding cassandraDatacenter object, and an error if there is any.
-func (c *FakeCassandraDatacenters) Get(name string, options v1.GetOptions) (result *v1beta1.CassandraDatacenter, err error) {
+func (c *FakeCassandraDatacenters) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CassandraDatacenter, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(cassandradatacentersResource, c.ns, name), &v1beta1.CassandraDatacenter{})
 
@@ -50,7 +52,7 @@ func (c *FakeCassandraDatacenters) Get(name string, options v1.GetOptions) (resu
 }
 
 // List takes label and field selectors, and returns the list of CassandraDatacenters that match those selectors.
-func (c *FakeCassandraDatacenters) List(opts v1.ListOptions) (result *v1beta1.CassandraDatacenterList, err error) {
+func (c *FakeCassandraDatacenters) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.CassandraDatacenterList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(cassandradatacentersResource, cassandradatacentersKind, c.ns, opts), &v1beta1.CassandraDatacenterList{})
 
@@ -72,14 +74,14 @@ func (c *FakeCassandraDatacenters) List(opts v1.ListOptions) (result *v1beta1.Ca
 }
 
 // Watch returns a watch.Interface that watches the requested cassandraDatacenters.
-func (c *FakeCassandraDatacenters) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCassandraDatacenters) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(cassandradatacentersResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a cassandraDatacenter and creates it.  Returns the server's representation of the cassandraDatacenter, and an error, if there is any.
-func (c *FakeCassandraDatacenters) Create(cassandraDatacenter *v1beta1.CassandraDatacenter) (result *v1beta1.CassandraDatacenter, err error) {
+func (c *FakeCassandraDatacenters) Create(ctx context.Context, cassandraDatacenter *v1beta1.CassandraDatacenter, opts v1.CreateOptions) (result *v1beta1.CassandraDatacenter, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(cassandradatacentersResource, c.ns, cassandraDatacenter), &v1beta1.CassandraDatacenter{})
 
@@ -90,7 +92,7 @@ func (c *FakeCassandraDatacenters) Create(cassandraDatacenter *v1beta1.Cassandra
 }
 
 // Update takes the representation of a cassandraDatacenter and updates it. Returns the server's representation of the cassandraDatacenter, and an error, if there is any.
-func (c *FakeCassandraDatacenters) Update(cassandraDatacenter *v1beta1.CassandraDatacenter) (result *v1beta1.CassandraDatacenter, err error) {
+func (c *FakeCassandraDatacenters) Update(ctx context.Context, cassandraDatacenter *v1beta1.CassandraDatacenter, opts v1.UpdateOptions) (result *v1beta1.CassandraDatacenter, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(cassandradatacentersResource, c.ns, cassandraDatacenter), &v1beta1.CassandraDatacenter{})
 
@@ -102,7 +104,7 @@ func (c *FakeCassandraDatacenters) Update(cassandraDatacenter *v1beta1.Cassandra
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCassandraDatacenters) UpdateStatus(cassandraDatacenter *v1beta1.CassandraDatacenter) (*v1beta1.CassandraDatacenter, error) {
+func (c *FakeCassandraDatacenters) UpdateStatus(ctx context.Context, cassandraDatacenter *v1beta1.CassandraDatacenter, opts v1.UpdateOptions) (*v1beta1.CassandraDatacenter, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(cassandradatacentersResource, "status", c.ns, cassandraDatacenter), &v1beta1.CassandraDatacenter{})
 
@@ -113,7 +115,7 @@ func (c *FakeCassandraDatacenters) UpdateStatus(cassandraDatacenter *v1beta1.Cas
 }
 
 // Delete takes name of the cassandraDatacenter and deletes it. Returns an error if one occurs.
-func (c *FakeCassandraDatacenters) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeCassandraDatacenters) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(cassandradatacentersResource, c.ns, name), &v1beta1.CassandraDatacenter{})
 
@@ -121,15 +123,15 @@ func (c *FakeCassandraDatacenters) Delete(name string, options *v1.DeleteOptions
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCassandraDatacenters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(cassandradatacentersResource, c.ns, listOptions)
+func (c *FakeCassandraDatacenters) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(cassandradatacentersResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.CassandraDatacenterList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched cassandraDatacenter.
-func (c *FakeCassandraDatacenters) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CassandraDatacenter, err error) {
+func (c *FakeCassandraDatacenters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CassandraDatacenter, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(cassandradatacentersResource, c.ns, name, pt, data, subresources...), &v1beta1.CassandraDatacenter{})
 

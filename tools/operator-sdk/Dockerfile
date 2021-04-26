@@ -16,8 +16,8 @@ FROM golang:1.16-stretch as install-operator-sdk
 # inside the container. Something like...
 # docker run -v /Users/jim/datastax/cass-operator:/go/src/github.com/datastax/cass-operator ...
 
-ENV OP_SDK_VERSION=v0.17.0
-ENV GOPROXY=https://proxy.golang.org,direct
+ENV OP_SDK_VERSION=v0.18.2
+ENV GOPROXY=https://proxy.golang.org
 
 WORKDIR /usr/bin
 
@@ -81,7 +81,7 @@ RUN GO111MODULE=on operator-sdk generate csv --verbose
 # So we copy the specific version that this operator-sdk pulled down and move it
 # into the required path.
 WORKDIR $GOPATH/src/k8s.io
-RUN cp -r "/go/pkg/mod/k8s.io/code-generator@v0.17.4" "code-generator"
+RUN cp -r "/go/pkg/mod/k8s.io/code-generator@v0.18.2" "code-generator"
 
 WORKDIR $GOPATH/src/k8s.io/code-generator
 RUN chmod 700 generate-groups.sh

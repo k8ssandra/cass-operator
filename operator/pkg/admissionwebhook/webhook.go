@@ -17,7 +17,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
-	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,7 +39,7 @@ func EnsureWebhookCertificate(cfg *rest.Config) (certDir string, err error) {
 	var webhook map[string]interface{}
 	var bundled string
 	var client crclient.Client
-	namespace, err := k8sutil.GetOperatorNamespace()
+	namespace, err := utils.GetOperatorNamespace()
 	if err != nil {
 		return "", err
 	}
@@ -167,13 +166,13 @@ func updateWebhook(client crclient.Client, cert, namespace string) (err error) {
 
 func EnsureWebhookConfigVolume(cfg *rest.Config) (err error) {
 	var pod *v1.Pod
-	namespace, err := k8sutil.GetOperatorNamespace()
+	namespace, err := utils.GetOperatorNamespace()
 	if err != nil {
 		return err
 	}
 	var client crclient.Client
 	if client, err = crclient.New(cfg, crclient.Options{}); err == nil {
-		if pod, err = k8sutil.GetPod(context.Background(), client, namespace); err == nil {
+		if pod, err = utils.GetPod(context.Background(), client, namespace); err == nil {
 			for _, volume := range pod.Spec.Volumes {
 				if "cass-operator-certs-volume" == volume.Name {
 					return nil

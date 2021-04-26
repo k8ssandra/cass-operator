@@ -135,6 +135,19 @@ func (y *yamlWalker) walk(key string) {
 	}
 }
 
+func (y *yamlWalker) jump(key string, index int) {
+	if y.err != nil {
+		return
+	}
+	val, ok := y.yaml[key]
+	if !ok {
+		y.err = fmt.Errorf("walk failed on %s", key)
+	} else {
+		node := val.([]interface{})
+		y.yaml = node[index].(map[interface{}]interface{})
+	}
+}
+
 func (y *yamlWalker) remove(key string) {
 	if y.err != nil {
 		return
@@ -162,7 +175,8 @@ func ensurePreserveUnknownFields(data map[interface{}]interface{}) yamlWalker {
 	walker := yamlWalker{yaml: data, err: nil, editsMade: false}
 	preserve := "x-kubernetes-preserve-unknown-fields"
 	walker.walk("spec")
-	walker.walk("validation")
+	walker.jump("versions", 0)
+	walker.walk("schema")
 	walker.walk("openAPIV3Schema")
 	if presVal, exists := walker.get(preserve); !exists || presVal != true {
 		walker.update(preserve, true)
@@ -175,7 +189,8 @@ func removeConfigSection(data map[interface{}]interface{}) yamlWalker {
 	// See postProcessCrd for why.	x := data["spec"].(t)
 	walker := yamlWalker{yaml: data, err: nil, editsMade: false}
 	walker.walk("spec")
-	walker.walk("validation")
+	walker.jump("versions", 0)
+	walker.walk("schema")
 	walker.walk("openAPIV3Schema")
 	walker.walk("properties")
 	walker.walk("spec")

@@ -1,8 +1,19 @@
 package utils
 
 import (
+	"context"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	volumeutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 //
@@ -78,17 +89,16 @@ func FilterNodesWithTaintKeyValueEffect(nodes []*corev1.Node, taintKey, value st
 	})
 }
 
-
 //
-// k8s Pod helper functions 
+// k8s Pod helper functions
 //
 func IsPodUnschedulable(pod *corev1.Pod) bool {
 	for _, condition := range pod.Status.Conditions {
-		if condition.Reason == corev1.PodReasonUnschedulable && 
+		if condition.Reason == corev1.PodReasonUnschedulable &&
 			condition.Type == corev1.PodScheduled &&
 			condition.Status == corev1.ConditionFalse {
-				return true
-			}
+			return true
+		}
 	}
 	return false
 }
@@ -110,7 +120,7 @@ func GetPodNodeNameSet(pods []*corev1.Pod) StringSet {
 	return names
 }
 
-func FilterPodsWithFn(pods []*corev1.Pod, fn func(*corev1.Pod)bool) []*corev1.Pod {
+func FilterPodsWithFn(pods []*corev1.Pod, fn func(*corev1.Pod) bool) []*corev1.Pod {
 	result := []*corev1.Pod{}
 	for _, pod := range pods {
 		if fn(pod) {
@@ -168,4 +178,162 @@ func GetPVCSelectedNodeName(pvc *corev1.PersistentVolumeClaim) string {
 	}
 	pvcNode := annos[volumeutil.AnnSelectedNode]
 	return pvcNode
+}
+
+//
+// Migrated from operator-sdk, these are internal in newer versions
+//
+
+// ForceRunModeEnv indicates if the operator should be forced to run in either local
+// or cluster mode (currently only used for local mode)
+var ForceRunModeEnv = "OSDK_FORCE_RUN_MODE"
+
+type RunModeType string
+
+const (
+	LocalRunMode   RunModeType = "local"
+	ClusterRunMode RunModeType = "cluster"
+)
+
+var log = logf.Log.WithName("k8sutil")
+
+const (
+	// KubeConfigEnvVar defines the env variable KUBECONFIG which
+	// contains the kubeconfig file path.
+	KubeConfigEnvVar = "KUBECONFIG"
+
+	// WatchNamespaceEnvVar is the constant for env variable WATCH_NAMESPACE
+	// which is the namespace where the watch activity happens.
+	// this value is empty if the operator is running with clusterScope.
+	WatchNamespaceEnvVar = "WATCH_NAMESPACE"
+
+	// OperatorNameEnvVar is the constant for env variable OPERATOR_NAME
+	// which is the name of the current operator
+	OperatorNameEnvVar = "OPERATOR_NAME"
+
+	// PodNameEnvVar is the constant for env variable POD_NAME
+	// which is the name of the current pod.
+	PodNameEnvVar = "POD_NAME"
+)
+
+// GetWatchNamespace returns the namespace the operator should be watching for changes
+func GetWatchNamespace() (string, error) {
+	ns, found := os.LookupEnv(WatchNamespaceEnvVar)
+	if !found {
+		return "", fmt.Errorf("%s must be set", WatchNamespaceEnvVar)
+	}
+	return ns, nil
+}
+
+// ErrNoNamespace indicates that a namespace could not be found for the current
+// environment
+var ErrNoNamespace = fmt.Errorf("namespace not found for current environment")
+
+// ErrRunLocal indicates that the operator is set to run in local mode (this error
+// is returned by functions that only work on operators running in cluster mode)
+var ErrRunLocal = fmt.Errorf("operator run mode forced to local")
+
+// GetOperatorNamespace returns the namespace the operator should be running in.
+func GetOperatorNamespace() (string, error) {
+	if isRunModeLocal() {
+		return "", ErrRunLocal
+	}
+	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", ErrNoNamespace
+		}
+		return "", err
+	}
+	ns := strings.TrimSpace(string(nsBytes))
+	log.V(1).Info("Found namespace", "Namespace", ns)
+	return ns, nil
+}
+
+// GetOperatorName return the operator name
+func GetOperatorName() (string, error) {
+	operatorName, found := os.LookupEnv(OperatorNameEnvVar)
+	if !found {
+		return "", fmt.Errorf("%s must be set", OperatorNameEnvVar)
+	}
+	if len(operatorName) == 0 {
+		return "", fmt.Errorf("%s must not be empty", OperatorNameEnvVar)
+	}
+	return operatorName, nil
+}
+
+func isRunModeLocal() bool {
+	return os.Getenv(ForceRunModeEnv) == string(LocalRunMode)
+}
+
+// GetPod returns a Pod object that corresponds to the pod in which the code
+// is currently running.
+// It expects the environment variable POD_NAME to be set by the downwards API.
+func GetPod(ctx context.Context, client client.Client, ns string) (*corev1.Pod, error) {
+	if isRunModeLocal() {
+		return nil, ErrRunLocal
+	}
+	podName := os.Getenv(PodNameEnvVar)
+	if podName == "" {
+		return nil, fmt.Errorf("required env %s not set, please configure downward API", PodNameEnvVar)
+	}
+
+	log.V(1).Info("Found podname", "Pod.Name", podName)
+
+	pod := &corev1.Pod{}
+	key := types.NamespacedName{Namespace: ns, Name: podName}
+	err := client.Get(ctx, key, pod)
+	if err != nil {
+		log.Error(err, "Failed to get Pod", "Pod.Namespace", ns, "Pod.Name", podName)
+		return nil, err
+	}
+
+	// .Get() clears the APIVersion and Kind,
+	// so we need to set them before returning the object.
+	pod.TypeMeta.APIVersion = "v1"
+	pod.TypeMeta.Kind = "Pod"
+
+	log.V(1).Info("Found Pod", "Pod.Namespace", ns, "Pod.Name", pod.Name)
+
+	return pod, nil
+}
+
+// GetGVKsFromAddToScheme takes in the runtime scheme and filters out all generic apimachinery meta types.
+// It returns just the GVK specific to this scheme.
+func GetGVKsFromAddToScheme(addToSchemeFunc func(*runtime.Scheme) error) ([]schema.GroupVersionKind, error) {
+	s := runtime.NewScheme()
+	err := addToSchemeFunc(s)
+	if err != nil {
+		return nil, err
+	}
+	schemeAllKnownTypes := s.AllKnownTypes()
+	ownGVKs := []schema.GroupVersionKind{}
+	for gvk := range schemeAllKnownTypes {
+		if !isKubeMetaKind(gvk.Kind) {
+			ownGVKs = append(ownGVKs, gvk)
+		}
+	}
+
+	return ownGVKs, nil
+}
+
+func isKubeMetaKind(kind string) bool {
+	if strings.HasSuffix(kind, "List") ||
+		kind == "PatchOptions" ||
+		kind == "GetOptions" ||
+		kind == "DeleteOptions" ||
+		kind == "ExportOptions" ||
+		kind == "APIVersions" ||
+		kind == "APIGroupList" ||
+		kind == "APIResourceList" ||
+		kind == "UpdateOptions" ||
+		kind == "CreateOptions" ||
+		kind == "Status" ||
+		kind == "WatchEvent" ||
+		kind == "ListOptions" ||
+		kind == "APIGroup" {
+		return true
+	}
+
+	return false
 }

@@ -929,7 +929,14 @@ func Test_makeImage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := makeImage(tt.args.serverType, tt.args.serverVersion, tt.args.serverImage)
+			dc := &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ServerType:    tt.args.serverType,
+					ServerVersion: tt.args.serverVersion,
+					ServerImage:   tt.args.serverImage,
+				},
+			}
+			got, err := makeImage(dc)
 			if got != tt.want {
 				t.Errorf("makeImage() = %v, want %v", got, tt.want)
 			}
@@ -1003,7 +1010,14 @@ func Test_makeUbiImage(t *testing.T) {
 		os.Setenv(images.EnvBaseImageOS, "example")
 
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := makeImage(tt.args.serverType, tt.args.serverVersion, tt.args.serverImage)
+			dc := &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ServerType:    tt.args.serverType,
+					ServerVersion: tt.args.serverVersion,
+					ServerImage:   tt.args.serverImage,
+				},
+			}
+			got, err := makeImage(dc)
 			if got != tt.want {
 				t.Errorf("makeImage() = %v, want %v", got, tt.want)
 			}

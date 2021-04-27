@@ -457,13 +457,6 @@ func (dc *CassandraDatacenter) GetRackLabels(rackName string) map[string]string 
 	return labels
 }
 
-func (dc *CassandraDatacenter) IsReaperEnabled() bool {
-	if dc.Spec.Reaper != nil && dc.Spec.Reaper.Enabled && dc.Spec.ServerType == "cassandra" {
-		return true
-	}
-	return false
-}
-
 func (status *CassandraDatacenterStatus) GetConditionStatus(conditionType DatacenterConditionType) corev1.ConditionStatus {
 	for _, condition := range status.Conditions {
 		if condition.Type == conditionType {

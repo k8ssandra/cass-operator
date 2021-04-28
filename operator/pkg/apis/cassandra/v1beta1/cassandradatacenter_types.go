@@ -171,6 +171,11 @@ type CassandraDatacenterSpec struct {
 
 	AdditionalSeeds []string `json:"additionalSeeds,omitempty"`
 
+	// Deprecated: Reaper's sidecar mode has too many problems in Kubernetes for it to
+	// usable. In order for it to work reliably, changes in Reaper would be needed. See
+	// https://github.com/thelastpickle/cassandra-reaper/issues/956 for details. Because
+	// those changes were not implemented in Reaper and because Reaper support was instead
+	// added through k8ssandra, this field will be removed in the 1.8.0 release.
 	Reaper *ReaperConfig `json:"reaper,omitempty"`
 
 	// Configuration for disabling the simple log tailing sidecar container. Our default is to have it enabled.
@@ -431,13 +436,6 @@ func (dc *CassandraDatacenter) GetRackLabels(rackName string) map[string]string 
 	labels := dc.GetDatacenterLabels()
 	labels[RackLabel] = rackName
 	return labels
-}
-
-func (dc *CassandraDatacenter) IsReaperEnabled() bool {
-	if dc.Spec.Reaper != nil && dc.Spec.Reaper.Enabled && dc.Spec.ServerType == "cassandra" {
-		return true
-	}
-	return false
 }
 
 func (status *CassandraDatacenterStatus) GetConditionStatus(conditionType DatacenterConditionType) corev1.ConditionStatus {

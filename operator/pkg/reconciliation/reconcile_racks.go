@@ -26,8 +26,8 @@ import (
 	"github.com/k8ssandra/cass-operator/operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
-	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 	"github.com/k8ssandra/cass-operator/operator/pkg/psp"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 )
 
 var (
@@ -2318,13 +2318,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return recResult.Output()
 	}
 
-	if recResult := rc.CheckReaperService(); recResult.Completed() {
-		return recResult.Output()
-	}
-
-	if recResult := rc.CheckReaperSchemaInitialized(); recResult.Completed() {
-		return recResult.Output()
-	}
 
 	if recResult := rc.CheckRollingRestart(); recResult.Completed() {
 		return recResult.Output()

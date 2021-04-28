@@ -6024,6 +6024,12 @@ spec:
                 type: object
               type: array
             reaper:
+              description: 'Deprecated: Reaper''s sidecar mode has too many problems
+                in Kubernetes for it to usable. In order for it to work reliably,
+                changes in Reaper would be needed. See https://github.com/thelastpickle/cassandra-reaper/issues/956
+                for details. Because those changes were not implemented in Reaper
+                and because Reaper support was instead added through k8ssandra, this
+                field will be removed in the 1.8.0 release.'
               properties:
                 enabled:
                   type: boolean

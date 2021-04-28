@@ -722,6 +722,41 @@ func TestCassandraDatacenter_buildPodTemplateSpec_labels_merge(t *testing.T) {
 	}
 }
 
+func TestCassandraDatacenter_buildPodTemplateSpec_overrideSecurityContext(t *testing.T) {
+	uid := int64(1111)
+	gid := int64(2222)
+
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "test",
+			ServerType: "cassandra",
+			ServerVersion: "3.11.7",
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsUser: &uid,
+						RunAsGroup: &gid,
+					},
+				},
+			},
+		},
+	}
+
+	spec, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "rack1")
+
+	assert.NoError(t, err, "should not have gotten an error when building podTemplateSpec")
+	assert.NotNil(t, spec)
+
+	expected := &corev1.PodSecurityContext{
+		RunAsUser: &uid,
+		RunAsGroup: &gid,
+	}
+
+	actual := spec.Spec.SecurityContext
+
+	assert.True(t, reflect.DeepEqual(expected, actual), "SecurityContext does not match expected value")
+}
+
 func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		Spec: api.CassandraDatacenterSpec{

@@ -538,6 +538,18 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 		baseTemplate.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 	}
 
+	if baseTemplate.Spec.SecurityContext == nil {
+		// workaround for https://cloud.google.com/kubernetes-engine/docs/security-bulletins#may-31-2019
+		if shouldDefineSecurityContext(dc) {
+			var userID int64 = 999
+			baseTemplate.Spec.SecurityContext = &corev1.PodSecurityContext{
+				RunAsUser:  &userID,
+				RunAsGroup: &userID,
+				FSGroup:    &userID,
+			}
+		}
+	}
+
 	// Adds custom registry pull secret if needed
 
 	_ = images.AddDefaultRegistryImagePullSecrets(&baseTemplate.Spec)

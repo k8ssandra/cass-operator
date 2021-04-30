@@ -110,10 +110,10 @@ jobs:
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_K8S_FLAVOR: kind
     steps:
-      # - name: Remove unused packages from disk
-      #   run: |
-      #     sudo rm -rf /usr/local/lib/android
-      #     sudo rm -rf /usr/share/dotnet
+      - name: Free diskspace by removing unused packages
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
       - uses: actions/checkout@v2
         if: github.event_name == 'pull_request'
         with:

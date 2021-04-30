@@ -120,6 +120,52 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	configSecretMapFn := handler.ToRequestsFunc(func(mapObj handler.MapObject) []reconcile.Request {
+		log.Info("config secret watch called", "Secret", mapObj.Meta.GetName())
+
+		requests := make([]reconcile.Request, 0)
+		secret := mapObj.Object.(*corev1.Secret)
+		if v, ok := secret.Annotations[api.DatacenterAnnotation]; ok {
+			log.Info("adding reconciliation request for config secret", "Secret", secret.Name)
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: secret.Namespace,
+					Name: v,
+				},
+			})
+		}
+
+		return requests
+	})
+
+	isConfigSecret := func(annotations map[string]string) bool {
+		_, ok := annotations[api.DatacenterAnnotation]
+		return ok
+	}
+
+	configSecretPredicate := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return isConfigSecret(e.Meta.GetAnnotations())
+		},
+
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return isConfigSecret(e.MetaOld.GetAnnotations()) || isConfigSecret(e.MetaNew.GetAnnotations())
+		},
+
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return isConfigSecret(e.Meta.GetAnnotations())
+		},
+
+		GenericFunc: func(e event.GenericEvent) bool {
+			return isConfigSecret(e.Meta.GetAnnotations())
+		},
+	}
+
+	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestsFromMapFunc{ToRequests: configSecretMapFn}, configSecretPredicate)
+	if err != nil {
+		return err
+	}
+
 	// Setup watches for Nodes to check for taints being added
 
 	nodeMapFn := handler.ToRequestsFunc(

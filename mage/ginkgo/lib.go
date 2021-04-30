@@ -217,11 +217,15 @@ func (ns *NsWrapper) WaitForOutputContainsAndLog(description string, kcmd kubect
 }
 
 func (ns *NsWrapper) WaitForDatacenterCondition(dcName string, conditionType string, value string) {
+	ns.WaitForDatacenterConditionWithTimeout(dcName, conditionType, value, 600)
+}
+
+func (ns *NsWrapper) WaitForDatacenterConditionWithTimeout(dcName, conditionType, value string, seconds int) {
 	step := fmt.Sprintf("checking that dc condition %s has value %s", conditionType, value)
 	json := fmt.Sprintf("jsonpath={.status.conditions[?(.type=='%s')].status}", conditionType)
 	k := kubectl.Get("cassandradatacenter", dcName).
 		FormatOutput(json)
-	ns.WaitForOutputAndLog(step, k, value, 600)
+	ns.WaitForOutputAndLog(step, k, value, seconds)
 }
 
 func (ns *NsWrapper) WaitForDatacenterConditionWithReason(dcName string, conditionType string, value string, reason string) {

@@ -34,6 +34,12 @@ const (
 	// PromMetricsLabel is a service label that can be selected for prometheus metrics scraping
 	PromMetricsLabel = "cassandra.datastax.com/prom-metrics"
 
+	// DatacenterAnnotation is the operator's annotation for the datacenter name
+	DatacenterAnnotation = DatacenterLabel
+
+	// ConfigHashAnnotation is the operator's annotation for the hash of the ConfigSecret
+	ConfigHashAnnotation = "cassandra.datastax.com/config-hash"
+
 	// CassNodeState
 	CassNodeState = "cassandra.datastax.com/node-state"
 
@@ -84,6 +90,25 @@ type CassandraDatacenterSpec struct {
 	// Config for the server, in YAML format
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Config json.RawMessage `json:"config,omitempty"`
+
+	// ConfigSecret is the name of a secret that contains configuration for Cassandra. The
+	// secret is expected to have a property named config whose value should be a JSON
+	// formatted string that should look like this:
+	//
+	//    config: |-
+	//      {
+	//        "cassandra-yaml": {
+	//          "read_request_timeout_in_ms": 10000
+	//        },
+	//        "jmv-options": {
+	//          "max_heap_size": 1024M
+    //        }
+	//      }
+	//
+	// ConfigSecret is mutually exclusive with Config. ConfigSecret takes precedence and
+	// will be used exclusively if both properties are set. The operator sets a watch such
+	// that an update to the secret will trigger an update of the StatefulSets.
+	ConfigSecret string `json:"configSecret,omitempty"`
 
 	// Config for the Management API certificates
 	ManagementApiAuth ManagementApiAuthConfig `json:"managementApiAuth,omitempty"`
@@ -537,7 +562,7 @@ func (dc *CassandraDatacenter) GetSuperuserSecretNamespacedName() types.Namespac
 }
 
 // GetConfigAsJSON gets a JSON-encoded string suitable for passing to configBuilder
-func (dc *CassandraDatacenter) GetConfigAsJSON() (string, error) {
+func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
 
 	// We use the cluster seed-service name here for the seed list as it will
 	// resolve to the seed nodes. This obviates the need to update the
@@ -600,8 +625,8 @@ func (dc *CassandraDatacenter) GetConfigAsJSON() (string, error) {
 		return "", errors.Wrap(err, "Model information for CassandraDatacenter resource was not properly configured")
 	}
 
-	if dc.Spec.Config != nil {
-		configParsed, err := gabs.ParseJSON([]byte(dc.Spec.Config))
+	if config != nil {
+		configParsed, err := gabs.ParseJSON(config)
 		if err != nil {
 			return "", errors.Wrap(err, "Error parsing Spec.Config for CassandraDatacenter resource")
 		}

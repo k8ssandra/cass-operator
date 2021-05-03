@@ -136,9 +136,10 @@ spec:
 
     jvm-options:
 
-      # Set the database to use 14 GB of Java heap
-      initial_heap_size: "14G"
-      max_heap_size: "14G"
+      # Set the database to use 12 GB of Java heap
+      initial_heap_size: "12G"
+      max_heap_size: "12G"
+      max_direct_memory: "6G"
 
       additional-jvm-opts:
 

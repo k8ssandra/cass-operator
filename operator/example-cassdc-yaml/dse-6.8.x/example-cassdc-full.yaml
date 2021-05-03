@@ -146,16 +146,17 @@ spec:
       allocate_tokens_for_local_replication_factor: 3
       backup_service:
         enabled: true
-      file_cache_size_in_mb: 1000
       authenticator: com.datastax.bdp.cassandra.auth.DseAuthenticator
       authorizer: com.datastax.bdp.cassandra.auth.DseAuthorizer
       role_manager: com.datastax.bdp.cassandra.auth.DseRoleManager
 
     jvm-server-options:
 
-      # Set the database to use 14 GB of Java heap
-      initial_heap_size: "14G"
-      max_heap_size: "14G"
+      # Set the database to use 12 GB of Java heap
+      initial_heap_size: "12G"
+      max_heap_size: "12G"
+      # Set the JVM's -XX:MaxDirectMemorySize
+      max_direct_memory: "6G"
 
       additional-jvm-opts:
       

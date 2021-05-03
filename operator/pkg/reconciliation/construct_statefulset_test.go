@@ -4,6 +4,8 @@
 package reconciliation
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
 	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
@@ -193,4 +195,175 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 		assert.Equal(t, "server-config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].Name)
 		assert.Equal(t, "/config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].MountPath)
 	}
+}
+
+func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
+	clusterName := "test"
+	rack := "rack1"
+	replicas := 1
+	storageClass := "standard"
+	storageConfig := api.StorageConfig{
+		CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+		},
+	}
+
+	defaultSecurityContext := &corev1.PodSecurityContext{
+		RunAsUser:  int64Ptr(999),
+		RunAsGroup: int64Ptr(999),
+		FSGroup:    int64Ptr(999),
+	}
+
+	tests := []struct{
+		name string
+		dc *api.CassandraDatacenter
+		expected *corev1.PodSecurityContext
+	} {
+		{
+			name: "run cassandra as non-root user",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName: clusterName,
+					ServerType: "cassandra",
+					ServerVersion: "3.11.10",
+					DockerImageRunsAsCassandra: boolPtr(true),
+					StorageConfig: storageConfig,
+				},
+			},
+			expected: defaultSecurityContext,
+		},
+		{
+			name: "run cassandra as root user",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName: clusterName,
+					ServerType: "cassandra",
+					ServerVersion: "3.11.7",
+					DockerImageRunsAsCassandra: boolPtr(false),
+					StorageConfig: storageConfig,
+				},
+			},
+			expected: nil,
+		},
+		{
+			// Note that DSE only supports running as non-root
+			name: "run dse as non-root user",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName: clusterName,
+					ServerType: "dse",
+					ServerVersion: "6.8.7",
+					StorageConfig: storageConfig,
+				},
+			},
+			expected: defaultSecurityContext,
+		},
+		{
+			name: "run cassandra with pod security context override",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName: clusterName,
+					ServerType: "cassandra",
+					ServerVersion: "3.11.10",
+					StorageConfig: storageConfig,
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							SecurityContext: &corev1.PodSecurityContext{
+								RunAsUser: int64Ptr(12345),
+								RunAsGroup: int64Ptr(54321),
+								FSGroup: int64Ptr(11111),
+							},
+						},
+					},
+				},
+			},
+			expected: &corev1.PodSecurityContext{
+				RunAsUser: int64Ptr(12345),
+				RunAsGroup: int64Ptr(54321),
+				FSGroup: int64Ptr(11111),
+			},
+		},
+		{
+			name: "run dse with pod security context override",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName: clusterName,
+					ServerType: "dse",
+					ServerVersion: "6.8.7",
+					StorageConfig: storageConfig,
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							SecurityContext: &corev1.PodSecurityContext{
+								RunAsUser: int64Ptr(12345),
+								RunAsGroup: int64Ptr(54321),
+								FSGroup: int64Ptr(11111),
+							},
+						},
+					},
+				},
+			},
+			expected: &corev1.PodSecurityContext{
+				RunAsUser: int64Ptr(12345),
+				RunAsGroup: int64Ptr(54321),
+				FSGroup: int64Ptr(11111),
+			},
+		},
+		{
+			name: "run cassandra with empty pod security context override",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName: clusterName,
+					ServerType: "cassandra",
+					ServerVersion: "3.11.10",
+					StorageConfig: storageConfig,
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							SecurityContext: &corev1.PodSecurityContext{},
+						},
+					},
+				},
+			},
+			expected: &corev1.PodSecurityContext{},
+		},
+		{
+			name: "run dse with empty pod security context override",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName: clusterName,
+					ServerType: "dse",
+					ServerVersion: "6.8.7",
+					StorageConfig: storageConfig,
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							SecurityContext: &corev1.PodSecurityContext{},
+						},
+					},
+				},
+			},
+			expected: &corev1.PodSecurityContext{},
+		},
+	}
+	for _, tt := range tests {
+		t.Log(tt.name)
+		statefulSet, err := newStatefulSetForCassandraDatacenter(rack, tt.dc, replicas)
+		assert.NoError(t, err, fmt.Sprintf("%s: failed to create new statefulset", tt.name))
+		assert.NotNil(t, statefulSet, fmt.Sprintf("%s: statefulset is nil", tt.name))
+
+		actual := statefulSet.Spec.Template.Spec.SecurityContext
+		if tt.expected == nil {
+			assert.Nil(t, actual, fmt.Sprintf("%s: expected pod security context to be nil", tt.name))
+		} else {
+			assert.NotNil(t, actual, fmt.Sprintf("%s: pod security context is nil", tt.name))
+			assert.True(t, reflect.DeepEqual(tt.expected, actual),
+				fmt.Sprintf("%s: pod security context does not match expected value:\n expected: %+v\n actual: %+v", tt.name, tt.expected, actual))
+		}
+	}
+}
+
+func int64Ptr(n int64) *int64 {
+	return &n
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }

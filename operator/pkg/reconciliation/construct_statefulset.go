@@ -176,14 +176,14 @@ func newStatefulSetForCassandraDatacenterHelper(
 
 	// workaround for https://cloud.google.com/kubernetes-engine/docs/security-bulletins#may-31-2019
 
-	if shouldDefineSecurityContext(dc) {
-		var userID int64 = 999
-		template.Spec.SecurityContext = &corev1.PodSecurityContext{
-			RunAsUser:  &userID,
-			RunAsGroup: &userID,
-			FSGroup:    &userID,
-		}
-	}
+	//if shouldDefineSecurityContext(dc) {
+	//	var userID int64 = 999
+	//	template.Spec.SecurityContext = &corev1.PodSecurityContext{
+	//		RunAsUser:  &userID,
+	//		RunAsGroup: &userID,
+	//		FSGroup:    &userID,
+	//	}
+	//}
 
 	_ = httphelper.AddManagementApiServerSecurity(dc, template)
 

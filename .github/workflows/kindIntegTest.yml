@@ -6,7 +6,54 @@ on:
   pull_request:
     branches: [ master ]
 jobs:
+  build_docker_images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-integ-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-integ-
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          file: operator/docker/base/Dockerfile
+          push: false
+          tags: k8ssandra/cass-operator:latest
+          platforms: linux/amd64
+          outputs: type=docker,dest=/tmp/k8ssandra-cass-operator.tar
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          file: operator/docker/system-logger/Dockerfile
+          push: false
+          tags: k8ssandra/system-logger:latest
+          outputs: type=docker,dest=/tmp/k8ssandra-system-logger.tar
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+      - name: Upload cass-operator image
+        uses: actions/upload-artifact@v2
+        with:
+          name: cass-operator
+          path: /tmp/k8ssandra-cass-operator.tar
+      - name: Upload system-logger image
+        uses: actions/upload-artifact@v2
+        with:
+          name: system-logger
+          path: /tmp/k8ssandra-system-logger.tar
   kind_integration_tests:
+    needs: build_docker_images
     strategy:
       matrix:
         integration_test:
@@ -63,7 +110,7 @@ jobs:
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_K8S_FLAVOR: kind
     steps:
-      - name: Remove unused packages from disk
+      - name: Free diskspace by removing unused packages
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
@@ -96,33 +143,20 @@ jobs:
           config: tests/testdata/kind/kind_config_6_workers.yaml
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
-      - name: Cache Docker layers
-        uses: actions/cache@v2
+      - name: Download cass-operator image
+        uses: actions/download-artifact@v2
         with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-integ-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-integ-
-      - name: Build and push
-        uses: docker/build-push-action@v2
+          name: cass-operator
+          path: /tmp
+      - name: Download system-logger image
+        uses: actions/download-artifact@v2
         with:
-          file: operator/docker/base/Dockerfile
-          push: false
-          load: true
-          tags: k8ssandra/cass-operator:latest
-          platforms: linux/amd64
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Build and push
-        uses: docker/build-push-action@v2
-        with:
-          file: operator/docker/system-logger/Dockerfile
-          push: false
-          load: true
-          tags: k8ssandra/system-logger:latest
-          platforms: linux/amd64
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
+          name: system-logger
+          path: /tmp
+      - name: Load Docker images
+        run: |
+          docker load --input /tmp/k8ssandra-cass-operator.tar
+          docker load --input /tmp/k8ssandra-system-logger.tar
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=kind k8ssandra/cass-operator:latest
@@ -133,7 +167,7 @@ jobs:
           version: latest
           args: integ:run
       - name: Archive k8s logs
-        if: ${{ always() }}
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v2
         with:
           name: k8s-logs-${{ matrix.integration_test }}

@@ -139,6 +139,7 @@ spec:
       # Set the database to use 12 GB of Java heap
       initial_heap_size: "12G"
       max_heap_size: "12G"
+      # Set the JVM's -XX:MaxDirectMemorySize
       max_direct_memory: "6G"
 
       additional-jvm-opts:

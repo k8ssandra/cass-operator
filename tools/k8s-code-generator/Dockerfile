@@ -3,7 +3,7 @@
 FROM golang:1.16-stretch
 
 ENV CGO_ENABLED=0
-ENV GOPROXY=https://proxy.golang.org,https://gocenter.io,direct
+ENV GOPROXY=https://proxy.golang.org,direct
 ENV GOPATH=/go
 ENV GO111MODULE=on
 

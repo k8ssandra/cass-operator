@@ -42,6 +42,7 @@ spec:
     jvm-server-options:
       initial_heap_size: "2G"
       max_heap_size: "2G"
+      max_direct_memory: "1G"      
       additional-jvm-opts:
         - "-Ddse.system_distributed_replication_dc_names=dc1"
         - "-Ddse.system_distributed_replication_per_dc=3"

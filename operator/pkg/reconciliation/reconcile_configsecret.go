@@ -140,13 +140,19 @@ func (rc *ReconciliationContext) getDatacenterConfigSecret(name string) (*corev1
 	if err == nil {
 		return secret, true, nil
 	} else if errors.IsNotFound(err)  {
-		return &corev1.Secret{
+		secret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: key.Namespace,
 				Name: name,
 			},
 			Data: map[string][]byte{},
-		}, false, nil
+		}
+
+		if err = rc.SetDatacenterAsOwner(secret); err != nil {
+			return nil, false, err
+		}
+
+		return secret, false, nil
 	} else {
 		return nil, false, err
 	}

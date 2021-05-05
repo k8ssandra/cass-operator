@@ -17,7 +17,7 @@ FROM golang:1.16-stretch as install-operator-sdk
 # docker run -v /Users/jim/datastax/cass-operator:/go/src/github.com/datastax/cass-operator ...
 
 ENV OP_SDK_VERSION=v0.17.0
-ENV GOPROXY=https://proxy.golang.org,https://gocenter.io,direct
+ENV GOPROXY=https://proxy.golang.org,direct
 
 WORKDIR /usr/bin
 

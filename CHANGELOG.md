@@ -1,4 +1,28 @@
 # Changelog
+Changelog for Cass Operator, new PRs should update the `main / unreleased` section with entries in the order:
+
+```markdown
+* [CHANGE]
+* [FEATURE]
+* [ENHANCEMENT]
+* [BUGFIX]
+
+
+## v1.7.0
+* [CHANGE] #1 Repository move
+* [CHANGE] #19 Remove internode_encryption_test
+* [CHANGE] #12 Remove Reaper sidecar integration
+* [CHANGE] #8 Reduce dependencies of apis/CassandraDatacenter
+* [FEATURE] #14 Override PodSecurityContext
+* [FEATURE] #18 Allow DNS lookup by pod name
+* [FEATURE] #27 Upgrade to Cassandra 4.0-RC1
+* [FEATURE] #293 Add custom labels and annotations for services (see datastax/cass-operator#293)
+* [FEATURE] #232 Use hostnames and DNS lookups for AdditionalSeeds (see datastax/cass-operator#293)
+* [FEATURE] #28 Make tolerations configurable
+* [FEATURE] #13 Provide server configuration with a secret
+* [ENHANCEMENT] #7 Add CreateKeyspace and AlterKeyspace functions
+* [ENHANCEMENT] #20 Include max_direct_memory in examples
+* [ENHANCEMENT] #16 Only build images once during integration tests
 
 ## v1.6.0
 

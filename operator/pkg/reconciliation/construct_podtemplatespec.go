@@ -564,6 +564,9 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 	affinity.PodAntiAffinity = calculatePodAntiAffinity(dc.Spec.AllowMultipleNodesPerWorker)
 	baseTemplate.Spec.Affinity = affinity
 
+	// Tolerations
+	baseTemplate.Spec.Tolerations = dc.Spec.Tolerations
+
 	// Volumes
 
 	addVolumes(dc, baseTemplate)

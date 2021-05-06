@@ -4,6 +4,7 @@
 package reconciliation
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"reflect"
 	"testing"
@@ -999,4 +1000,72 @@ func Test_makeUbiImage(t *testing.T) {
 		})
 		os.Unsetenv(images.EnvBaseImageOS)
 	}
+}
+
+func TestTolerations(t *testing.T) {
+	tolerations := []corev1.Toleration{
+		{
+			Key: "cassandra-node",
+			Operator: corev1.TolerationOpExists,
+			Value: "true",
+			Effect: corev1.TaintEffectNoExecute,
+		},
+		{
+			Key: "search-node",
+			Operator: corev1.TolerationOpExists,
+			Value: "true",
+			Effect: corev1.TaintEffectNoSchedule,
+		},
+	}
+
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name: "test",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "test",
+			ServerType: "cassandra",
+			ServerVersion: "3.11.10",
+			Tolerations: tolerations,
+		},
+	}
+
+	spec, err := buildPodTemplateSpec(dc, nil, "rack1")
+
+	assert.NoError(t, err, "failed to build PodTemplateSpec")
+	// using ElementsMatch instead of Equal because we do not really care about ordering.
+	assert.ElementsMatch(t, tolerations, spec.Spec.Tolerations, "tolerations do not match")
+
+	// Now verify that we cannot override the tolerations with the PodTemplateSpec property
+	dc = &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name: "test",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "test",
+			ServerType: "cassandra",
+			ServerVersion: "3.11.10",
+			Tolerations: tolerations,
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Tolerations: []corev1.Toleration{
+						{
+							Key: "cassandra-node",
+							Operator: corev1.TolerationOpExists,
+							Value: "false",
+							Effect: corev1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec, err = buildPodTemplateSpec(dc, nil, "rack1")
+
+	assert.NoError(t, err, "failed to build PodTemplateSpec")
+	// using ElementsMatch instead of Equal because we do not really care about ordering.
+	assert.ElementsMatch(t, tolerations, spec.Spec.Tolerations, "tolerations do not match")
 }

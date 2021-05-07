@@ -6,7 +6,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [FEATURE]
 * [ENHANCEMENT]
 * [BUGFIX]
-
+```
 
 ## v1.7.0
 * [CHANGE] #1 Repository move

@@ -9,6 +9,6 @@ webhookClusterRoleName: cass-operator-webhook
 webhookClusterRoleBindingName: cass-operator-webhook
 deploymentName: cass-operator
 deploymentReplicas: 1
-defaultImage: "k8ssandra/cass-operator:1.7.0"
+defaultImage: "k8ssandra/cass-operator:v1.7.0"
 imagePullPolicy: IfNotPresent
 imagePullSecret: ""

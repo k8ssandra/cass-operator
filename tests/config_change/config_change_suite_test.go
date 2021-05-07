@@ -74,7 +74,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1800)
 
 			step = "checking that the init container got the updated config roles_validity_in_ms=256000, garbage_collector=CMS"
-			json = "jsonpath={.spec.initContainers[0].env[0].value}"
+			json = "jsonpath={.spec.initContainers[0].env[7].value}"
 			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").
 				FormatOutput(json)
 			ns.WaitForOutputContainsAndLog(step, k, "\"roles_validity_in_ms\":256000", 30)

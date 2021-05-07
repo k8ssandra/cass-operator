@@ -88,6 +88,7 @@ jobs:
         - additional_seeds
         - cluster_wide_install
         - config_change
+        - config_secret
         - multi_cluster_management
         - oss_test_all_the_things
         - scale_down

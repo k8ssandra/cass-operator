@@ -4,6 +4,7 @@
 package reconciliation
 
 import (
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"reflect"
@@ -139,20 +140,12 @@ func TestCassandraDatacenter_buildInitContainer_with_overrides(t *testing.T) {
 	if !reflect.DeepEqual(initContainers[0].Resources, DefaultsConfigInitContainer) {
 		t.Error("Unexpected default resources allocated for the init container.")
 	}
-	if !reflect.DeepEqual(initContainers[0].Env[0],
-		corev1.EnvVar{
-			Name:  "k1",
-			Value: "v1",
-		}) {
-		t.Errorf("Unexpected env vars allocated for the init container: %v", initContainers[0].Env)
-	}
-	if !reflect.DeepEqual(initContainers[0].Env[4],
-		corev1.EnvVar{
-			Name:  "USE_HOST_IP_FOR_BROADCAST",
-			Value: "false",
-		}) {
-		t.Errorf("Unexpected env vars allocated for the init container: %v", initContainers[0].Env)
-	}
+
+	assert.Contains(t, initContainers[0].Env, corev1.EnvVar{Name:  "k1", Value: "v1"},
+		fmt.Sprintf("Unexpected env vars allocated for the init container: %v", initContainers[0].Env))
+
+	assert.Contains(t, initContainers[0].Env, corev1.EnvVar{Name: "USE_HOST_IP_FOR_BROADCAST", Value: "false"},
+		fmt.Sprintf("Unexpected env vars allocated for the init container: %v", initContainers[0].Env))
 }
 
 func TestCassandraDatacenter_buildContainers_systemlogger_resources_set(t *testing.T) {
@@ -237,6 +230,115 @@ func TestCassandraDatacenter_buildContainers_use_cassandra_settings(t *testing.T
 
 	if !reflect.DeepEqual(containers[0].Env[0].Name, "k1") {
 		t.Errorf("Unexpected env vars allocated for the cassandra container: %v", containers[0].Env)
+	}
+}
+
+func TestServerConfigInitContainerEnvVars(t *testing.T) {
+	rack := "rack1"
+	podIPEnvVar := corev1.EnvVar{Name: "POD_IP", ValueFrom: selectorFromFieldPath("status.podIP")}
+	hostIPEnvVar := corev1.EnvVar{Name: "HOST_IP", ValueFrom: selectorFromFieldPath("status.hostIP")}
+
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		config       []byte
+		configSecret string
+		want        []corev1.EnvVar
+	}{
+		{
+			name: "use config",
+			config: []byte(`{"cassandra-yaml":{"read_request_timeout_in_ms":10000}}`),
+			want: []corev1.EnvVar{
+				podIPEnvVar,
+				hostIPEnvVar,
+				{
+					Name: "USE_HOST_IP_FOR_BROADCAST",
+					Value: "false",
+				},
+				{
+					Name: "RACK_NAME",
+					Value: rack,
+				},
+				{
+					Name: "PRODUCT_VERSION",
+					Value: "3.11.10",
+				},
+				{
+					Name: "PRODUCT_NAME",
+					Value: "cassandra",
+				},
+				{
+					Name: "DSE_VERSION",
+					Value: "3.11.10",
+				},
+			},
+		},
+		{
+			name: "use config secret",
+			annotations: map[string]string{
+				api.ConfigHashAnnotation: "123456789",
+			},
+			configSecret: "secret-config",
+			want: []corev1.EnvVar{
+				podIPEnvVar,
+				hostIPEnvVar,
+				{
+					Name: "USE_HOST_IP_FOR_BROADCAST",
+					Value: "false",
+				},
+				{
+					Name: "RACK_NAME",
+					Value: rack,
+				},
+				{
+					Name: "PRODUCT_VERSION",
+					Value: "3.11.10",
+				},
+				{
+					Name: "PRODUCT_NAME",
+					Value: "cassandra",
+				},
+				{
+					Name: "DSE_VERSION",
+					Value: "3.11.10",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		templateSpec := &corev1.PodTemplateSpec{}
+		dc := &api.CassandraDatacenter{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test",
+				Name:      "test",
+				Annotations: tt.annotations,
+			},
+			Spec: api.CassandraDatacenterSpec{
+				ClusterName:   "test",
+				ServerType:    "cassandra",
+				ServerVersion: "3.11.10",
+				Config:        tt.config,
+				ConfigSecret: tt.configSecret,
+			},
+		}
+
+		configEnVars, err := getConfigDataEnVars(dc)
+		assert.NoError(t, err, "failed to get config env vars")
+
+		for _, v := range configEnVars {
+			tt.want = append(tt.want, v)
+		}
+
+		if err := buildInitContainers(dc, rack, templateSpec); err == nil {
+			assert.Equal(t, 1, len(templateSpec.Spec.InitContainers), fmt.Sprintf("%s: expected to find 1 init container", tt.name))
+
+			initContainer := templateSpec.Spec.InitContainers[0]
+			assert.Equal(t, ServerConfigContainerName, initContainer.Name, fmt.Sprintf("%s: expected to find %s init container", tt.name, ServerConfigContainerName))
+
+			assert.True(t, envVarsMatch(tt.want, initContainer.Env), fmt.Sprintf("%s: wanted %+v, got %+v", tt.name, tt.want, initContainer.Env))
+		} else {
+			t.Errorf("%s: failed to build init containers: %s", tt.name, err)
+		}
 	}
 }
 
@@ -615,6 +717,29 @@ func volumesContains(volumes []corev1.Volume, matcher VolumeMatcher) bool {
 	for _, volume := range volumes {
 		if matcher(volume) {
 			return true
+		}
+	}
+	return false
+}
+
+func envVarsMatch(expected, actual []corev1.EnvVar) bool {
+	if len(expected) != len(actual) {
+		return false
+	}
+
+	for _, v := range expected {
+		if !envVarsContains(actual, v) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func envVarsContains(envVars []corev1.EnvVar, envVar corev1.EnvVar) bool {
+	for _, v := range envVars {
+		if v.Name == envVar.Name {
+			return reflect.DeepEqual(envVar, v)
 		}
 	}
 	return false

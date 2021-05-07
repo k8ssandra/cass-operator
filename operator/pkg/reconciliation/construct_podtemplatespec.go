@@ -7,6 +7,7 @@ package reconciliation
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"reflect"
 	"sort"
 
@@ -295,15 +296,14 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		useHostIpForBroadcast = "true"
 	}
 
-	configData, err := dc.GetConfigAsJSON()
+	configEnvVar, err := getConfigDataEnVars(dc)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get config env vars")
 	}
 
 	serverVersion := dc.Spec.ServerVersion
 
 	envDefaults := []corev1.EnvVar{
-		{Name: "CONFIG_FILE_DATA", Value: configData},
 		{Name: "POD_IP", ValueFrom: selectorFromFieldPath("status.podIP")},
 		{Name: "HOST_IP", ValueFrom: selectorFromFieldPath("status.hostIP")},
 		{Name: "USE_HOST_IP_FOR_BROADCAST", Value: useHostIpForBroadcast},
@@ -312,6 +312,10 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		{Name: "PRODUCT_NAME", Value: dc.Spec.ServerType},
 		// TODO remove this post 1.0
 		{Name: "DSE_VERSION", Value: serverVersion},
+	}
+
+	for _, envVar := range configEnvVar {
+		envDefaults = append(envDefaults, envVar)
 	}
 
 	serverCfg.Env = combineEnvSlices(envDefaults, serverCfg.Env)
@@ -323,6 +327,43 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 	}
 
 	return nil
+}
+
+func getConfigDataEnVars(dc *api.CassandraDatacenter) ([]corev1.EnvVar, error) {
+	envVars := make([]corev1.EnvVar, 0)
+
+	if len(dc.Spec.ConfigSecret) > 0 {
+		envVars = append(envVars, corev1.EnvVar{
+			Name: "CONFIG_FILE_DATA",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: getDatacenterConfigSecretName(dc),
+					},
+					Key: "config",
+				},
+			},
+		})
+
+		if configHash, ok := dc.Annotations[api.ConfigHashAnnotation]; ok {
+			envVars = append(envVars, corev1.EnvVar{
+				Name: "CONFIG_HASH",
+				Value: configHash,
+			})
+			return envVars, nil
+		}
+
+		return nil, fmt.Errorf("datacenter %s is missing %s annotation", dc.Name, api.ConfigHashAnnotation)
+	}
+
+	configData, err := dc.GetConfigAsJSON(dc.Spec.Config)
+
+	if err != nil {
+		return envVars, err
+	}
+	envVars = append(envVars, corev1.EnvVar{Name: "CONFIG_FILE_DATA", Value: configData})
+
+	return envVars, nil
 }
 
 // makeImage takes the server type/version and image from the spec,

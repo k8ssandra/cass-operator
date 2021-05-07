@@ -103,7 +103,7 @@ var imageLookupMap map[Image]string = map[Image]string{
 	UBIConfigBuilder: "datastax/cass-config-builder:1.0.3-ubi7",
 
 	BusyBox:           "busybox:1.32.0-uclibc",
-	SystemLoggerImage: "k8ssandra/system-logger:latest",
+	SystemLoggerImage: "k8ssandra/system-logger:9c4c3692",
 }
 
 var versionToOSSCassandra map[string]Image = map[string]Image{

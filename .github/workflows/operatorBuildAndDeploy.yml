@@ -127,3 +127,42 @@ jobs:
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
+  push_k8ssandra_update:
+    runs-on: ubuntu-latest
+    needs: [build_system_logger, build_operator_docker]
+    name: Update dependency in k8ssandra
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+      - name: Set git parsed values
+        id: vars
+        run: |
+          echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
+          echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
+      - name: Checkout k8ssandra charts
+        uses: actions/checkout@v2
+        with:
+          repository: k8ssandra/k8ssandra
+          path: k8ssandra
+      - name: Update cass-operator values in k8ssandra
+        run: |
+          # Update the CRD
+          cp charts/cass-operator-chart/templates/customresourcedefinition.yaml k8ssandra/charts/cass-operator/crds/customresourcedefinition.yaml
+          # Update values.yaml's tag to use the newly built image
+          cd k8ssandra
+          pip3 install ruamel.yaml
+          scripts/image-update.py --chart cass-operator --tag ${{ steps.vars.outputs.sha_short }}
+      - name: Create PR to k8ssandra
+        id: master-pr
+        uses: peter-evans/create-pull-request@v3
+        with:
+          path: k8ssandra
+          commit-message: Automated update for cass-operator release
+          delete-branch: true
+          title: Update cass-operator to ${{ steps.vars.outputs.sha_short }}
+          body: |
+            This is auto-generated update from the cass-operator's github actions.
+      - name: Log outputs
+        run: |
+          echo "Pull request number ${{ steps.master-pr.outputs.pull-request-number }}"

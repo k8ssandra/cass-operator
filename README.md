@@ -1,7 +1,7 @@
 # Cass Operator
 [![License: Apache License 2.0](https://img.shields.io/github/license/k8ssandra/cass-operator)](https://github.com/k8ssandra/cass-operator/blob/master/LICENSE.txt)
 [![Gitter](https://badges.gitter.im/cass-operator/community.svg)](https://gitter.im/cass-operator/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-[![Go Report Card](https://goreportcard.com/badge/github.com/datastax/cass-operator)](https://goreportcard.com/report/github.com/datastax/cass-operator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/k8ssandra/cass-operator)](https://goreportcard.com/report/github.com/k8ssandra/cass-operator)
 
 The DataStax Kubernetes Operator for Apache Cassandra&reg;. This repository replaces the old [datastax/cass-operator](https://github.com/datastax/cass-operator) for use-cases in the k8ssandra project. Some documentation is still out of date and will be modified in the future. Check [k8ssandra/k8ssandra](https://github.com/k8ssandra/k8ssandra) for more up to date information.
 

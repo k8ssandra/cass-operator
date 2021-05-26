@@ -7,6 +7,7 @@ package reconciliation
 
 import (
 	"fmt"
+
 	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/operator/pkg/images"
@@ -49,25 +50,6 @@ func newNamespacedNameForStatefulSet(
 	}
 }
 
-// We have to account for the fact that they might use the old managed-by label value
-// (oplabels.ManagedByLabelDefunctValue) for CassandraDatacenters originally
-// created in version 1.1.0 or earlier.
-func newStatefulSetForCassandraDatacenterWithDefunctPvcManagedBy(
-	rackName string,
-	dc *api.CassandraDatacenter,
-	replicaCount int) (*appsv1.StatefulSet, error) {
-
-	return newStatefulSetForCassandraDatacenterHelper(rackName, dc, replicaCount, true)
-}
-
-func newStatefulSetForCassandraDatacenter(
-	rackName string,
-	dc *api.CassandraDatacenter,
-	replicaCount int) (*appsv1.StatefulSet, error) {
-
-	return newStatefulSetForCassandraDatacenterHelper(rackName, dc, replicaCount, false)
-}
-
 // Check if we need to define a SecurityContext.
 // If the user defines the DockerImageRunsAsCassandra field, we trust that.
 // Otherwise if ServerType is "dse", the answer is true.
@@ -93,12 +75,12 @@ func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[s
 			if rack.Zone != "" {
 				if _, found := nodeAffinityLabels[zoneLabel]; found {
 					log.Error(nil,
-						"Deprecated parameter Zone is used and also defined in NodeAffinityLabels. " +
-						"You should only define it in NodeAffinityLabels")
+						"Deprecated parameter Zone is used and also defined in NodeAffinityLabels. "+
+							"You should only define it in NodeAffinityLabels")
 				}
 				nodeAffinityLabels = utils.MergeMap(
 					emptyMapIfNil(nodeAffinityLabels), map[string]string{zoneLabel: rack.Zone},
-					)
+				)
 			}
 			break
 		}
@@ -107,7 +89,11 @@ func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[s
 }
 
 // Create a statefulset object for the Datacenter.
-func newStatefulSetForCassandraDatacenterHelper(
+// We have to account for the fact that they might use the old managed-by label value
+// (oplabels.ManagedByLabelDefunctValue) for CassandraDatacenters originally
+// created in version 1.1.0 or earlier. Set useDefunctManagedByForPvc to true to use old ones.
+func newStatefulSetForCassandraDatacenter(
+	sts *appsv1.StatefulSet,
 	rackName string,
 	dc *api.CassandraDatacenter,
 	replicaCount int,
@@ -194,6 +180,10 @@ func newStatefulSetForCassandraDatacenterHelper(
 		},
 	}
 	result.Annotations = map[string]string{}
+
+	if sts != nil && sts.Spec.ServiceName != result.Spec.ServiceName {
+		result.Spec.ServiceName = sts.Spec.ServiceName
+	}
 
 	if utils.IsPSPEnabled() {
 		result = psp.AddStatefulSetChanges(dc, result)

@@ -11,6 +11,8 @@
 # Note that the script assumes that the namespace of the current context is the
 # namespace in which the CassandraDatacenter is deployed.
 #
+# The script uses jq (https://stedolan.github.io/jq/) for json queries.
+#
 # The script accepts 3 space-separated options:
 #
 #   --operator           The name of the cass-operator deployment. Required.
@@ -109,3 +111,5 @@ dc_copy=`kubectl get cassdc $dc -o json`
 scale_down_cass_operator
 
 delete_objects
+
+restore_objects

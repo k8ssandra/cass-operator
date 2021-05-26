@@ -174,13 +174,7 @@ func (rc *ReconciliationContext) desiredStatefulSetForExistingStatefulSet(sts *a
 	// StatefulSet. Consequently, we must preserve the old labels in this case.
 	usesDefunct := usesDefunctPvcManagedByLabel(sts)
 
-	if usesDefunct {
-		desiredSts, err = newStatefulSetForCassandraDatacenterWithDefunctPvcManagedBy(rackName, dc, replicas)
-	} else {
-		desiredSts, err = newStatefulSetForCassandraDatacenter(rackName, dc, replicas)
-	}
-
-	return
+	return newStatefulSetForCassandraDatacenter(sts, rackName, dc, replicas, usesDefunct)
 }
 
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
@@ -342,7 +336,7 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 			// have to use zero here, because each statefulset is created with no replicas
 			// in GetStatefulSetForRack()
-			desiredSts, err := newStatefulSetForCassandraDatacenter(rackName, dc, 0)
+			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, 0, false)
 			if err != nil {
 				logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
 				return result.Error(err)
@@ -648,7 +642,7 @@ func hasPodPotentiallyBootstrapped(pod *corev1.Pod, nodeStatuses api.CassandraSt
 	// In effect, we want to know if 'nodetool status' would indicate the relevant cassandra node
 	// is part of the cluster
 
-	// Case 1: If we have a host ID for the pod, then we know it must be a member of the cluster 
+	// Case 1: If we have a host ID for the pod, then we know it must be a member of the cluster
 	// (even if the pod does not exist)
 	nodeStatus, ok := nodeStatuses[pod.Name]
 	if ok {
@@ -663,7 +657,7 @@ func hasPodPotentiallyBootstrapped(pod *corev1.Pod, nodeStatuses api.CassandraSt
 		state, ok := pod.Labels[api.CassNodeState]
 		if ok && state != stateReadyToStart {
 			return true
-		} 
+		}
 	}
 
 	return false
@@ -747,7 +741,7 @@ func allPodsBelongToSameNodeOrHaveNoNode(pods []*corev1.Pod) (string, bool) {
 		}
 	}
 
-	return nodeName, true	
+	return nodeName, true
 }
 
 // CheckRackScale loops over each statefulset and makes sure that it has the right
@@ -1370,9 +1364,11 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 	}
 
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		currentStatefulSet,
 		nextRack.RackName,
 		rc.Datacenter,
-		0)
+		0,
+		false)
 	if err != nil {
 		return nil, false, err
 	}
@@ -2321,7 +2317,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	if recResult := rc.CheckCassandraNodeStatuses(); recResult.Completed() {
 		return recResult.Output()
 	}
-
 
 	if recResult := rc.CheckRollingRestart(); recResult.Completed() {
 		return recResult.Output()

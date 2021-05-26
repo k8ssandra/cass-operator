@@ -10,9 +10,9 @@ To create a full featured cluster, the recommend approach is to use the Helm cha
 Quick start:
 ```console
 # *** This is for GKE Regular Channel - k8s 1.16 -> Adjust based on your cloud or storage options
-kubectl create -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/docs/user/cass-operator-manifests.yaml
-kubectl create -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/operator/k8s-flavors/gke/storage.yaml
-kubectl -n cass-operator create -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/operator/example-cassdc-yaml/cassandra-3.11.x/example-cassdc-minimal.yaml
+kubectl create -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.1/docs/user/cass-operator-manifests.yaml
+kubectl create -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.1/operator/k8s-flavors/gke/storage.yaml
+kubectl -n cass-operator create -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.1/operator/example-cassdc-yaml/cassandra-3.11.x/example-cassdc-minimal.yaml
 ```
 
 ### Loading the operator
@@ -20,7 +20,7 @@ kubectl -n cass-operator create -f https://raw.githubusercontent.com/k8ssandra/c
 Installing the Cass Operator itself is straightforward. Apply the relevant manifest to your cluster as follows:
 
 ```console
-kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/docs/user/cass-operator-manifests.yaml
+kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.1/docs/user/cass-operator-manifests.yaml
 ```
 
 Note that since the manifest will install a [Custom Resource Definition](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/), the user running the above command will need cluster-admin privileges.
@@ -53,7 +53,7 @@ reclaimPolicy: Delete
 Apply the above as follows:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/operator/k8s-flavors/gke/storage.yaml
+kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.1/operator/k8s-flavors/gke/storage.yaml
 ```
 
 ### Creating a CassandraDatacenter
@@ -93,7 +93,7 @@ spec:
 Apply the above as follows:
 
 ```console
-kubectl -n cass-operator apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/operator/example-cassdc-yaml/cassandra-3.11.x/example-cassdc-minimal.yaml
+kubectl -n cass-operator apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.1/operator/example-cassdc-yaml/cassandra-3.11.x/example-cassdc-minimal.yaml
 ```
 
 You can check the status of pods in the Cassandra cluster as follows:
@@ -344,7 +344,7 @@ kubectl delete cassdcs --all-namespaces --all
 
 Remove the operator Deployment, CRD, etc.
 ```
-kubectl delete -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.0/docs/user/cass-operator-manifests.yaml
+kubectl delete -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.1/docs/user/cass-operator-manifests.yaml
 ```
 
 ## Contacts

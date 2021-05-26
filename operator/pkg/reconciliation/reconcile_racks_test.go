@@ -152,9 +152,11 @@ func TestReconcileRacks_ReconcilePods(t *testing.T) {
 	)
 
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Spec.Replicas = &one
@@ -320,9 +322,11 @@ func TestReconcilePods(t *testing.T) {
 		Once()
 
 	statefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	statefulSet.Status.Replicas = int32(1)
 
@@ -337,9 +341,11 @@ func TestReconcilePods_WithVolumes(t *testing.T) {
 	defer cleanupMockScr()
 
 	statefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	statefulSet.Status.Replicas = int32(1)
 
@@ -394,9 +400,11 @@ func TestReconcileNextRack(t *testing.T) {
 	defer cleanupMockScr()
 
 	statefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	err = rc.ReconcileNextRack(statefulSet)
@@ -417,9 +425,11 @@ func TestReconcileNextRack_CreateError(t *testing.T) {
 	defer cleanupMockScr()
 
 	statefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	mockClient := &mocks.Client{}
@@ -493,9 +503,11 @@ func TestReconcileRacks(t *testing.T) {
 	defer cleanupMockScr()
 
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -565,9 +577,11 @@ func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
 	defer cleanupMockScr()
 
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -606,9 +620,11 @@ func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
 	defer cleanupMockScr()
 
 	preExistingStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -640,9 +656,11 @@ func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
 	defer cleanupMockScr()
 
 	preExistingStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -680,9 +698,11 @@ func TestReconcileRacks_NeedToPark(t *testing.T) {
 	defer cleanupMockScr()
 
 	preExistingStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		3)
+		3,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -724,9 +744,11 @@ func TestReconcileRacks_AlreadyReconciled(t *testing.T) {
 	defer cleanupMockScr()
 
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = 2
@@ -765,17 +787,21 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 	defer cleanupMockScr()
 
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"rack0",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = 2
 
 	secondDesiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"rack1",
 		rc.Datacenter,
-		1)
+		1,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	secondDesiredStatefulSet.Status.ReadyReplicas = 1
 
@@ -874,9 +900,11 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 	defer cleanupMockScr()
 
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
 		"rack0",
 		rc.Datacenter,
-		2)
+		2,
+		false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = 2

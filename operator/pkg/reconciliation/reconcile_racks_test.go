@@ -780,6 +780,33 @@ func TestReconcileRacks_AlreadyReconciled(t *testing.T) {
 	assert.Equal(t, reconcile.Result{}, result, "Should not requeue request")
 }
 
+func TestReconcileStatefulSet_ImmutableSpec(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	origStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
+		"rack0",
+		rc.Datacenter,
+		2,
+		false)
+	assert.NoErrorf(err, "error occurred creating statefulset")
+
+	assert.NotEqual("immutable-service", origStatefulSet.Spec.ServiceName)
+	origStatefulSet.Spec.ServiceName = "immutable-service"
+
+	modifiedStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		origStatefulSet,
+		"rack0",
+		rc.Datacenter,
+		2,
+		false)
+	assert.NoErrorf(err, "error occurred creating statefulset")
+
+	assert.Equal("immutable-service", modifiedStatefulSet.Spec.ServiceName)
+}
+
 func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 	t.Skip("FIXME - Skipping this test")
 

@@ -8,6 +8,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## v1.7.1
+* [BUGFIX] #103 Fix upgrade of StatefulSet, do not change service name
+
 ## v1.7.0
 * [CHANGE] #1 Repository move
 * [CHANGE] #19 Remove internode_encryption_test

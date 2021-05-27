@@ -6,6 +6,8 @@ spec:
   clusterName: cluster1
   serverType: cassandra
   serverVersion: "3.11.6"
+  dockerImageRunsAsCassandra: true
+  serverImage: k8ssandra/cass-management-api:3.11.7-v0.1.25
   managementApiAuth:
     insecure: {}
   size: 1

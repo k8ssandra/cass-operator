@@ -44,7 +44,7 @@ func Test_newStatefulSetForCassandraDatacenter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount, false)
+		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount)
 		assert.NoError(t, err, "newStatefulSetForCassandraDatacenter should not have errored")
 		assert.NotNil(t, got, "newStatefulSetForCassandraDatacenter should not have returned a nil statefulset")
 		assert.Equal(t, map[string]string{"dedicated": "cassandra"}, got.Spec.Template.Spec.NodeSelector)
@@ -155,7 +155,7 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount, false)
+		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount)
 		assert.NoError(t, err, "newStatefulSetForCassandraDatacenter should not have errored")
 		assert.NotNil(t, got, "newStatefulSetForCassandraDatacenter should not have returned a nil statefulset")
 
@@ -345,7 +345,7 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		statefulSet, err := newStatefulSetForCassandraDatacenter(nil, rack, tt.dc, replicas, false)
+		statefulSet, err := newStatefulSetForCassandraDatacenter(nil, rack, tt.dc, replicas)
 		assert.NoError(t, err, fmt.Sprintf("%s: failed to create new statefulset", tt.name))
 		assert.NotNil(t, statefulSet, fmt.Sprintf("%s: statefulset is nil", tt.name))
 

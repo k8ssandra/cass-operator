@@ -172,9 +172,7 @@ func (rc *ReconciliationContext) desiredStatefulSetForExistingStatefulSet(sts *a
 	// label of "cassandra-operator" we have since fixed this to be "cass-operator",
 	// but unfortunately, we cannot modify the labels in the volumeClaimTemplates of a
 	// StatefulSet. Consequently, we must preserve the old labels in this case.
-	usesDefunct := usesDefunctPvcManagedByLabel(sts)
-
-	return newStatefulSetForCassandraDatacenter(sts, rackName, dc, replicas, usesDefunct)
+	return newStatefulSetForCassandraDatacenter(sts, rackName, dc, replicas)
 }
 
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
@@ -336,7 +334,7 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 			// have to use zero here, because each statefulset is created with no replicas
 			// in GetStatefulSetForRack()
-			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, 0, false)
+			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, 0)
 			if err != nil {
 				logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
 				return result.Error(err)
@@ -1367,8 +1365,7 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 		currentStatefulSet,
 		nextRack.RackName,
 		rc.Datacenter,
-		0,
-		false)
+		0)
 	if err != nil {
 		return nil, false, err
 	}

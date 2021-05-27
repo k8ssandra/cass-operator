@@ -112,8 +112,9 @@ fi
 
 echo "Detected kubectl client version v${client_major_version}.${client_minor_version}"
 if [ $client_major_version -eq 1 ]; then
+  # The check for versions under 1.16 is arbitrary and only chose to match the general support in K8ssandra
   if [ $client_minor_version -lt 16 ]; then
-    echo "The deteched kubectl client version is not supported, it must be >= v1.16"
+    echo "The detected kubectl client version is not supported, it must be >= v1.16"
     exit 1
   fi
   if [ $client_minor_version -lt 20 ]; then

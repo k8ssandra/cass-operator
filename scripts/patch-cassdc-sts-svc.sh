@@ -41,10 +41,10 @@ delete_objects() {
   kubectl patch cassdc $dc --type=merge --patch '{"metadata": {"finalizers": []}}'
 
   echo "Deleting CassandraDatacenter $dc"
-  kubectl delete --cascade="orphan" --wait=true cassdc $dc
+  kubectl delete --cascade=$cascade_mode --wait=true cassdc $dc
 
   echo "Deleting StatefulSets"
-  kubectl delete sts --cascade="orphan" --wait=true -l cassandra.datastax.com/datacenter=$dc,cassandra.datastax.com/cluster=$cluster
+  kubectl delete sts --cascade=$cascade_mode --wait=true -l cassandra.datastax.com/datacenter=$dc,cassandra.datastax.com/cluster=$cluster
 }
 
 restore_objects() {
@@ -69,6 +69,12 @@ dc=""
 # different than the CassandraDatacenter which would be common when the 
 # operator is configured to watch multiple namespaces.
 operator_ns=""
+
+client_major_version=`kubectl version --client -o json | jq -r '.clientVersion.major'`
+
+client_minor_version=`kubectl version --client -o json | jq -r '.clientVersion.minor'`
+
+cascade_mode="orphan"
 
 while [[ $# -gt 0  ]]
 do
@@ -104,6 +110,18 @@ if [ -z $dc ]; then
   echo "The --datacenter option is required and should specify the name of the cassandradatacenter"
 fi 
 
+echo "Detected kubectl client version v${client_major_version}.${client_minor_version}"
+if [ $client_major_version -eq 1 ]; then
+  # The check for versions under 1.16 is arbitrary and only chose to match the general support in K8ssandra
+  if [ $client_minor_version -lt 16 ]; then
+    echo "The detected kubectl client version is not supported, it must be >= v1.16"
+    exit 1
+  fi
+  if [ $client_minor_version -lt 20 ]; then
+    cascade_mode="false"
+  fi
+fi
+echo "Will use delete --cascade=${cascade_mode}"
 
 # Store a copy of the CassandraDatacenter object to recreate it later.
 dc_copy=`kubectl get cassdc $dc -o json`

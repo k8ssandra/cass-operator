@@ -334,7 +334,8 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 			// have to use zero here, because each statefulset is created with no replicas
 			// in GetStatefulSetForRack()
-			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, 0)
+			// We want to construct new desired state, that's why the previous state is not passed
+			desiredSts, err := newStatefulSetForCassandraDatacenter(nil, rackName, dc, 0)
 			if err != nil {
 				logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
 				return result.Error(err)

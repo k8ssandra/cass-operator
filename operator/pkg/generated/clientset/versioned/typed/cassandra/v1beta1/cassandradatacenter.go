@@ -22,7 +22,7 @@ import (
 	"context"
 	"time"
 
-	v1beta1 "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	v1beta1 "github.com/k8ssandra/cass-operator/api/v1beta1"
 	scheme "github.com/k8ssandra/cass-operator/operator/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"

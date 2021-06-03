@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 )
 

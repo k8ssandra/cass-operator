@@ -72,7 +72,7 @@ var _ = Describe(testName, func() {
 			step = "create user secret"
 			k = kubectl.CreateSecretLiteral("bobby-secret", bobbyuserName, bobbyuserPass)
 			ns.ExecAndLog(step, k)
-			
+
 			step = "creating a datacenter resource with 1 racks/2 nodes"
 			k = kubectl.ApplyFiles(dcYaml)
 			ns.ExecAndLog(step, k)
@@ -144,8 +144,8 @@ var _ = Describe(testName, func() {
 			step = "check annotations and labels removed"
 			k = kubectl.Get("secret", superuserSecretName).FormatOutput(json)
 			output := ns.OutputAndLog(step, k)
-			Expect(output).ToNot(ContainSubstring(labelAnnoPrefix), 
-				"Secret %s should no longer have annotations or labels namespaced with %s", 
+			Expect(output).ToNot(ContainSubstring(labelAnnoPrefix),
+				"Secret %s should no longer have annotations or labels namespaced with %s",
 				superuserSecretName, labelAnnoPrefix)
 		})
 	})

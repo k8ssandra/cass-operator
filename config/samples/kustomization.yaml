@@ -1,0 +1,4 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- cassandra.datastax.com_v1beta1_cassandradatacenter.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

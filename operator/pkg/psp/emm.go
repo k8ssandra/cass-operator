@@ -30,8 +30,8 @@ import (
 
 	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/internal/result"
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 )
 
 const (

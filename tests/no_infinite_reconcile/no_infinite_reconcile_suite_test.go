@@ -15,13 +15,13 @@ import (
 )
 
 var (
-	testName                       = "No Infinite Reconcile"
-	namespace                      = "test-no-infinite-reconcile"
-	dcName                         = "dc1"
-	dcYaml                         = "../testdata/default-three-rack-three-node-dc.yaml"
-	dcResource                     = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel                        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns                             = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "No Infinite Reconcile"
+	namespace  = "test-no-infinite-reconcile"
+	dcName     = "dc1"
+	dcYaml     = "../testdata/default-three-rack-three-node-dc.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {

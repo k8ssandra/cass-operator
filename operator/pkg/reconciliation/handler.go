@@ -5,11 +5,13 @@ package reconciliation
 
 import (
 	"fmt"
-	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sync"
 	"time"
+
+	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -21,14 +23,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/internal/result"
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 	"github.com/k8ssandra/cass-operator/operator/pkg/psp"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 )
 
 // Use a var so we can mock this function
@@ -326,7 +327,7 @@ func (rc *ReconciliationContext) isValid(dc *api.CassandraDatacenter) error {
 }
 
 // NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(mgr manager.Manager) *ReconcileCassandraDatacenter {
 	client := mgr.GetClient()
 	dynamicWatches := dynamicwatch.NewDynamicSecretWatches(client)
 	return &ReconcileCassandraDatacenter{

@@ -22,8 +22,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/internal/result"
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"

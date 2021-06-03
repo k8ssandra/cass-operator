@@ -5,10 +5,10 @@ package shutil
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
-	"fmt"
 	"strings"
 
 	"github.com/k8ssandra/cass-operator/mage/util"
@@ -133,7 +133,7 @@ func RunVWithInput(cmd string, in string, args ...string) error {
 	return RunVWithEnvWithInput(nil, cmd, in, args...)
 }
 
-func RunVWithEnvWithInput(env map[string]string, cmd string, in string, args...string) error {
+func RunVWithEnvWithInput(env map[string]string, cmd string, in string, args ...string) error {
 	c := cmdWithStdIn(env, cmd, in, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr

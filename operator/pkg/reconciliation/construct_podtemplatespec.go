@@ -7,11 +7,12 @@ package reconciliation
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"reflect"
 	"sort"
 
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	"github.com/pkg/errors"
+
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
@@ -347,7 +348,7 @@ func getConfigDataEnVars(dc *api.CassandraDatacenter) ([]corev1.EnvVar, error) {
 
 		if configHash, ok := dc.Annotations[api.ConfigHashAnnotation]; ok {
 			envVars = append(envVars, corev1.EnvVar{
-				Name: "CONFIG_HASH",
+				Name:  "CONFIG_HASH",
 				Value: configHash,
 			})
 			return envVars, nil

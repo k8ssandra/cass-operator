@@ -5,14 +5,15 @@ package reconciliation
 
 import (
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
 	"github.com/stretchr/testify/assert"
@@ -141,7 +142,7 @@ func TestCassandraDatacenter_buildInitContainer_with_overrides(t *testing.T) {
 		t.Error("Unexpected default resources allocated for the init container.")
 	}
 
-	assert.Contains(t, initContainers[0].Env, corev1.EnvVar{Name:  "k1", Value: "v1"},
+	assert.Contains(t, initContainers[0].Env, corev1.EnvVar{Name: "k1", Value: "v1"},
 		fmt.Sprintf("Unexpected env vars allocated for the init container: %v", initContainers[0].Env))
 
 	assert.Contains(t, initContainers[0].Env, corev1.EnvVar{Name: "USE_HOST_IP_FOR_BROADCAST", Value: "false"},
@@ -239,36 +240,36 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 	hostIPEnvVar := corev1.EnvVar{Name: "HOST_IP", ValueFrom: selectorFromFieldPath("status.hostIP")}
 
 	tests := []struct {
-		name        string
-		annotations map[string]string
+		name         string
+		annotations  map[string]string
 		config       []byte
 		configSecret string
-		want        []corev1.EnvVar
+		want         []corev1.EnvVar
 	}{
 		{
-			name: "use config",
+			name:   "use config",
 			config: []byte(`{"cassandra-yaml":{"read_request_timeout_in_ms":10000}}`),
 			want: []corev1.EnvVar{
 				podIPEnvVar,
 				hostIPEnvVar,
 				{
-					Name: "USE_HOST_IP_FOR_BROADCAST",
+					Name:  "USE_HOST_IP_FOR_BROADCAST",
 					Value: "false",
 				},
 				{
-					Name: "RACK_NAME",
+					Name:  "RACK_NAME",
 					Value: rack,
 				},
 				{
-					Name: "PRODUCT_VERSION",
+					Name:  "PRODUCT_VERSION",
 					Value: "3.11.10",
 				},
 				{
-					Name: "PRODUCT_NAME",
+					Name:  "PRODUCT_NAME",
 					Value: "cassandra",
 				},
 				{
-					Name: "DSE_VERSION",
+					Name:  "DSE_VERSION",
 					Value: "3.11.10",
 				},
 			},
@@ -283,23 +284,23 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 				podIPEnvVar,
 				hostIPEnvVar,
 				{
-					Name: "USE_HOST_IP_FOR_BROADCAST",
+					Name:  "USE_HOST_IP_FOR_BROADCAST",
 					Value: "false",
 				},
 				{
-					Name: "RACK_NAME",
+					Name:  "RACK_NAME",
 					Value: rack,
 				},
 				{
-					Name: "PRODUCT_VERSION",
+					Name:  "PRODUCT_VERSION",
 					Value: "3.11.10",
 				},
 				{
-					Name: "PRODUCT_NAME",
+					Name:  "PRODUCT_NAME",
 					Value: "cassandra",
 				},
 				{
-					Name: "DSE_VERSION",
+					Name:  "DSE_VERSION",
 					Value: "3.11.10",
 				},
 			},
@@ -309,8 +310,8 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 		templateSpec := &corev1.PodTemplateSpec{}
 		dc := &api.CassandraDatacenter{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "test",
-				Name:      "test",
+				Namespace:   "test",
+				Name:        "test",
 				Annotations: tt.annotations,
 			},
 			Spec: api.CassandraDatacenterSpec{
@@ -318,7 +319,7 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 				ServerType:    "cassandra",
 				ServerVersion: "3.11.10",
 				Config:        tt.config,
-				ConfigSecret: tt.configSecret,
+				ConfigSecret:  tt.configSecret,
 			},
 		}
 
@@ -785,13 +786,13 @@ func TestCassandraDatacenter_buildPodTemplateSpec_overrideSecurityContext(t *tes
 
 	dc := &api.CassandraDatacenter{
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: "test",
-			ServerType: "cassandra",
+			ClusterName:   "test",
+			ServerType:    "cassandra",
 			ServerVersion: "3.11.7",
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &uid,
+						RunAsUser:  &uid,
 						RunAsGroup: &gid,
 					},
 				},
@@ -805,7 +806,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_overrideSecurityContext(t *tes
 	assert.NotNil(t, spec)
 
 	expected := &corev1.PodSecurityContext{
-		RunAsUser: &uid,
+		RunAsUser:  &uid,
 		RunAsGroup: &gid,
 	}
 
@@ -1130,29 +1131,29 @@ func Test_makeUbiImage(t *testing.T) {
 func TestTolerations(t *testing.T) {
 	tolerations := []corev1.Toleration{
 		{
-			Key: "cassandra-node",
+			Key:      "cassandra-node",
 			Operator: corev1.TolerationOpExists,
-			Value: "true",
-			Effect: corev1.TaintEffectNoExecute,
+			Value:    "true",
+			Effect:   corev1.TaintEffectNoExecute,
 		},
 		{
-			Key: "search-node",
+			Key:      "search-node",
 			Operator: corev1.TolerationOpExists,
-			Value: "true",
-			Effect: corev1.TaintEffectNoSchedule,
+			Value:    "true",
+			Effect:   corev1.TaintEffectNoSchedule,
 		},
 	}
 
 	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "test",
-			Name: "test",
+			Name:      "test",
 		},
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: "test",
-			ServerType: "cassandra",
+			ClusterName:   "test",
+			ServerType:    "cassandra",
 			ServerVersion: "3.11.10",
-			Tolerations: tolerations,
+			Tolerations:   tolerations,
 		},
 	}
 
@@ -1166,21 +1167,21 @@ func TestTolerations(t *testing.T) {
 	dc = &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "test",
-			Name: "test",
+			Name:      "test",
 		},
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: "test",
-			ServerType: "cassandra",
+			ClusterName:   "test",
+			ServerType:    "cassandra",
 			ServerVersion: "3.11.10",
-			Tolerations: tolerations,
+			Tolerations:   tolerations,
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Tolerations: []corev1.Toleration{
 						{
-							Key: "cassandra-node",
+							Key:      "cassandra-node",
 							Operator: corev1.TolerationOpExists,
-							Value: "false",
-							Effect: corev1.TaintEffectNoSchedule,
+							Value:    "false",
+							Effect:   corev1.TaintEffectNoSchedule,
 						},
 					},
 				},

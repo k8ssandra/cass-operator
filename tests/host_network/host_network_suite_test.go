@@ -15,13 +15,13 @@ import (
 )
 
 var (
-	testName                       = "Host Network"
-	namespace                      = "test-host-network"
-	dcName                         = "dc1"
-	dcYaml                         = "../testdata/host-network-dc.yaml"
-	dcResource                     = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel                        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns                             = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "Host Network"
+	namespace  = "test-host-network"
+	dcName     = "dc1"
+	dcYaml     = "../testdata/host-network-dc.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {

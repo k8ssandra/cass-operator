@@ -13,8 +13,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/k8ssandra/cass-operator/operator/pkg/psp"
 	"github.com/go-logr/logr"
+	"github.com/k8ssandra/cass-operator/operator/pkg/psp"
 	mock "github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/operator/pkg/mocks"
 )
@@ -96,7 +96,7 @@ func CreateMockReconciliationContext(
 	}
 
 	s := scheme.Scheme
-	s.AddKnownTypes(api.SchemeGroupVersion, cassandraDatacenter)
+	s.AddKnownTypes(api.GroupVersion, cassandraDatacenter)
 
 	fakeClient := fake.NewFakeClient(trackObjects...)
 
@@ -156,7 +156,7 @@ func fakeClientWithService(
 
 func setupTest() (*ReconciliationContext, *corev1.Service, func()) {
 	// Set up verbose logging
-	logger := zap.Logger(true)
+	logger := zap.New()
 	log2.SetLogger(logger)
 	cleanupMockScr := MockSetControllerReference()
 

@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/pkg/mocks"
 )
 
@@ -113,7 +113,7 @@ func TestReconcile(t *testing.T) {
 	t.Skip()
 
 	// Set up verbose logging
-	logger := zap.Logger(true)
+	logger := zap.New()
 	logf.SetLogger(logger)
 
 	var (
@@ -156,7 +156,7 @@ func TestReconcile(t *testing.T) {
 	}
 
 	s := scheme.Scheme
-	s.AddKnownTypes(api.SchemeGroupVersion, dc)
+	s.AddKnownTypes(api.GroupVersion, dc)
 
 	fakeClient := fake.NewFakeClient(trackObjects...)
 
@@ -185,9 +185,9 @@ func TestReconcile(t *testing.T) {
 
 func TestReconcile_NotFound(t *testing.T) {
 	t.Skip()
-	
+
 	// Set up verbose logging
-	logger := zap.Logger(true)
+	logger := zap.New()
 	logf.SetLogger(logger)
 
 	var (
@@ -227,7 +227,7 @@ func TestReconcile_NotFound(t *testing.T) {
 	trackObjects := []runtime.Object{}
 
 	s := scheme.Scheme
-	s.AddKnownTypes(api.SchemeGroupVersion, dc)
+	s.AddKnownTypes(api.GroupVersion, dc)
 
 	fakeClient := fake.NewFakeClient(trackObjects...)
 
@@ -256,7 +256,7 @@ func TestReconcile_NotFound(t *testing.T) {
 
 func TestReconcile_Error(t *testing.T) {
 	// Set up verbose logging
-	logger := zap.Logger(true)
+	logger := zap.New()
 	logf.SetLogger(logger)
 
 	var (
@@ -295,7 +295,7 @@ func TestReconcile_Error(t *testing.T) {
 	// Objects to keep track of
 
 	s := scheme.Scheme
-	s.AddKnownTypes(api.SchemeGroupVersion, dc)
+	s.AddKnownTypes(api.GroupVersion, dc)
 
 	mockClient := &mocks.Client{}
 	k8sMockClientGet(mockClient, fmt.Errorf(""))
@@ -321,7 +321,7 @@ func TestReconcile_Error(t *testing.T) {
 func TestReconcile_CassandraDatacenterToBeDeleted(t *testing.T) {
 	t.Skip()
 	// Set up verbose logging
-	logger := zap.Logger(true)
+	logger := zap.New()
 	logf.SetLogger(logger)
 
 	var (
@@ -367,7 +367,7 @@ func TestReconcile_CassandraDatacenterToBeDeleted(t *testing.T) {
 	}
 
 	s := scheme.Scheme
-	s.AddKnownTypes(api.SchemeGroupVersion, dc)
+	s.AddKnownTypes(api.GroupVersion, dc)
 
 	fakeClient := fake.NewFakeClient(trackObjects...)
 

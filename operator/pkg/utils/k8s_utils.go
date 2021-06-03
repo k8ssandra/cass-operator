@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	volumeutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -176,7 +175,7 @@ func GetPVCSelectedNodeName(pvc *corev1.PersistentVolumeClaim) string {
 	if annos == nil {
 		annos = map[string]string{}
 	}
-	pvcNode := annos[volumeutil.AnnSelectedNode]
+	pvcNode := annos["volume.kubernetes.io/selected-node"]
 	return pvcNode
 }
 

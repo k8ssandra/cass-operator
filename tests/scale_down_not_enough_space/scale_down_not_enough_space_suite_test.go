@@ -13,9 +13,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/google/uuid"
 	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
-	"github.com/google/uuid"
 )
 
 var (

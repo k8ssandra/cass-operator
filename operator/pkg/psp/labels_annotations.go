@@ -3,17 +3,17 @@ package psp
 import (
 	"os"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 )
 
 const (
-	ExtensionIDLabel string        = "appplatform.vmware.com/extension-id"
-	InstanceIDLabel string         = "appplatform.vmware.com/instance-id"
+	ExtensionIDLabel        string = "appplatform.vmware.com/extension-id"
+	InstanceIDLabel         string = "appplatform.vmware.com/instance-id"
 	EMMIntegratedAnnotation string = "appplatform.vmware.com/vsphere-emm-integrated"
-	ExtensionIDEnv string          = "PSP_EXTENSION_ID"
+	ExtensionIDEnv          string = "PSP_EXTENSION_ID"
 )
 
 // The return value here _should_ be the same as `vSphereExtensionKey` in the
@@ -46,7 +46,7 @@ func AddStatefulSetChanges(dc *api.CassandraDatacenter, statefulSet *appsv1.Stat
 		cvt := &statefulSet.Spec.VolumeClaimTemplates[i]
 		addLabels(dc.Name, cvt)
 	}
-	
+
 	podTemplate := &statefulSet.Spec.Template
 	addLabels(dc.Name, podTemplate)
 	addAnnotations(podTemplate)

@@ -63,7 +63,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			// Ensure conditions set correctly for stopped
-			ns.WaitForDatacenterCondition(dcName, "Stopped", string(corev1.ConditionTrue)) 
+			ns.WaitForDatacenterCondition(dcName, "Stopped", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterCondition(dcName, "Ready", string(corev1.ConditionFalse))
 
 			step = "checking the spec size hasn't changed"

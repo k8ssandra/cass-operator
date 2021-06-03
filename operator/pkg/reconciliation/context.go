@@ -15,7 +15,7 @@ import (
 	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/operator/pkg/httphelper"

@@ -17,13 +17,13 @@ import (
 )
 
 var (
-	testName         = "Rolling Restart"
-	namespace        = "test-rolling-restart"
-	dcName           = "dc2"
-	dcYaml           = "../testdata/default-single-rack-2-node-dc.yaml"
-	dcResource       = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel          = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns               = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "Rolling Restart"
+	namespace  = "test-rolling-restart"
+	dcName     = "dc2"
+	dcYaml     = "../testdata/default-single-rack-2-node-dc.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {

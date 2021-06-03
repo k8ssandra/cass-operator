@@ -1,19 +1,19 @@
 package psp
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"k8s.io/apimachinery/pkg/types"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/internal/result"
+	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 )
 
@@ -45,13 +45,13 @@ func newNetworkPolicyForCassandraDatacenter(dc *api.CassandraDatacenter) *networ
 }
 
 // VMWare with Kubernetes does not permit network traffic between namespaces
-// by default. This means a NetworkPolicy must be created to allow the 
+// by default. This means a NetworkPolicy must be created to allow the
 // operator to make requests to the Management API.
 //
 // NOTE: The way VMWare implements NetworkPolicy appears to be non-standard.
 // For example, typially setting the namespace selector to an empty value
 // _should_ select all namespaces, but it does not in VMWare with Kubernetes.
-// Consequently, it is important that changes here be verified in that 
+// Consequently, it is important that changes here be verified in that
 // environment.
 func CheckNetworkPolicies(spi CheckNetworkPoliciesSPI) result.ReconcileResult {
 	logger := spi.GetLogger()
@@ -111,6 +111,6 @@ func CheckNetworkPolicies(spi CheckNetworkPoliciesSPI) result.ReconcileResult {
 			}
 		}
 	}
-	
+
 	return result.Continue()
 }

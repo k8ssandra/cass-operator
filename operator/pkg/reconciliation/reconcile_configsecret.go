@@ -5,8 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/operator/internal/result"
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,7 +65,7 @@ func (rc *ReconciliationContext) CheckConfigSecret() result.ReconcileResult {
 
 		if exists {
 			if err := rc.Client.Update(rc.Ctx, dcConfigSecret); err != nil {
-				rc.ReqLogger.Error(err,"failed to update datacenter config secret", "ConfigSecret", dcConfigSecret.Name)
+				rc.ReqLogger.Error(err, "failed to update datacenter config secret", "ConfigSecret", dcConfigSecret.Name)
 				return result.Error(err)
 			}
 		}
@@ -81,7 +82,7 @@ func (rc *ReconciliationContext) CheckConfigSecret() result.ReconcileResult {
 // If the secret does not have the annotation, it is added, and the secret is patched. The
 // secret should be the one specifiied by ConfigSecret.
 func (rc *ReconciliationContext) checkDatacenterNameAnnotation(secret *corev1.Secret) error {
-	if v, ok := secret.Annotations[api.DatacenterAnnotation]; ok &&  v == rc.Datacenter.Name {
+	if v, ok := secret.Annotations[api.DatacenterAnnotation]; ok && v == rc.Datacenter.Name {
 		return nil
 	}
 
@@ -139,11 +140,11 @@ func (rc *ReconciliationContext) getDatacenterConfigSecret(name string) (*corev1
 
 	if err == nil {
 		return secret, true, nil
-	} else if errors.IsNotFound(err)  {
+	} else if errors.IsNotFound(err) {
 		secret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: key.Namespace,
-				Name: name,
+				Name:      name,
 			},
 			Data: map[string][]byte{},
 		}

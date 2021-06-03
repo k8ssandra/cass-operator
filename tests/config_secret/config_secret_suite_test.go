@@ -2,9 +2,10 @@ package config_secret
 
 import (
 	"fmt"
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	"testing"
+
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -14,17 +15,17 @@ import (
 )
 
 var (
-	testName   = "Config change rollout with config secret"
-	namespace  = "test-config-change-rollout-secret"
-	dcName     = "dc1"
-	dcYaml     = "../testdata/cluster-with-config-secret.yaml"
- 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	secretName = "test-config"
-	secretYaml = "../testdata/test-config-secret.yaml"
+	testName          = "Config change rollout with config secret"
+	namespace         = "test-config-change-rollout-secret"
+	dcName            = "dc1"
+	dcYaml            = "../testdata/cluster-with-config-secret.yaml"
+	dcResource        = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel           = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	secretName        = "test-config"
+	secretYaml        = "../testdata/test-config-secret.yaml"
 	updatedSecretYaml = "../testdata/updated-test-config-secret.yaml"
-	secretResource = fmt.Sprintf("secret/%s", secretName)
-	ns         = ginkgo_util.NewWrapper(testName, namespace)
+	secretResource    = fmt.Sprintf("secret/%s", secretName)
+	ns                = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {

@@ -16,13 +16,13 @@ import (
 )
 
 var (
-	testName         = "PSP Health"
-	namespace        = "test-psp-health"
-	dcName           = "dc2"
-	dcYaml           = "../testdata/default-single-rack-2-node-dc.yaml"
-	dcResource       = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel          = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns               = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "PSP Health"
+	namespace  = "test-psp-health"
+	dcName     = "dc2"
+	dcYaml     = "../testdata/default-single-rack-2-node-dc.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -51,7 +51,7 @@ func getPspInstanceHealth() (map[interface{}]interface{}, error) {
 	return config, nil
 }
 
-func getPath(obj interface{}, path... interface{}) interface{} {
+func getPath(obj interface{}, path ...interface{}) interface{} {
 	if len(path) == 0 {
 		return obj
 	}
@@ -65,7 +65,7 @@ func getPath(obj interface{}, path... interface{}) interface{} {
 	if ok {
 		return getPath(l[path[0].(int)], path[1:]...)
 	}
-	
+
 	return nil
 }
 
@@ -106,16 +106,15 @@ var _ = Describe(testName, func() {
 
 			Expect(
 				getPath(config, "status", "instancehealth", 0, "instance"),
-				).To(Equal(dcName), "Expected instance name to be %s", dcName)
+			).To(Equal(dcName), "Expected instance name to be %s", dcName)
 
 			Expect(
 				getPath(config, "status", "instancehealth", 0, "namespace"),
-				).To(Equal(namespace), "Expected instance namespace to be %s", namespace)
+			).To(Equal(namespace), "Expected instance namespace to be %s", namespace)
 
 			Expect(
 				getPath(config, "status", "instancehealth", 0, "health"),
-				).To(Equal("green"), "Expected instance health value to be green")
-
+			).To(Equal("green"), "Expected instance health value to be green")
 
 			// Check some labels and annotations
 			//

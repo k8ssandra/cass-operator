@@ -15,7 +15,6 @@ import (
 	"time"
 )
 
-
 func setupKey() (*big.Int, time.Time, *rsa.PrivateKey, string, time.Time, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	var serialNumber *big.Int
@@ -105,6 +104,7 @@ func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err
 	}
 	var derBytes []byte
 	ca_cert_bytes, ca_certificate, ca_key, err := prepare_ca(ca)
+
 	if derBytes, err = x509.CreateCertificate(rand.Reader, &newCert, ca_certificate, &priv.PublicKey, ca_key); err == nil {
 		asn1_bytes, err := rsa2pkcs8(priv)
 		buffer := bytes.NewBufferString("")

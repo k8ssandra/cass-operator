@@ -3,11 +3,12 @@ package events
 import (
 	"testing"
 
-	"github.com/stretchr/testify/mock"
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"k8s.io/client-go/tools/record"
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
 )
 
 type MockInfoLogger struct {
@@ -21,14 +22,29 @@ func (l *MockInfoLogger) Info(msg string, keysAndValues ...interface{}) {
 
 func (l *MockInfoLogger) Enabled() bool {
 	args := l.Called()
-  	return args.Bool(0)
+	return args.Bool(0)
+}
+
+func (l *MockInfoLogger) Error(err error, msg string, keysAndValues ...interface{}) {
+}
+
+func (l *MockInfoLogger) V(level int) logr.InfoLogger {
+	return l
+}
+
+func (l *MockInfoLogger) WithValues(keysAndValues ...interface{}) logr.InfoLogger {
+	return l
+}
+
+func (l *MockInfoLogger) WithName(name string) logr.InfoLogger {
+	return l
 }
 
 func TestLoggingEventRecorder(t *testing.T) {
 	logger := &MockInfoLogger{}
 	recorder := &LoggingEventRecorder{
 		EventRecorder: &record.FakeRecorder{},
-		ReqLogger: logger}
+		ReqLogger:     logger}
 	dc := &api.CassandraDatacenter{}
 
 	logger.On("Info",
@@ -53,17 +69,17 @@ func TestLoggingEventRecorder(t *testing.T) {
 	for j := 0; j < 3; j++ {
 		keysAndValues := map[string]string{}
 		args := logger.Calls[j].Arguments
-		for i := 1; i < len(args) - 1; i += 2 {
+		for i := 1; i < len(args)-1; i += 2 {
 			key, ok := args[i].(string)
 			assert.True(t, ok)
-			value, ok := args[i + 1].(string)
+			value, ok := args[i+1].(string)
 			assert.True(t, ok)
 			keysAndValues[key] = value
 		}
 
 		assert.Equal(
 			t,
-			map[string]string{"eventType": "SomeType", "reason": "SomeReason",},
+			map[string]string{"eventType": "SomeType", "reason": "SomeReason"},
 			keysAndValues)
 	}
 }

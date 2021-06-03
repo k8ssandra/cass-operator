@@ -4,22 +4,22 @@
 package dynamicwatch
 
 import (
-	"reflect"
 	"context"
 	"encoding/json"
-	"strings"
 	"fmt"
-	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"github.com/go-logr/logr"
+	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"strings"
 )
 
 const (
@@ -44,10 +44,10 @@ type DynamicWatchesAnnotationImpl struct {
 func NewDynamicSecretWatches(client client.Client) DynamicWatches {
 	impl := &DynamicWatchesAnnotationImpl{
 		Client: client,
-		Ctx: context.Background(),
+		Ctx:    context.Background(),
 		WatchedType: metav1.TypeMeta{
 			APIVersion: "v1",
-			Kind: "Secret",
+			Kind:       "Secret",
 		},
 		WatchedListType: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -63,7 +63,7 @@ func NewDynamicSecretWatches(client client.Client) DynamicWatches {
 //
 
 func namespacedNameString(meta metav1.Object) string {
-	return namespacedNameToString(types.NamespacedName{Name: meta.GetName(), Namespace: meta.GetNamespace(),})
+	return namespacedNameToString(types.NamespacedName{Name: meta.GetName(), Namespace: meta.GetNamespace()})
 }
 
 func namespacedNameFromString(s string) types.NamespacedName {
@@ -72,12 +72,12 @@ func namespacedNameFromString(s string) types.NamespacedName {
 	namespace := strings.TrimSuffix(s, name)
 	namespace = strings.TrimRight(namespace, "/")
 
-	return types.NamespacedName{Name: name, Namespace: namespace,}
+	return types.NamespacedName{Name: name, Namespace: namespace}
 }
 
-// There does not appear to be an explicit guarantee that 
+// There does not appear to be an explicit guarantee that
 // NamespacedName.String() will produced output in a given format. It's quite
-// unlikely it will ever change, but to be safe, we implement our own 
+// unlikely it will ever change, but to be safe, we implement our own
 // serialization to a string.
 func namespacedNameToString(n types.NamespacedName) string {
 	return fmt.Sprintf("%s/%s", n.Namespace, n.Name)
@@ -117,7 +117,7 @@ func getLabelsOrEmptyMap(meta metav1.Object) map[string]string {
 
 //
 // Functions for loading and saving watchers in an annotation
-// 
+//
 
 func (impl *DynamicWatchesAnnotationImpl) getWatcherNames(watched metav1.Object) []string {
 	annotations := getAnnotationsOrEmptyMap(watched)
@@ -126,12 +126,12 @@ func (impl *DynamicWatchesAnnotationImpl) getWatcherNames(watched metav1.Object)
 	if !ok {
 		content = ""
 	}
-	
+
 	data := []string{}
 	if content != "" {
 		err := json.Unmarshal([]byte(content), &data)
 		if err != nil {
-			impl.Logger.Error(err, "Failed to parse watchers data", 
+			impl.Logger.Error(err, "Failed to parse watchers data",
 				"watched", namespacedNameString(watched))
 
 			// As opposed to erroring out here, we'll just allow the
@@ -207,23 +207,23 @@ func (impl *DynamicWatchesAnnotationImpl) listAllWatched(namespace string) ([]un
 	watchedList.SetKind(impl.WatchedListType.Kind)
 	watchedList.SetAPIVersion(impl.WatchedListType.APIVersion)
 
-	selector := map[string]string{WatchedLabel: "true",}
+	selector := map[string]string{WatchedLabel: "true"}
 
 	listOptions := &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(selector),
-		Namespace: namespace,
+		Namespace:     namespace,
 	}
 
 	err := impl.Client.List(
 		impl.Ctx,
 		watchedList,
 		listOptions)
-	
+
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil
 		} else {
-			return nil, err	
+			return nil, err
 		}
 	}
 
@@ -282,7 +282,7 @@ func (impl *DynamicWatchesAnnotationImpl) UpdateWatch(watcher types.NamespacedNa
 				// `watcher` is not recorded as watching this resource in its
 				// annotation.
 				if impl.removeWatcher(watchedItem, watcherAsString) {
-					itemsToUpdate = append(itemsToUpdate, toUpdate{watchedItem: watchedItem, patch: patch,})
+					itemsToUpdate = append(itemsToUpdate, toUpdate{watchedItem: watchedItem, patch: patch})
 				}
 			}
 
@@ -292,7 +292,7 @@ func (impl *DynamicWatchesAnnotationImpl) UpdateWatch(watcher types.NamespacedNa
 	// Now we need to add `watcher` to the relevant resource
 	for _, name := range watched {
 		watchedItem, err := impl.getWatched(name)
-	
+
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// we are attempting to watch a resource that does not exist...
@@ -306,7 +306,7 @@ func (impl *DynamicWatchesAnnotationImpl) UpdateWatch(watcher types.NamespacedNa
 		patch := client.MergeFrom(watchedItem.DeepCopy())
 
 		if impl.addWatcher(watchedItem, watcherAsString) {
-			itemsToUpdate = append(itemsToUpdate, toUpdate{watchedItem: watchedItem, patch: patch,})
+			itemsToUpdate = append(itemsToUpdate, toUpdate{watchedItem: watchedItem, patch: patch})
 		}
 	}
 

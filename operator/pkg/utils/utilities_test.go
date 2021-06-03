@@ -26,35 +26,35 @@ func Test_ElementsMatch(t *testing.T) {
 	var bNil []int = nil
 
 	assert.True(t, ElementsMatch(
-		[]foo{{1,2}, {3,4}, {5,6}},
-		[]foo{{1,2}, {3,4}, {5,6}}))
+		[]foo{{1, 2}, {3, 4}, {5, 6}},
+		[]foo{{1, 2}, {3, 4}, {5, 6}}))
 
 	assert.True(t, ElementsMatch(
-		[]foo{{1,2}, {3,4}, {5,6}},
-		[]foo{{5,6}, {1,2}, {3,4}}))
+		[]foo{{1, 2}, {3, 4}, {5, 6}},
+		[]foo{{5, 6}, {1, 2}, {3, 4}}))
 
 	assert.True(t, ElementsMatch(
 		aNil,
 		bNil))
 
 	assert.False(t, ElementsMatch(
-		[]foo{{1,2}, {3,4}, {5,6}},
-		[]foo{{5,6}, {1,2}}))
+		[]foo{{1, 2}, {3, 4}, {5, 6}},
+		[]foo{{5, 6}, {1, 2}}))
 
 	assert.False(t, ElementsMatch(
-		[]foo{{1,2}, {1,2}},
-		[]foo{{5,6}, {1,2}}))
+		[]foo{{1, 2}, {1, 2}},
+		[]foo{{5, 6}, {1, 2}}))
 
 	assert.False(t, ElementsMatch(
-		[]foo{{5,6}, {1,2}},
-		[]foo{{1,2}, {1,2}}))
+		[]foo{{5, 6}, {1, 2}},
+		[]foo{{1, 2}, {1, 2}}))
 
 	assert.False(t, ElementsMatch(
 		aNil,
-		[]foo{{1,2}, {1,2}}))
+		[]foo{{1, 2}, {1, 2}}))
 
 	assert.False(t, ElementsMatch(
-		[]foo{{5,6}, {1,2}},
+		[]foo{{5, 6}, {1, 2}},
 		bNil))
 }
 
@@ -170,21 +170,20 @@ func Test_mergeMap(t *testing.T) {
 				},
 				sources: []map[string]string{
 					{
-						"foo": "qux",
+						"foo":   "qux",
 						"waldo": "fred",
-
 					},
 					{
-						"foo": "quux",
+						"foo":  "quux",
 						"quuz": "flob",
 					},
 				},
 			},
 			want: map[string]string{
-				"foo": "quux",
-				"baz": "foobar",
+				"foo":   "quux",
+				"baz":   "foobar",
 				"waldo": "fred",
-				"quuz": "flob",
+				"quuz":  "flob",
 			},
 		},
 	}

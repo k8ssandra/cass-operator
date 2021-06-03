@@ -9,11 +9,11 @@ import (
 func buildResourceRequirements(cpuMillis int64, memoryMB int64) corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			"cpu": *resource.NewMilliQuantity(cpuMillis, resource.DecimalSI),
+			"cpu":    *resource.NewMilliQuantity(cpuMillis, resource.DecimalSI),
 			"memory": *resource.NewScaledQuantity(memoryMB, resource.Mega),
 		},
 		Limits: corev1.ResourceList{
-			"cpu": *resource.NewMilliQuantity(cpuMillis, resource.DecimalSI),
+			"cpu":    *resource.NewMilliQuantity(cpuMillis, resource.DecimalSI),
 			"memory": *resource.NewScaledQuantity(memoryMB, resource.Mega),
 		},
 	}
@@ -30,7 +30,7 @@ func isResourceRequirementsNotSpecified(res *corev1.ResourceRequirements) bool {
 
 // Returns the default resources in case the given resources are not configured.
 func getResourcesOrDefault(res *corev1.ResourceRequirements,
-		defaultRes *corev1.ResourceRequirements) *corev1.ResourceRequirements {
+	defaultRes *corev1.ResourceRequirements) *corev1.ResourceRequirements {
 	if !isResourceRequirementsNotSpecified(res) {
 		return defaultRes
 	}

@@ -4,10 +4,10 @@
 package utils
 
 import (
-	"os"
-	"strings"
-	"reflect"
 	"math"
+	"os"
+	"reflect"
+	"strings"
 )
 
 func IsPSPEnabled() bool {
@@ -19,7 +19,7 @@ func RangeInt(min, max, step int) []int {
 	size := int(math.Ceil(float64((max - min)) / float64(step)))
 	l := make([]int, size)
 	for i := 0; i < size; i++ {
-		l[i] = min + i * step
+		l[i] = min + i*step
 	}
 	return l
 }

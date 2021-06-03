@@ -1,10 +1,9 @@
 package utils
 
 import (
-	"testing"
 	appsv1 "k8s.io/api/apps/v1"
+	"testing"
 )
-
 
 func Test_deepHashString(t *testing.T) {
 

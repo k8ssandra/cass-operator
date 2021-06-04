@@ -18,24 +18,15 @@ jobs:
       - name: Checkout latest tag
         run: |
           git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
-      - name: Check git
-        run: |
-          git status
       - name: Install Fossa CLI
         run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | bash
       - name: Initialize Fossa
         run: |
           fossa init
-      - name: Check filesystem
-        run: |
-          ls -al
       - name: Rename Fossa project
         run: |
           sed -i 's/project: .*/project: cass-operator/g' .fossa.yml
-      - name: Check Fossa file
-        run: |
-          cat .fossa.yml
       - name: Scan for dependencies and licenses
         run: |
           FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} fossa analyze -r $(git describe --tags `git rev-list --tags --max-count=1`)

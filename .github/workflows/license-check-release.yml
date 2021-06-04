@@ -1,17 +1,23 @@
-name: Dependency and License Scan
+name: Dependency and License Scan (Release)
 on:
   pull_request:
     branches:
       - master
-  push:
-    branches:
-      - master
+  release:
+    types:
+      - published
 jobs:
   scan-repo:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v2
+      - name: Fetch Tags
+        run: git fetch --tags
+      - name: Identify latest tag
+        run: LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+      - name: Checkout latest tag
+        run: git checkout $LATEST_TAG
       - name: Install Fossa CLI
         run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | bash
@@ -22,4 +28,4 @@ jobs:
       -name: Replace Fossa configuration
         run: mv .fossa.yml-e .fossa.yml
       - name: Scan for dependencies and licenses
-        run: FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} fossa analyze
+        run: FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} fossa analyze -r $LATEST_TAG

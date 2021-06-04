@@ -15,15 +15,15 @@ jobs:
       - name: Fetch Tags
         run: |
           git fetch --tags
-      - name: Identify latest tag
-        run: |
-          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+      - name: Output latest tag
+        run: echo '::set-output name=LATEST_TAG::$(git describe --tags `git rev-list --tags --max-count=1`)'
+        id: output-latest-tag
       - name: Check LATEST_TAG
         run: |
-          echo $LATEST_TAG
+          echo ${{ steps.output-latest-tag.outputs.LATEST_TAG }}
       - name: Checkout latest tag
         run: |
-          git checkout $LATEST_TAG
+          git checkout ${{ steps.output-latest-tag.outputs.LATEST_TAG }}
       - name: Check git
         run: |
           git status
@@ -50,4 +50,4 @@ jobs:
       #     ls -al
       - name: Scan for dependencies and licenses
         run: |
-          FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} fossa analyze -r $LATEST_TAG
+          FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} fossa analyze -r ${{ steps.output-latest-tag.outputs.LATEST_TAG }}

@@ -1,8 +1,5 @@
 name: Dependency and License Scan (Release)
 on:
-  push:
-    branches:
-      - master
   release:
     types:
       - published

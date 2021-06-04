@@ -1,0 +1,34 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - cassandra.datastax.com.cassandra.datastax.com
+  resources:
+  - cassandradatacenters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cassandra.datastax.com.cassandra.datastax.com
+  resources:
+  - cassandradatacenters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cassandra.datastax.com.cassandra.datastax.com
+  resources:
+  - cassandradatacenters/status
+  verbs:
+  - get
+  - patch
+  - update

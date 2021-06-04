@@ -248,3 +248,7 @@ tags
 
 # Packet captures
 *.pcap
+
+# make temps
+bin/
+testbin/

@@ -36,7 +36,7 @@ const (
 	mermaidJsImage             = "operator-mermaid-js"
 	generatedDseDataCentersCrd = "operator/deploy/crds/cassandra.datastax.com_cassandradatacenters_crd.yaml"
 	helmChartCrd               = "charts/cass-operator-chart/templates/customresourcedefinition.yaml"
-	packagePath                = "github.com/k8ssandra/cass-operator/operator"
+	packagePath                = "github.com/k8ssandra/cass-operator"
 	envGitBranch               = "MO_BRANCH"
 	envVersionString           = "MO_VERSION"
 	envGitHash                 = "MO_HASH"
@@ -401,7 +401,8 @@ func runGoBuild(version string) {
 	goArgs := []string{
 		"build", "-o", binaryPath,
 		"-ldflags", fmt.Sprintf("-X main.version=%s", version),
-		fmt.Sprintf("%s/cmd/manager", packagePath),
+		packagePath,
+		// fmt.Sprintf("%s/cmd/manager", packagePath),
 	}
 	shutil.RunVPanic("go", goArgs...)
 	os.Chdir("..")

@@ -1,9 +1,9 @@
 name: Cass Operator Release
 
-# on:
-#   push:
-#     tags:
-#       - 'v*.*.*'
+on:
+  push:
+    tags:
+      - 'v*.*.*'
 
 jobs:
   release_cass_operator:

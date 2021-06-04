@@ -15,15 +15,9 @@ jobs:
       - name: Fetch Tags
         run: |
           git fetch --tags
-      - name: Output latest tag
-        run: echo '::set-output name=LATEST_TAG::echo $(git describe --tags `git rev-list --tags --max-count=1`)'
-        id: output-latest-tag
-      - name: Check LATEST_TAG
-        run: |
-          echo ${{ steps.output-latest-tag.outputs.LATEST_TAG }}
       - name: Checkout latest tag
         run: |
-          git checkout ${{ steps.output-latest-tag.outputs.LATEST_TAG }}
+          git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
       - name: Check git
         run: |
           git status
@@ -42,12 +36,6 @@ jobs:
       - name: Check Fossa file
         run: |
           cat .fossa.yml
-      # - name: Replace Fossa configuration
-      #   run: |
-      #     mv .fossa.yml-e .fossa.yml
-      # - name: Check filesystem
-      #   run: |
-      #     ls -al
       - name: Scan for dependencies and licenses
         run: |
-          FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} fossa analyze -r ${{ steps.output-latest-tag.outputs.LATEST_TAG }}
+          FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} fossa analyze -r $(git describe --tags `git rev-list --tags --max-count=1`)

@@ -22,11 +22,14 @@ jobs:
         run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | bash
       - name: Initialize Fossa
-        run: fossa init
+        run: |
+          fossa init
       - name: Rename Fossa project
         run: |
           sed -i -e 's/project: .*/project: cass-operator/g' .fossa.yml
       - name: Replace Fossa configuration
-        run: mv .fossa.yml-e .fossa.yml
+        run: |
+          mv .fossa.yml-e .fossa.yml
       - name: Scan for dependencies and licenses
-        run: FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} fossa analyze -r $LATEST_TAG
+        run: |
+          FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} fossa analyze -r $LATEST_TAG

@@ -29,16 +29,16 @@ jobs:
           ls -al
       - name: Rename Fossa project
         run: |
-          sed -i -e 's/project: .*/project: cass-operator/g' .fossa.yml
-      - name: Check filesystem
+          sed -i 's/project: .*/project: cass-operator/g' .fossa.yml
+      - name: Check Fossa file
         run: |
-          ls -al
-      - name: Replace Fossa configuration
-        run: |
-          mv .fossa.yml-e .fossa.yml
-      - name: Check filesystem
-        run: |
-          ls -al
+          cat .fossa.yml
+      # - name: Replace Fossa configuration
+      #   run: |
+      #     mv .fossa.yml-e .fossa.yml
+      # - name: Check filesystem
+      #   run: |
+      #     ls -al
       - name: Scan for dependencies and licenses
         run: |
           FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} fossa analyze -r $LATEST_TAG

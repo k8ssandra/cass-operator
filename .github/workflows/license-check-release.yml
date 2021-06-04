@@ -13,11 +13,20 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
       - name: Fetch Tags
-        run: git fetch --tags
+        run: |
+          git fetch --tags
       - name: Identify latest tag
-        run: LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+        run: |
+          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+      - name: Check LATEST_TAG
+        run: |
+          echo $LATEST_TAG
       - name: Checkout latest tag
-        run: git checkout $LATEST_TAG
+        run: |
+          git checkout $LATEST_TAG
+      - name: Check git
+        run: |
+          git status
       - name: Install Fossa CLI
         run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | bash

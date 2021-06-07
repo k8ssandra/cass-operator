@@ -3,9 +3,6 @@ on:
   push:
     branches:
       - master
-    paths:
-      - 'operator/pkg/**'
-      - 'operator/cmd/**'
 jobs:
   scan-repo:
     runs-on: ubuntu-latest

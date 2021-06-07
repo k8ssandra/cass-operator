@@ -165,22 +165,23 @@ func updateWebhook(client crclient.Client, cert, namespace string) (err error) {
 }
 
 func EnsureWebhookConfigVolume(cfg *rest.Config) (err error) {
-	var pod *v1.Pod
-	namespace, err := utils.GetOperatorNamespace()
-	if err != nil {
-		return err
-	}
-	var client crclient.Client
-	if client, err = crclient.New(cfg, crclient.Options{}); err == nil {
-		if pod, err = utils.GetPod(context.Background(), client, namespace); err == nil {
-			for _, volume := range pod.Spec.Volumes {
-				if "cass-operator-certs-volume" == volume.Name {
-					return nil
-				}
-			}
-			log.Error(fmt.Errorf("Secrets volume not found, unable to start webhook"), "")
-			os.Exit(1)
-		}
-	}
-	return err
+	return nil
+	// var pod *v1.Pod
+	// namespace, err := utils.GetOperatorNamespace()
+	// if err != nil {
+	// 	return err
+	// }
+	// var client crclient.Client
+	// if client, err = crclient.New(cfg, crclient.Options{}); err == nil {
+	// 	if pod, err = utils.GetPod(context.Background(), client, namespace); err == nil {
+	// 		for _, volume := range pod.Spec.Volumes {
+	// 			if "cass-operator-certs-volume" == volume.Name {
+	// 				return nil
+	// 			}
+	// 		}
+	// 		log.Error(fmt.Errorf("Secrets volume not found, unable to start webhook"), "")
+	// 		os.Exit(1)
+	// 	}
+	// }
+	// return err
 }

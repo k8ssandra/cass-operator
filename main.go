@@ -87,14 +87,16 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraDatacenter")
 		os.Exit(1)
 	}
-	if err = (&api.CassandraDatacenter{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
-		os.Exit(1)
-	}
-	if err = (&api.CassandraDatacenter{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
-		os.Exit(1)
-	}
+
+	// TODO Webhooks disabled for now - needs cert-manager changes
+	// if err = (&api.CassandraDatacenter{}).SetupWebhookWithManager(mgr); err != nil {
+	// 	setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
+	// 	os.Exit(1)
+	// }
+	// if err = (&api.CassandraDatacenter{}).SetupWebhookWithManager(mgr); err != nil {
+	// 	setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
+	// 	os.Exit(1)
+	// }
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

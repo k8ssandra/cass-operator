@@ -4,7 +4,7 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
-  name: cass-oper.v0.0.0
+  name: cass-operator.v1.8.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -37,8 +37,8 @@ spec:
   - cassandra
   - k8ssandra
   links:
-  - name: Cass Oper
-    url: https://cass-oper.domain
+  - name: Cass Operator
+    url: https://k8ssandra.io
   maturity: alpha
   provider:
     name: k8ssandra

@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,8 +9,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -205,14 +202,6 @@ const (
 	// which is the namespace where the watch activity happens.
 	// this value is empty if the operator is running with clusterScope.
 	WatchNamespaceEnvVar = "WATCH_NAMESPACE"
-
-	// OperatorNameEnvVar is the constant for env variable OPERATOR_NAME
-	// which is the name of the current operator
-	OperatorNameEnvVar = "OPERATOR_NAME"
-
-	// PodNameEnvVar is the constant for env variable POD_NAME
-	// which is the name of the current pod.
-	PodNameEnvVar = "POD_NAME"
 )
 
 // GetWatchNamespace returns the namespace the operator should be watching for changes
@@ -249,52 +238,8 @@ func GetOperatorNamespace() (string, error) {
 	return ns, nil
 }
 
-// GetOperatorName return the operator name
-func GetOperatorName() (string, error) {
-	operatorName, found := os.LookupEnv(OperatorNameEnvVar)
-	if !found {
-		return "", fmt.Errorf("%s must be set", OperatorNameEnvVar)
-	}
-	if len(operatorName) == 0 {
-		return "", fmt.Errorf("%s must not be empty", OperatorNameEnvVar)
-	}
-	return operatorName, nil
-}
-
 func isRunModeLocal() bool {
 	return os.Getenv(ForceRunModeEnv) == string(LocalRunMode)
-}
-
-// GetPod returns a Pod object that corresponds to the pod in which the code
-// is currently running.
-// It expects the environment variable POD_NAME to be set by the downwards API.
-func GetPod(ctx context.Context, client client.Client, ns string) (*corev1.Pod, error) {
-	if isRunModeLocal() {
-		return nil, ErrRunLocal
-	}
-	podName := os.Getenv(PodNameEnvVar)
-	if podName == "" {
-		return nil, fmt.Errorf("required env %s not set, please configure downward API", PodNameEnvVar)
-	}
-
-	log.V(1).Info("Found podname", "Pod.Name", podName)
-
-	pod := &corev1.Pod{}
-	key := types.NamespacedName{Namespace: ns, Name: podName}
-	err := client.Get(ctx, key, pod)
-	if err != nil {
-		log.Error(err, "Failed to get Pod", "Pod.Namespace", ns, "Pod.Name", podName)
-		return nil, err
-	}
-
-	// .Get() clears the APIVersion and Kind,
-	// so we need to set them before returning the object.
-	pod.TypeMeta.APIVersion = "v1"
-	pod.TypeMeta.Kind = "Pod"
-
-	log.V(1).Info("Found Pod", "Pod.Namespace", ns, "Pod.Name", pod.Name)
-
-	return pod, nil
 }
 
 // GetGVKsFromAddToScheme takes in the runtime scheme and filters out all generic apimachinery meta types.

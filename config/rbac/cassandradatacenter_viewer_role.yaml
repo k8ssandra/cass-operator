@@ -5,7 +5,7 @@ metadata:
   name: cassandradatacenter-viewer-role
 rules:
 - apiGroups:
-  - cassandra.datastax.com.cassandra.datastax.com
+  - cassandra.datastax.com
   resources:
   - cassandradatacenters
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - cassandra.datastax.com.cassandra.datastax.com
+  - cassandra.datastax.com
   resources:
   - cassandradatacenters/status
   verbs:

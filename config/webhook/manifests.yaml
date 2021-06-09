@@ -13,12 +13,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-cassandra-datastax-com-cassandra-datastax-com-v1beta1-cassandradatacenter
+      path: /mutate-cassandra-datastax-com-v1beta1-cassandradatacenter
   failurePolicy: Fail
   name: mcassandradatacenter.kb.io
   rules:
   - apiGroups:
-    - cassandra.datastax.com.cassandra.datastax.com
+    - cassandra.datastax.com
     apiVersions:
     - v1beta1
     operations:

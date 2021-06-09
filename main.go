@@ -89,6 +89,9 @@ func main() {
 		// configure cluster-scoped with MultiNamespacedCacheBuilder
 		options.Namespace = ""
 		options.NewCache = cache.MultiNamespacedCacheBuilder(strings.Split(ns, ","))
+	} else {
+		setupLog.Info("watch namespace configured", "namespace", ns)
+		options.Namespace = ns
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)

@@ -28,7 +28,7 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - cassandra.datastax.com.cassandra.datastax.com
+  - cassandra.datastax.com
   resources:
   - cassandradatacenters
   verbs:
@@ -40,14 +40,14 @@ rules:
   - update
   - watch
 - apiGroups:
-  - cassandra.datastax.com.cassandra.datastax.com
+  - cassandra.datastax.com
   resources:
   - cassandradatacenters/finalizers
   verbs:
   - delete
   - update
 - apiGroups:
-  - cassandra.datastax.com.cassandra.datastax.com
+  - cassandra.datastax.com
   resources:
   - cassandradatacenters/status
   verbs:

@@ -1,0 +1,6 @@
+namespace: test-smoke-test-oss
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../../config/default

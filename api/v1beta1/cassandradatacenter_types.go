@@ -62,11 +62,9 @@ type CassandraUser struct {
 
 // CassandraDatacenterSpec defines the desired state of a CassandraDatacenter
 // +k8s:openapi-gen=true
+// +kubebuilder:pruning:PreserveUnknownFields
+// +kubebuilder:validation:XPreserveUnknownFields
 type CassandraDatacenterSpec struct {
-	// Important: Run "mage operator:sdkGenerate" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags:
-	// https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-
 	// Desired number of Cassandra server nodes
 	// +kubebuilder:validation:Minimum=1
 	Size int32 `json:"size"`
@@ -89,6 +87,7 @@ type CassandraDatacenterSpec struct {
 
 	// Config for the server, in YAML format
 	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:XPreserveUnknownFields
 	Config json.RawMessage `json:"config,omitempty"`
 
 	// ConfigSecret is the name of a secret that contains configuration for Cassandra. The

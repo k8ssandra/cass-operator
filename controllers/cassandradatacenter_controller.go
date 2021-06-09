@@ -41,9 +41,9 @@ import (
 )
 
 // datastax.com groups
-//+kubebuilder:rbac:groups=cassandra.datastax.com.cassandra.datastax.com,resources=cassandradatacenters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=cassandra.datastax.com.cassandra.datastax.com,resources=cassandradatacenters/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=cassandra.datastax.com.cassandra.datastax.com,resources=cassandradatacenters/finalizers,verbs=update;delete
+//+kubebuilder:rbac:groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=cassandra.datastax.com,resources=cassandradatacenters/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=cassandra.datastax.com,resources=cassandradatacenters/finalizers,verbs=update;delete
 
 // Kubernetes core
 // +kubebuilder:rbac:groups=apps,resources=statefulsets;replicasets;deployments;daemonsets,verbs=get;list;watch;create;update;patch;delete
@@ -111,6 +111,13 @@ type CassandraDatacenterReconciler struct {
 // otherwise upon completion it will remove the work from the queue.
 // See: https://godoc.org/sigs.k8s.io/controller-runtime/pkg/reconcile#Result
 func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+	logger := r.Log.
+		WithValues("cassandradatacenter", request.NamespacedName).
+		WithValues("requestNamespace", request.Namespace).
+		WithValues("requestName", request.Name)
+
+	logger.Info("Found item, starting reconcile", "object", request.NamespacedName)
+
 	return r.oldReconciler.Reconcile(request)
 	/*
 		startReconcile := time.Now()

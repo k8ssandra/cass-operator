@@ -20,6 +20,7 @@ spec:
   template:
     metadata:
       labels:
+        name: cass-operator
         control-plane: controller-manager
     spec:
       securityContext:

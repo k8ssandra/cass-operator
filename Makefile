@@ -119,6 +119,17 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
+make deploy-test:
+ifneq ($(strip $(NAMESPACE)),)
+	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
+endif
+	$(KUSTOMIZE) build tests/kustomize | kubectl apply -f -
+
+make undeploy-test:
+ifneq ($(strip $(NAMESPACE)),)
+	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
+endif
+	$(KUSTOMIZE) build tests/kustomize | kubectl delete -f -
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
@@ -151,7 +162,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker buildx build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	docker buildx build -f bundle.Dockerfile -t $(BUNDLE_IMG) . --load
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.

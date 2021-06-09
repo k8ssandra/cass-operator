@@ -11,9 +11,7 @@ patchesJson6902:
     version: v1
     kind: CustomResourceDefinition
     name: cassandradatacenters.cassandra.datastax.com
-  patch: |-
-    - op: remove
-      path: /spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/config
+  path: patches/config_removal.yaml
 #    name: controller-manager
 #    namespace: system
 #  patch: |-

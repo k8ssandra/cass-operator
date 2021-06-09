@@ -29,8 +29,8 @@ func TestLifecycle(t *testing.T) {
 		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
 		kubectl.DumpAllLogs(logPath).ExecV()
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
-		kustomize.Undeploy(namespace)
 		ns.Terminate()
+		kustomize.Undeploy(namespace)
 	})
 
 	RegisterFailHandler(Fail)
@@ -40,15 +40,9 @@ func TestLifecycle(t *testing.T) {
 var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
 		Specify("the operator can stand up a one node cluster", func() {
-			// By("creating a namespace")
-			// err := kubectl.CreateNamespace(namespace).ExecV()
-			// Expect(err).ToNot(HaveOccurred())
-
-			// step := "setting up cass-operator resources via helm chart"
 			By("deploy cass-operator with kustomize")
 			err := kustomize.Deploy(namespace)
 			Expect(err).ToNot(HaveOccurred())
-			// ns.HelmInstall("../../charts/cass-operator-chart")
 
 			step := "waiting for the operator to become ready"
 			json := "jsonpath={.items[0].status.containerStatuses[0].ready}"

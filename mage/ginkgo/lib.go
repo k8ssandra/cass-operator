@@ -123,31 +123,8 @@ func (ns NsWrapper) Terminate() {
 	// This is important because deleting the namespace itself
 	// can hang if this step is skipped.
 	kcmd := kubectl.Delete("cassandradatacenter", "--all")
-	_, dcErrOut, dcErr := ns.ExecVCapture(kcmd)
-
-	// Must run helm uninstall before deleting namespace
-	// or else it won't see that it has an active release
-	// out there
-	_, helmErrOut, helmErr := helm_util.UninstallCapture("cass-operator", ns.Namespace)
-
-	_, nsErrOut, nsErr := kubectl.DeleteByTypeAndName("namespace", ns.Namespace).ExecVCapture()
-
-	var errMsgs []string
-	if dcErr != nil {
-		errMsgs = append(errMsgs, fmt.Sprintf("Error deleting datacenters: %v\n\t%s", dcErr.Error(), dcErrOut))
-	}
-	if helmErr != nil {
-		errMsgs = append(errMsgs, fmt.Sprintf("Error performing helm uninstall: %v\n\t%s", helmErr.Error(), helmErrOut))
-	}
-	if nsErr != nil {
-		errMsgs = append(errMsgs, fmt.Sprintf("Error deleting namespace: %v\n\t%s", nsErr.Error(), nsErrOut))
-	}
-
-	if len(errMsgs) > 0 {
-		msg := fmt.Sprintf("One or more errors occurred while cleaning up test resources.\n%s", strings.Join(errMsgs, "\n"))
-		err := fmt.Errorf(msg)
-		Expect(err).ToNot(HaveOccurred())
-	}
+	_, _, dcErr := ns.ExecVCapture(kcmd)
+	Expect(dcErr).ToNot(HaveOccurred())
 }
 
 //===================================

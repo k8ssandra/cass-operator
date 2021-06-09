@@ -33,6 +33,7 @@ import (
 	// TODO Missmatch here due to the cass-operator requirement
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -70,19 +71,18 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		},
 	}
 
-	r.oldReconciler = reconciliation.NewReconciler(mgr)
-
 	c := ctrl.NewControllerManagedBy(mgr).
 		For(&api.CassandraDatacenter{}).
-		Owns(&appsv1.StatefulSet{}).
-		Owns(&policyv1beta1.PodDisruptionBudget{}).
-		Owns(&corev1.Service{}).
-		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		WithEventFilter(managedByCassandraOperatorPredicate)
+		Owns(&appsv1.StatefulSet{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
+		Owns(&policyv1beta1.PodDisruptionBudget{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
+		Owns(&corev1.Service{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
+		WithEventFilter(predicate.GenerationChangedPredicate{})
 
 	// TODO Still missing pspEnabled functions
 
 	// TODO Missing Secrets watch function
+
+	r.oldReconciler = reconciliation.NewReconciler(mgr)
 
 	return c.Complete(r)
 }

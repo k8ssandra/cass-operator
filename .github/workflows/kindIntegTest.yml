@@ -25,7 +25,8 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v2
         with:
-          file: operator/docker/base/Dockerfile
+          file: Dockerfile
+          context: .
           push: false
           tags: k8ssandra/cass-operator:latest
           platforms: linux/amd64

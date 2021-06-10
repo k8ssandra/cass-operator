@@ -38,21 +38,24 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-      - name: Test Sdk Generate
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: operator:testSdkGenerate
-      - name: Test Client Generate
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: operator:testGenerateClient
+      # - name: Test Sdk Generate
+      #   uses: magefile/mage-action@v1
+      #   with:
+      #     version: latest
+      #     args: operator:testSdkGenerate
+      # - name: Test Client Generate
+      #   uses: magefile/mage-action@v1
+      #   with:
+      #     version: latest
+      #     args: operator:testGenerateClient
       - name: Unit Tests
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: operator:testGo
+        run: |
+          export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
+          make test
+        # uses: magefile/mage-action@v1
+        # with:
+        #   version: latest
+        #   args: operator:testGo
   build_operator_docker:
     name: Build Cass Operator Docker Image
     runs-on: ubuntu-latest

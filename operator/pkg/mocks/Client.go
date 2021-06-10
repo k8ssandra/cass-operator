@@ -105,14 +105,14 @@ func (_m *Client) List(ctx context.Context, list client.ObjectList, opts ...clie
 	var _ca []interface{}
 	_ca = append(_ca, ctx, list)
 	_ca = append(_ca, _va...)
-	// ret := _m.Called(_ca...)
+	ret := _m.Called(_ca...)
 
 	var r0 error
-	// if rf, ok := ret.Get(0).(func(context.Context, client.Object, ...client.ListOption) error); ok {
-	// 	r0 = rf(ctx, list, opts...)
-	// } else {
-	// 	r0 = ret.Error(0)
-	// }
+	if rf, ok := ret.Get(0).(func(context.Context, client.ObjectList, ...client.ListOption) error); ok {
+		r0 = rf(ctx, list, opts...)
+	} else {
+		r0 = ret.Error(0)
+	}
 
 	return r0
 }

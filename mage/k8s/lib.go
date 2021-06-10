@@ -143,47 +143,6 @@ func RunIntegTests() {
 	}
 }
 
-// Perform all the steps to stand up an example cluster,
-// except for applying the final cassandra yaml specification.
-// This must either be applied manually or by calling SetupCassandraCluster
-// or SetupDSECluster.
-// This target assumes that helm is installed and available on path.
-func SetupExampleCluster() {
-	mg.Deps(SetupEmptyCluster)
-	kubectl.CreateSecretLiteral("cassandra-superuser-secret", "devuser", "devpass").ExecVPanic()
-
-	var namespace = "default"
-	overrides := map[string]string{}
-
-	ginkgo_util.HelmInstallWithOverrides("./charts/cass-operator-chart", namespace, overrides)
-
-	// Wait for 15 seconds for the operator to come up
-	// because the apiserver will call the webhook too soon and fail if we do not wait
-	time.Sleep(time.Second * 15)
-}
-
-// Stand up an example cluster running Apache Cassandra.
-// Loads all necessary resources to get a running Apache Cassandra data center and operator
-// This target assumes that helm is installed and available on path.
-func SetupCassandraCluster() {
-	mg.Deps(SetupExampleCluster)
-	kubectl.ApplyFiles(
-		"operator/example-cassdc-yaml/cassandra-3.11.x/example-cassdc-minimal.yaml",
-	).ExecVPanic()
-	kubectl.WatchPods()
-}
-
-// Stand up an example cluster running DSE 6.8.
-// Loads all necessary resources to get a running DCE data center and operator
-// This target assumes that helm is installed and available on path.
-func SetupDSECluster() {
-	mg.Deps(SetupExampleCluster)
-	kubectl.ApplyFiles(
-		"operator/example-cassdc-yaml/dse-6.8.x/example-cassdc-minimal.yaml",
-	).ExecVPanic()
-	kubectl.WatchPods()
-}
-
 // Delete a running cluster.
 func DeleteCluster() {
 	loadClusterSettings()

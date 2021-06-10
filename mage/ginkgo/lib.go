@@ -16,8 +16,6 @@ import (
 	ginkgo "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
-	helm_util "github.com/k8ssandra/cass-operator/mage/helm"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
 	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 )
@@ -394,46 +392,6 @@ func CreateDockerRegistrySecret(name string, namespace string) {
 	}
 	k := kubectl.KCmd{Command: "create", Args: args, Flags: flags}
 	k.InNamespace(namespace).ExecVCapture()
-}
-
-func (ns NsWrapper) HelmInstall(chartPath string, overrides ...string) {
-	overridesMap := map[string]string{}
-	for i := 0; i < len(overrides)-1; i = i + 2 {
-		overridesMap[overrides[i]] = overrides[i+1]
-	}
-	HelmInstallWithOverrides(chartPath, ns.Namespace, overridesMap)
-}
-
-func (ns NsWrapper) HelmInstallWithPSPEnabled(chartPath string) {
-	var overrides = map[string]string{
-		"vmwarePSPEnabled": "true",
-	}
-	HelmInstallWithOverrides(chartPath, ns.Namespace, overrides)
-}
-
-// This is not a method on NsWrapper to allow mage to use it to create an example cluster.
-func HelmInstallWithOverrides(chartPath string, namespace string, overrides map[string]string) {
-	overrides["image"] = cfgutil.GetOperatorImage()
-
-	if kubectl.DockerCredentialsDefined() {
-		CreateDockerRegistrySecret(ImagePullSecretName, namespace)
-		overrides["imagePullSecret"] = ImagePullSecretName
-	}
-
-	err := helm_util.Install(chartPath, "cass-operator", namespace, overrides)
-	mageutil.PanicOnError(err)
-}
-
-func HelmUpgradeWithOverrides(chartPath string, namespace string, overrides map[string]string) {
-	overrides["image"] = cfgutil.GetOperatorImage()
-
-	// NOTE: This assumes the credential has already been defined during HelmInstallWithOverrides
-	if kubectl.DockerCredentialsDefined() {
-		overrides["imagePullSecret"] = ImagePullSecretName
-	}
-
-	err := helm_util.Upgrade(chartPath, "cass-operator", namespace, overrides)
-	mageutil.PanicOnError(err)
 }
 
 // Note that the actual value will be cast to a string before the comparison with the expectedValue

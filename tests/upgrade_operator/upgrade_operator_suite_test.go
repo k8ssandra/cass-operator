@@ -11,11 +11,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
 	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
-	helm_util "github.com/k8ssandra/cass-operator/mage/helm"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
-	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 )
 
 var (
@@ -26,8 +23,6 @@ var (
 	dcYaml           = "../testdata/operator-1.1.0-oss-dc.yaml"
 	podName          = fmt.Sprintf("cluster1-%s-r1-sts-0", dcName)
 	podNameJson      = "jsonpath={.items[*].metadata.name}"
-	dcResource       = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel          = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns               = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -46,16 +41,18 @@ func TestLifecycle(t *testing.T) {
 func InstallOldOperator() {
 	step := "install old Cass Operator v1.1.0"
 	By(step)
-	err := helm_util.Install(oldOperatorChart, "cass-operator", ns.Namespace, map[string]string{})
-	mageutil.PanicOnError(err)
+	panic("NotImplemented")
+	// err := helm_util.Install(oldOperatorChart, "cass-operator", ns.Namespace, map[string]string{})
+	// mageutil.PanicOnError(err)
 }
 
 func UpgradeOperator() {
 	step := "upgrade Cass Operator"
 	By(step)
-	var overrides = map[string]string{"image": cfgutil.GetOperatorImage()}
-	err := helm_util.Upgrade("../../charts/cass-operator-chart", "cass-operator", ns.Namespace, overrides)
-	mageutil.PanicOnError(err)
+	panic("NotImplemented")
+	// var overrides = map[string]string{"image": cfgutil.GetOperatorImage()}
+	// err := helm_util.Upgrade("../../charts/cass-operator-chart", "cass-operator", ns.Namespace, overrides)
+	// mageutil.PanicOnError(err)
 }
 
 var _ = Describe(testName, func() {

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	api "github.com/k8ssandra/cass-operator/api/v1beta1"
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo"
@@ -37,6 +38,7 @@ func TestLifecycle(t *testing.T) {
 		}
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
+		kustomize.Undeploy(namespace)
 	})
 
 	RegisterFailHandler(Fail)
@@ -46,12 +48,10 @@ func TestLifecycle(t *testing.T) {
 var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
 		Specify("cassandra configuration can be applied with a secret", func() {
-			By("creating a namespace")
-			err := kubectl.CreateNamespace(namespace).ExecV()
+			By("deploy cass-operator with kustomize")
+			err := kustomize.Deploy(namespace)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("setting up cass-operator resources via helm chart")
-			ns.HelmInstall("../../charts/cass-operator-chart")
 			ns.WaitForOperatorReady()
 
 			step := "creating config secret"

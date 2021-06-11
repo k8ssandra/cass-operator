@@ -33,6 +33,9 @@ func runMake(namespace, command string) error {
 	}
 
 	deploy.Dir = makeDir.Name()
+
+	fmt.Printf("Running make in: %s\n", makeDir.Name())
+
 	err = deploy.Run()
 	if err != nil {
 		return err

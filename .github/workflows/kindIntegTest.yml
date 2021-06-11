@@ -159,10 +159,12 @@ jobs:
           kind load docker-image --name=kind k8ssandra/cass-operator:latest
           kind load docker-image --name=kind k8ssandra/system-logger:latest
       - name: Run integration test ( ${{ matrix.integration_test }} )
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: integ:run
+        run: |
+          make integ-test
+        # uses: magefile/mage-action@v1
+        # with:
+        #   version: latest
+        #   args: integ:run
       - name: Archive k8s logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2

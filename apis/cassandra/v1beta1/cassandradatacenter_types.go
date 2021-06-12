@@ -24,6 +24,9 @@ const (
 	// DatacenterLabel is the operator's label for the datacenter name
 	DatacenterLabel = "cassandra.datastax.com/datacenter"
 
+	// DatacenterUID is the operator's label for datacenter UID
+	DatacenterUID = "cassandra.datastax.com/datacenterUID"
+
 	// SeedNodeLabel is the operator's label for the seed node state
 	SeedNodeLabel = "cassandra.datastax.com/seed-node"
 
@@ -496,6 +499,7 @@ func (dc *CassandraDatacenter) SetCondition(condition DatacenterCondition) {
 func (dc *CassandraDatacenter) GetDatacenterLabels() map[string]string {
 	labels := dc.GetClusterLabels()
 	labels[DatacenterLabel] = dc.Name
+	labels[DatacenterUID] = string(dc.UID)
 	return labels
 }
 

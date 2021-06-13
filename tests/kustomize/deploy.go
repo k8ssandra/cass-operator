@@ -38,6 +38,7 @@ func runMake(namespace, command string) error {
 
 	err = deploy.Run()
 	if err != nil {
+		fmt.Printf("Output of Makefile: %s\n", out.String())
 		return err
 	}
 

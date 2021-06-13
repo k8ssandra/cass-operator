@@ -136,7 +136,7 @@ endif
 	$(KUSTOMIZE) build tests/kustomize | kubectl delete -f -
 
 integ-test: kustomize
-	cd tests/${M_INTEG_DIR} && go test -v ./...
+	cd tests/${M_INTEG_DIR} && go test -v -timeout 30m --ginkgo.progress --ginkgo.v ./...
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.

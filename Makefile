@@ -135,7 +135,7 @@ ifneq ($(strip $(NAMESPACE)),)
 endif
 	$(KUSTOMIZE) build tests/kustomize | kubectl delete -f -
 
-integ-test:
+integ-test: kustomize
 	cd tests/${M_INTEG_DIR} && go test -v ./...
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen

@@ -1,3 +1,6 @@
+# Makefile uses sh by default, but Github Actions (ubuntu-latest) requires dash/bash to work.
+SHELL := /bin/bash
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:

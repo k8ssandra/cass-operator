@@ -2003,7 +2003,7 @@ func (rc *ReconciliationContext) CheckRollingRestart() result.ReconcileResult {
 			return result.Error(err)
 		}
 
-		dcPatch = client.MergeFrom(dc.DeepCopy())
+		dcPatch = client.MergeFromWithOptions(dc.DeepCopy(), client.MergeFromWithOptimisticLock{})
 		dc.Spec.RollingRestartRequested = false
 		err = rc.Client.Patch(rc.Ctx, dc, dcPatch)
 		if err != nil {

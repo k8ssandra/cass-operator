@@ -12,6 +12,7 @@ jobs:
     env:
       GOPATH: /home/runner/go
       GOROOT: /usr/local/go1.16
+      CGO_ENABLED: 0
     steps:
       - uses: actions/checkout@v2
         if: github.event_name == 'pull_request'

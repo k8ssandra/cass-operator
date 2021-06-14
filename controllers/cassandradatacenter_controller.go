@@ -18,15 +18,19 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	"github.com/k8ssandra/cass-operator/operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/operator/pkg/reconciliation"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 
 	// "k8s.io/cri-api/pkg/errors"
@@ -36,7 +40,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 )
@@ -53,48 +60,12 @@ import (
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	managedByCassandraOperatorPredicate := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return oplabels.HasManagedByCassandraOperatorLabel(e.Object.GetLabels())
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return oplabels.HasManagedByCassandraOperatorLabel(e.Object.GetLabels())
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return oplabels.HasManagedByCassandraOperatorLabel(e.ObjectOld.GetLabels()) ||
-				oplabels.HasManagedByCassandraOperatorLabel(e.ObjectNew.GetLabels())
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			return oplabels.HasManagedByCassandraOperatorLabel(e.Object.GetLabels())
-		},
-	}
-
-	c := ctrl.NewControllerManagedBy(mgr).
-		For(&api.CassandraDatacenter{}).
-		Owns(&appsv1.StatefulSet{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
-		Owns(&policyv1beta1.PodDisruptionBudget{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
-		Owns(&corev1.Service{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
-		WithEventFilter(predicate.GenerationChangedPredicate{})
-
-	// TODO Still missing pspEnabled functions
-
-	// TODO Missing Secrets watch function
-
-	r.oldReconciler = reconciliation.NewReconciler(mgr)
-
-	return c.Complete(r)
-}
-
 // CassandraDatacenterReconciler reconciles a cassandraDatacenter object
 type CassandraDatacenterReconciler struct {
 	client.Client
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
-
-	oldReconciler *reconciliation.ReconcileCassandraDatacenter
 
 	// SecretWatches is used in the controller when setting up the watches and
 	// during reconciliation where we update the mappings for the watches.
@@ -111,77 +82,211 @@ type CassandraDatacenterReconciler struct {
 // otherwise upon completion it will remove the work from the queue.
 // See: https://godoc.org/sigs.k8s.io/controller-runtime/pkg/reconcile#Result
 func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+	startReconcile := time.Now()
+
 	logger := r.Log.
 		WithValues("cassandradatacenter", request.NamespacedName).
 		WithValues("requestNamespace", request.Namespace).
-		WithValues("requestName", request.Name)
+		WithValues("requestName", request.Name).
+		// loopID is used to tie all events together that are spawned by the same reconciliation loop
+		WithValues("loopID", uuid.New().String())
 
-	logger.Info("Found item, starting reconcile", "object", request.NamespacedName)
+	defer func() {
+		reconcileDuration := time.Since(startReconcile).Seconds()
+		logger.Info("Reconcile loop completed",
+			"duration", reconcileDuration)
+	}()
 
-	return r.oldReconciler.Reconcile(request)
-	/*
-		startReconcile := time.Now()
+	logger.Info("======== handler::Reconcile has been called")
 
-		logger := r.Log.
-			WithValues("cassandradatacenter", request.NamespacedName).
-			WithValues("requestNamespace", request.Namespace).
-			WithValues("requestName", request.Name).
-			// loopID is used to tie all events together that are spawned by the same reconciliation loop
-			WithValues("loopID", uuid.New().String())
+	rc, err := reconciliation.CreateReconciliationContext(&request, r.Client, r.Scheme, r.Recorder, r.SecretWatches, logger)
 
-		defer func() {
-			reconcileDuration := time.Since(startReconcile).Seconds()
-			logger.Info("Reconcile loop completed",
-				"duration", reconcileDuration)
-		}()
-
-		logger.Info("======== handler::Reconcile has been called")
-
-		rc, err := reconciliation.CreateReconciliationContext(&request, r.Client, r.Scheme, r.Recorder, r.SecretWatches, r.Log)
-
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// Request object not found, could have been deleted after reconcile request.
-				// Owned objects are automatically garbage collected.
-				// Return and don't requeue
-				r.Log.Info("CassandraDatacenter resource not found. Ignoring since object must be deleted.")
-				return ctrl.Result{}, nil
-			}
-
-			// Error reading the object
-			logger.Error(err, "Failed to get CassandraDatacenter.")
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected.
+			// Return and don't requeue
+			logger.Info("CassandraDatacenter resource not found. Ignoring since object must be deleted.")
+			return ctrl.Result{}, nil
 		}
 
-		if err := rc.isValid(rc.Datacenter); err != nil {
-			logger.Error(err, "CassandraDatacenter resource is invalid")
-			rc.Recorder.Eventf(rc.Datacenter, "Warning", "ValidationFailed", err.Error())
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
-		}
+		// Error reading the object
+		logger.Error(err, "Failed to get CassandraDatacenter.")
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
+	}
 
-		// TODO fold this into the quiet period
-		twentySecs := time.Second * 20
-		lastNodeStart := rc.Datacenter.Status.LastServerNodeStarted
-		cooldownTime := time.Until(lastNodeStart.Add(twentySecs))
+	if err := rc.IsValid(rc.Datacenter); err != nil {
+		logger.Error(err, "CassandraDatacenter resource is invalid")
+		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ValidationFailed", err.Error())
+		return ctrl.Result{}, err
+	}
 
-		if cooldownTime > 0 {
-			logger.Info("Ending reconciliation early because a server node was recently started")
-			secs := 1 + int(cooldownTime.Seconds())
-			return ctrl.Result{RequeueAfter: time.Duration(secs) * time.Second}, nil
-		}
+	// TODO fold this into the quiet period
+	twentySecs := time.Second * 20
+	lastNodeStart := rc.Datacenter.Status.LastServerNodeStarted
+	cooldownTime := time.Until(lastNodeStart.Add(twentySecs))
 
-		if rc.Datacenter.Status.QuietPeriod.After(time.Now()) {
-			logger.Info("Ending reconciliation early because the datacenter is in a quiet period")
-			cooldownTime = rc.Datacenter.Status.QuietPeriod.Sub(time.Now())
-			secs := 1 + int(cooldownTime.Seconds())
-			return ctrl.Result{RequeueAfter: time.Duration(secs) * time.Second}, nil
-		}
+	if cooldownTime > 0 {
+		logger.Info("Ending reconciliation early because a server node was recently started")
+		secs := time.Duration(1 + int(cooldownTime.Seconds()))
+		return ctrl.Result{RequeueAfter: secs * time.Second}, nil
+	}
 
-		res, err := rc.calculateReconciliationActions()
-		if err != nil {
-			logger.Error(err, "calculateReconciliationActions returned an error")
-			rc.Recorder.Eventf(rc.Datacenter, "Warning", "ReconcileFailed", err.Error())
-		}
-		return res, err
-	*/
+	if rc.Datacenter.Status.QuietPeriod.After(time.Now()) {
+		logger.Info("Ending reconciliation early because the datacenter is in a quiet period")
+		cooldownTime = rc.Datacenter.Status.QuietPeriod.Sub(time.Now())
+		secs := time.Duration(1 + int(cooldownTime.Seconds()))
+		return ctrl.Result{RequeueAfter: secs * time.Second}, nil
+	}
+
+	res, err := rc.CalculateReconciliationActions()
+	if err != nil {
+		logger.Error(err, "calculateReconciliationActions returned an error")
+		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ReconcileFailed", err.Error())
+	}
+	return res, err
 }
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	log := r.Log.
+		WithName("cassandradatacenter_controller")
+
+	// Create a new managed controller builder
+	c := ctrl.NewControllerManagedBy(mgr).
+		Named("cassandradatacenter-controller").
+		WithLogger(log).
+		For(&api.CassandraDatacenter{}, builder.WithPredicates(predicate.GenerationChangedPredicate{}))
+
+	// Watch for changes to primary resource CassandraDatacenter
+	// c = c.Watches(
+	// 	&source.Kind{Type: &api.CassandraDatacenter{}},
+	// 	&handler.EnqueueRequestForObject{},
+	// 	// This allows us to update the status on every reconcile call without
+	// 	// triggering an infinite loop.
+	// 	builder.WithPredicates(predicate.GenerationChangedPredicate{}))
+
+	// Here we list all the types that we create that are owned by the primary resource.
+	//
+	// Watch for changes to secondary resources StatefulSets, PodDisruptionBudgets, and Services and requeue the
+	// CassandraDatacenter that owns them.
+	managedByCassandraOperatorPredicate := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return oplabels.HasManagedByCassandraOperatorLabel(e.Object.GetLabels())
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return oplabels.HasManagedByCassandraOperatorLabel(e.Object.GetLabels())
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return oplabels.HasManagedByCassandraOperatorLabel(e.ObjectOld.GetLabels()) ||
+				oplabels.HasManagedByCassandraOperatorLabel(e.ObjectNew.GetLabels())
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return oplabels.HasManagedByCassandraOperatorLabel(e.Object.GetLabels())
+		},
+	}
+
+	// NOTE: We do not currently watch PVC resources, but if we did, we'd have to
+	// account for the fact that they might use the old managed-by label value
+	// (oplabels.ManagedByLabelDefunctValue) for CassandraDatacenters originally
+	// created in version 1.1.0 or earlier.
+
+	c = c.Watches(
+		&source.Kind{Type: &appsv1.StatefulSet{}},
+		&handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &api.CassandraDatacenter{},
+		},
+		builder.WithPredicates(managedByCassandraOperatorPredicate),
+	)
+
+	c = c.Watches(
+		&source.Kind{Type: &policyv1beta1.PodDisruptionBudget{}},
+		&handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &api.CassandraDatacenter{},
+		},
+		builder.WithPredicates(managedByCassandraOperatorPredicate),
+	)
+
+	c = c.Watches(
+		&source.Kind{Type: &corev1.Service{}},
+		&handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &api.CassandraDatacenter{},
+		},
+		builder.WithPredicates(managedByCassandraOperatorPredicate),
+	)
+
+	configSecretMapFn := func(mapObj client.Object) []reconcile.Request {
+		log.Info("config secret watch called", "Secret", mapObj.GetName())
+
+		requests := make([]reconcile.Request, 0)
+		secret := mapObj.(*corev1.Secret)
+		if v, ok := secret.Annotations[api.DatacenterAnnotation]; ok {
+			log.Info("adding reconciliation request for config secret", "Secret", secret.Name)
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: secret.Namespace,
+					Name:      v,
+				},
+			})
+		}
+
+		return requests
+	}
+
+	isConfigSecret := func(annotations map[string]string) bool {
+		_, ok := annotations[api.DatacenterAnnotation]
+		return ok
+	}
+
+	configSecretPredicate := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return isConfigSecret(e.Object.GetAnnotations())
+		},
+
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return isConfigSecret(e.ObjectOld.GetAnnotations()) || isConfigSecret(e.ObjectNew.GetAnnotations())
+		},
+
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return isConfigSecret(e.Object.GetAnnotations())
+		},
+
+		GenericFunc: func(e event.GenericEvent) bool {
+			return isConfigSecret(e.Object.GetAnnotations())
+		},
+	}
+
+	c = c.Watches(&source.Kind{Type: &corev1.Secret{}}, handler.EnqueueRequestsFromMapFunc(configSecretMapFn), builder.WithPredicates(configSecretPredicate))
+
+	// TODO Add PSP stuff here if necessary
+
+	// Setup watches for Secrets. These secrets are often not owned by or created by
+	// the operator, so we must create a mapping back to the appropriate datacenters.
+
+	r.SecretWatches = dynamicwatch.NewDynamicSecretWatches(r.Client)
+	dynamicSecretWatches := r.SecretWatches
+
+	toRequests := func(a client.Object) []reconcile.Request {
+		log.Info("toRequests secret change", "object", a.GetName())
+		watchers := dynamicSecretWatches.FindWatchers(a)
+		requests := []reconcile.Request{}
+		for _, watcher := range watchers {
+			log.Info("adding watcher", "watcher", watcher)
+			requests = append(requests, reconcile.Request{NamespacedName: watcher})
+		}
+		return requests
+	}
+
+	c = c.Watches(
+		&source.Kind{Type: &corev1.Secret{}},
+		handler.EnqueueRequestsFromMapFunc(toRequests),
+	)
+
+	return c.Complete(r)
+}
+
+// blank assignment to verify that CassandraDatacenterReconciler implements reconciliation.Reconciler
+var _ reconcile.Reconciler = &CassandraDatacenterReconciler{}

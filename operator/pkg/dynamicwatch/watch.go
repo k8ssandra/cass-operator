@@ -7,19 +7,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/go-logr/logr"
 	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
 )
 
 const (
@@ -30,7 +30,7 @@ const (
 type DynamicWatches interface {
 	UpdateWatch(watcher types.NamespacedName, watched []types.NamespacedName) error
 	RemoveWatcher(watcher types.NamespacedName) error
-	FindWatchers(meta metav1.Object, object runtime.Object) []types.NamespacedName
+	FindWatchers(obj client.Object) []types.NamespacedName
 }
 
 type DynamicWatchesAnnotationImpl struct {
@@ -331,7 +331,7 @@ func (impl *DynamicWatchesAnnotationImpl) RemoveWatcher(watcher types.Namespaced
 	return impl.UpdateWatch(watcher, []types.NamespacedName{})
 }
 
-func (impl *DynamicWatchesAnnotationImpl) FindWatchers(watchedMeta metav1.Object, watchedObject runtime.Object) []types.NamespacedName {
-	watchersAsStrings := impl.getWatcherNames(watchedMeta)
+func (impl *DynamicWatchesAnnotationImpl) FindWatchers(watchedObject client.Object) []types.NamespacedName {
+	watchersAsStrings := impl.getWatcherNames(watchedObject)
 	return namespacedNamesFromStringArray(watchersAsStrings)
 }

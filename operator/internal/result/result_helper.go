@@ -6,12 +6,12 @@ package result
 import (
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type ReconcileResult interface {
 	Completed() bool
-	Output() (reconcile.Result, error)
+	Output() (ctrl.Result, error)
 }
 
 type continueReconcile struct{}
@@ -19,7 +19,7 @@ type continueReconcile struct{}
 func (c continueReconcile) Completed() bool {
 	return false
 }
-func (c continueReconcile) Output() (reconcile.Result, error) {
+func (c continueReconcile) Output() (ctrl.Result, error) {
 	panic("there was no Result to return")
 }
 
@@ -28,8 +28,8 @@ type done struct{}
 func (d done) Completed() bool {
 	return true
 }
-func (d done) Output() (reconcile.Result, error) {
-	return reconcile.Result{}, nil
+func (d done) Output() (ctrl.Result, error) {
+	return ctrl.Result{}, nil
 }
 
 type callBackSoon struct {
@@ -39,9 +39,9 @@ type callBackSoon struct {
 func (c callBackSoon) Completed() bool {
 	return true
 }
-func (c callBackSoon) Output() (reconcile.Result, error) {
+func (c callBackSoon) Output() (ctrl.Result, error) {
 	t := time.Duration(c.secs) * time.Second
-	return reconcile.Result{Requeue: true, RequeueAfter: t}, nil
+	return ctrl.Result{Requeue: true, RequeueAfter: t}, nil
 }
 
 type errorOut struct {
@@ -51,8 +51,8 @@ type errorOut struct {
 func (e errorOut) Completed() bool {
 	return true
 }
-func (e errorOut) Output() (reconcile.Result, error) {
-	return reconcile.Result{}, e.err
+func (e errorOut) Output() (ctrl.Result, error) {
+	return ctrl.Result{}, e.err
 }
 
 func Continue() ReconcileResult {

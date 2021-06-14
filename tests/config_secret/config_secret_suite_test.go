@@ -21,11 +21,8 @@ var (
 	dcName            = "dc1"
 	dcYaml            = "../testdata/cluster-with-config-secret.yaml"
 	dcResource        = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel           = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	secretName        = "test-config"
 	secretYaml        = "../testdata/test-config-secret.yaml"
 	updatedSecretYaml = "../testdata/updated-test-config-secret.yaml"
-	secretResource    = fmt.Sprintf("secret/%s", secretName)
 	ns                = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -67,7 +64,7 @@ var _ = Describe(testName, func() {
 			k = kubectl.ApplyFiles(updatedSecretYaml)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterConditionWithTimeout(dcName, string(api.DatacenterReady), string(corev1.ConditionTrue), 450)
 
 			step = "checking cassandra.yaml"

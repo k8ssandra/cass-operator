@@ -99,7 +99,7 @@ var imageLookupMap map[Image]string = map[Image]string{
 	UBIDSE_6_8_3: "datastax/dse-server:6.8.3-ubi7",
 	UBIDSE_6_8_4: "datastax/dse-server:6.8.4-ubi7",
 
-	ConfigBuilder:    "datastax/cass-config-builder:1.0.3",
+	ConfigBuilder:    "datastax/cass-config-builder:1.0.4",
 	UBIConfigBuilder: "datastax/cass-config-builder:1.0.3-ubi7",
 
 	BusyBox:           "busybox:1.32.0-uclibc",

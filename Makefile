@@ -83,13 +83,21 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-test: manifests generate fmt vet ## Run tests.
+test: manifests generate fmt vet ## Run unit tests (including envtest based ones)
 	# Old unit tests first - these use mocked client / fakeclient
 	go test ./operator/pkg/... -coverprofile cover-operator.out
 	# These are not used yet
 	mkdir -p ${ENVTEST_ASSETS_DIR}
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.2/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./controllers/... -coverprofile cover.out
+
+integ-test: kustomize cert-manager ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
+ifeq ($(M_INTEG_DIR), all)
+	# Run all the tests (exclude kustomize & testdata directories)
+	cd tests && go test -v -timeout 300m --ginkgo.progress --ginkgo.v ./...
+else
+	cd tests/${M_INTEG_DIR} && go test -v -timeout 300m --ginkgo.progress --ginkgo.v ./...
+endif
 
 ##@ Build
 
@@ -135,8 +143,10 @@ ifneq ($(strip $(NAMESPACE)),)
 endif
 	$(KUSTOMIZE) build tests/kustomize | kubectl delete -f -
 
-integ-test: kustomize
-	cd tests/${M_INTEG_DIR} && go test -v -timeout 30m --ginkgo.progress --ginkgo.v ./...
+##@ Tools
+
+cert-manager: ## Install cert-manager to the cluster
+	kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.3.1/cert-manager.yaml
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.

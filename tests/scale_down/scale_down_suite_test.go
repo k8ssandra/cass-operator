@@ -70,7 +70,7 @@ var _ = Describe(testName, func() {
 			k = kubectl.Get("pod").
 				WithLabel("cassandra.datastax.com/node-state=Decommissioning").
 				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, podWithDecommissionedNode, 30)
+			ns.WaitForOutputAndLog(step, k, podWithDecommissionedNode, 90)
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
 			ns.WaitForDatacenterCondition(dcName, "ScalingDown", string(corev1.ConditionFalse))

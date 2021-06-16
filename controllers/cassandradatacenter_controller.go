@@ -33,9 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 
-	// "k8s.io/cri-api/pkg/errors"
-	// TODO Missmatch here due to the cass-operator requirement
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,6 +55,7 @@ import (
 // +kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=pods;endpoints;services;configmaps;secrets;persistentvolumeclaims;events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get
+// +kubebuilder:rbac:groups=core,resources=persistentvolumes;nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 
 // CassandraDatacenterReconciler reconciles a cassandraDatacenter object
@@ -270,11 +268,9 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 	dynamicSecretWatches := r.SecretWatches
 
 	toRequests := func(a client.Object) []reconcile.Request {
-		log.Info("toRequests secret change", "object", a.GetName())
 		watchers := dynamicSecretWatches.FindWatchers(a)
 		requests := []reconcile.Request{}
 		for _, watcher := range watchers {
-			log.Info("adding watcher", "watcher", watcher)
 			requests = append(requests, reconcile.Request{NamespacedName: watcher})
 		}
 		return requests

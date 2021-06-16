@@ -77,7 +77,7 @@ var _ = Describe(testName, func() {
 			k = kubectl.Get("pod").
 				WithFlag("field-selector", fmt.Sprintf("metadata.name=%s", extraPod)).
 				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "true", 360)
+			ns.WaitForOutputAndLog(step, k, "true", 600)
 
 			// The rack with an extra node should get a decommission request
 			// first, despite being the last rack and the first rack also needing
@@ -101,7 +101,7 @@ var _ = Describe(testName, func() {
 			ensurePodGetsDecommissionedNext("cluster1-dc1-r1-sts-1", expectedRemainingPods)
 
 			ns.WaitForDatacenterCondition(dcName, "ScalingDown", string(corev1.ConditionFalse))
-			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 120)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 180)
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(dcYaml)

@@ -9,16 +9,25 @@ import (
 )
 
 func Deploy(namespace string) error {
-	return runMake(namespace, "deploy-test")
+	return DeployDir(namespace, "kustomize")
 }
 
 func Undeploy(namespace string) error {
-	return runMake(namespace, "undeploy-test")
+	return UndeployDir(namespace, "kustomize")
 }
 
-func runMake(namespace, command string) error {
+func DeployDir(namespace, testDir string) error {
+	return runMake(namespace, "deploy-test", testDir)
+}
+
+func UndeployDir(namespace, testDir string) error {
+	return runMake(namespace, "undeploy-test", testDir)
+}
+
+func runMake(namespace, command, dir string) error {
 	ns := fmt.Sprintf("NAMESPACE=%s", namespace)
-	deploy := exec.Command("make", ns, command)
+	kustDir := fmt.Sprintf("TEST_DIR=%s", dir)
+	deploy := exec.Command("make", ns, command, kustDir)
 	var out bytes.Buffer
 	deploy.Stdout = &out
 

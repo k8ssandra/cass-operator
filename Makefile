@@ -135,13 +135,13 @@ deploy-test:
 ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
-	$(KUSTOMIZE) build tests/kustomize | kubectl apply -f -
+	$(KUSTOMIZE) build tests/$(TEST_DIR) | kubectl apply -f -
 
 undeploy-test:
 ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
-	$(KUSTOMIZE) build tests/kustomize | kubectl delete -f -
+	$(KUSTOMIZE) build tests/$(TEST_DIR) | kubectl delete -f -
 
 ##@ Tools
 
@@ -154,7 +154,7 @@ controller-gen: ## Download controller-gen locally if necessary.
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.1.3)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

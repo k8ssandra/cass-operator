@@ -54,7 +54,7 @@ var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
 		Specify("the operator can monitor multiple namespaces", func() {
 			By("deploy cass-operator with kustomize")
-			err := kustomize.Deploy(opNamespace)
+			err := kustomize.DeployDir(opNamespace, "cluster_wide_install")
 			Expect(err).ToNot(HaveOccurred())
 
 			// By("creating a namespace for the cass-operator")

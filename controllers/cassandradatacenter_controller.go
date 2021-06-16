@@ -46,17 +46,17 @@ import (
 )
 
 // datastax.com groups
-//+kubebuilder:rbac:groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=cassandra.datastax.com,resources=cassandradatacenters/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=cassandra.datastax.com,resources=cassandradatacenters/finalizers,verbs=update;delete
+//+kubebuilder:rbac:groups=cassandra.datastax.com,namespace=cass-operator,resources=cassandradatacenters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=cassandra.datastax.com,namespace=cass-operator,resources=cassandradatacenters/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=cassandra.datastax.com,namespace=cass-operator,resources=cassandradatacenters/finalizers,verbs=update;delete
 
 // Kubernetes core
-// +kubebuilder:rbac:groups=apps,resources=statefulsets;replicasets;deployments;daemonsets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,resources=pods;endpoints;services;configmaps;secrets;persistentvolumeclaims;events,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get
-// +kubebuilder:rbac:groups=core,resources=persistentvolumes;nodes,verbs=get;list;watch
-// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,namespace=cass-operator,resources=statefulsets;replicasets;deployments;daemonsets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,namespace=cass-operator,resources=deployments/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods;endpoints;services;configmaps;secrets;persistentvolumeclaims;events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=namespaces,verbs=get
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=persistentvolumes;nodes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=policy,namespace=cass-operator,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 
 // CassandraDatacenterReconciler reconciles a cassandraDatacenter object
 type CassandraDatacenterReconciler struct {

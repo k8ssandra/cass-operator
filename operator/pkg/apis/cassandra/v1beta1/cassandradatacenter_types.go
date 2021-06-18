@@ -22,6 +22,9 @@ const (
 	// DatacenterLabel is the operator's label for the datacenter name
 	DatacenterLabel = "cassandra.datastax.com/datacenter"
 
+	// DatacenterUID is the operator's label for datacenter UID
+	DatacenterUID = "cassandra.datastax.com/datacenterUID"
+
 	// SeedNodeLabel is the operator's label for the seed node state
 	SeedNodeLabel = "cassandra.datastax.com/seed-node"
 
@@ -102,7 +105,7 @@ type CassandraDatacenterSpec struct {
 	//        },
 	//        "jmv-options": {
 	//          "max_heap_size": 1024M
-    //        }
+	//        }
 	//      }
 	//
 	// ConfigSecret is mutually exclusive with Config. ConfigSecret takes precedence and
@@ -514,6 +517,7 @@ func (dc *CassandraDatacenter) SetCondition(condition DatacenterCondition) {
 func (dc *CassandraDatacenter) GetDatacenterLabels() map[string]string {
 	labels := dc.GetClusterLabels()
 	labels[DatacenterLabel] = dc.Name
+	labels[DatacenterUID] = string(dc.UID)
 	return labels
 }
 

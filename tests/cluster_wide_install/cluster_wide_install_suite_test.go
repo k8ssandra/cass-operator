@@ -53,13 +53,14 @@ func TestLifecycle(t *testing.T) {
 var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
 		Specify("the operator can monitor multiple namespaces", func() {
-			By("deploy cass-operator with kustomize")
-			err := kustomize.DeployDir(opNamespace, "cluster_wide_install")
+			// Workaround for kustomize reorder bug
+			By("creating a namespace for the cass-operator")
+			err := kubectl.CreateNamespace(opNamespace).ExecV()
 			Expect(err).ToNot(HaveOccurred())
 
-			// By("creating a namespace for the cass-operator")
-			// err := kubectl.CreateNamespace(opNamespace).ExecV()
-			// Expect(err).ToNot(HaveOccurred())
+			By("deploy cass-operator with kustomize")
+			err = kustomize.DeployDir(opNamespace, "cluster_wide_install")
+			Expect(err).ToNot(HaveOccurred())
 
 			// var overrides = map[string]string{
 			// 	"clusterWideInstall": "true",

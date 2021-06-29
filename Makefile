@@ -85,7 +85,7 @@ vet: ## Run go vet against code.
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 test: manifests generate fmt vet ## Run unit tests (including envtest based ones)
 	# Old unit tests first - these use mocked client / fakeclient
-	go test ./operator/pkg/... -coverprofile cover-operator.out
+	go test ./pkg/... -coverprofile cover-operator.out
 	# These are not used yet
 	mkdir -p ${ENVTEST_ASSETS_DIR}
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.2/hack/setup-envtest.sh

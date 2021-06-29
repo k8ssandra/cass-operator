@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/k8ssandra/cass-operator/operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/pkg/images"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"

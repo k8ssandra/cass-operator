@@ -22,9 +22,9 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
-	"github.com/k8ssandra/cass-operator/operator/pkg/dynamicwatch"
-	"github.com/k8ssandra/cass-operator/operator/pkg/oplabels"
-	"github.com/k8ssandra/cass-operator/operator/pkg/reconciliation"
+	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/pkg/reconciliation"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"

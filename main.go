@@ -36,7 +36,7 @@ import (
 
 	api "github.com/k8ssandra/cass-operator/api/v1beta1"
 	"github.com/k8ssandra/cass-operator/controllers"
-	"github.com/k8ssandra/cass-operator/operator/pkg/utils"
+	"github.com/k8ssandra/cass-operator/pkg/utils"
 	//+kubebuilder:scaffold:imports
 )
 

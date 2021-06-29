@@ -14,7 +14,7 @@ import (
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
-	"github.com/k8ssandra/cass-operator/operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 )
 

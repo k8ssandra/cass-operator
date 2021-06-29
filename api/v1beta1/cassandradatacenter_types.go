@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/Jeffail/gabs"
-	"github.com/k8ssandra/cass-operator/operator/pkg/serverconfig"
+	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

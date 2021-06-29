@@ -9,6 +9,18 @@ patchesJson6902:
 - target:
     group: rbac.authorization.k8s.io
     version: v1
+    kind: Role
+    name: manager-role
+  patch: |-
+    - op: replace
+      path: /kind
+      value: ClusterRole
+    - op: replace
+      path: /metadata/name
+      value: cass-operator-manager-crrole
+- target:
+    group: rbac.authorization.k8s.io
+    version: v1
     kind: RoleBinding
     name: manager-rolebinding
   patch: |-
@@ -20,22 +32,13 @@ patchesJson6902:
       value: ClusterRole
     - op: replace
       path: /roleRef/name
-      value: cass-operator-manager-role
+      value: cass-operator-manager-crrole
     - op: replace
       path: /subjects/0/name
       value: cass-operator-controller-manager
     - op: add
       path: /subjects/0/namespace
       value: test-cluster-wide-install
-- target:
-    group: rbac.authorization.k8s.io
-    version: v1
-    kind: Role
-    name: manager-role
-  patch: |-
-    - op: replace
-      path: /kind
-      value: ClusterRole
 - target:
     group: apps
     version: v1

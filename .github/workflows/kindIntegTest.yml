@@ -162,10 +162,6 @@ jobs:
       - name: Run integration test ( ${{ matrix.integration_test }} )
         run: |
           make integ-test
-        # uses: magefile/mage-action@v1
-        # with:
-        #   version: latest
-        #   args: integ:run
       - name: Archive k8s logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2

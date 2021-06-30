@@ -12,6 +12,12 @@ patchesJson6902:
     kind: CustomResourceDefinition
     name: cassandradatacenters.cassandra.datastax.com
   path: patches/config_removal.yaml
+- target:
+    group: apiextensions.k8s.io
+    version: v1
+    kind: CustomResourceDefinition
+    name: cassandradatacenters.cassandra.datastax.com
+  path: patches/remove_xkeys.yaml
 #    name: controller-manager
 #    namespace: system
 #  patch: |-

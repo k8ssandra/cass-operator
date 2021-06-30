@@ -1,0 +1,12 @@
+- op: remove
+  path: /spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/podTemplateSpec/properties/spec/properties/containers/items/properties/ports/x-kubernetes-list-map-keys
+- op: remove
+  path: /spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/podTemplateSpec/properties/spec/properties/containers/items/properties/ports/x-kubernetes-list-type
+- op: remove
+  path: /spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/podTemplateSpec/properties/spec/properties/initContainers/items/properties/ports/x-kubernetes-list-map-keys
+- op: remove
+  path: /spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/podTemplateSpec/properties/spec/properties/initContainers/items/properties/ports/x-kubernetes-list-type
+- op: remove
+  path: /spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/podTemplateSpec/properties/spec/properties/topologySpreadConstraints/x-kubernetes-list-map-keys
+- op: remove
+  path: /spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/podTemplateSpec/properties/spec/properties/topologySpreadConstraints/x-kubernetes-list-type

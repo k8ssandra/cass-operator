@@ -12,9 +12,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
-	"github.com/k8ssandra/cass-operator/mage/kubectl"
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
+	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
+	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
 )
 
 var (

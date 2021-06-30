@@ -39,24 +39,11 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-      # - name: Test Sdk Generate
-      #   uses: magefile/mage-action@v1
-      #   with:
-      #     version: latest
-      #     args: operator:testSdkGenerate
-      # - name: Test Client Generate
-      #   uses: magefile/mage-action@v1
-      #   with:
-      #     version: latest
-      #     args: operator:testGenerateClient
       - name: Unit Tests
         run: |
           export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
-          make controller-gen test
-        # uses: magefile/mage-action@v1
-        # with:
-        #   version: latest
-        #   args: operator:testGo
+          make test
+          # TODO Verify that go fmt / vet did not modify anything?
   build_operator_docker:
     name: Build Cass Operator Docker Image
     runs-on: ubuntu-latest

@@ -7,13 +7,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
 
-	"github.com/k8ssandra/cass-operator/mage/util"
-	"github.com/magefile/mage/mg"
-	"github.com/magefile/mage/sh"
+	mageutil "github.com/k8ssandra/cass-operator/tests/util"
 )
 
 // Run command.
@@ -27,11 +26,7 @@ func Run(cmd string, args ...string) error {
 
 func RunWithEnv(env map[string]string, cmd string, args ...string) error {
 	var output io.Writer
-	if mg.Verbose() {
-		output = os.Stdout
-	}
-
-	_, err := sh.Exec(env, output, os.Stderr, cmd, args...)
+	_, err := Exec(env, output, os.Stderr, cmd, args...)
 	return err
 }
 
@@ -52,7 +47,7 @@ func RunV(cmd string, args ...string) error {
 }
 
 func RunVWithEnv(env map[string]string, cmd string, args ...string) error {
-	_, err := sh.Exec(env, os.Stdout, os.Stderr, cmd, args...)
+	_, err := Exec(env, os.Stdout, os.Stderr, cmd, args...)
 	return err
 }
 
@@ -77,7 +72,7 @@ func RunVCapture(cmd string, args ...string) (string, string, error) {
 	multiOut := io.MultiWriter(captureOut, os.Stdout)
 	multiErr := io.MultiWriter(captureErr, os.Stderr)
 
-	_, err := sh.Exec(nil, multiOut, multiErr, cmd, args...)
+	_, err := Exec(nil, multiOut, multiErr, cmd, args...)
 	return captureOut.String(), captureErr.String(), err
 }
 
@@ -89,7 +84,7 @@ func Output(cmd string, args ...string) (string, error) {
 
 func OutputWithEnv(env map[string]string, cmd string, args ...string) (string, error) {
 	buf := &bytes.Buffer{}
-	_, err := sh.Exec(env, buf, os.Stderr, cmd, args...)
+	_, err := Exec(env, buf, os.Stderr, cmd, args...)
 	return strings.TrimSuffix(buf.String(), "\n"), err
 }
 
@@ -121,9 +116,6 @@ func RunWithInput(cmd string, in string, args ...string) error {
 func RunWithEnvWithInput(env map[string]string, cmd string, in string, args ...string) error {
 	c := cmdWithStdIn(nil, cmd, in, args...)
 	var output io.Writer
-	if mg.Verbose() {
-		output = os.Stdout
-	}
 	c.Stderr = os.Stderr
 	c.Stdout = output
 	return c.Run()
@@ -156,4 +148,74 @@ func OutputWithEnvWithInput(env map[string]string, cmd string, in string, args .
 	c.Stdin = &buffer
 	out, err := c.Output()
 	return string(out), err
+}
+
+// Copied from mage
+func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, err error) {
+	expand := func(s string) string {
+		s2, ok := env[s]
+		if ok {
+			return s2
+		}
+		return os.Getenv(s)
+	}
+	cmd = os.Expand(cmd, expand)
+	for i := range args {
+		args[i] = os.Expand(args[i], expand)
+	}
+	ran, code, err := run(env, stdout, stderr, cmd, args...)
+	if err == nil {
+		return true, nil
+	}
+	if ran {
+		return ran, fmt.Errorf(`running "%s %s" failed with exit code %d`, cmd, strings.Join(args, " "), code)
+	}
+	return ran, fmt.Errorf(`failed to run "%s %s: %v"`, cmd, strings.Join(args, " "), err)
+}
+
+func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
+	c := exec.Command(cmd, args...)
+	c.Env = os.Environ()
+	for k, v := range env {
+		c.Env = append(c.Env, k+"="+v)
+	}
+	c.Stderr = stderr
+	c.Stdout = stdout
+	c.Stdin = os.Stdin
+	log.Println("exec:", cmd, strings.Join(args, " "))
+	err = c.Run()
+	return CmdRan(err), ExitStatus(err), err
+}
+
+func CmdRan(err error) bool {
+	if err == nil {
+		return true
+	}
+	ee, ok := err.(*exec.ExitError)
+	if ok {
+		return ee.Exited()
+	}
+	return false
+}
+
+type exitStatus interface {
+	ExitStatus() int
+}
+
+// ExitStatus returns the exit status of the error if it is an exec.ExitError
+// or if it implements ExitStatus() int.
+// 0 if it is nil or 1 if it is a different error.
+func ExitStatus(err error) int {
+	if err == nil {
+		return 0
+	}
+	if e, ok := err.(exitStatus); ok {
+		return e.ExitStatus()
+	}
+	if e, ok := err.(*exec.ExitError); ok {
+		if ex, ok := e.Sys().(exitStatus); ok {
+			return ex.ExitStatus()
+		}
+	}
+	return 1
 }

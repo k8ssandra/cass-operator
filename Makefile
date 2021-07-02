@@ -34,6 +34,8 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # cassandra.datastax.com/cass-oper-bundle:$VERSION and cassandra.datastax.com/cass-oper-catalog:$VERSION.
 IMAGE_TAG_BASE ?= k8ssandra/cass-operator
 
+M_INTEG_DIR ?= all
+
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)

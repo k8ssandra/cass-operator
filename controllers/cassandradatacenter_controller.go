@@ -150,24 +150,6 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 	log := r.Log.
 		WithName("cassandradatacenter_controller")
 
-	// Create a new managed controller builder
-	c := ctrl.NewControllerManagedBy(mgr).
-		Named("cassandradatacenter-controller").
-		WithLogger(log).
-		For(&api.CassandraDatacenter{}, builder.WithPredicates(predicate.GenerationChangedPredicate{}))
-
-	// Watch for changes to primary resource CassandraDatacenter
-	// c = c.Watches(
-	// 	&source.Kind{Type: &api.CassandraDatacenter{}},
-	// 	&handler.EnqueueRequestForObject{},
-	// 	// This allows us to update the status on every reconcile call without
-	// 	// triggering an infinite loop.
-	// 	builder.WithPredicates(predicate.GenerationChangedPredicate{}))
-
-	// Here we list all the types that we create that are owned by the primary resource.
-	//
-	// Watch for changes to secondary resources StatefulSets, PodDisruptionBudgets, and Services and requeue the
-	// CassandraDatacenter that owns them.
 	managedByCassandraOperatorPredicate := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return oplabels.HasManagedByCassandraOperatorLabel(e.Object.GetLabels())
@@ -184,37 +166,14 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		},
 	}
 
-	// NOTE: We do not currently watch PVC resources, but if we did, we'd have to
-	// account for the fact that they might use the old managed-by label value
-	// (oplabels.ManagedByLabelDefunctValue) for CassandraDatacenters originally
-	// created in version 1.1.0 or earlier.
-
-	c = c.Watches(
-		&source.Kind{Type: &appsv1.StatefulSet{}},
-		&handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &api.CassandraDatacenter{},
-		},
-		builder.WithPredicates(managedByCassandraOperatorPredicate),
-	)
-
-	c = c.Watches(
-		&source.Kind{Type: &policyv1beta1.PodDisruptionBudget{}},
-		&handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &api.CassandraDatacenter{},
-		},
-		builder.WithPredicates(managedByCassandraOperatorPredicate),
-	)
-
-	c = c.Watches(
-		&source.Kind{Type: &corev1.Service{}},
-		&handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &api.CassandraDatacenter{},
-		},
-		builder.WithPredicates(managedByCassandraOperatorPredicate),
-	)
+	// Create a new managed controller builder
+	c := ctrl.NewControllerManagedBy(mgr).
+		Named("cassandradatacenter-controller").
+		WithLogger(log).
+		For(&api.CassandraDatacenter{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		Owns(&appsv1.StatefulSet{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
+		Owns(&policyv1beta1.PodDisruptionBudget{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
+		Owns(&corev1.Service{}, builder.WithPredicates(managedByCassandraOperatorPredicate))
 
 	configSecretMapFn := func(mapObj client.Object) []reconcile.Request {
 		log.Info("config secret watch called", "Secret", mapObj.GetName())

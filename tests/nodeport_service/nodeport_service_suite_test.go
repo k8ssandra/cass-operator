@@ -15,6 +15,7 @@ import (
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
 )
 
 var (
@@ -34,6 +35,7 @@ func TestLifecycle(t *testing.T) {
 
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
+		kustomize.Undeploy(namespace)
 	})
 
 	RegisterFailHandler(Fail)
@@ -81,12 +83,9 @@ var _ = Describe(testName, func() {
 			var step string
 			var k kubectl.KCmd
 
-			By("creating a namespace")
-			err := kubectl.CreateNamespace(namespace).ExecV()
+			By("deploy cass-operator with kustomize")
+			err := kustomize.Deploy(namespace)
 			Expect(err).ToNot(HaveOccurred())
-
-			step = "setting up cass-operator resources via helm chart"
-			ns.HelmInstall("../../charts/cass-operator-chart")
 
 			ns.WaitForOperatorReady()
 

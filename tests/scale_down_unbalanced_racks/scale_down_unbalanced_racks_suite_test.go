@@ -15,6 +15,7 @@ import (
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
 )
 
 var (
@@ -33,6 +34,7 @@ func TestLifecycle(t *testing.T) {
 		kubectl.DumpAllLogs(logPath).ExecV()
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
+		kustomize.Undeploy(namespace)
 	})
 
 	RegisterFailHandler(Fail)
@@ -42,16 +44,13 @@ func TestLifecycle(t *testing.T) {
 var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
 		Specify("a datacenter can be scaled down with unbalanced racks", func() {
-			By("creating a namespace")
-			err := kubectl.CreateNamespace(namespace).ExecV()
+			By("deploy cass-operator with kustomize")
+			err := kustomize.Deploy(namespace)
 			Expect(err).ToNot(HaveOccurred())
-
-			step := "setting up cass-operator resources via helm chart"
-			ns.HelmInstall("../../charts/cass-operator-chart")
 
 			ns.WaitForOperatorReady()
 
-			step = "creating a datacenter resource with 2 racks/4 nodes"
+			step := "creating a datacenter resource with 2 racks/4 nodes"
 			k := kubectl.ApplyFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
@@ -78,7 +77,7 @@ var _ = Describe(testName, func() {
 			k = kubectl.Get("pod").
 				WithFlag("field-selector", fmt.Sprintf("metadata.name=%s", extraPod)).
 				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "true", 360)
+			ns.WaitForOutputAndLog(step, k, "true", 600)
 
 			// The rack with an extra node should get a decommission request
 			// first, despite being the last rack and the first rack also needing
@@ -102,7 +101,7 @@ var _ = Describe(testName, func() {
 			ensurePodGetsDecommissionedNext("cluster1-dc1-r1-sts-1", expectedRemainingPods)
 
 			ns.WaitForDatacenterCondition(dcName, "ScalingDown", string(corev1.ConditionFalse))
-			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 120)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 180)
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(dcYaml)

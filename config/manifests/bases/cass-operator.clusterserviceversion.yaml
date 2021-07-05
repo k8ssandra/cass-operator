@@ -1,0 +1,47 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: cass-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: CassandraDatacenter is the Schema for the cassandradatacenters API
+      displayName: Cassandra Datacenter
+      kind: CassandraDatacenter
+      name: cassandradatacenters.cassandra.datastax.com
+      version: v1beta1
+  description: '-'
+  displayName: DataStax Apache Cassandra Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - k8ssandra
+  - cass-operator
+  - cassandra
+  links:
+  - name: Cass Operator
+    url: https://k8ssandra.io
+  maturity: alpha
+  provider:
+    name: DataStax
+    url: k8ssandra.io
+  version: 0.0.0

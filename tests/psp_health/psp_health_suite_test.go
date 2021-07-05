@@ -12,17 +12,18 @@ import (
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	"gopkg.in/yaml.v2"
 )
 
 var (
-	testName         = "PSP Health"
-	namespace        = "test-psp-health"
-	dcName           = "dc2"
-	dcYaml           = "../testdata/default-single-rack-2-node-dc.yaml"
-	dcResource       = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel          = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns               = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "PSP Health"
+	namespace  = "test-psp-health"
+	dcName     = "dc2"
+	dcYaml     = "../testdata/default-single-rack-2-node-dc.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -31,6 +32,7 @@ func TestLifecycle(t *testing.T) {
 		kubectl.DumpAllLogs(logPath).ExecV()
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
+		kustomize.Undeploy(namespace)
 	})
 
 	RegisterFailHandler(Fail)
@@ -51,7 +53,7 @@ func getPspInstanceHealth() (map[interface{}]interface{}, error) {
 	return config, nil
 }
 
-func getPath(obj interface{}, path... interface{}) interface{} {
+func getPath(obj interface{}, path ...interface{}) interface{} {
 	if len(path) == 0 {
 		return obj
 	}
@@ -65,23 +67,27 @@ func getPath(obj interface{}, path... interface{}) interface{} {
 	if ok {
 		return getPath(l[path[0].(int)], path[1:]...)
 	}
-	
+
 	return nil
 }
 
 var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
 		Specify("the operator syncs PSP health status information", func() {
-			By("creating a namespace")
-			err := kubectl.CreateNamespace(namespace).ExecV()
+			By("deploy cass-operator with kustomize")
+			err := kustomize.Deploy(namespace)
 			Expect(err).ToNot(HaveOccurred())
 
-			step := "setting up cass-operator resources via helm chart"
-			ns.HelmInstallWithPSPEnabled("../../charts/cass-operator-chart")
+			// By("creating a namespace")
+			// err := kubectl.CreateNamespace(namespace).ExecV()
+			// Expect(err).ToNot(HaveOccurred())
+
+			// step := "setting up cass-operator resources via helm chart"
+			// ns.HelmInstallWithPSPEnabled("../../charts/cass-operator-chart")
 
 			ns.WaitForOperatorReady()
 
-			step = "creating a datacenter resource with 1 rack/2 node"
+			step := "creating a datacenter resource with 1 rack/2 node"
 			k := kubectl.ApplyFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
@@ -106,16 +112,15 @@ var _ = Describe(testName, func() {
 
 			Expect(
 				getPath(config, "status", "instancehealth", 0, "instance"),
-				).To(Equal(dcName), "Expected instance name to be %s", dcName)
+			).To(Equal(dcName), "Expected instance name to be %s", dcName)
 
 			Expect(
 				getPath(config, "status", "instancehealth", 0, "namespace"),
-				).To(Equal(namespace), "Expected instance namespace to be %s", namespace)
+			).To(Equal(namespace), "Expected instance namespace to be %s", namespace)
 
 			Expect(
 				getPath(config, "status", "instancehealth", 0, "health"),
-				).To(Equal("green"), "Expected instance health value to be green")
-
+			).To(Equal("green"), "Expected instance health value to be green")
 
 			// Check some labels and annotations
 			//

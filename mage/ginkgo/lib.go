@@ -16,8 +16,6 @@ import (
 	ginkgo "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	cfgutil "github.com/k8ssandra/cass-operator/mage/config"
-	helm_util "github.com/k8ssandra/cass-operator/mage/helm"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
 	mageutil "github.com/k8ssandra/cass-operator/mage/util"
 )
@@ -123,31 +121,8 @@ func (ns NsWrapper) Terminate() {
 	// This is important because deleting the namespace itself
 	// can hang if this step is skipped.
 	kcmd := kubectl.Delete("cassandradatacenter", "--all")
-	_, dcErrOut, dcErr := ns.ExecVCapture(kcmd)
-
-	// Must run helm uninstall before deleting namespace
-	// or else it won't see that it has an active release
-	// out there
-	_, helmErrOut, helmErr := helm_util.UninstallCapture("cass-operator", ns.Namespace)
-
-	_, nsErrOut, nsErr := kubectl.DeleteByTypeAndName("namespace", ns.Namespace).ExecVCapture()
-
-	var errMsgs []string
-	if dcErr != nil {
-		errMsgs = append(errMsgs, fmt.Sprintf("Error deleting datacenters: %v\n\t%s", dcErr.Error(), dcErrOut))
-	}
-	if helmErr != nil {
-		errMsgs = append(errMsgs, fmt.Sprintf("Error performing helm uninstall: %v\n\t%s", helmErr.Error(), helmErrOut))
-	}
-	if nsErr != nil {
-		errMsgs = append(errMsgs, fmt.Sprintf("Error deleting namespace: %v\n\t%s", nsErr.Error(), nsErrOut))
-	}
-
-	if len(errMsgs) > 0 {
-		msg := fmt.Sprintf("One or more errors occurred while cleaning up test resources.\n%s", strings.Join(errMsgs, "\n"))
-		err := fmt.Errorf(msg)
-		Expect(err).ToNot(HaveOccurred())
-	}
+	_, _, dcErr := ns.ExecVCapture(kcmd)
+	Expect(dcErr).ToNot(HaveOccurred())
 }
 
 //===================================
@@ -417,46 +392,6 @@ func CreateDockerRegistrySecret(name string, namespace string) {
 	}
 	k := kubectl.KCmd{Command: "create", Args: args, Flags: flags}
 	k.InNamespace(namespace).ExecVCapture()
-}
-
-func (ns NsWrapper) HelmInstall(chartPath string, overrides ...string) {
-	overridesMap := map[string]string{}
-	for i := 0; i < len(overrides)-1; i = i + 2 {
-		overridesMap[overrides[i]] = overrides[i+1]
-	}
-	HelmInstallWithOverrides(chartPath, ns.Namespace, overridesMap)
-}
-
-func (ns NsWrapper) HelmInstallWithPSPEnabled(chartPath string) {
-	var overrides = map[string]string{
-		"vmwarePSPEnabled": "true",
-	}
-	HelmInstallWithOverrides(chartPath, ns.Namespace, overrides)
-}
-
-// This is not a method on NsWrapper to allow mage to use it to create an example cluster.
-func HelmInstallWithOverrides(chartPath string, namespace string, overrides map[string]string) {
-	overrides["image"] = cfgutil.GetOperatorImage()
-
-	if kubectl.DockerCredentialsDefined() {
-		CreateDockerRegistrySecret(ImagePullSecretName, namespace)
-		overrides["imagePullSecret"] = ImagePullSecretName
-	}
-
-	err := helm_util.Install(chartPath, "cass-operator", namespace, overrides)
-	mageutil.PanicOnError(err)
-}
-
-func HelmUpgradeWithOverrides(chartPath string, namespace string, overrides map[string]string) {
-	overrides["image"] = cfgutil.GetOperatorImage()
-
-	// NOTE: This assumes the credential has already been defined during HelmInstallWithOverrides
-	if kubectl.DockerCredentialsDefined() {
-		overrides["imagePullSecret"] = ImagePullSecretName
-	}
-
-	err := helm_util.Upgrade(chartPath, "cass-operator", namespace, overrides)
-	mageutil.PanicOnError(err)
 }
 
 // Note that the actual value will be cast to a string before the comparison with the expectedValue

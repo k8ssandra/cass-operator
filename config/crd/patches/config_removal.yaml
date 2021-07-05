@@ -1,0 +1,15 @@
+# Remove the "config" section from the CRD, and enable
+# x-kubernetes-preserve-unknown-fields.
+#
+# This is necessary because the config field has a dynamic
+# schema which depends on the DSE version selected, and
+# dynamic schema aren't possible to fully specify and
+# validate via openAPI V3.
+#
+# Instead, we remove the config field from the schema
+# entirely and instruct openAPI/k8s to preserve fields even
+# if they aren't specified in the CRD. The field itself is defined
+# as a json.RawMessage, see dsedatacenter_types.go in the
+# api's subdirectory for details.
+- op: remove
+  path: /spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/config

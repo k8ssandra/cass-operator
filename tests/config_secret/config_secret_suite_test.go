@@ -2,9 +2,11 @@ package config_secret
 
 import (
 	"fmt"
-	api "github.com/k8ssandra/cass-operator/operator/pkg/apis/cassandra/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	"testing"
+
+	api "github.com/k8ssandra/cass-operator/api/v1beta1"
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
+	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -14,17 +16,14 @@ import (
 )
 
 var (
-	testName   = "Config change rollout with config secret"
-	namespace  = "test-config-change-rollout-secret"
-	dcName     = "dc1"
-	dcYaml     = "../testdata/cluster-with-config-secret.yaml"
- 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	secretName = "test-config"
-	secretYaml = "../testdata/test-config-secret.yaml"
+	testName          = "Config change rollout with config secret"
+	namespace         = "test-config-change-rollout-secret"
+	dcName            = "dc1"
+	dcYaml            = "../testdata/cluster-with-config-secret.yaml"
+	dcResource        = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	secretYaml        = "../testdata/test-config-secret.yaml"
 	updatedSecretYaml = "../testdata/updated-test-config-secret.yaml"
-	secretResource = fmt.Sprintf("secret/%s", secretName)
-	ns         = ginkgo_util.NewWrapper(testName, namespace)
+	ns                = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -36,6 +35,7 @@ func TestLifecycle(t *testing.T) {
 		}
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
+		kustomize.Undeploy(namespace)
 	})
 
 	RegisterFailHandler(Fail)
@@ -45,12 +45,10 @@ func TestLifecycle(t *testing.T) {
 var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
 		Specify("cassandra configuration can be applied with a secret", func() {
-			By("creating a namespace")
-			err := kubectl.CreateNamespace(namespace).ExecV()
+			By("deploy cass-operator with kustomize")
+			err := kustomize.Deploy(namespace)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("setting up cass-operator resources via helm chart")
-			ns.HelmInstall("../../charts/cass-operator-chart")
 			ns.WaitForOperatorReady()
 
 			step := "creating config secret"
@@ -66,7 +64,7 @@ var _ = Describe(testName, func() {
 			k = kubectl.ApplyFiles(updatedSecretYaml)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterConditionWithTimeout(dcName, string(api.DatacenterReady), string(corev1.ConditionTrue), 450)
 
 			step = "checking cassandra.yaml"

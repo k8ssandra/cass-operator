@@ -12,17 +12,17 @@ import (
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
 )
 
 var (
-	testName     = "test mtls protecting mgmt api"
-	namespace    = "test-mtls-for-mgmt-api"
-	dcName       = "dc1"
-	dcYaml       = "../testdata/oss-one-node-dc-with-mtls.yaml"
-	operatorYaml = "../testdata/operator.yaml"
-	dcResource   = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel      = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns           = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "test mtls protecting mgmt api"
+	namespace  = "test-mtls-for-mgmt-api"
+	dcName     = "dc1"
+	dcYaml     = "../testdata/oss-one-node-dc-with-mtls.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -31,6 +31,7 @@ func TestLifecycle(t *testing.T) {
 		kubectl.DumpAllLogs(logPath).ExecV()
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
+		kustomize.Undeploy(namespace)
 	})
 
 	RegisterFailHandler(Fail)
@@ -40,17 +41,14 @@ func TestLifecycle(t *testing.T) {
 var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
 		Specify("the operator can start, scale up, and terminate a datacenter where the mgmt api is behind mtls", func() {
-			By("creating a namespace")
-			err := kubectl.CreateNamespace(namespace).ExecV()
+			By("deploy cass-operator with kustomize")
+			err := kustomize.Deploy(namespace)
 			Expect(err).ToNot(HaveOccurred())
-
-			step := "setting up cass-operator resources via helm chart"
-			ns.HelmInstall("../../charts/cass-operator-chart")
 
 			ns.WaitForOperatorReady()
 
 			// jam in secrets
-			step = "creating mtls secrets"
+			step := "creating mtls secrets"
 			k := kubectl.ApplyFiles(
 				"../testdata/mtls-certs-server.yaml",
 				"../testdata/mtls-certs-client.yaml",

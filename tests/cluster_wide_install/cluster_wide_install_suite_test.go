@@ -12,6 +12,7 @@ import (
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
 )
 
 // Note: the cass-operator itself will be installed in the test-cluster-wide-install namespace
@@ -42,6 +43,7 @@ func TestLifecycle(t *testing.T) {
 		}
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
+		kustomize.Undeploy(opNamespace)
 	})
 
 	RegisterFailHandler(Fail)
@@ -51,15 +53,20 @@ func TestLifecycle(t *testing.T) {
 var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
 		Specify("the operator can monitor multiple namespaces", func() {
+			// Workaround for kustomize reorder bug
 			By("creating a namespace for the cass-operator")
 			err := kubectl.CreateNamespace(opNamespace).ExecV()
 			Expect(err).ToNot(HaveOccurred())
 
-			var overrides = map[string]string{
-				"clusterWideInstall": "true",
-			}
-			chartPath := "../../charts/cass-operator-chart"
-			ginkgo_util.HelmInstallWithOverrides(chartPath, ns.Namespace, overrides)
+			By("deploy cass-operator with kustomize")
+			err = kustomize.DeployDir(opNamespace, "cluster_wide_install")
+			Expect(err).ToNot(HaveOccurred())
+
+			// var overrides = map[string]string{
+			// 	"clusterWideInstall": "true",
+			// }
+			// chartPath := "../../charts/cass-operator-chart"
+			// ginkgo_util.HelmInstallWithOverrides(chartPath, ns.Namespace, overrides)
 
 			ns.WaitForOperatorReady()
 

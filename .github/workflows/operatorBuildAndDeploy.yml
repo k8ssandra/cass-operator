@@ -12,6 +12,7 @@ jobs:
     env:
       GOPATH: /home/runner/go
       GOROOT: /usr/local/go1.16
+      CGO_ENABLED: 0
     steps:
       - uses: actions/checkout@v2
         if: github.event_name == 'pull_request'
@@ -38,21 +39,24 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-      - name: Test Sdk Generate
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: operator:testSdkGenerate
-      - name: Test Client Generate
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: operator:testGenerateClient
+      # - name: Test Sdk Generate
+      #   uses: magefile/mage-action@v1
+      #   with:
+      #     version: latest
+      #     args: operator:testSdkGenerate
+      # - name: Test Client Generate
+      #   uses: magefile/mage-action@v1
+      #   with:
+      #     version: latest
+      #     args: operator:testGenerateClient
       - name: Unit Tests
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: operator:testGo
+        run: |
+          export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
+          make controller-gen test
+        # uses: magefile/mage-action@v1
+        # with:
+        #   version: latest
+        #   args: operator:testGo
   build_operator_docker:
     name: Build Cass Operator Docker Image
     runs-on: ubuntu-latest
@@ -84,7 +88,8 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v2
         with:
-          file: operator/docker/base/Dockerfile
+          file: Dockerfile
+          context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: k8ssandra/cass-operator:${{ steps.vars.outputs.sha_short }}, k8ssandra/cass-operator:latest
           platforms: linux/amd64

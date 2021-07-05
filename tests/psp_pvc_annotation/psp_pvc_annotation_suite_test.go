@@ -13,6 +13,7 @@ import (
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/mage/ginkgo"
 	"github.com/k8ssandra/cass-operator/mage/kubectl"
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
 )
 
 var (
@@ -38,6 +39,7 @@ func TestLifecycle(t *testing.T) {
 		}
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
+		kustomize.Undeploy(opNamespace)
 	})
 
 	RegisterFailHandler(Fail)
@@ -47,17 +49,16 @@ func TestLifecycle(t *testing.T) {
 var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
 		Specify("the operator can respond to psp annotations on PVCs", func() {
-
-			By("creating a namespace for the cass-operator")
-			err := kubectl.CreateNamespace(opNamespace).ExecV()
+			By("deploy cass-operator with kustomize")
+			err := kustomize.Deploy(opNamespace)
 			Expect(err).ToNot(HaveOccurred())
 
-			step := "setting up cass-operator resources via helm chart"
-			ns.HelmInstallWithPSPEnabled("../../charts/cass-operator-chart")
+			// step := "setting up cass-operator resources via helm chart"
+			// ns.HelmInstallWithPSPEnabled("../../charts/cass-operator-chart")
 
 			ns.WaitForOperatorReady()
 
-			step = "creating first datacenter resource"
+			step := "creating first datacenter resource"
 			k := kubectl.ApplyFiles(dc1Yaml)
 			ns.ExecAndLog(step, k)
 

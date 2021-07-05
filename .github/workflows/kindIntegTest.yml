@@ -25,7 +25,8 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v2
         with:
-          file: operator/docker/base/Dockerfile
+          file: Dockerfile
+          context: .
           push: false
           tags: k8ssandra/cass-operator:latest
           platforms: linux/amd64
@@ -106,6 +107,7 @@ jobs:
     env:
       GOPATH: /home/runner/go
       GOROOT: /usr/local/go1.16
+      CGO_ENABLED: 0
       M_LOAD_TEST_IMAGES: false
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_K8S_FLAVOR: kind
@@ -130,15 +132,11 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Install Helm
-        uses: azure/setup-helm@v1
-        with:
-          version: v3.5.3
       - name: Create Kind Cluster
         uses: helm/kind-action@v1.1.0
         with:
-          version: v0.10.0
-          node_image: kindest/node:v1.20.2
+          version: v0.11.1
+          node_image: kindest/node:v1.20.7
           cluster_name: kind
           config: tests/testdata/kind/kind_config_6_workers.yaml
       - name: Set up Docker Buildx
@@ -162,10 +160,12 @@ jobs:
           kind load docker-image --name=kind k8ssandra/cass-operator:latest
           kind load docker-image --name=kind k8ssandra/system-logger:latest
       - name: Run integration test ( ${{ matrix.integration_test }} )
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: integ:run
+        run: |
+          make integ-test
+        # uses: magefile/mage-action@v1
+        # with:
+        #   version: latest
+        #   args: integ:run
       - name: Archive k8s logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2

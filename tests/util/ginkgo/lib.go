@@ -16,8 +16,8 @@ import (
 	ginkgo "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/k8ssandra/cass-operator/mage/kubectl"
-	mageutil "github.com/k8ssandra/cass-operator/mage/util"
+	mageutil "github.com/k8ssandra/cass-operator/tests/util"
+	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
 )
 
 const (

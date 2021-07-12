@@ -1,6 +1,3 @@
-# Makefile uses sh by default, but Github Actions (ubuntu-latest) requires dash/bash to work.
-SHELL := /bin/bash
-
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -52,6 +49,12 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# Setting SHELL to bash allows bash commands to be executed by recipes.
+# This is a requirement for 'setup-envtest.sh' in the test target.
+# Options are set to exit when a recipe line exits non-zero or a piped command fails.
+SHELL = /usr/bin/env bash -o pipefail
+.SHELLFLAGS = -ec
+
 all: build
 
 ##@ General
@@ -90,7 +93,7 @@ test: manifests generate fmt vet ## Run unit tests (including envtest based ones
 	go test ./pkg/... -coverprofile cover-operator.out
 	# These are not used yet
 	mkdir -p ${ENVTEST_ASSETS_DIR}
-	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.2/hack/setup-envtest.sh
+	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.8.3/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./controllers/... -coverprofile cover.out
 
 integ-test: kustomize cert-manager ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
@@ -116,7 +119,7 @@ docker-kind: docker-build ## Build docker image and load to kind cluster
 	kind load docker-image ${IMG}
 
 docker-push: ## Build and push docker image with the manager.
-	docker buildx build -t ${IMG} . --push
+	docker push ${IMG}
 
 ##@ Deployment
 

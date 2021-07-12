@@ -191,8 +191,9 @@ var _ = Describe(testName, func() {
 					step = "get podIP"
 					podIP := ns.OutputAndLog(step, k)
 					if podName == podNameToReplace && podIP == nodeInfo.Address {
-						fmt.Sprintf("jsonpath={.status.nodeStatuses['%s'].hostID}", podNameToReplace)
-						hostIdInCassandraDatacenter := kubectl.Get("cassandradatacenter", dcName).FormatOutput(json)
+						step = "verify nodeStatus HostID is up to date"
+						json = fmt.Sprintf("jsonpath={.status.nodeStatuses['%s'].hostID}", podNameToReplace)
+						hostIdInCassandraDatacenter := ns.OutputAndLog(step, kubectl.Get("cassandradatacenter", dcName).FormatOutput(json))
 						Expect(nodeInfo.HostId).To(Equal(hostIdInCassandraDatacenter), "Expected HostId to be %s but got %s in CassandraDatacenter CRD", nodeInfo.HostId, hostIdInCassandraDatacenter)
 					}
 				}

@@ -957,7 +957,7 @@ func getRpcAddress(dc *api.CassandraDatacenter, pod *corev1.Pod) string {
 	return pod.Status.PodIP
 }
 
-func (rc *ReconciliationContext) UpdateCassandraNodeStatus() error {
+func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
 
@@ -975,7 +975,8 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus() error {
 			// Getting the HostID requires a call to the node management API which is
 			// moderately expensive, so if we already have a HostID, don't bother. This
 			// would only change if something has gone horribly horribly wrong.
-			if nodeStatus.HostID == "" {
+
+			if force || nodeStatus.HostID == "" {
 				endpointsResponse, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
 				if err == nil {
 					ip := getRpcAddress(dc, pod)
@@ -1042,6 +1043,7 @@ func (rc *ReconciliationContext) updateCurrentReplacePodsProgress() error {
 							"Finished replacing pod %s", pod.Name)
 
 						dc.Status.NodeReplacements = utils.RemoveValueFromStringArray(dc.Status.NodeReplacements, pod.Name)
+						rc.UpdateCassandraNodeStatus(true)
 					}
 				}
 			}
@@ -1098,7 +1100,7 @@ func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 	status := rc.Datacenter.Status.DeepCopy()
 	oldDc := rc.Datacenter.DeepCopy()
 
-	err := rc.UpdateCassandraNodeStatus()
+	err := rc.UpdateCassandraNodeStatus(false)
 	if err != nil {
 		return result.Error(err)
 	}

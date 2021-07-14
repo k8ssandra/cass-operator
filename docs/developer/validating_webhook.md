@@ -13,24 +13,6 @@ Validating webhooks have specific requirements in kubernetes:
 * The CA signing the certificate must be either installed in the kube apiserver filesystem, or
 explicitly configured in the kubernetes validatingwebhookconfiguration object.
 
-The operator takes a progressive-enhancement approach to enabling this webhook,
-which is described as follows:
-
-The operator will look for, and if present, use, the certificates in the
-default location that the controller-manager expects the certificates.  If the
-files there don't exist, or the certificate does not appear to be valid, then
-the operator will generate a self-signed CA, and attempt to update the various
-kubernetes references to that certificate, specifically:
-* The CA defined in the webhook
-* The cert and key stored in the relevant secret in the cass-operator namespace.
-
-If the cert and key are regenerated, then they will also be written to an
-alternative location on disk, so that they can be consumed by the
-controller-manager. Because the operator root filesystem is recommended to be
-deployed read-only, and secret mount points are typically read-only as well, an
-alternative location to host the certificate and key is chosen in a
-memory-backed temporary kubernetes volume.
-
-To avoid a prohibitive user experience, the webhook is configured to fail open.
-This means that errors encountered in the above process will generate log
-messages, but will not wholly prevent the operation of the cass-operator.
+To support the above scenarios, the operator uses cert-manager to take care of generating and
+injecting the certificates. The validating webhook can be disabled in the OperatorConfig, which is
+mounted as a ConfigMap to the container.

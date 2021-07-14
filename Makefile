@@ -101,9 +101,9 @@ test: manifests generate fmt vet envtest ## Run tests.
 integ-test: kustomize cert-manager ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
 ifeq ($(M_INTEG_DIR), all)
 	# Run all the tests (exclude kustomize & testdata directories)
-	cd tests && go test -v -timeout 300m --ginkgo.progress --ginkgo.v ./...
+	cd tests && go test -v ./... -timeout 300m --ginkgo.progress --ginkgo.v
 else
-	cd tests/${M_INTEG_DIR} && go test -v -timeout 300m --ginkgo.progress --ginkgo.v ./...
+	cd tests/${M_INTEG_DIR} && go test -v ./... -timeout 300m --ginkgo.progress --ginkgo.v
 endif
 
 ##@ Build
@@ -139,10 +139,10 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	$(KUSTOMIZE) build config/deployments/default | kubectl apply -f -
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/default | kubectl delete -f -
+	$(KUSTOMIZE) build config/deployments/default | kubectl delete -f -
 
 deploy-test:
 ifneq ($(strip $(NAMESPACE)),)

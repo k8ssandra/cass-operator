@@ -29,7 +29,7 @@ To kick off all integration tests against the cluster that your kubectl is curre
 make integ-test
 ```
 
-### Running a single test
+### Running a single e2e test
 If you only want to run a single test, you can specify it's parent directory in an environment variable called `M_INTEG_DIR`:
 
 ```

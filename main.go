@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	configv1 "github.com/k8ssandra/cass-operator/apis/config/v1"
+	// configv1 "github.com/k8ssandra/cass-operator/apis/config/v1"
 	controllers "github.com/k8ssandra/cass-operator/controllers/cassandra"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	//+kubebuilder:scaffold:imports
@@ -50,7 +50,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(api.AddToScheme(scheme))
-	utilruntime.Must(configv1.AddToScheme(scheme))
+	// utilruntime.Must(configv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

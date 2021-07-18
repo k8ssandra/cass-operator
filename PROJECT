@@ -12,7 +12,6 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: cassandra.datastax.com
   group: cassandra.datastax.com
   kind: CassandraDatacenter
   path: github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1
@@ -24,7 +23,7 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
-  domain: cassandra.datastax.com
+  domain: k8ssandra.io
   group: config
   kind: ImageConfig
   path: github.com/k8ssandra/cass-operator/apis/config/v1

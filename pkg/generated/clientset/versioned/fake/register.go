@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	api "github.com/k8ssandra/cass-operator/api/v1beta1"
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	api "github.com/k8ssandra/cass-operator/api/v1beta1"
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 )

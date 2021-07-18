@@ -30,7 +30,7 @@ import (
 
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
-	api "github.com/k8ssandra/cass-operator/api/v1beta1"
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 )
 

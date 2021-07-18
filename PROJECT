@@ -1,6 +1,7 @@
 domain: cassandra.datastax.com
 layout:
 - go.kubebuilder.io/v3
+multigroup: true
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
@@ -14,10 +15,18 @@ resources:
   domain: cassandra.datastax.com
   group: cassandra.datastax.com
   kind: CassandraDatacenter
-  path: github.com/k8ssandra/cass-operator/api/v1beta1
+  path: github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1
   version: v1beta1
   webhooks:
     defaulting: true
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: cassandra.datastax.com
+  group: config
+  kind: ImageConfig
+  path: github.com/k8ssandra/cass-operator/apis/config/v1
+  version: v1
 version: "3"

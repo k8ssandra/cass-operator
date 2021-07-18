@@ -42,6 +42,9 @@ IMG ?= $(IMAGE_TAG_BASE):latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
+# Logger image
+LOG_IMG ?= k8ssandra/system-logger:latest
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -120,6 +123,12 @@ docker-kind: docker-build ## Build docker image and load to kind cluster
 
 docker-push: ## Build and push docker image with the manager.
 	docker push ${IMG}
+
+docker-logger-build: ## Build system-logger image.
+	docker buildx build -t ${LOG_IMG} -f operator/docker/system-logger/Dockerfile . --load
+
+docker-logger-push: ## Push system-logger-image
+	docker push ${LOG_IMG}
 
 ##@ Deployment
 

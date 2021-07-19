@@ -252,4 +252,3 @@ tags
 # make temps
 bin/
 testbin/
-manager

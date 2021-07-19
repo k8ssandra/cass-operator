@@ -5,7 +5,7 @@ package reconciliation
 
 import (
 	"fmt"
-	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -19,6 +19,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 )
+
+func init() {
+	imageConfigFile := filepath.Join("..", "..", "config", "manager", "image_config.yaml")
+	err := images.ParseImageConfig(imageConfigFile)
+	if err != nil {
+		panic(err)
+	}
+}
 
 func Test_calculatePodAntiAffinity(t *testing.T) {
 	t.Run("check when we allow more than one server pod per node", func(t *testing.T) {
@@ -956,7 +964,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "cassandra",
 				serverVersion: "3.11.7",
 			},
-			want:      "k8ssandra/cass-management-api:3.11.7-v0.1.25",
+			want:      "k8ssandra/cass-management-api:3.11.7",
 			errString: "",
 		},
 		{
@@ -1000,16 +1008,6 @@ func Test_makeImage(t *testing.T) {
 			errString: "",
 		},
 		{
-			name: "test cassandra fallback",
-			args: args{
-				serverImage:   "",
-				serverType:    "cassandra",
-				serverVersion: "3.11.1234",
-			},
-			want:      "datastax/cassandra-mgmtapi:3.11.1234",
-			errString: "",
-		},
-		{
 			name: "test 6.8.4",
 			args: args{
 				serverImage:   "",
@@ -1043,88 +1041,6 @@ func Test_makeImage(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func Test_makeUbiImage(t *testing.T) {
-	type args struct {
-		serverType    string
-		serverImage   string
-		serverVersion string
-	}
-	tests := []struct {
-		name      string
-		args      args
-		want      string
-		errString string
-	}{
-		{
-			name: "test fallback",
-			args: args{
-				serverImage:   "",
-				serverType:    "dse",
-				serverVersion: "6.8.1234",
-			},
-			want:      "datastax/dse-server:6.8.1234-ubi7",
-			errString: "",
-		},
-		{
-			name: "test cassandra fallback",
-			args: args{
-				serverImage:   "",
-				serverType:    "cassandra",
-				serverVersion: "4.0.1234",
-			},
-			want:      "datastax/cassandra-mgmtapi:4.0.1234-ubi7",
-			errString: "",
-		},
-		{
-			name: "test unknown dse version",
-			args: args{
-				serverImage:   "",
-				serverType:    "dse",
-				serverVersion: "6.7.0",
-			},
-			want:      "",
-			errString: "server 'dse' and version '6.7.0' do not work together",
-		},
-		{
-			name: "test unknown cassandra version",
-			args: args{
-				serverImage:   "",
-				serverType:    "cassandra",
-				serverVersion: "3.10.0",
-			},
-			want:      "",
-			errString: "server 'cassandra' and version '3.10.0' do not work together",
-		},
-	}
-	for _, tt := range tests {
-		os.Setenv(images.EnvBaseImageOS, "example")
-
-		t.Run(tt.name, func(t *testing.T) {
-			dc := &api.CassandraDatacenter{
-				Spec: api.CassandraDatacenterSpec{
-					ServerType:    tt.args.serverType,
-					ServerVersion: tt.args.serverVersion,
-					ServerImage:   tt.args.serverImage,
-				},
-			}
-			got, err := makeImage(dc)
-			if got != tt.want {
-				t.Errorf("makeImage() = %v, want %v", got, tt.want)
-			}
-			if err == nil {
-				if tt.errString != "" {
-					t.Errorf("makeImage() err = %v, want %v", err, tt.errString)
-				}
-			} else {
-				if err.Error() != tt.errString {
-					t.Errorf("makeImage() err = %v, want %v", err, tt.errString)
-				}
-			}
-		})
-		os.Unsetenv(images.EnvBaseImageOS)
 	}
 }
 

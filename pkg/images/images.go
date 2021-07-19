@@ -47,7 +47,7 @@ func ParseImageConfig(imageConfigFile string) error {
 	// it will be read successfully and converted into the internal version
 	emptyImageConfig := configv1beta1.ImageConfig{}
 	if err = runtime.DecodeInto(codecs.UniversalDecoder(), content, &emptyImageConfig); err != nil {
-		return fmt.Errorf("could not decode file into runtime.Object")
+		return fmt.Errorf("could not decode file into runtime.Object: %v", err)
 	}
 
 	imageConfig = &emptyImageConfig

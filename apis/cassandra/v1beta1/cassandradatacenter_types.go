@@ -74,7 +74,8 @@ type CassandraDatacenterSpec struct {
 	// +kubebuilder:validation:Pattern=(6\.8\.\d+)|(3\.11\.\d+)|(4\.0\.\d+)
 	ServerVersion string `json:"serverVersion"`
 
-	// Cassandra server image name.
+	// Cassandra server image name. Use of ImageConfig to match ServerVersion is recommended instead of this value.
+	// This value will override anything set in the ImageConfig matching the ServerVersion
 	// More info: https://kubernetes.io/docs/concepts/containers/images
 	ServerImage string `json:"serverImage,omitempty"`
 
@@ -82,7 +83,7 @@ type CassandraDatacenterSpec struct {
 	// +kubebuilder:validation:Enum=cassandra;dse
 	ServerType string `json:"serverType"`
 
-	// Does the Server Docker image run as the Cassandra user?
+	// Does the Server Docker image run as the Cassandra user? Defaults to true
 	DockerImageRunsAsCassandra *bool `json:"dockerImageRunsAsCassandra,omitempty"`
 
 	// Config for the server, in YAML format
@@ -146,7 +147,7 @@ type CassandraDatacenterSpec struct {
 	// will re-attach when the CassandraDatacenter workload is resumed.
 	Stopped bool `json:"stopped,omitempty"`
 
-	// Container image for the config builder init container.
+	// Container image for the config builder init container. Overrides value from ImageConfig ConfigBuilderImage
 	ConfigBuilderImage string `json:"configBuilderImage,omitempty"`
 
 	// Indicates that configuration and container image changes should only be pushed to
@@ -195,17 +196,10 @@ type CassandraDatacenterSpec struct {
 
 	AdditionalSeeds []string `json:"additionalSeeds,omitempty"`
 
-	// Deprecated: Reaper's sidecar mode has too many problems in Kubernetes for it to
-	// usable. In order for it to work reliably, changes in Reaper would be needed. See
-	// https://github.com/thelastpickle/cassandra-reaper/issues/956 for details. Because
-	// those changes were not implemented in Reaper and because Reaper support was instead
-	// added through k8ssandra, this field will be removed in the 1.8.0 release.
-	Reaper *ReaperConfig `json:"reaper,omitempty"`
-
 	// Configuration for disabling the simple log tailing sidecar container. Our default is to have it enabled.
 	DisableSystemLoggerSidecar bool `json:"disableSystemLoggerSidecar,omitempty"`
 
-	// Container image for the log tailing sidecar container.
+	// Container image for the log tailing sidecar container. Overrides value from ImageConfig SystemLoggerImage
 	SystemLoggerImage string `json:"systemLoggerImage,omitempty"`
 
 	// AdditionalServiceConfig allows to define additional parameters that are included in the created Services. Note, user can override values set by cass-operator and doing so could break cass-operator functionality.
@@ -417,17 +411,6 @@ type ManagementApiAuthConfig struct {
 	Insecure *ManagementApiAuthInsecureConfig `json:"insecure,omitempty"`
 	Manual   *ManagementApiAuthManualConfig   `json:"manual,omitempty"`
 	// other strategy configs (e.g. Cert Manager) go here
-}
-
-type ReaperConfig struct {
-	Enabled bool `json:"enabled,omitempty"`
-
-	Image string `json:"image,omitempty"`
-
-	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-
-	// Kubernetes resource requests and limits per reaper container.
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 //+kubebuilder:object:root=true

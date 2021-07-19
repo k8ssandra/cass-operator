@@ -147,6 +147,7 @@ spec:
                 x-kubernetes-preserve-unknown-fields: true
               configBuilderImage:
                 description: Container image for the config builder init container.
+                  Overrides value from ImageConfig ConfigBuilderImage
                 type: string
               configBuilderResources:
                 description: Kubernetes resource requests and limits per server config
@@ -192,6 +193,7 @@ spec:
                 type: boolean
               dockerImageRunsAsCassandra:
                 description: Does the Server Docker image run as the Cassandra user?
+                  Defaults to true
                 type: boolean
               dseWorkloads:
                 properties:
@@ -6526,50 +6528,6 @@ spec:
                   - name
                   type: object
                 type: array
-              reaper:
-                description: 'Deprecated: Reaper''s sidecar mode has too many problems
-                  in Kubernetes for it to usable. In order for it to work reliably,
-                  changes in Reaper would be needed. See https://github.com/thelastpickle/cassandra-reaper/issues/956
-                  for details. Because those changes were not implemented in Reaper
-                  and because Reaper support was instead added through k8ssandra,
-                  this field will be removed in the 1.8.0 release.'
-                properties:
-                  enabled:
-                    type: boolean
-                  image:
-                    type: string
-                  imagePullPolicy:
-                    description: PullPolicy describes a policy for if/when to pull
-                      a container image
-                    type: string
-                  resources:
-                    description: Kubernetes resource requests and limits per reaper
-                      container.
-                    properties:
-                      limits:
-                        additionalProperties:
-                          anyOf:
-                          - type: integer
-                          - type: string
-                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                          x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                        type: object
-                      requests:
-                        additionalProperties:
-                          anyOf:
-                          - type: integer
-                          - type: string
-                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                          x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                        type: object
-                    type: object
-                type: object
               replaceNodes:
                 description: A list of pod names that need to be replaced.
                 items:
@@ -6607,7 +6565,10 @@ spec:
                   progress.
                 type: boolean
               serverImage:
-                description: 'Cassandra server image name. More info: https://kubernetes.io/docs/concepts/containers/images'
+                description: 'Cassandra server image name. Use of ImageConfig to match
+                  ServerVersion is recommended instead of this value. This value will
+                  override anything set in the ImageConfig matching the ServerVersion
+                  More info: https://kubernetes.io/docs/concepts/containers/images'
                 type: string
               serverType:
                 description: 'Server type: "cassandra" or "dse"'
@@ -6916,6 +6877,7 @@ spec:
                 type: string
               systemLoggerImage:
                 description: Container image for the log tailing sidecar container.
+                  Overrides value from ImageConfig SystemLoggerImage
                 type: string
               systemLoggerResources:
                 description: Kubernetes resource requests and limits per system logger

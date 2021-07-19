@@ -10,7 +10,6 @@ import (
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/psp"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
@@ -61,7 +60,7 @@ func shouldDefineSecurityContext(dc *api.CassandraDatacenter) bool {
 		return *dc.Spec.DockerImageRunsAsCassandra
 	}
 
-	return dc.Spec.ServerType == "dse" || images.CalculateDockerImageRunsAsCassandra(dc.Spec.ServerVersion)
+	return true
 }
 
 func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[string]string, error) {

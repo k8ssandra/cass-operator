@@ -28,4 +28,12 @@ resources:
   kind: ImageConfig
   path: github.com/k8ssandra/cass-operator/apis/config/v1
   version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: cassandra.datastax.com
+  group: config
+  kind: OperatorConfig
+  path: github.com/k8ssandra/cass-operator/apis/config/v1beta1
+  version: v1beta1
 version: "3"

@@ -411,6 +411,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 
 		cassContainer.Image = serverImage
+		// TODO Add ImagePullPolicy
 	}
 
 	if reflect.DeepEqual(cassContainer.Resources, corev1.ResourceRequirements{}) {
@@ -507,6 +508,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 			loggerContainer.Image = specImage
 		} else {
 			loggerContainer.Image = images.GetSystemLoggerImage()
+			// TODO Get these from Config
 			loggerContainer.ImagePullPolicy = corev1.PullIfNotPresent
 		}
 	}

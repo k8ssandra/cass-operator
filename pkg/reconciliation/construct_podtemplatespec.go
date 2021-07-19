@@ -279,7 +279,9 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		} else {
 			serverCfg.Image = images.GetConfigBuilderImage()
 		}
-
+		if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
+			serverCfg.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
+		}
 	}
 
 	serverCfgMount := corev1.VolumeMount{
@@ -411,7 +413,9 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 
 		cassContainer.Image = serverImage
-		// TODO Add ImagePullPolicy
+		if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
+			cassContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
+		}
 	}
 
 	if reflect.DeepEqual(cassContainer.Resources, corev1.ResourceRequirements{}) {
@@ -508,8 +512,9 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 			loggerContainer.Image = specImage
 		} else {
 			loggerContainer.Image = images.GetSystemLoggerImage()
-			// TODO Get these from Config
-			loggerContainer.ImagePullPolicy = corev1.PullIfNotPresent
+		}
+		if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
+			loggerContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
 		}
 	}
 

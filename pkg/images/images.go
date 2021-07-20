@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 )
@@ -45,16 +44,15 @@ func ParseImageConfig(imageConfigFile string) error {
 
 	// Regardless of if the bytes are of any external version,
 	// it will be read successfully and converted into the internal version
-	emptyImageConfig := configv1beta1.ImageConfig{}
-	if err = runtime.DecodeInto(codecs.UniversalDecoder(), content, &emptyImageConfig); err != nil {
+	parsedImageConfig := configv1beta1.ImageConfig{}
+	if err = runtime.DecodeInto(codecs.UniversalDecoder(), content, &parsedImageConfig); err != nil {
 		return fmt.Errorf("could not decode file into runtime.Object: %v", err)
 	}
 
-	imageConfig = &emptyImageConfig
+	imageConfig = &parsedImageConfig
+
 	return nil
 }
-
-var log = logf.Log.WithName("images")
 
 func IsDseVersionSupported(version string) bool {
 	validVersions := regexp.MustCompile(ValidDseVersionRegexp)

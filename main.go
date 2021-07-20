@@ -56,32 +56,9 @@ func init() {
 
 func main() {
 	var configFile string
-	var imageConfigFile string
 	flag.StringVar(&configFile, "config", "",
 		"The controller will load its initial configuration from this file. "+
 			"Omit this flag to use the default configuration values. ")
-
-	flag.StringVar(&imageConfigFile, "imageConfig", "",
-		"The controller will load image configuration from this file. ")
-
-	var err error
-	operConfig := configv1beta1.OperatorConfig{}
-	options := ctrl.Options{Scheme: scheme}
-	if configFile != "" {
-		options, err = options.AndFrom(ctrl.ConfigFile().AtPath(configFile).OfKind(&operConfig))
-		if err != nil {
-			setupLog.Error(err, "unable to load the config file")
-			os.Exit(1)
-		}
-	}
-
-	if imageConfigFile != "" {
-		err = images.ParseImageConfig(imageConfigFile)
-		if err != nil {
-			setupLog.Error(err, "unable to load the image config file")
-			os.Exit(1)
-		}
-	}
 
 	opts := zap.Options{
 		Development: true,
@@ -95,6 +72,24 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "unable to get WatchNamespace, "+
 			"the manager will watch and manage resources in all namespaces")
+	}
+
+	operConfig := configv1beta1.OperatorConfig{}
+	options := ctrl.Options{Scheme: scheme}
+	if configFile != "" {
+		options, err = options.AndFrom(ctrl.ConfigFile().AtPath(configFile).OfKind(&operConfig))
+		if err != nil {
+			setupLog.Error(err, "unable to load the config file")
+			os.Exit(1)
+		}
+	}
+
+	if operConfig.ImageConfigFile != "" {
+		err = images.ParseImageConfig(operConfig.ImageConfigFile)
+		if err != nil {
+			setupLog.Error(err, "unable to load the image config file")
+			os.Exit(1)
+		}
 	}
 
 	// Add support for MultiNamespace set in WATCH_NAMESPACE (e.g ns1,ns2)
@@ -124,7 +119,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !operConfig.SkipValidatingWebhook {
+	if !operConfig.DisableWebhooks {
 		if err = (&api.CassandraDatacenter{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
 			os.Exit(1)

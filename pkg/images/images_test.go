@@ -4,6 +4,7 @@
 package images
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -42,4 +43,17 @@ func TestCassandraOverride(t *testing.T) {
 	cassImage, err = GetCassandraImage("cassandra", "4.0.0")
 	assert.NoError(err, "getting Cassandra image with override should succeed")
 	assert.Equal(customImageName, cassImage)
+}
+
+func TestImageConfigParsing(t *testing.T) {
+	assert := assert.New(t)
+	imageConfigFile := filepath.Join("..", "..", "config", "manager", "image_config.yaml")
+	err := ParseImageConfig(imageConfigFile)
+	assert.NoError(err, "imageConfig parsing should succeed")
+
+	// Verify some default values are set
+	assert.NotNil(GetImageConfig())
+	assert.NotNil(GetImageConfig().Images)
+	assert.True(strings.HasPrefix(GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
+	assert.True(strings.HasPrefix(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
 }

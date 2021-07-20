@@ -34,7 +34,10 @@ type OperatorConfig struct {
 	cfg.ControllerManagerConfigurationSpec `json:",inline"`
 
 	// SkipValidatingWebhook replaces the old SKIP_VALIDATING_WEBHOOK env variable. If set to true, the webhooks are not initialized
-	SkipValidatingWebhook bool `json:"skipValidatingWebhook,omitempty"`
+	DisableWebhooks bool `json:"disableWebhooks,omitempty"`
+
+	// ImageConfigFile indicates the path where to load the imageConfig from
+	ImageConfigFile string `json:"imageConfigFile,omitempty"`
 }
 
 func init() {

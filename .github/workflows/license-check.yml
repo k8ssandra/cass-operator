@@ -9,24 +9,9 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v2
-      - name: Check Directory
-        run: |
-          pwd
-      - name: Move Up Directory
-        run: |
-          cd ..
-      - name: Check Parent Directory
-        run: |
-          pwd
-      - name: Check Child Directory Permissions
-        run: |
-          ls -al
       - name: Install Fossa CLI
         run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | bash -s -- -b .
-      - name: Check Child Directory Permissions
-        run: |
-          ls -al
       - name: Scan for dependencies and licenses
         run: |
           FOSSA_API_KEY=${{ secrets.FOSSA_PUSH_ONLY_API_KEY }} ./fossa analyze

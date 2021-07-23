@@ -25,6 +25,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/reconciliation"
+	"github.com/k8ssandra/cass-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -219,7 +220,102 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 	c = c.Watches(&source.Kind{Type: &corev1.Secret{}}, handler.EnqueueRequestsFromMapFunc(configSecretMapFn), builder.WithPredicates(configSecretPredicate))
 
 	// TODO Add PSP stuff here if necessary
+	// Setup watches for Nodes to check for taints being added
 
+	nodeMapFn := func(a client.Object) []reconcile.Request {
+		log.Info("Node Watch called")
+		requests := []reconcile.Request{}
+
+		nodeName := a.(*corev1.Node).Name
+		dcs := reconciliation.DatacentersForNode(nodeName)
+
+		for _, dc := range dcs {
+			log.Info("node watch adding reconciliation request",
+				"cassandraDatacenter", dc.Name,
+				"namespace", dc.Namespace)
+
+			// Create reconcilerequests for the related cassandraDatacenter
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      dc.Name,
+					Namespace: dc.Namespace,
+				}},
+			)
+		}
+		return requests
+	}
+
+	nodeTaintsChangedPredicate := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			nodeOld, ok1 := e.ObjectOld.(*corev1.Node)
+			nodeNew, ok2 := e.ObjectNew.(*corev1.Node)
+
+			if !ok1 || !ok2 {
+				log.Error(nil, "Failed to cast update.Event objects to type Node", "objectOld", e.ObjectOld, "objectNew", e.ObjectNew)
+				return true
+			}
+
+			if nodeOld == nil && nodeNew == nil {
+				return false
+			}
+
+			if (nodeOld == nil && nodeNew != nil) || (nodeOld != nil && nodeNew == nil) {
+				return true
+			}
+
+			return !utils.ElementsMatch(
+				nodeOld.Spec.Taints, nodeNew.Spec.Taints)
+		},
+	}
+
+	if utils.IsPSPEnabled() {
+		c = c.Watches(
+			&source.Kind{Type: &corev1.Node{}},
+			handler.EnqueueRequestsFromMapFunc(nodeMapFn),
+			builder.WithPredicates(nodeTaintsChangedPredicate),
+		)
+	}
+
+	// Setup watches for pvc to check for taints being added
+
+	pvcMapFn := func(a client.Object) []reconcile.Request {
+		log.Info("PersistentVolumeClaim Watch called")
+		requests := []reconcile.Request{}
+
+		pvc := a.(*corev1.PersistentVolumeClaim)
+		pvcLabels := pvc.ObjectMeta.Labels
+		pvcNamespace := pvc.ObjectMeta.Namespace
+
+		managedByValue, ok := pvcLabels[oplabels.ManagedByLabel]
+		if !ok {
+			return requests
+		}
+
+		if (managedByValue == oplabels.ManagedByLabelValue) || (managedByValue == oplabels.ManagedByLabelDefunctValue) {
+
+			dcName := pvcLabels[api.DatacenterLabel]
+
+			log.Info("PersistentVolumeClaim watch adding reconciliation request",
+				"cassandraDatacenter", dcName,
+				"namespace", pvcNamespace)
+
+			// Create reconcilerequests for the related cassandraDatacenter
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      dcName,
+					Namespace: pvcNamespace,
+				}},
+			)
+		}
+		return requests
+	}
+
+	if utils.IsPSPEnabled() {
+		c = c.Watches(
+			&source.Kind{Type: &corev1.PersistentVolumeClaim{}},
+			handler.EnqueueRequestsFromMapFunc(pvcMapFn),
+		)
+	}
 	// Setup watches for Secrets. These secrets are often not owned by or created by
 	// the operator, so we must create a mapping back to the appropriate datacenters.
 

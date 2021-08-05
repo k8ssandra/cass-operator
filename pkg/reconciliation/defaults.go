@@ -5,5 +5,5 @@ var (
 	DefaultsLoggerContainer = buildResourceRequirements(100, 64)
 
 	// Provides reasonable defaults for the configuration container.
-	DefaultsConfigInitContainer = buildResourceRequirements(1000, 256)
+	DefaultsConfigInitContainer = buildResourceRequirements(1000, 300)
 )

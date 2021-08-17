@@ -58,13 +58,9 @@ func (rc *ReconciliationContext) CheckHeadlessServices() result.ReconcileResult 
 	cqlService := newServiceForCassandraDatacenter(dc)
 	seedService := newSeedServiceForCassandraDatacenter(dc)
 	allPodsService := newAllPodsServiceForCassandraDatacenter(dc)
+	additionalSeedService := newAdditionalSeedServiceForCassandraDatacenter(dc)
 
-	services := []*corev1.Service{cqlService, seedService, allPodsService}
-
-	if len(dc.Spec.AdditionalSeeds) > 0 {
-		additionalSeedService := newAdditionalSeedServiceForCassandraDatacenter(dc)
-		services = append(services, additionalSeedService)
-	}
+	services := []*corev1.Service{cqlService, seedService, allPodsService, additionalSeedService}
 
 	if dc.IsNodePortEnabled() {
 		nodePortService := newNodePortServiceForCassandraDatacenter(dc)

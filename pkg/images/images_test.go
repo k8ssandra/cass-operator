@@ -4,81 +4,56 @@
 package images
 
 import (
-	"fmt"
-	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+
+	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 )
 
-func tempSetEnv(name, value string) (func(), error) {
-	oldValue, wasDefined := os.LookupEnv(name)
-	restore := func() {
-		if !wasDefined {
-			_ = os.Unsetenv(name)
-		} else {
-			_ = os.Setenv(name, oldValue)
-		}
-	}
-
-	err := os.Setenv(name, value)
-	return restore, err
-}
-
-func Test_AllImageEnumValuesHaveImageDefined(t *testing.T) {
-	for i := 0; i < ImageEnumLength; i++ {
-		if Image(i) == BaseImageOS {
-			// the BaseImageOS is unique in that we get it's value from an
-			// environment variable, so if the environment variable is not
-			// defined, then we will have no value here.
-			continue
-		}
-
-		assert.NotEmpty(t, GetImage(Image(i)), "No image defined for Image enum value %d", i)
-	}
-}
-
-func Test_BaseImageOS(t *testing.T) {
-	restore, err := tempSetEnv(EnvBaseImageOS, "my-test-value")
-	require.NoError(t, err)
-	defer restore()
-
-	assert.Equal(t, "my-test-value", GetImage(BaseImageOS))
-}
-
-func Test_DefaultRegistryOverride(t *testing.T) {
-	restore, err := tempSetEnv(envDefaultRegistryOverride, "localhost:5000")
-	require.NoError(t, err)
-	defer restore()
+func TestDefaultRegistryOverride(t *testing.T) {
+	imageConfig = &configv1beta1.ImageConfig{}
+	imageConfig.ImageRegistry = "localhost:5000"
+	imageConfig.Images = &configv1beta1.Images{}
+	imageConfig.Images.ConfigBuilder = "k8ssandra/config-builder-temp:latest"
 
 	image := GetConfigBuilderImage()
 	assert.True(t, strings.HasPrefix(image, "localhost:5000/"))
 }
 
-func Test_CalculateDockerImageRunsAsCassandra(t *testing.T) {
-	tests := []struct {
-		version string
-		want    bool
-	}{
-		{
-			version: "3.11.7",
-			want:    true,
-		},
-		{
-			version: "4.0.0",
-			want:    true,
-		},
-		// We default to true
-		{
-			version: "4.0.1",
-			want:    true,
-		},
-	}
-	for _, tt := range tests {
-		got := CalculateDockerImageRunsAsCassandra(tt.version)
+func TestCassandraOverride(t *testing.T) {
 
-		assert.Equal(t, got, tt.want, fmt.Sprintf("Version: %s should not have returned %v", tt.version, got))
+	assert := assert.New(t)
+
+	customImageName := "my-custom-image:4.0.0"
+
+	imageConfig = &configv1beta1.ImageConfig{}
+	imageConfig.Images = &configv1beta1.Images{}
+
+	cassImage, err := GetCassandraImage("cassandra", "4.0.0")
+	assert.NoError(err, "getting Cassandra image should succeed")
+	assert.Equal("k8ssandra/cass-management-api:4.0.0", cassImage)
+
+	imageConfig.Images.CassandraVersions = map[string]string{
+		"4.0.0": customImageName,
 	}
+
+	cassImage, err = GetCassandraImage("cassandra", "4.0.0")
+	assert.NoError(err, "getting Cassandra image with override should succeed")
+	assert.Equal(customImageName, cassImage)
+}
+
+func TestImageConfigParsing(t *testing.T) {
+	assert := assert.New(t)
+	imageConfigFile := filepath.Join("..", "..", "config", "manager", "image_config.yaml")
+	err := ParseImageConfig(imageConfigFile)
+	assert.NoError(err, "imageConfig parsing should succeed")
+
+	// Verify some default values are set
+	assert.NotNil(GetImageConfig())
+	assert.NotNil(GetImageConfig().Images)
+	assert.True(strings.HasPrefix(GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
+	assert.True(strings.HasPrefix(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
 }

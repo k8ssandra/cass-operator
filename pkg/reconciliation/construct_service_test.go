@@ -10,7 +10,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	api "github.com/k8ssandra/cass-operator/api/v1beta1"
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
 
 func TestCassandraDatacenter_buildLabelSelectorForSeedService(t *testing.T) {

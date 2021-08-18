@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	"os"
-	"strconv"
 	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -34,8 +33,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	api "github.com/k8ssandra/cass-operator/api/v1beta1"
-	"github.com/k8ssandra/cass-operator/controllers"
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
+	controllers "github.com/k8ssandra/cass-operator/controllers/cassandra"
+	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	//+kubebuilder:scaffold:imports
 )
@@ -49,18 +50,16 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(api.AddToScheme(scheme))
+	utilruntime.Must(configv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+	var configFile string
+	flag.StringVar(&configFile, "config", "",
+		"The controller will load its initial configuration from this file. "+
+			"Omit this flag to use the default configuration values. ")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -69,19 +68,28 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	options := ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "b569adb7.cassandra.datastax.com",
-	}
-
 	ns, err := utils.GetWatchNamespace()
 	if err != nil {
 		setupLog.Error(err, "unable to get WatchNamespace, "+
 			"the manager will watch and manage resources in all namespaces")
+	}
+
+	operConfig := configv1beta1.OperatorConfig{}
+	options := ctrl.Options{Scheme: scheme}
+	if configFile != "" {
+		options, err = options.AndFrom(ctrl.ConfigFile().AtPath(configFile).OfKind(&operConfig))
+		if err != nil {
+			setupLog.Error(err, "unable to load the config file")
+			os.Exit(1)
+		}
+	}
+
+	if operConfig.ImageConfigFile != "" {
+		err = images.ParseImageConfig(operConfig.ImageConfigFile)
+		if err != nil {
+			setupLog.Error(err, "unable to load the image config file")
+			os.Exit(1)
+		}
 	}
 
 	// Add support for MultiNamespace set in WATCH_NAMESPACE (e.g ns1,ns2)
@@ -111,17 +119,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	skipWebhookEnvVal := os.Getenv("SKIP_VALIDATING_WEBHOOK")
-	if skipWebhookEnvVal == "" {
-		skipWebhookEnvVal = "FALSE"
-	}
-	skipWebhook, err := strconv.ParseBool(skipWebhookEnvVal)
-	if err != nil {
-		setupLog.Error(err, "bad value for SKIP_VALIDATING_WEBHOOK env")
-		os.Exit(1)
-	}
-
-	if !skipWebhook {
+	if !operConfig.DisableWebhooks {
 		if err = (&api.CassandraDatacenter{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
 			os.Exit(1)

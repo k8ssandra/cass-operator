@@ -5,6 +5,7 @@ package canary_upgrade
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -75,6 +76,10 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)
+
+			imageConfigFile := filepath.Join("..", "..", "config", "manager", "image_config.yaml")
+			err = images.ParseImageConfig(imageConfigFile)
+			Expect(err).ToNot(HaveOccurred())
 
 			old, _ := images.GetCassandraImage("cassandra", "3.11.7")
 			updated, _ := images.GetCassandraImage("cassandra", "3.11.10")

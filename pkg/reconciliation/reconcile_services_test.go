@@ -43,9 +43,9 @@ func TestReconcileHeadlessService_UpdateLabels(t *testing.T) {
 			arg.SetLabels(make(map[string]string))
 		}).
 		Return(nil).
-		Times(3)
+		Times(4)
 	k8sMockClientUpdate(mockClient, nil).
-		Times(3)
+		Times(4)
 
 	service.SetLabels(make(map[string]string))
 

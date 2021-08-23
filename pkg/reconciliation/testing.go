@@ -137,8 +137,7 @@ func CreateMockReconciliationContext(
 }
 
 // Create a fake client that is tracking a service
-func fakeClientWithService(
-	cassandraDatacenter *api.CassandraDatacenter) (*client.Client, *corev1.Service) {
+func fakeClientWithService(cassandraDatacenter *api.CassandraDatacenter) (*client.WithWatch, *corev1.Service) {
 
 	service := newServiceForCassandraDatacenter(cassandraDatacenter)
 

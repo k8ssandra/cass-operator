@@ -67,22 +67,29 @@ func (rc *ReconciliationContext) CheckAdditionalSeedEndpoints() result.Reconcile
 	}
 
 	// See if the Endpoints already exists
-	nsName := types.NamespacedName{Name: desiredEndpoints.Name, Namespace: desiredEndpoints.Namespace}
-	currentEndpoints := &corev1.Endpoints{}
-	err = client.Get(rc.Ctx, nsName, currentEndpoints)
+	currentEndpoints, err := rc.GetAdditionalSeedEndpoint()
 
 	if err != nil && errors.IsNotFound(err) {
 		// if it's not found, we need to create it
 		createNeeded = true
-
 	} else if err != nil {
 		// if we hit a k8s error, log it and error out
-		logger.Error(err, "Could not get endoints for additional seed service",
+		nsName := types.NamespacedName{Name: desiredEndpoints.Name, Namespace: desiredEndpoints.Namespace}
+		logger.Error(err, "Could not get endpoints for additional seed service",
 			"name", nsName,
 		)
 		return result.Error(err)
-
 	} else {
+		// desiredEndpoints always has just a single Subset at most - we can apply safely there all the addresses we still want to keep
+		for _, subset := range currentEndpoints.Subsets {
+			for _, addr := range subset.Addresses {
+				if addr.TargetRef != nil {
+					// Managed by something else, so we want to keep this
+					desiredEndpoints.Subsets[0].Addresses = append(desiredEndpoints.Subsets[0].Addresses, addr)
+				}
+			}
+		}
+
 		// if we found the endpoints already, check if it needs updating
 		if !utils.ResourcesHaveSameHash(currentEndpoints, desiredEndpoints) {
 			resourceVersion := currentEndpoints.GetResourceVersion()
@@ -112,4 +119,12 @@ func (rc *ReconciliationContext) CheckAdditionalSeedEndpoints() result.Reconcile
 	}
 
 	return result.Continue()
+}
+
+func (rc *ReconciliationContext) GetAdditionalSeedEndpoint() (*corev1.Endpoints, error) {
+	dc := rc.Datacenter
+	nsName := types.NamespacedName{Name: dc.GetAdditionalSeedsServiceName(), Namespace: dc.Namespace}
+	currentEndpoints := &corev1.Endpoints{}
+	err := rc.Client.Get(rc.Ctx, nsName, currentEndpoints)
+	return currentEndpoints, err
 }

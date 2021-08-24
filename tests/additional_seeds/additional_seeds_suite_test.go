@@ -226,6 +226,16 @@ func checkSeedConstraints() {
 	// checkCassandraSeedListsAlignWithSeedLabels(info)
 }
 
+func checkAdditionalSeedServiceExists() {
+	// Check the service
+
+	k := kubectl.Get(additionalSeedServiceResource).FormatOutput("json")
+	output := ns.OutputPanic(k)
+	data := map[string]interface{}{}
+	err := json.Unmarshal([]byte(output), &data)
+	Expect(err).ToNot(HaveOccurred())
+}
+
 func checkAdditionalSeedService() {
 	// Check the service
 
@@ -234,8 +244,6 @@ func checkAdditionalSeedService() {
 	data := map[string]interface{}{}
 	err := json.Unmarshal([]byte(output), &data)
 	Expect(err).ToNot(HaveOccurred())
-
-	err = json.Unmarshal([]byte(output), &data)
 
 	spec := data["spec"].(map[string]interface{})
 	actualType := spec["type"].(string)
@@ -249,8 +257,6 @@ func checkAdditionalSeedService() {
 	actualIp := ""
 	err = json.Unmarshal([]byte(output), &actualIp)
 	Expect(err).ToNot(HaveOccurred())
-
-	err = json.Unmarshal([]byte(output), &actualIp)
 	Expect(actualIp).To(Equal("192.168.1.1"), "Expected additional seed endpoints IP %s to be 192.168.1.1", actualIp)
 
 	// Verify there's secondary IP also (from the hostname parsing)
@@ -262,7 +268,6 @@ func checkAdditionalSeedService() {
 	err = json.Unmarshal([]byte(output), &actualIp)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = json.Unmarshal([]byte(output), &actualIp)
 	match, _ := regexp.MatchString("^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$", actualIp)
 	Expect(match).To(BeTrue())
 }
@@ -286,6 +291,9 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReady(dcName)
 
 			checkSeedConstraints()
+
+			// We should have all the services deployed, even if they're empty
+			checkAdditionalSeedServiceExists()
 
 			step = "add additionalSeeds"
 			json := `

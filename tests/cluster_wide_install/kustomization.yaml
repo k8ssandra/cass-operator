@@ -1,6 +1,4 @@
-# Set WATCH_NAMESPACE to "" in the deployment to provide cluster-wide install
-# Modify Role to ClusteRole
-# Modify RoleBinding to ClusterRoleBinding and kind to ClusterRole
+# Set WATCH_NAMESPACE to "" in the deployment to provide cluster-wide install testing
 namespace: test-cluster-wide-install
 
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -9,46 +7,25 @@ patchesJson6902:
 - target:
     group: rbac.authorization.k8s.io
     version: v1
-    kind: Role
-    name: manager-role
+    kind: ClusterRoleBinding
+    name: cass-operator-manager-rolebinding
   patch: |-
     - op: replace
-      path: /kind
-      value: ClusterRole
+      path: /metadata/namespace
+      value: test-cluster-wide-install
     - op: replace
-      path: /metadata/name
-      value: cass-operator-manager-crrole
-- target:
-    group: rbac.authorization.k8s.io
-    version: v1
-    kind: RoleBinding
-    name: manager-rolebinding
-  patch: |-
-    - op: replace
-      path: /kind
-      value: ClusterRoleBinding
-    - op: replace
-      path: /roleRef/kind
-      value: ClusterRole
-    - op: replace
-      path: /roleRef/name
-      value: cass-operator-manager-crrole
-    - op: replace
-      path: /subjects/0/name
-      value: cass-operator-controller-manager
-    - op: add
       path: /subjects/0/namespace
       value: test-cluster-wide-install
 - target:
-    group: apps
+    group: rbac.authorization.k8s.io
     version: v1
-    name: controller-manager
-    kind: Deployment
+    kind: ClusterRole
+    name: cass-operator-manager-crrole
   patch: |-
-    - op: remove
-      path: /spec/template/spec/containers/0/env/0/valueFrom
-    - op: add
-      path: /spec/template/spec/containers/0/env/0/value
-      value: ""
+    - op: replace
+      path: /metadata/namespace
+      value: test-cluster-wide-install
+
 resources:
-- ../../config/default
+- ../../config/cluster
+

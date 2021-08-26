@@ -69,8 +69,8 @@ func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[s
 	racks := dc.GetRacks()
 	for _, rack := range racks {
 		if rack.Name == rackName {
-			nodeAffinityLabels = utils.MergeMap(emptyMapIfNil(rack.NodeAffinityLabels),
-				emptyMapIfNil(dc.Spec.NodeAffinityLabels))
+			nodeAffinityLabels = utils.MergeMap(emptyMapIfNil(dc.Spec.NodeAffinityLabels),
+				emptyMapIfNil(rack.NodeAffinityLabels))
 			if rack.Zone != "" {
 				if _, found := nodeAffinityLabels[zoneLabel]; found {
 					log.Error(nil,

@@ -10,6 +10,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## Unreleased
 * [CHANGE] #108 Integrate Fossa component/license scanning
+* [BUGFIX] #162 Affinity labels defined at rack-level should have precedence over DC-level ones
 
 ## v1.7.1
 * [BUGFIX] #103 Fix upgrade of StatefulSet, do not change service name

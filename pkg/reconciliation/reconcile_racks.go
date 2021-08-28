@@ -1803,7 +1803,13 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 
 	// if the DC has no ready seeds, label a pod as a seed before we start Cassandra on it
 	// and also consider additional seeds
-	labelSeedBeforeStart := readySeeds == 0 && len(rc.Datacenter.Spec.AdditionalSeeds) == 0
+
+	externalSeedPoints := 0
+	if existingEndpoints, err := rc.GetAdditionalSeedEndpoint(); err == nil {
+		externalSeedPoints = len(existingEndpoints.Subsets[0].Addresses)
+	}
+
+	labelSeedBeforeStart := readySeeds == 0 && len(rc.Datacenter.Spec.AdditionalSeeds) == 0 && externalSeedPoints == 0
 
 	rackThatNeedsNode := ""
 	for rackName, readyCount := range rackReadyCount {

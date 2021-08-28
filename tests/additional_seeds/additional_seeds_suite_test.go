@@ -99,8 +99,6 @@ func retrieveDatacenterInfo() DatacenterInfo {
 	err := json.Unmarshal([]byte(output), &data)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = json.Unmarshal([]byte(output), &data)
-
 	spec := data["spec"].(map[string]interface{})
 	rackNames := []string{}
 	for _, rackData := range spec["racks"].([]interface{}) {
@@ -117,20 +115,6 @@ func retrieveDatacenterInfo() DatacenterInfo {
 	}
 
 	return dc
-}
-
-func retrieveNameSeedNodeForRack(rack string) string {
-	info := retrieveDatacenterInfo()
-	name := ""
-	for _, node := range info.Nodes {
-		if node.Rack == rack && node.Seed {
-			name = node.Name
-			break
-		}
-	}
-
-	Expect(name).ToNot(Equal(""))
-	return name
 }
 
 func MinInt(a, b int) int {
@@ -226,48 +210,42 @@ func checkSeedConstraints() {
 	// checkCassandraSeedListsAlignWithSeedLabels(info)
 }
 
-func checkAdditionalSeedServiceExists() {
-	// Check the service
+func getAdditionalSeedEndpointResourceAddresses() ([]interface{}, error) {
+	// Should be addresses and then go through them in the later check
+	jsonpath := "jsonpath={.subsets[0].addresses}"
+	k := kubectl.Get(additionalSeedEndpointResource).FormatOutput(jsonpath)
+	output := ns.OutputPanic(k)
+	ips := []interface{}{}
+	err := json.Unmarshal([]byte(output), &ips)
+	return ips, err
+}
 
+func getAdditionalSeedServiceData() (map[string]interface{}, error) {
+	// Check the service
 	k := kubectl.Get(additionalSeedServiceResource).FormatOutput("json")
 	output := ns.OutputPanic(k)
 	data := map[string]interface{}{}
 	err := json.Unmarshal([]byte(output), &data)
-	Expect(err).ToNot(HaveOccurred())
+	return data, err
 }
 
 func checkAdditionalSeedService() {
 	// Check the service
-
-	k := kubectl.Get(additionalSeedServiceResource).FormatOutput("json")
-	output := ns.OutputPanic(k)
-	data := map[string]interface{}{}
-	err := json.Unmarshal([]byte(output), &data)
+	data, err := getAdditionalSeedServiceData()
 	Expect(err).ToNot(HaveOccurred())
 
 	spec := data["spec"].(map[string]interface{})
 	actualType := spec["type"].(string)
 	Expect(actualType).To(Equal("ClusterIP"), "Expected additional seed service type %s to be ClusterIP", actualType)
 
-	// Check the endpoint
-
-	jsonpath := "jsonpath=\"{.subsets[0].addresses[0].ip}\""
-	k = kubectl.Get(additionalSeedEndpointResource).FormatOutput(jsonpath)
-	output = ns.OutputPanic(k)
-	actualIp := ""
-	err = json.Unmarshal([]byte(output), &actualIp)
+	// Check the endpoints
+	ipList, err := getAdditionalSeedEndpointResourceAddresses()
 	Expect(err).ToNot(HaveOccurred())
-	Expect(actualIp).To(Equal("192.168.1.1"), "Expected additional seed endpoints IP %s to be 192.168.1.1", actualIp)
+	firstIP := ipList[0].(map[string]interface{})
+	Expect(firstIP["ip"]).To(Equal("192.168.1.1"), "Expected additional seed endpoints IP %s to be 192.168.1.1", firstIP)
 
-	// Verify there's secondary IP also (from the hostname parsing)
-
-	jsonpath = "jsonpath=\"{.subsets[0].addresses[1].ip}\""
-	k = kubectl.Get(additionalSeedEndpointResource).FormatOutput(jsonpath)
-	output = ns.OutputPanic(k)
-	actualIp = ""
-	err = json.Unmarshal([]byte(output), &actualIp)
-	Expect(err).ToNot(HaveOccurred())
-
+	secondIP := ipList[1].(map[string]interface{})
+	actualIp := secondIP["ip"].(string)
 	match, _ := regexp.MatchString("^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$", actualIp)
 	Expect(match).To(BeTrue())
 }
@@ -293,7 +271,11 @@ var _ = Describe(testName, func() {
 			checkSeedConstraints()
 
 			// We should have all the services deployed, even if they're empty
-			checkAdditionalSeedServiceExists()
+			_, err = getAdditionalSeedServiceData()
+			Expect(err).ToNot(HaveOccurred())
+
+			// kubectl get endpoints kubernetes -o jsonpath={.metadata.resourceVersion}
+			// beforeModification := getResourceVersionOfEndpoints()
 
 			step = "add additionalSeeds"
 			json := `
@@ -305,8 +287,10 @@ var _ = Describe(testName, func() {
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
-			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1800)
+			Eventually(func() error {
+				_, err := getAdditionalSeedEndpointResourceAddresses()
+				return err
+			}, "5s", "100ms").Should(Succeed())
 
 			checkSeedConstraints()
 

@@ -5,7 +5,6 @@ package v1beta1
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/Jeffail/gabs"
 	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
@@ -509,7 +508,7 @@ func (dc *CassandraDatacenter) GetSeedServiceName() string {
 }
 
 func (dc *CassandraDatacenter) GetAdditionalSeedsServiceName() string {
-	return dc.Spec.ClusterName + "-" + dc.Name + fmt.Sprintf("-additional-seed-service")
+	return dc.Spec.ClusterName + "-" + dc.Name + "-additional-seed-service"
 }
 
 func (dc *CassandraDatacenter) GetAllPodsServiceName() string {
@@ -547,23 +546,20 @@ func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
 	// We use the cluster seed-service name here for the seed list as it will
 	// resolve to the seed nodes. This obviates the need to update the
 	// cassandra.yaml whenever the seed nodes change.
-	seeds := []string{dc.GetSeedServiceName()}
-	if len(dc.Spec.AdditionalSeeds) > 0 {
-		seeds = append(seeds, dc.GetAdditionalSeedsServiceName())
-	}
+	seeds := []string{dc.GetSeedServiceName(), dc.GetAdditionalSeedsServiceName()}
 
 	graphEnabled := 0
 	solrEnabled := 0
 	sparkEnabled := 0
 
 	if dc.Spec.ServerType == "dse" && dc.Spec.DseWorkloads != nil {
-		if dc.Spec.DseWorkloads.AnalyticsEnabled == true {
+		if dc.Spec.DseWorkloads.AnalyticsEnabled {
 			sparkEnabled = 1
 		}
-		if dc.Spec.DseWorkloads.GraphEnabled == true {
+		if dc.Spec.DseWorkloads.GraphEnabled {
 			graphEnabled = 1
 		}
-		if dc.Spec.DseWorkloads.SearchEnabled == true {
+		if dc.Spec.DseWorkloads.SearchEnabled {
 			solrEnabled = 1
 		}
 	}

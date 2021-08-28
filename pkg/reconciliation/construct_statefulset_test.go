@@ -58,12 +58,12 @@ func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing
 			ServerType:         "cassandra",
 			ServerVersion:      "3.11.7",
 			PodTemplateSpec:    &corev1.PodTemplateSpec{},
-			NodeAffinityLabels: map[string]string{"dclabel1": "dcvalue1", "dclabel2": "dcvalue2"},
+			NodeAffinityLabels: map[string]string{"label1": "dc", "label2": "dc"},
 			Racks: []api.Rack{
 				{
 					Name:               "rack1",
 					Zone:               "z1",
-					NodeAffinityLabels: map[string]string{"r1label1": "r1value1", "r1label2": "r1value2"},
+					NodeAffinityLabels: map[string]string{"label2": "rack1", "label3": "rack1"},
 				},
 			},
 		},
@@ -77,11 +77,10 @@ func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing
 		"should not have gotten error when getting NodeAffinitylabels of rack rack1")
 
 	expected := map[string]string{
-		"dclabel1": "dcvalue1",
-		"dclabel2": "dcvalue2",
-		"r1label1": "r1value1",
-		"r1label2": "r1value2",
-		zoneLabel:  "z1",
+		"label1":  "dc",
+		"label2":  "rack1",
+		"label3":  "rack1",
+		zoneLabel: "z1",
 	}
 
 	assert.Equal(t, expected, nodeAffinityLabels)

@@ -30,18 +30,17 @@ func runMake(namespace, command, dir string) error {
 	deploy := exec.Command("make", ns, command, kustDir)
 	var out bytes.Buffer
 	deploy.Stdout = &out
+	deploy.Stderr = &out
 
 	path, err := os.Getwd()
 	if err != nil {
-		o, _ := deploy.CombinedOutput()
-		fmt.Printf("Getwd error output:\n%s\n", string(o))
+		fmt.Printf("Getwd error output:\n%s\n", out.String())
 		return err
 	}
 
 	makeDir, err := os.Open(filepath.Join(path, "..", ".."))
 	if err != nil {
-		o, _ := deploy.CombinedOutput()
-		fmt.Printf("Getwd error output:\n%s\n", string(o))
+		fmt.Printf("os.Open error output:\n%s\n", out.String())
 		return err
 	}
 
@@ -49,8 +48,7 @@ func runMake(namespace, command, dir string) error {
 
 	err = deploy.Run()
 	if err != nil {
-		o, _ := deploy.CombinedOutput()
-		fmt.Printf("Getwd error output:\n%s\n", string(o))
+		fmt.Printf("Run error output:\n%s\n", out.String())
 		return err
 	}
 

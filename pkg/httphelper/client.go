@@ -280,6 +280,37 @@ func (client *NodeMgmtClient) modifyKeyspace(endpoint string, pod *corev1.Pod, k
 	return err
 }
 
+func parseListKeyspacesEndpointsResponseBody(body []byte) ([]string, error) {
+	var keyspaces []string
+	if err := json.Unmarshal(body, &keyspaces); err != nil {
+		return nil, err
+	}
+	return keyspaces, nil
+}
+
+// ListKeyspaces calls the management API to list existing keyspaces
+func (client *NodeMgmtClient) ListKeyspaces(pod *corev1.Pod, keyspaceName string) ([]string, error) {
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: fmt.Sprintf("/api/v0/ops/keyspace?keyspaceName=%s", keyspaceName),
+		host:     podHost,
+		method:   http.MethodGet,
+		timeout:  time.Second * 20,
+	}
+
+	body, err := callNodeMgmtEndpoint(client, request, "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	keyspaces, err := parseListKeyspacesEndpointsResponseBody(body)
+	return keyspaces, err
+}
+
 func (client *NodeMgmtClient) CallLifecycleStartEndpointWithReplaceIp(pod *corev1.Pod, replaceIp string) error {
 	// talk to the pod via IP because we are dialing up a pod that isn't ready,
 	// so it won't be reachable via the service and pod DNS

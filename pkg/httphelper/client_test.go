@@ -102,3 +102,12 @@ func Test_parseMetadataEndpointsResponseBody(t *testing.T) {
 	assert.Equal(t, "10.233.90.45", endpoints.Entity[0].RpcAddress)
 	assert.Equal(t, "95c157dc-2811-446a-a541-9faaab2e6930", endpoints.Entity[0].HostID)
 }
+
+func Test_parseListKeyspacesEndpointsResponseBody(t *testing.T) {
+	keyspaces, err := parseListKeyspacesEndpointsResponseBody([]byte(`["keyspace1", "keyspace2"]`))
+
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(keyspaces))
+	assert.Equal(t, "keyspace1", keyspaces[0])
+	assert.Equal(t, "keyspace2", keyspaces[1])
+}

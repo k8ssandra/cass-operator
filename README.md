@@ -15,15 +15,16 @@ The operator can be installed in a namespace scoped settings or cluster wide. If
 
 Default installation is simple, the kubectl will create a namespace ``cass-operator`` and install cass-operator there. It will only listen for the CassandraDatacenters in that namespace. Note that since the manifests will install a [Custom Resource Definition](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/), the user running the commands will need cluster-admin privileges.
 
+Default install requires cert-manager to be installed, since webhooks require TLS certificates to be injected. See below in modifying Kustomize template how to install cert-manager with cass-operator (or other modifications) for more instructions. 
 
 ```console
-kubectl -k github.com/k8ssandra/cass-operator/config/default
+kubectl apply -k github.com/k8ssandra/cass-operator/config/default
 ```
 
 If you wish to install it with cluster wide rights to monitor all the namespaces for ``CassandraDatacenter`` objects, use the following command:
 
 ```console
-kubectl -k github.com/k8ssandra/cass-operator/config/cluster
+kubectl apply -k github.com/k8ssandra/cass-operator/config/cluster
 ```
 
 Alternatively, if you checkout the code, you can use ``make deploy`` to run [Kustomize](https://kustomize.io/) and deploy the files.
@@ -36,9 +37,17 @@ NAME                             READY   STATUS    RESTARTS   AGE
 cass-operator-555577b9f8-zgx6j   1/1     Running   0          25h
 ```
 
+### Install Prometheus monitor rules
+
+If you have Prometheus installed in your cluster, you can apply the following command to install the Prometheus support:
+
+```console
+kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus
+```
+
 #### Modifying the Kustomize template
 
-If you wish to modify the deployment, create your own ``kustomization.yaml`` and modify it to your needs.
+If you wish to modify the deployment, create your own ``kustomization.yaml`` and modify it to your needs. The starting point could be the config/default: 
 
 ```yaml
 # This is the default kustomize template for tests.
@@ -49,6 +58,20 @@ kind: Kustomization
 resources:
 - github.com/k8ssandra/cass-operator/config/default
 ```
+
+An another example, to install cert-manager with your installation and install cass-operator in a cluster-wide mode, the following ``kustomization.yaml`` would work:
+
+```yaml
+namespace: cass-operator
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- 'https://github.com/jetstack/cert-manager/releases/download/v1.5.3/cert-manager.yaml'
+- github.com/k8ssandra/cass-operator/config/cluster
+```
+
+The above example is also available with: ``kubectl -k github.com/k8ssandra/cass-operator/config/overlays/cluster-with-certmanager``. You can use kustomize to modify the example overlays we provide. See ``config`` directory for more examples or Kustomize's documentation.
 
  You can find more resources on how Kustomize works from their [documentation](https://kubectl.docs.kubernetes.io/installation/kustomize/). You can install kustomize with ``make kustomize`` if you do not have it already (this will install it to ``bin/kustomize``).
 

@@ -5,6 +5,8 @@ package v1beta1
 
 import (
 	"encoding/json"
+	"regexp"
+	"strings"
 
 	"github.com/Jeffail/gabs"
 	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
@@ -12,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const (
@@ -503,24 +506,41 @@ func (dc *CassandraDatacenter) GetClusterLabels() map[string]string {
 	}
 }
 
+// apimachinery validation does not expose this, copied here
+const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+
+func cleanupForKubernetes(input string) string {
+	if len(validation.IsDNS1035Label(input)) > 0 {
+		r := regexp.MustCompile(dns1035LabelFmt)
+
+		// Invalid domain name, Kubernetes will reject this. Try to modify it to a suitable string
+		input = strings.ToLower(input)
+		input = strings.ReplaceAll(input, "_", "-")
+		validParts := r.FindAllString(input, -1)
+		return strings.Join(validParts, "")
+	}
+
+	return input
+}
+
 func (dc *CassandraDatacenter) GetSeedServiceName() string {
-	return dc.Spec.ClusterName + "-seed-service"
+	return cleanupForKubernetes(dc.Spec.ClusterName) + "-seed-service"
 }
 
 func (dc *CassandraDatacenter) GetAdditionalSeedsServiceName() string {
-	return dc.Spec.ClusterName + "-" + dc.Name + "-additional-seed-service"
+	return cleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-additional-seed-service"
 }
 
 func (dc *CassandraDatacenter) GetAllPodsServiceName() string {
-	return dc.Spec.ClusterName + "-" + dc.Name + "-all-pods-service"
+	return cleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-all-pods-service"
 }
 
 func (dc *CassandraDatacenter) GetDatacenterServiceName() string {
-	return dc.Spec.ClusterName + "-" + dc.Name + "-service"
+	return cleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-service"
 }
 
 func (dc *CassandraDatacenter) GetNodePortServiceName() string {
-	return dc.Spec.ClusterName + "-" + dc.Name + "-node-port-service"
+	return cleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-node-port-service"
 }
 
 func (dc *CassandraDatacenter) ShouldGenerateSuperuserSecret() bool {

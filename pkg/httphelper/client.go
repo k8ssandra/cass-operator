@@ -294,9 +294,12 @@ func (client *NodeMgmtClient) GetKeyspace(pod *corev1.Pod, keyspaceName string) 
 	if err != nil {
 		return nil, err
 	}
-
+	endpoint := "/api/v0/ops/keyspace"
+	if keyspaceName != "" {
+		endpoint += fmt.Sprintf("?keyspaceName=%s", keyspaceName)
+	}
 	request := nodeMgmtRequest{
-		endpoint: fmt.Sprintf("/api/v0/ops/keyspace?keyspaceName=%s", keyspaceName),
+		endpoint: endpoint,
 		host:     podHost,
 		method:   http.MethodGet,
 		timeout:  time.Second * 20,

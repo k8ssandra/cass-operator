@@ -288,8 +288,8 @@ func parseListKeyspacesEndpointsResponseBody(body []byte) ([]string, error) {
 	return keyspaces, nil
 }
 
-// ListKeyspaces calls the management API to list existing keyspaces
-func (client *NodeMgmtClient) ListKeyspaces(pod *corev1.Pod, keyspaceName string) ([]string, error) {
+// GetKeyspace calls the management API to check if a specific keyspace exists
+func (client *NodeMgmtClient) GetKeyspace(pod *corev1.Pod, keyspaceName string) ([]string, error) {
 	podHost, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return nil, err
@@ -309,6 +309,12 @@ func (client *NodeMgmtClient) ListKeyspaces(pod *corev1.Pod, keyspaceName string
 
 	keyspaces, err := parseListKeyspacesEndpointsResponseBody(body)
 	return keyspaces, err
+}
+
+// ListKeyspaces calls the management API to list existing keyspaces
+func (client *NodeMgmtClient) ListKeyspaces(pod *corev1.Pod) ([]string, error) {
+	// Calling GetKeyspace with an empty keyspace name lists all keyspaces
+	return client.GetKeyspace(pod, "")
 }
 
 func (client *NodeMgmtClient) CallLifecycleStartEndpointWithReplaceIp(pod *corev1.Pod, replaceIp string) error {

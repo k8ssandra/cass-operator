@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -53,4 +54,18 @@ func TestCassandraDatacenter_allPodsServiceLabels(t *testing.T) {
 	if !reflect.DeepEqual(wantLabels, gotLabels) {
 		t.Errorf("allPodsService labels = %v, want %v", gotLabels, wantLabels)
 	}
+}
+
+func TestServiceNameGeneration(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "NotCool_Bob",
+		},
+	}
+
+	service := newSeedServiceForCassandraDatacenter(dc)
+	assert.Equal(t, "notcool-bob-seed-service", service.Name)
 }

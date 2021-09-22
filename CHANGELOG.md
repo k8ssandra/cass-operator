@@ -10,6 +10,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## Unreleased
 * [CHANGE] #108 Integrate Fossa component/license scanning
+* [CHANGE] If clusterName includes characters not allowed in the serviceName, strip those chars from service name.
 * [BUGFIX] #162 Affinity labels defined at rack-level should have precedence over DC-level ones
 * [ENHANCEMENT] Add ListKeyspace function to httphelper
 

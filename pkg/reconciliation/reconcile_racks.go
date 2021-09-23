@@ -4,9 +4,11 @@
 package reconciliation
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -2243,6 +2245,41 @@ func (rc *ReconciliationContext) fixMissingPVC() (bool, error) {
 	return false, nil
 }
 
+func (rc *ReconciliationContext) SetFullQueryLogging() result.ReconcileResult {
+	datacenter := rc.GetDatacenter()
+	var DCConfig map[string]interface{}
+	if err := json.Unmarshal(datacenter.Spec.Config, &DCConfig); err != nil {
+		rc.ReqLogger.Error(err, "error unmarshalling DC config JSON")
+		return result.RequeueSoon(2)
+	}
+	shouldFQLBeEnabled := false
+	if err := DCConfig["full_query_logging_options"]; err == nil {
+		shouldFQLBeEnabled = true
+	}
+
+	podList, err := rc.listPods(rc.Datacenter.GetClusterLabels())
+	if err != nil {
+		rc.ReqLogger.Error(err, "error listing all pods in the cluster")
+		return result.RequeueSoon(2)
+	}
+	for _, podPtr := range PodPtrsFromPodList(podList) {
+		fqlEnabledForPod, err := rc.NodeMgmtClient.CallIsFullQueryLogEnabledEndpoint(podPtr)
+		if err != nil {
+			rc.ReqLogger.Error(err, fmt.Sprintln("can't get whether query logging enabled for pod ", podPtr.Name))
+			return result.RequeueSoon(2)
+		}
+		fqlEnabledForPodBool, err := strconv.ParseBool(fqlEnabledForPod)
+		if err != nil {
+			rc.ReqLogger.Error(err, "Can't convert result of CallIsFullQueryLogEnabledEndpoint into a bool")
+			return result.RequeueSoon(2)
+		}
+		if fqlEnabledForPodBool != shouldFQLBeEnabled {
+			rc.NodeMgmtClient.CallSetFullQuerylog(podPtr, shouldFQLBeEnabled)
+		}
+	}
+	return result.Continue()
+}
+
 // ReconcileAllRacks determines if a rack needs to be reconciled.
 func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	if recResult := rc.CheckForInvalidState(); recResult.Completed() {
@@ -2354,6 +2391,10 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	}
 
 	if recResult := rc.CheckConditionInitializedAndReady(); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.SetFullQueryLogging(); recResult.Completed() {
 		return recResult.Output()
 	}
 

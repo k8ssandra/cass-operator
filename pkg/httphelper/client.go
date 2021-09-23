@@ -456,3 +456,36 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 
 	return body, nil
 }
+
+func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod) (string, error) {
+	client.Log.Info("client::callIsFullQueryLogEnabledEndpoint")
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return "", err
+	}
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/ops/node/fullquerylogging",
+		host:     podHost,
+		method:   http.MethodGet,
+		timeout:  time.Minute * 2,
+	}
+
+	isEnabledBytes, err := callNodeMgmtEndpoint(client, request, "")
+	return string(isEnabledBytes), err
+}
+
+func (client *NodeMgmtClient) CallSetFullQuerylog(pod *corev1.Pod, enableFullQueryLogging bool) error {
+	client.Log.Info("client::callIsFullQueryLogEnabledEndpoint")
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/ops/node/fullquerylogging?enabled=" + strconv.FormatBool(enableFullQueryLogging),
+		host:     podHost,
+		method:   http.MethodPut,
+		timeout:  time.Minute * 2,
+	}
+	_, err = callNodeMgmtEndpoint(client, request, "")
+	return err
+}

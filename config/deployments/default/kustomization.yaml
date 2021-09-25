@@ -10,3 +10,7 @@ resources:
 components:
   - ../../components/namespace
   - ../../components/webhook
+
+images:
+- name: k8ssandra/cass-operator
+  newTag: v1.8.0-rc.2

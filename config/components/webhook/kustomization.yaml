@@ -1,25 +1,16 @@
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 
-# controller-manager-config, enable webhooks
-# import webhook directory
-# import cert-manager directory
-
 patchesStrategicMerge:
 - patches/cainjection_in_cassandradatacenters.yaml
 - patches/manager_webhook_patch.yaml
 - patches/webhookcainjection_patch.yaml
 
-patchesJson6902:
-- target:
-    group: config.k8ssandra.io
-    kind: OperatorConfig
-    version: v1beta1
-    name: operator-config
-  patch: |-
-    - op: replace
-      path: /disableWebhooks
-      value: false
+configMapGenerator:
+- files:
+  - controller_manager_config.yaml
+  behavior: merge
+  name: manager-config
 
 resources:
 - ../../webhook

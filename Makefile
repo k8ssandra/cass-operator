@@ -159,12 +159,12 @@ endif
 ##@ Tools
 
 cert-manager: ## Install cert-manager to the cluster
-	kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.3.1/cert-manager.yaml
+	kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.5.3/cert-manager.yaml
 	kubectl wait --for=condition=Established crd certificates.cert-manager.io
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.1)
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.2)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
@@ -184,7 +184,7 @@ ifeq (,$(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPSDK)) ;\
-	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.11.0/operator-sdk_${OS}_${ARCH} ;\
+	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.12.0/operator-sdk_${OS}_${ARCH} ;\
 	chmod +x $(OPSDK) ;\
 	}
 else

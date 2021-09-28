@@ -4,6 +4,9 @@ FROM redhat/ubi8-micro:latest
 ENV TINI_VERSION v0.19.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /sbin/tini
 RUN chmod +x /sbin/tini
+
+# Non-root user, cassandra as default
+USER cassandra:cassandra
 ENTRYPOINT ["/sbin/tini", "--"]
 
 # Run your program under Tini

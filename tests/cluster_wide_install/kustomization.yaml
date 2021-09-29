@@ -27,5 +27,5 @@ patchesJson6902:
       value: test-cluster-wide-install
 
 resources:
-- ../../config/cluster
+- ../../config/deployments/cluster
 

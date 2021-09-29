@@ -1,6 +1,6 @@
 # Set WATCH_NAMESPACE to "" in the deployment to provide cluster-wide install
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
 patchesJson6902:
 - target:
     group: apps
@@ -46,5 +46,3 @@ patchesJson6902:
     - op: replace
       path: /kind
       value: ClusterRoleBinding
-resources:
-- ../../config/default

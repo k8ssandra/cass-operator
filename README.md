@@ -7,7 +7,7 @@ The DataStax Kubernetes Operator for Apache Cassandra&reg;. This repository repl
 
 To create a full featured cluster, the recommend approach is to use the Helm charts from k8ssandra. Check the [Getting started](https://k8ssandra.io/docs/getting-started/) documentation at (k8ssandra.io)[https://k8ssandra.io/docs].
 
-A more custom approach is to use Kustomize as described in the following sections if you wish to use cass-operator only.
+A more custom approach is to use Kustomize as described in the following sections if you wish to use cass-operator only. If updating from previous version, please see ``Upgrade instructions`` section first.
 
 ### Installing the operator with Kustomize
 
@@ -36,6 +36,22 @@ $ kubectl -n cass-operator get pods --selector name=cass-operator
 NAME                             READY   STATUS    RESTARTS   AGE
 cass-operator-555577b9f8-zgx6j   1/1     Running   0          25h
 ```
+
+### Upgrade instructions:
+
+Updates are supported from previous versions of ``k8ssandra/cass-operator``. If upgrading from versions older than 1.7.0 (released under ``datastax/cass-operator`` name), please upgrade first to version 1.7.1. The following instructions apply when upgrading from 1.7.1 to 1.8.0.
+
+Due to the modifications to cass-operator’s underlying controller-runtime and updated Kubernetes versions, there is a need to do couple of manual steps before updating to a newest version of cass-operator. Newer Kubernetes versions require stricter validation and as such we need to remove ``preserveUnknownFields`` global property from the CRD to allow us to update to a newer CRD. The newer controller-runtime on the other hand modifies the liveness, readiness and configuration options, which require us to delete the older deployment. These commands do not delete your running Cassandra instances.
+
+ Run the following commands assuming cass-operator is installed to ``cass-operator`` namespace (change -n parameter if it is installed to some other namespace):
+
+```sh
+kubectl -n cass-operator delete deployment.apps/cass-operator
+kubectl -n cass-operator delete service/cassandradatacenter-webhook-service
+kubectl patch crd cassandradatacenters.cassandra.datastax.com -p '{"spec":{"preserveUnknownFields":false}}'
+```
+
+You can now install new version of cass-operator as instructed previously.
 
 ### Install Prometheus monitor rules
 

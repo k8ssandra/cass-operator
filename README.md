@@ -15,7 +15,7 @@ The operator can be installed in a namespace scoped settings or cluster wide. If
 
 Default installation is simple, the kubectl will create a namespace ``cass-operator`` and install cass-operator there. It will only listen for the CassandraDatacenters in that namespace. Note that since the manifests will install a [Custom Resource Definition](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/), the user running the commands will need cluster-admin privileges.
 
-Default install requires cert-manager to be installed, since webhooks require TLS certificates to be injected. See below in modifying Kustomize template how to install cert-manager with cass-operator (or other modifications) for more instructions. 
+Default install requires cert-manager to be installed, since webhooks require TLS certificates to be injected. See below how to install cert-manager if your environment does not have it installed previously.
 
 ```console
 kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/default

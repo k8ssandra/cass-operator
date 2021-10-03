@@ -13,4 +13,4 @@ components:
 
 images:
 - name: k8ssandra/cass-operator
-  newTag: v1.8.0
+  newTag: latest

@@ -1,105 +1,49 @@
 # cass-operator integration tests
 
-[Ginkgo](https://onsi.github.io/ginkgo/) is used alongside kubectl
-for integration testing of the operator.
+[Ginkgo](https://onsi.github.io/ginkgo/) is used alongside kubectl for integration testing of the operator.
 
 ## Prerequisites
-Install mage using the instructions
-[here](https://github.com/magefile/mage#installation)
+Install kubectl using the instructions [here](https://kubernetes.io/docs/tasks/tools/install-kubectl) 
 
-Install kubectl using the instructions
-[here](https://kubernetes.io/docs/tasks/tools/install-kubectl) 
+The tests use Kustomize to deploy the cass-operator. Kustomize is installed if not present in the machine. We test against 4.1.x series of Kustomize at this point, but newer 3.x releases should work also. 
+
+You will also need a running Kubernetes cluster. We use [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), but others should work also. Note that the storageClass is set to ``default`` in the tests. The StorageClass has to have ``volumeBindingMode`` set to ``WaitForFirstConsumer``, otherwise tests might get stuck. 
 
 ## Running the tests
-The tests themselves expect a running k8s cluster, with at least 6 worker nodes,
-and kubectl to be configured to point at the cluster.
+The tests themselves expect a running k8s cluster, with at least 6 worker nodes, and kubectl to be configured to point at the cluster. You can find instructions to setup kind cluster [here](docs/developer/kind.md)
 
-You can either stand up your own cluster and point kubectl to it yourself, or use
-a mage target to bootstrap and configure a cluster for you.
+### Running tests with custom operator image
 
-Refer to the [k8s targets](../docs/developer/k8s_targets.md) for more information on
-supported k8s flavors.
-
-### Using preconfigured targets for cluster management
-
-To let a mage bootstrap a new cluster, run all of the tests,
-and then tear down the cluster at the end, run the `k8s:runIntegTests` target
-with the desired k8s flavor specified:
-
-#### Using a k3d cluster
-```
-M_K8S_FLAVOR=k3d mage k8s:runIntegTests
-```
-
-#### Using a KIND cluster
-```
-M_K8S_FLAVOR=kind mage k8s:runIntegTests
-```
-
-If you just want to have the cluster stood up and configured for you, but
-not automatically run the tests or tear down, run:
-
-#### Using a k3d cluster
-```
-M_K8S_FLAVOR=k3d mage k8s:setupEmptyCluster
-```
-
-### Using a custom Docker registry for the operator image
-
-If M_DOCKER_USERNAME, M_DOCKER_PASSWORD, and M_DOCKER_SERVER environment variables are defined, then they will be used to create an image pull secret.  This secret will automatically be used by the integration tests for pulling the Docker image of the operator.
-
-This should be used in conjunction with the M_OPERATOR_IMAGE environment variable to select a specific image.  Note that the M_OPERATOR_IMAGE value should include the name of the custom registry.
-
-Example:
+If you wish to use a custom operator image (or deploy from custom container registry), modify the used image by running:
 
 ```console
-export M_DOCKER_USERNAME=USERNAME
-export M_DOCKER_PASSWORD=ACCESSTOKEN
-export M_DOCKER_SERVER="docker.pkg.github.com"
-export M_OPERATOR_IMAGE="docker.pkg.github.com/datastax/cass-operator/operator:latest-ubi"
+cd config/manager && kustomize edit set image controller=$(IMG)
 ```
 
-Replace USERNAME with the Github username and ACCESSTOKEN with a Github access token in the above commands.
-
-Note: The automatically created image pull secret will be named "imagepullsecret", and it will be removed at the end of each test when the test namespace is deleted.
+Replace ``$(IMG)`` with the repository/image combination. One can also modify the ``tests/kustomize/kustomization.yaml`` if you wish modify the test scenario of deploying the operator. Alternatively, a test can create its own ``kustomization.yaml``, as seen in the ``cluster_wide_install`` test.
 
 ### Kicking off the tests on an existing cluster
-To kick off all integration tests against the cluster that your kubectl
-is currently configured against, run:
-```
-mage integ:run
-```
+To kick off all integration tests against the cluster that your kubectl is currently configured against, run:
 
-### Running a single test
-If you only want to run a single test, you can specify it's parent directory
-in an environment variable called `M_INTEG_DIR`:
-```
-M_INTEG_DIR=scale_up mage integ:run
+```console
+make integ-test
 ```
 
-### Running a test with a custom operator image
-If you are building the operator image locally, you will want to use it for integration tests.
+### Running a single e2e test
+If you only want to run a single test, you can specify its parent directory in an environment variable called `M_INTEG_DIR`:
 
+```console
+M_INTEG_DIR=scale_up make integ-test
 ```
-# This will create a datastax/cass-operator:latest image.
-$ mage operator:build
 
-# Tag the image with the commit hash. T
-# The Docker Hub org for the example is bob.
-$ docker tag docker.io/datastax/cass-operator:latest bob/cass-operator:6208cb4a8b1c
+## PR testing
 
-# If you are running tests against a remote cluster you will 
-# need to push your image to registry.
-$ docker push bob/cass-operator:6208cb4a8b1c
-
-# Run a single test using the image.
-$ M_INTEG_DIR=scale_up M_OPERATOR_IMAGE=docker.io/bob/cass-operator:6208cb4a8b1c mage integ:run
-```
+Most of the e2e integration tests are run automatically on Github Actions when a PR is submitted. If you wish to add new tests to the test suite, modify the file ``.github/workflows/kindIntegTest.yml``. These run against kind cluster with 6 worker nodes. Unit tests are also executed as part of the PR process, defined in the ``.github/workflows/operatorBuildAndDeploy.yml``.
 
 ## Test structure and design
 Our tests are structured such that there is a single Ginkgo test suite
 per integration test. This is done in order to provide the maximum amount
-of flexibility when running locally and in Jenkins. The main benefits we
+of flexibility when running locally and in Github Actions. The main benefits we
 get from this structure are:
 
 * We can separate the output streams from each test
@@ -124,6 +68,7 @@ After the test is done running, whether it was successful or not, we do a
 final log dump for the entire cluster.
 
 By default, we dump logs out at:
+
 ```
 build/kubectl_dump/<test name>/<date/time stamp>/<steps>
 ```

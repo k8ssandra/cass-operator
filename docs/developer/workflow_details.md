@@ -10,7 +10,7 @@ metadata:
 spec:
   clusterName: cluster1
   serverType: cassandra
-  serverVersion: "3.11.7"
+  serverVersion: "3.11.11"
   managementApiAuth:
     insecure: {}
   size: 1

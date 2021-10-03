@@ -7,10 +7,9 @@ and managing Cassandra or DSE in a Kubernetes cluster.
 
 ## Prerequisites
 
-1. A Kubernetes cluster. Kubernetes v1.18 is recommended, but Kubernetes
-   v1.15 has been tested.
+1. A Kubernetes cluster. We support versions above 1.17
 2. The ability to download images from Docker Hub from within the Kubernetes
-   cluster.
+   cluster. If that isn't possible, a private registry must be configured.
 
 ## Create a namespace
 
@@ -23,6 +22,9 @@ $ kubectl create ns cass-operator
 
 For the rest of this guide, we will be using the namespace `cass-operator`. Adjust
 further commands as necessary to match the namespace you defined.
+
+If installing the operator using Kustomize template ``config/deployments/default``, the 
+``cass-operator`` namespace is created automatically. 
 
 ## Define a storage class
 

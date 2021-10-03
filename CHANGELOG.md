@@ -8,11 +8,28 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## Unreleased
+## v1.8.0
+* [CHANGE] #178 If clusterName includes characters not allowed in the serviceName, strip those chars from service name.
 * [CHANGE] #108 Integrate Fossa component/license scanning
-* [CHANGE] If clusterName includes characters not allowed in the serviceName, strip those chars from service name.
+* [CHANGE] #120 Removed Helm charts, use k8ssandra helm charts instead
+* [CHANGE] #120 Deployment model is now Kustomize in cass-operator
+* [CHANGE] #120 and #148 Package placements have been modified
+* [CHANGE] #148 Project uses kubebuilder multigroup structure
+* [CHANGE] #120 Mage has been removed and replaced with Makefile
+* [CHANGE] #120 Webhook TLS certs require new deployment model (such as with cert-manager)
+* [CHANGE] #145 SKIP_VALIDATING_WEBHOOK env variable is replaced with configuration in OperatorConfig
+* [CHANGE] #161 Additional seeds service is always created, even if no additional seeds in the spec is defined
+* [CHANGE] #163 If additional-seeds-service includes an IP address with targetRef, do not remove it
+* [ENHANCEMENT] #173 Add ListKeyspace function to httphelper
+* [ENHANCEMENT] #120 Update operator-sdk and modify the project to use newer kubebuilder v3 structure instead of v1
+* [ENHANCEMENT] #145 Operaator can be configured with configuration objects from ConfigMap
+* [ENHANCEMENT] #146 system-logger and cass-operator base is now UBI8-micro
+* [ENHANCEMENT] #180 Add Kustomize components to improve installation experience and customization options
 * [BUGFIX] #162 Affinity labels defined at rack-level should have precedence over DC-level ones
-* [ENHANCEMENT] Add ListKeyspace function to httphelper
+* [BUGFIX] #120 Fix ResourceVersion conflict in CheckRackPodTemplate
+* [BUGFIX] #141 #110 Force update of HostId after pod replace process to avoid stale HostId
+* [BUGFIX] #139 Bundle creation had some bugs after #120
+* [BUGFIX] #134 Fix cluster-wide-installation to happen with Kustomize also, from config/cluster
 
 ## v1.7.1
 * [BUGFIX] #103 Fix upgrade of StatefulSet, do not change service name

@@ -17,6 +17,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] #185 Add more app.kubernetes.io labels to all the managed resources
 * [BUGFIX] #185 introduced a regression which caused labels to be updated in StatefulSet when updating a version. Keep the original as these are not allowed to be modified.
 * [BUGFIX] #222 There were still occasions where clusterName was not an allowed value, cleaning them before creating StatefulSet
+* [BUGFIX] #186 Run cleanups in the background once per pod and poll its state instead of looping endlessly
 
 ## v1.8.0
 * [CHANGE] #178 If clusterName includes characters not allowed in the serviceName, strip those chars from service name.

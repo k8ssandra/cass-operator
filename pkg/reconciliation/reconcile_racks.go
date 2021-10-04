@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/go-logr/logr"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
@@ -2092,16 +2093,12 @@ func (rc *ReconciliationContext) CheckConditionInitializedAndReady() result.Reco
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) cleanupAfterScaling() error {
-	var err error
-
-	for idx := range rc.dcPods {
-		err = rc.NodeMgmtClient.CallKeyspaceCleanupEndpoint(rc.dcPods[idx], -1, "", nil)
-		if err == nil {
-			break
+func cleanupAfterScaling(nodeClient *httphelper.NodeMgmtClient, logger logr.Logger, pods []*corev1.Pod) {
+	for _, pod := range pods {
+		if err := nodeClient.CallKeyspaceCleanupEndpoint(pod, -1, "", nil); err != nil {
+			logger.Error(err, "error cleaning up after scaling datacenter", "Pod", pod.GetName())
 		}
 	}
-	return err
 }
 
 func (rc *ReconciliationContext) CheckCassandraNodeStatuses() result.ReconcileResult {
@@ -2141,11 +2138,7 @@ func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileRe
 
 	// Explicitly handle scaling up here because we want to run a cleanup afterwards
 	if dc.GetConditionStatus(api.DatacenterScalingUp) == corev1.ConditionTrue {
-		err := rc.cleanupAfterScaling()
-		if err != nil {
-			logger.Error(err, "error cleaning up after scaling datacenter")
-			return result.Error(err)
-		}
+		go cleanupAfterScaling(&rc.NodeMgmtClient, logger, rc.dcPods)
 
 		updated = rc.setCondition(
 			api.NewDatacenterCondition(api.DatacenterScalingUp, corev1.ConditionFalse)) || updated

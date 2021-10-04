@@ -157,6 +157,7 @@ func (client *NodeMgmtClient) CallMetadataEndpointsEndpoint(pod *corev1.Pod) (Ca
 		endpoint: "/api/v0/metadata/endpoints",
 		host:     podHost,
 		method:   http.MethodGet,
+		timeout:  60 * time.Second,
 	}
 
 	bytes, err := callNodeMgmtEndpoint(client, request, "")
@@ -195,6 +196,7 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 		endpoint: fmt.Sprintf("/api/v0/ops/auth/role?%s", postData.Encode()),
 		host:     podHost,
 		method:   http.MethodPost,
+		timeout:  60 * time.Second,
 	}
 	_, err = callNodeMgmtEndpoint(client, request, "")
 	return err
@@ -215,6 +217,7 @@ func (client *NodeMgmtClient) CallProbeClusterEndpoint(pod *corev1.Pod, consiste
 		endpoint: fmt.Sprintf("/api/v0/probes/cluster?consistency_level=%s&rf_per_dc=%d", consistencyLevel, rfPerDc),
 		host:     podHost,
 		method:   http.MethodGet,
+		timeout:  60 * time.Second,
 	}
 
 	_, err = callNodeMgmtEndpoint(client, request, "")
@@ -275,7 +278,6 @@ func (client *NodeMgmtClient) CallKeyspaceCleanupEndpoint(pod *corev1.Pod, jobs 
 		endpoint: "/api/v0/ops/keyspace/cleanup",
 		host:     podHost,
 		method:   http.MethodPost,
-		timeout:  time.Second * 20,
 		body:     body,
 	}
 
@@ -574,6 +576,7 @@ func (client *NodeMgmtClient) CallReloadSeedsEndpoint(pod *corev1.Pod) error {
 		endpoint: "/api/v0/ops/seeds/reload",
 		host:     podHost,
 		method:   http.MethodPost,
+		timeout:  60 * time.Second,
 	}
 
 	_, err = callNodeMgmtEndpoint(client, request, "")
@@ -595,6 +598,7 @@ func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) erro
 		endpoint: "/api/v0/ops/node/decommission",
 		host:     podHost,
 		method:   http.MethodPost,
+		timeout:  60 * time.Second,
 	}
 
 	_, err = callNodeMgmtEndpoint(client, request, "")
@@ -688,10 +692,6 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 		return nil, err
 	}
 	req.Close = true
-
-	if request.timeout == 0 {
-		request.timeout = 60 * time.Second
-	}
 
 	if request.timeout > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), request.timeout)

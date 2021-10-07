@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
+* [FEATURE] #193 Add new Management API endpoints to HTTP Helper: GetKeyspaceReplication, ListTables, CreateTable
 * [ENHANCEMENT] #175 Add FQL reconciliation via parseFQLFromConfig and SetFullQueryLogging called from ReconcileAllRacks. CallIsFullQueryLogEnabledEndpoint and CallSetFullQueryLog functions to httphelper.
 * [ENHANCEMENT] #185 Add more app.kubernetes.io labels to all the managed resources
 

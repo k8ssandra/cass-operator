@@ -2268,12 +2268,12 @@ func (rc *ReconciliationContext) SetFullQueryLogging() result.ReconcileResult {
 			serverMajorVersion, err := strconv.ParseInt(strings.Split(dc.Spec.ServerVersion, ".")[0], 10, 8)
 			if err != nil {
 				rc.ReqLogger.Error(err, "error parsing server major version. Can't enable full query logging without knowing this")
-				return result.RequeueSoon(2)
+				return result.Error(err)
 			}
 			if serverMajorVersion < 4 {
 				err := fmt.Errorf("full query logging only supported on OSS Cassandra 4x+")
 				rc.ReqLogger.Error(err, "full_query_logging_options is defined in Cassandra config, it is not supported on the version of Cassandra you are running")
-				return result.RequeueSoon(2)
+				return result.Error(err)
 			}
 			rc.ReqLogger.Info("full_query_logging_options is defined in Cassandra config, we will try to enable it via the management API")
 			shouldFQLBeEnabled = true
@@ -2293,10 +2293,10 @@ func (rc *ReconciliationContext) SetFullQueryLogging() result.ReconcileResult {
 		}
 		rc.ReqLogger.Info("full query logging status:", "isEnabled", fqlEnabledForPod, "shouldBeEnabled", shouldFQLBeEnabled)
 		if fqlEnabledForPod != shouldFQLBeEnabled {
-			rc.ReqLogger.Info("Setting full query logging on ", "podIP", podPtr.Status.HostIP, "podName", podPtr.Name, "fqlDesiredState", shouldFQLBeEnabled)
+			rc.ReqLogger.Info("Setting full query logging on ", "podIP", podPtr.Status.PodIP, "podName", podPtr.Name, "fqlDesiredState", shouldFQLBeEnabled)
 			err := rc.NodeMgmtClient.CallSetFullQueryLog(podPtr, shouldFQLBeEnabled)
 			if err != nil {
-				rc.ReqLogger.Error(err, "couldn't enable full query logging on ", "podIP", podPtr.Status.HostIP, "podName", podPtr.Name)
+				rc.ReqLogger.Error(err, "couldn't enable full query logging on ", "podIP", podPtr.Status.PodIP, "podName", podPtr.Name)
 				return result.RequeueSoon(2)
 			}
 		}

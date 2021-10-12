@@ -3,16 +3,9 @@ kind: CassandraDatacenter
 metadata:
   name: dc1
 spec:
-  podTemplateSpec:
-    spec:
-      containers:
-        - name: "cassandra"
-          image: k8ssandra/mgmtapi-4_0:latest
-          imagePullPolicy: IfNotPresent
   clusterName: cluster1
   serverType: cassandra
   serverVersion: 4.0.0
-  serverImage: k8ssandra/mgmtapi-4_0:latest
   managementApiAuth:
     insecure: {}
   size: 1

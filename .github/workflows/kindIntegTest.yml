@@ -98,6 +98,7 @@ jobs:
         - scale_up
         - scale_up_stop_resume
         - seed_selection
+        - config_fql
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
       # let other tests continue to run
       # even if one fails

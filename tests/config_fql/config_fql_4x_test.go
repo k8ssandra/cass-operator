@@ -18,14 +18,12 @@ import (
 )
 
 var (
-	testName     = "FQL config is applied on Cassandra 4x"
-	namespace    = "fql-config"
-	dcName       = "dc1"
-	dcYaml       = "./config_fql_4x_test.yaml"
-	operatorYaml = "../testdata/operator.yaml"
-	dcResource   = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel      = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns           = ginkgo_util.NewWrapper(testName, namespace)
+	testName  = "FQL config is applied on Cassandra 4x"
+	namespace = "fql-config"
+	dcName    = "dc1"
+	dcYaml    = "./config_fql_4x_test.yaml"
+	dcLabel   = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns        = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {

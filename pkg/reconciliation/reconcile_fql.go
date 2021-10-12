@@ -9,8 +9,9 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 )
 
+// parseFQLFromConfig parses the DC config field to determine whether FQL should be enabled based on the presence of full_query_logging_options within the cassandra-yaml field.
+// To ease integration into the reconciliation process, it returns a (result.ReconcileResult, error) where the ReconcileResult may be result.Error() or result.Continue().
 func parseFQLFromConfig(rc *ReconciliationContext) (bool, result.ReconcileResult) {
-	// Should FQL be enabled according to the CassDC config?
 	shouldFQLBeEnabled := false
 	dc := rc.GetDatacenter()
 	if dc.Spec.Config != nil {
@@ -47,6 +48,8 @@ func parseFQLFromConfig(rc *ReconciliationContext) (bool, result.ReconcileResult
 	return shouldFQLBeEnabled, result.Continue()
 }
 
+// SetFullQueryLogging sets FQL enabled or disabled based on the `enableFQL` parameter.
+// It calls the NodeMgmtClient which calls the Cassandra management API and returns a result.ReconcileResult.
 func SetFullQueryLogging(rc *ReconciliationContext, enableFQL bool) result.ReconcileResult {
 	podList, err := rc.listPods(rc.Datacenter.GetClusterLabels())
 	if err != nil {

@@ -13,7 +13,6 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gopkg.in/yaml.v2"
 )
 
 ////////////////////////////////////
@@ -80,39 +79,34 @@ func Test_SetFullQueryLogging_EnableFail(t *testing.T) {
 ////////////////////////////////////
 //////Test parseFQLFromConfig///////
 ////////////////////////////////////
-var fqlEnabledConfig string = `cassandra-yaml:
-  full_query_logging_options:
-    log_dir: /var/log/cassandra/fql
+var fqlEnabledConfig string = `{"cassandra-yaml": { 
+		"full_query_logging_options": {
+			"log_dir": "/var/log/cassandra/fql" 
+			}
+		}
+	}
 `
 
 func Test_parseFQLFromConfig_fqlEnabled(t *testing.T) {
 	// Test parsing when fql is set, should return (true, continue).
 	mockRC, _, cleanupMockScr := setupTest()
-	configJSON, err := createconfigJSON(fqlEnabledConfig)
-	if err != nil {
-		t.Log("could not create DC config as expected")
-		t.FailNow()
-	}
-	mockRC.Datacenter.Spec.Config = configJSON
+	mockRC.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
 	parsedFQLisEnabled, recResult := parseFQLFromConfig(mockRC)
 	assert.True(t, parsedFQLisEnabled)
 	assert.Equal(t, result.Continue(), recResult)
 	cleanupMockScr()
 }
 
-var fqlDisabledConfig string = `cassandra-yaml:
-  key_cache_size_in_mb: 256
+var fqlDisabledConfig string = `{"cassandra-yaml": {
+	"key_cache_size_in_mb": 256
+	}
+}
 `
 
 func Test_parseFQLFromConfig_fqlDisabled(t *testing.T) {
 	// Test parsing when config exists + fql not set, should return (false, continue()).
 	mockRC, _, cleanupMockScr := setupTest()
-	configJSON, err := createconfigJSON(fqlDisabledConfig)
-	if err != nil {
-		t.Log("could not create DC config as expected")
-		t.FailNow()
-	}
-	mockRC.Datacenter.Spec.Config = configJSON
+	mockRC.Datacenter.Spec.Config = json.RawMessage(fqlDisabledConfig)
 	parsedFQLisEnabled, recResult := parseFQLFromConfig(mockRC)
 	assert.False(t, parsedFQLisEnabled)
 	assert.Equal(t, result.Continue(), recResult)
@@ -121,12 +115,7 @@ func Test_parseFQLFromConfig_fqlDisabled(t *testing.T) {
 func Test_parseFQLFromConfig_noConfig(t *testing.T) {
 	// Test parsing when DC config key does not exist at all, should return (false, continue()).
 	mockRC, _, cleanupMockScr := setupTest()
-	configJSON, err := createconfigJSON("")
-	if err != nil {
-		t.Log("could not create DC config as expected")
-		t.FailNow()
-	}
-	mockRC.Datacenter.Spec.Config = configJSON
+	mockRC.Datacenter.Spec.Config = json.RawMessage("{}")
 	parsedFQLisEnabled, recResult := parseFQLFromConfig(mockRC)
 	assert.False(t, parsedFQLisEnabled)
 	assert.Equal(t, result.Continue(), recResult)
@@ -136,13 +125,8 @@ func Test_parseFQLFromConfig_noConfig(t *testing.T) {
 func Test_parseFQLFromConfig_malformedConfig(t *testing.T) {
 	// Test parsing when dcConfig is malformed, should return (false, error).
 	mockRC, _, cleanupMockScr := setupTest()
-	configJSON, err := createconfigJSON(fqlEnabledConfig)
-	if err != nil {
-		t.Log("could not create DC config as expected")
-		t.FailNow()
-	}
 	var corruptedCfg []byte
-	for _, b := range configJSON {
+	for _, b := range json.RawMessage(fqlEnabledConfig) {
 		corruptedCfg = append(corruptedCfg, b<<3) // corrupt the byte array.
 	}
 	mockRC.Datacenter.Spec.Config = corruptedCfg
@@ -155,47 +139,10 @@ func Test_parseFQLFromConfig_malformedConfig(t *testing.T) {
 func Test_parseFQLFromConfig_3xFQLEnabled(t *testing.T) {
 	// Test parsing when dcConfig asks for FQL on a non-4x server, should return (false, error).
 	mockRC, _, cleanupMockScr := setupTest()
-	configJSON, err := createconfigJSON(fqlEnabledConfig)
-	if err != nil {
-		t.Log("could not create DC config as expected")
-		t.FailNow()
-	}
-	mockRC.Datacenter.Spec.Config = configJSON
+	mockRC.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
 	mockRC.Datacenter.Spec.ServerVersion = "3.11.10"
 	parsedFQLisEnabled, recResult := parseFQLFromConfig(mockRC)
 	assert.False(t, parsedFQLisEnabled)
 	assert.IsType(t, result.Error(errors.New("")), recResult)
 	cleanupMockScr()
-}
-
-func convert(i interface{}) interface{} {
-	// Courtesy of https://stackoverflow.com/a/40737676
-	switch x := i.(type) {
-	case map[interface{}]interface{}:
-		m2 := map[string]interface{}{}
-		for k, v := range x {
-			m2[k.(string)] = convert(v)
-		}
-		return m2
-	case []interface{}:
-		for i, v := range x {
-			x[i] = convert(v)
-		}
-	}
-	return i
-}
-
-func createconfigJSON(yamlString string) (json.RawMessage, error) {
-	// inspired by https://stackoverflow.com/a/40737676
-	var body interface{}
-	yamlB := []byte(yamlString)
-	if err := yaml.Unmarshal(yamlB, &body); err != nil {
-		return nil, err
-	}
-	body = convert(body)
-	jsonOut, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	return jsonOut, nil
 }

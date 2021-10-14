@@ -10,59 +10,55 @@ import (
 )
 
 // parseFQLFromConfig parses the DC config field to determine whether FQL should be enabled based on the presence of full_query_logging_options within the cassandra-yaml field.
-// To ease integration into the reconciliation process, it returns a (result.ReconcileResult, error) where the ReconcileResult may be result.Error() or result.Continue().
-func parseFQLFromConfig(rc *ReconciliationContext) (bool, result.ReconcileResult) {
-	shouldFQLBeEnabled := false
+// To ease integration into the reconciliation process, it returns (shouldFQLBeEnabled, serverMajorVersion, ReconcileResult) where the ReconcileResult may be result.Error() or result.Continue().
+func parseFQLFromConfig(rc *ReconciliationContext) (bool, int64, result.ReconcileResult) {
 	dc := rc.GetDatacenter()
+	serverMajorVersion, err := strconv.ParseInt(strings.Split(dc.Spec.ServerVersion, ".")[0], 10, 8)
+	if err != nil {
+		rc.ReqLogger.Error(err, "error parsing server major version. Can't enable full query logging without knowing this")
+		return false, serverMajorVersion, result.Error(err)
+	}
+	shouldFQLBeEnabled := false
 	if dc.Spec.Config != nil {
 		var dcConfig map[string]interface{}
 		if err := json.Unmarshal(dc.Spec.Config, &dcConfig); err != nil {
 			rc.ReqLogger.Error(err, "error unmarshalling DC config JSON")
-			return false, result.Error(err)
+			return false, serverMajorVersion, result.Error(err)
 		}
 		casYaml, found := dcConfig["cassandra-yaml"]
 		if !found {
-			return false, result.Continue()
+			return false, serverMajorVersion, result.Continue()
 		}
 		casYamlMap, ok := casYaml.(map[string]interface{})
 		if !ok {
 			err := fmt.Errorf("type casting error")
 			rc.ReqLogger.Error(err, "couldn't cast cassandra-yaml value from config to map[string]interface{}")
-			return false, result.Error(err)
+			return false, serverMajorVersion, result.Error(err)
 		}
 		if _, found := casYamlMap["full_query_logging_options"]; found {
-			serverMajorVersion, err := strconv.ParseInt(strings.Split(dc.Spec.ServerVersion, ".")[0], 10, 8)
-			if err != nil {
-				rc.ReqLogger.Error(err, "error parsing server major version. Can't enable full query logging without knowing this")
-				return false, result.Error(err)
-			}
 			if serverMajorVersion < 4 {
 				err := fmt.Errorf("full query logging only supported on OSS Cassandra 4x+")
 				rc.ReqLogger.Error(err, "full_query_logging_options is defined in Cassandra config, it is not supported on the version of Cassandra you are running")
-				return false, result.Error(err)
+				return false, serverMajorVersion, result.Error(err)
 			}
 			rc.ReqLogger.Info("full_query_logging_options is defined in Cassandra config, we will try to enable it via the management API")
 			shouldFQLBeEnabled = true
 		}
 	}
-	return shouldFQLBeEnabled, result.Continue()
+	return shouldFQLBeEnabled, serverMajorVersion, result.Continue()
 }
 
-// SetFullQueryLogging sets FQL enabled or disabled based on the `enableFQL` parameter.
+// SetFullQueryLogging sets FQL enabled or disabled based on the `enableFQL` parameter, and takes serverMajorVersion for additional validation.
 // It calls the NodeMgmtClient which calls the Cassandra management API and returns a result.ReconcileResult.
-func SetFullQueryLogging(rc *ReconciliationContext, enableFQL bool) result.ReconcileResult {
-	podList, err := rc.listPods(rc.Datacenter.GetClusterLabels())
-	if err != nil {
-		rc.ReqLogger.Error(err, "error listing all pods in the cluster to progress full query logging reconciliation")
-		return result.RequeueSoon(2)
-	}
-	for _, podPtr := range PodPtrsFromPodList(podList) {
-		serverMajorVersion, err := strconv.ParseInt(strings.Split(rc.Datacenter.Spec.ServerVersion, ".")[0], 10, 8)
+func SetFullQueryLogging(rc *ReconciliationContext, enableFQL bool, serverMajorVersion int64) result.ReconcileResult {
+	if serverMajorVersion >= 4 {
+		rc.ReqLogger.Info("setting FQL as server major version is ", "serverMajorVersion", serverMajorVersion)
+		podList, err := rc.listPods(rc.Datacenter.GetClusterLabels())
 		if err != nil {
-			rc.ReqLogger.Error(err, "error parsing server major version. Can't enable full query logging without knowing this")
-			return result.Error(err)
+			rc.ReqLogger.Error(err, "error listing all pods in the cluster to progress full query logging reconciliation")
+			return result.RequeueSoon(2)
 		}
-		if serverMajorVersion >= 4 {
+		for _, podPtr := range PodPtrsFromPodList(podList) {
 			fqlEnabledForPod, err := rc.NodeMgmtClient.CallIsFullQueryLogEnabledEndpoint(podPtr)
 			if err != nil {
 				rc.ReqLogger.Error(err, "can't get whether query logging enabled for pod ", "podName", podPtr.Name)

@@ -57,18 +57,25 @@ func SetFullQueryLogging(rc *ReconciliationContext, enableFQL bool) result.Recon
 		return result.RequeueSoon(2)
 	}
 	for _, podPtr := range PodPtrsFromPodList(podList) {
-		fqlEnabledForPod, err := rc.NodeMgmtClient.CallIsFullQueryLogEnabledEndpoint(podPtr)
+		serverMajorVersion, err := strconv.ParseInt(strings.Split(rc.Datacenter.Spec.ServerVersion, ".")[0], 10, 8)
 		if err != nil {
-			rc.ReqLogger.Error(err, "can't get whether query logging enabled for pod ", "podName", podPtr.Name)
-			return result.RequeueSoon(2)
+			rc.ReqLogger.Error(err, "error parsing server major version. Can't enable full query logging without knowing this")
+			return result.Error(err)
 		}
-		rc.ReqLogger.Info("full query logging status:", "isEnabled", fqlEnabledForPod, "shouldBeEnabled", enableFQL)
-		if fqlEnabledForPod != enableFQL {
-			rc.ReqLogger.Info("Setting full query logging on ", "podIP", podPtr.Status.PodIP, "podName", podPtr.Name, "fqlDesiredState", enableFQL)
-			err := rc.NodeMgmtClient.CallSetFullQueryLog(podPtr, enableFQL)
+		if serverMajorVersion >= 4 {
+			fqlEnabledForPod, err := rc.NodeMgmtClient.CallIsFullQueryLogEnabledEndpoint(podPtr)
 			if err != nil {
-				rc.ReqLogger.Error(err, "couldn't enable full query logging on ", "podIP", podPtr.Status.PodIP, "podName", podPtr.Name)
+				rc.ReqLogger.Error(err, "can't get whether query logging enabled for pod ", "podName", podPtr.Name)
 				return result.RequeueSoon(2)
+			}
+			rc.ReqLogger.Info("full query logging status:", "isEnabled", fqlEnabledForPod, "shouldBeEnabled", enableFQL)
+			if fqlEnabledForPod != enableFQL {
+				rc.ReqLogger.Info("Setting full query logging on ", "podIP", podPtr.Status.PodIP, "podName", podPtr.Name, "fqlDesiredState", enableFQL)
+				err := rc.NodeMgmtClient.CallSetFullQueryLog(podPtr, enableFQL)
+				if err != nil {
+					rc.ReqLogger.Error(err, "couldn't enable full query logging on ", "podIP", podPtr.Status.PodIP, "podName", podPtr.Name)
+					return result.RequeueSoon(2)
+				}
 			}
 		}
 	}

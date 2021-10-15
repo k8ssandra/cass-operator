@@ -74,6 +74,15 @@ func newNoPodIPError(pod *corev1.Pod) NoPodIPError {
 	return fmt.Errorf("pod %s has no IP", pod.Name)
 }
 
+type JobDetails struct {
+	Id         string "json:`id`"
+	Type       string "json:`type`"
+	Status     string "json:`status`"
+	SubmitTime string "json:`submit_time`"
+	EndTime    string "json:`end_time`"
+	Error      string "json:`error`"
+}
+
 type Feature string
 
 type FeatureSet struct {
@@ -83,6 +92,7 @@ type FeatureSet struct {
 
 const (
 	AsyncSSTableTasks Feature = "async_sstable_tasks"
+	FullQuerySupport  Feature = "full_query_logging"
 )
 
 func (f *FeatureSet) UnmarshalJSON(b []byte) error {
@@ -467,6 +477,37 @@ func (client *NodeMgmtClient) FeatureSet(pod *corev1.Pod) (*FeatureSet, error) {
 	}
 
 	return features, nil
+}
+
+func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDetails, error) {
+	client.Log.Info(
+		"calling Management API features - GET /api/v0/ops/executor/job",
+		"pod", pod.Name,
+	)
+
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/ops/executor/job",
+		host:     podHost,
+		method:   http.MethodGet,
+	}
+
+	data, err := callNodeMgmtEndpoint(client, request, "")
+	if err != nil {
+		client.Log.Error(err, "failed to fetch job details from management-api")
+		return nil, err
+	}
+
+	job := &JobDetails{}
+	if err := json.Unmarshal(data, &job); err != nil {
+		return nil, err
+	}
+
+	return job, nil
 }
 
 func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, contentType string) ([]byte, error) {

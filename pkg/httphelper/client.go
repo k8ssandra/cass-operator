@@ -75,12 +75,12 @@ func newNoPodIPError(pod *corev1.Pod) NoPodIPError {
 }
 
 type JobDetails struct {
-	Id         string "json:`id`"
-	Type       string "json:`type`"
-	Status     string "json:`status`"
-	SubmitTime string "json:`submit_time`"
-	EndTime    string "json:`end_time`"
-	Error      string "json:`error`"
+	Id         string `json:"id"`
+	Type       string `json:"type"`
+	Status     string `json:"status"`
+	SubmitTime string `json:"submit_time"`
+	EndTime    string `json:"end_time,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
 type Feature string

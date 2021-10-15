@@ -4,6 +4,7 @@
 package reconciliation
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -38,11 +39,15 @@ func TestCassandraDatacenter_allPodsServiceLabels(t *testing.T) {
 			Name: "dc1",
 		},
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: "bob",
+			ClusterName:   "bob",
+			ServerVersion: "4.0.1",
 		},
 	}
 	wantLabels := map[string]string{
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
+		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.VersionLabel:   "4.0.1",
 		api.ClusterLabel:        "bob",
 		api.DatacenterLabel:     "dc1",
 		api.PromMetricsLabel:    "true",

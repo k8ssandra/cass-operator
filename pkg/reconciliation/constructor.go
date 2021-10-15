@@ -20,7 +20,7 @@ import (
 func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1beta1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(int(dc.Spec.Size - 1))
 	labels := dc.GetDatacenterLabels()
-	oplabels.AddManagedByLabel(labels)
+	oplabels.AddKubernetesLabels(labels, dc)
 	selectorLabels := dc.GetDatacenterLabels()
 	pdb := &policyv1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{

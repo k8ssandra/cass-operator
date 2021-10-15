@@ -589,7 +589,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 	// Labels
 
 	podLabels := dc.GetRackLabels(rackName)
-	oplabels.AddManagedByLabel(podLabels)
+	oplabels.AddKubernetesLabels(podLabels, dc)
 	podLabels[api.CassNodeState] = stateReadyToStart
 
 	if baseTemplate.Labels == nil {

@@ -8,6 +8,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
+
 ## v1.8.0
 * [CHANGE] #178 If clusterName includes characters not allowed in the serviceName, strip those chars from service name.
 * [CHANGE] #108 Integrate Fossa component/license scanning

@@ -4,6 +4,7 @@
 package httphelper
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -110,4 +111,36 @@ func Test_parseListKeyspacesEndpointsResponseBody(t *testing.T) {
 	assert.Equal(t, 2, len(keyspaces))
 	assert.Equal(t, "keyspace1", keyspaces[0])
 	assert.Equal(t, "keyspace2", keyspaces[1])
+}
+
+func Test_featureSet(t *testing.T) {
+	assert := assert.New(t)
+
+	exampleData := `{
+		"cassandra_version": "4.0.0",
+		"features": [
+			"async_sstable_tasks",
+			"this_feature_is_not_real"
+		]
+		}`
+
+	featureSet := &FeatureSet{}
+	if err := json.Unmarshal([]byte(exampleData), featureSet); err != nil {
+		assert.FailNow("failed to unmarshal featureSet")
+	}
+
+	assert.True(featureSet.Supports(AsyncSSTableTasks))
+
+	exampleDataEmpty := `{
+		"cassandra_version": "3.11.11",
+		"features": [
+		]
+		}`
+
+	featureSet = &FeatureSet{}
+	if err := json.Unmarshal([]byte(exampleDataEmpty), featureSet); err != nil {
+		assert.FailNow("failed to unmarshal featureSet")
+	}
+
+	assert.False(featureSet.Supports(AsyncSSTableTasks))
 }

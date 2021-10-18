@@ -74,6 +74,50 @@ func newNoPodIPError(pod *corev1.Pod) NoPodIPError {
 	return fmt.Errorf("pod %s has no IP", pod.Name)
 }
 
+type JobDetails struct {
+	Id         string `json:"id"`
+	Type       string `json:"type"`
+	Status     string `json:"status"`
+	SubmitTime string `json:"submit_time"`
+	EndTime    string `json:"end_time,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
+type Feature string
+
+type FeatureSet struct {
+	CassandraVersion string
+	Features         map[string]struct{}
+}
+
+const (
+	AsyncSSTableTasks Feature = "async_sstable_tasks"
+	FullQuerySupport  Feature = "full_query_logging"
+)
+
+func (f *FeatureSet) UnmarshalJSON(b []byte) error {
+	var input map[string]interface{}
+	if err := json.Unmarshal(b, &input); err != nil {
+		return err
+	}
+
+	f.CassandraVersion = input["cassandra_version"].(string)
+	var empty struct{}
+	f.Features = make(map[string]struct{})
+	if fList, ok := input["features"].([]interface{}); ok {
+		for _, feature := range fList {
+			f.Features[feature.(string)] = empty
+		}
+	}
+	return nil
+}
+
+// Supports returns true if the target pod's management-api supports certain feature
+func (f *FeatureSet) Supports(feature Feature) bool {
+	_, found := f.Features[string(feature)]
+	return found
+}
+
 func BuildPodHostFromPod(pod *corev1.Pod) (string, error) {
 	// This function previously returned the dns hostname which includes the StatefulSet's headless service,
 	// which is the datacenter service. There are times though that we want to make a mgmt api call to the pod
@@ -395,6 +439,77 @@ func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) erro
 	return err
 }
 
+// FeatureSet returns supported features on the target pod. If the target pod is too old, empty
+// FeatureSet is returned. One can check the supported feature by using FeatureSet.Supports(feature) and that
+// will work regardless if this endpoint returns a result or 404 (other errors are passed as error)
+func (client *NodeMgmtClient) FeatureSet(pod *corev1.Pod) (*FeatureSet, error) {
+	client.Log.Info(
+		"calling Management API features - GET /api/v0/metadata/versions/features",
+		"pod", pod.Name,
+	)
+
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/metadata/versions/features",
+		host:     podHost,
+		method:   http.MethodGet,
+	}
+
+	data, err := callNodeMgmtEndpoint(client, request, "")
+	if err != nil {
+		if re, ok := err.(*RequestError); ok {
+			// There's no supported new features on this endpoint
+			if re.NotFound() {
+				return &FeatureSet{}, nil
+			}
+		}
+		client.Log.Error(err, "failed to fetch features from management-api")
+		return nil, err
+	}
+
+	features := &FeatureSet{}
+	if err := json.Unmarshal(data, &features); err != nil {
+		return nil, err
+	}
+
+	return features, nil
+}
+
+func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDetails, error) {
+	client.Log.Info(
+		"calling Management API features - GET /api/v0/ops/executor/job",
+		"pod", pod.Name,
+	)
+
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/ops/executor/job",
+		host:     podHost,
+		method:   http.MethodGet,
+	}
+
+	data, err := callNodeMgmtEndpoint(client, request, "")
+	if err != nil {
+		client.Log.Error(err, "failed to fetch job details from management-api")
+		return nil, err
+	}
+
+	job := &JobDetails{}
+	if err := json.Unmarshal(data, &job); err != nil {
+		return nil, err
+	}
+
+	return job, nil
+}
+
 func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, contentType string) ([]byte, error) {
 	client.Log.Info("client::callNodeMgmtEndpoint")
 
@@ -447,12 +562,31 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 
 	goodStatus := res.StatusCode >= 200 && res.StatusCode < 300
 	if !goodStatus {
-		client.Log.Info("incorrect status code when calling Node Management Endpoint",
-			"statusCode", res.StatusCode,
-			"pod", request.host)
+		reqErr := &RequestError{
+			StatusCode: res.StatusCode,
+			Err:        fmt.Errorf("incorrect status code of %d when calling endpoint", res.StatusCode),
+		}
+		if res.StatusCode != http.StatusNotFound {
+			client.Log.Info("incorrect status code when calling Node Management Endpoint",
+				"statusCode", res.StatusCode,
+				"pod", request.host)
+		}
 
-		return nil, fmt.Errorf("incorrect status code of %d when calling endpoint", res.StatusCode)
+		return nil, reqErr
 	}
 
 	return body, nil
+}
+
+type RequestError struct {
+	StatusCode int
+	Err        error
+}
+
+func (r *RequestError) Error() string {
+	return r.Err.Error()
+}
+
+func (r *RequestError) NotFound() bool {
+	return r.StatusCode == http.StatusNotFound
 }

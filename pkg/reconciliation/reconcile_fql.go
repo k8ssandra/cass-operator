@@ -18,10 +18,6 @@ func parseFQLFromConfig(rc *ReconciliationContext) (bool, int64, result.Reconcil
 		rc.ReqLogger.Error(err, "error parsing server major version. Can't enable full query logging without knowing this")
 		return false, serverMajorVersion, result.Error(err)
 	}
-	if dc.Spec.ServerType != "cassandra" {
-		// DSE does not support FQL.
-		return false, 0, result.Continue()
-	}
 	shouldFQLBeEnabled := false
 	if dc.Spec.Config != nil {
 		var dcConfig map[string]interface{}
@@ -40,7 +36,7 @@ func parseFQLFromConfig(rc *ReconciliationContext) (bool, int64, result.Reconcil
 			return false, serverMajorVersion, result.Error(err)
 		}
 		if _, found := casYamlMap["full_query_logging_options"]; found {
-			if serverMajorVersion < 4 {
+			if serverMajorVersion < 4 || dc.Spec.ServerType != "cassandra" {
 				err := fmt.Errorf("full query logging only supported on OSS Cassandra 4x+")
 				rc.ReqLogger.Error(err, "full_query_logging_options is defined in Cassandra config, it is not supported on the version of Cassandra you are running")
 				return false, serverMajorVersion, result.Error(err)
@@ -48,6 +44,10 @@ func parseFQLFromConfig(rc *ReconciliationContext) (bool, int64, result.Reconcil
 			rc.ReqLogger.Info("full_query_logging_options is defined in Cassandra config, we will try to enable it via the management API")
 			shouldFQLBeEnabled = true
 		}
+	}
+	if dc.Spec.ServerType != "cassandra" {
+		// DSE does not support FQL
+		return false, 0, result.Continue()
 	}
 	return shouldFQLBeEnabled, serverMajorVersion, result.Continue()
 }

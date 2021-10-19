@@ -80,13 +80,13 @@ func (k KCmd) ToCliArgs() []string {
 	return args
 }
 
-// Run KCmd via `kubectl`, where KCmd is a struct holding the kubectl command to run (not including `kubectl` itself), the args, and any flags.
+// ExecV runs KCmd via `kubectl`, where KCmd is a struct holding the kubectl command to run (not including `kubectl` itself), the args, and any flags.
 // Returns (stdout, stderr, error) and also logs logs output.
 func (k KCmd) ExecVCapture() (string, string, error) {
 	return shutil.RunVCapture("kubectl", k.ToCliArgs()...)
 }
 
-// Run KCmd via `kubectl`, where KCmd is a struct holding the kubectl command to run (not including `kubectl` itself), the args, and any flags.
+// ExecV runs KCmd via `kubectl`, where KCmd is a struct holding the kubectl command to run (not including `kubectl` itself), the args, and any flags.
 // Returns error only (no capture of results) and also logs logs output.
 func (k KCmd) ExecV() error {
 	return shutil.RunV("kubectl", k.ToCliArgs()...)

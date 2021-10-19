@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
+* [ENHANCEMENT] #175 Add FQL reconciliation via parseFQLFromConfig and SetFullQueryLogging called from ReconcileAllRacks. CallIsFullQueryLogEnabledEndpoint and CallSetFullQueryLog functions to httphelper.
 
 ## v1.8.0
 * [CHANGE] #178 If clusterName includes characters not allowed in the serviceName, strip those chars from service name.
@@ -34,7 +35,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] #141 #110 Force update of HostId after pod replace process to avoid stale HostId
 * [BUGFIX] #139 Bundle creation had some bugs after #120
 * [BUGFIX] #134 Fix cluster-wide-installation to happen with Kustomize also, from config/cluster
-* [ENHANCEMENT] #175 Add FQL reconciliation via parseFQLFromConfig and SetFullQueryLogging called from ReconcileAllRacks. CallIsFullQueryLogEnabledEndpoint and CallSetFullQueryLog functions to httphelper.
+
 ## v1.7.1
 * [BUGFIX] #103 Fix upgrade of StatefulSet, do not change service name
 

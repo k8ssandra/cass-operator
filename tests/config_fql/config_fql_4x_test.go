@@ -21,7 +21,7 @@ var (
 	testName  = "FQL config is applied on Cassandra 4x"
 	namespace = "fql-config"
 	dcName    = "dc1"
-	dcYaml    = "./config_fql_4x_test.yaml"
+	dcYaml    = "../testdata/config_fql_4x_test.yaml"
 	dcLabel   = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns        = ginkgo_util.NewWrapper(testName, namespace)
 )

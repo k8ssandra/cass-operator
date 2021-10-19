@@ -2,10 +2,12 @@ package reconciliation
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 )
 
@@ -64,6 +66,20 @@ func SetFullQueryLogging(rc *ReconciliationContext, enableFQL bool, serverMajorV
 			return result.RequeueSoon(2)
 		}
 		for _, podPtr := range PodPtrsFromPodList(podList) {
+			features, err := rc.NodeMgmtClient.FeatureSet(podPtr)
+			if err != nil {
+				rc.ReqLogger.Error(err, "failed to verify featureset for FQL support")
+				return result.RequeueSoon(2)
+			}
+			if !features.Supports(httphelper.FullQuerySupport) {
+				if enableFQL {
+					err := errors.New("FQL should be enabled but we cannot verify if FQL is supported by mgmt api")
+					return result.Error(err)
+				} else {
+					// FQL support not available in mgmt API but user is not requesting it - continue.
+					return result.Continue()
+				}
+			}
 			fqlEnabledForPod, err := rc.NodeMgmtClient.CallIsFullQueryLogEnabledEndpoint(podPtr)
 			if err != nil {
 				rc.ReqLogger.Error(err, "can't get whether query logging enabled for pod ", "podName", podPtr.Name)

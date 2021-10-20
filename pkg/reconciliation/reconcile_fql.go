@@ -75,10 +75,9 @@ func SetFullQueryLogging(rc *ReconciliationContext, enableFQL bool, serverMajorV
 				if enableFQL {
 					err := errors.New("FQL should be enabled but we cannot verify if FQL is supported by mgmt api")
 					return result.Error(err)
-				} else {
-					// FQL support not available in mgmt API but user is not requesting it - continue.
-					return result.Continue()
 				}
+				// FQL support not available in mgmt API but user is not requesting it - continue.
+				return result.Continue()
 			}
 			fqlEnabledForPod, err := rc.NodeMgmtClient.CallIsFullQueryLogEnabledEndpoint(podPtr)
 			if err != nil {

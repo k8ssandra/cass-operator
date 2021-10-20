@@ -54,11 +54,12 @@ func createTestFile(cassandraVersion, serverImage string) (string, error) {
 		spec["serverImage"] = serverImage
 	}
 
-	spec["cassandraVersion"] = cassandraVersion
+	spec["serverVersion"] = cassandraVersion
 
 	if strings.HasPrefix(cassandraVersion, "3.") {
-		spec["jvm-options"] = spec["jvm-server-options"]
-		delete(spec, "jvm-server-options")
+		config := spec["config"].(map[interface{}]interface{})
+		config["jvm-options"] = config["jvm-server-options"]
+		delete(config, "jvm-server-options")
 	}
 
 	// Marshal back to temp file and return it

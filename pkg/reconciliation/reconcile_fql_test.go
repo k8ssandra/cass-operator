@@ -30,7 +30,7 @@ func Test_parseFQLFromConfig_fqlEnabled(t *testing.T) {
 	mockRC, _, cleanupMockScr := setupTest()
 	mockRC.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
 	mockRC.Datacenter.Spec.ServerType = "cassandra"
-	parsedFQLisEnabled, _, recResult := parseFQLFromConfig(mockRC)
+	parsedFQLisEnabled, _, recResult := mockRC.parseFQLFromConfig()
 	assert.True(t, parsedFQLisEnabled)
 	assert.Equal(t, result.Continue(), recResult)
 	cleanupMockScr()
@@ -47,7 +47,7 @@ func Test_parseFQLFromConfig_fqlDisabled(t *testing.T) {
 	mockRC, _, cleanupMockScr := setupTest()
 	mockRC.Datacenter.Spec.Config = json.RawMessage(fqlDisabledConfig)
 	mockRC.Datacenter.Spec.ServerType = "cassandra"
-	parsedFQLisEnabled, _, recResult := parseFQLFromConfig(mockRC)
+	parsedFQLisEnabled, _, recResult := mockRC.parseFQLFromConfig()
 	assert.False(t, parsedFQLisEnabled)
 	assert.Equal(t, result.Continue(), recResult)
 	cleanupMockScr()
@@ -57,7 +57,7 @@ func Test_parseFQLFromConfig_noConfig(t *testing.T) {
 	mockRC, _, cleanupMockScr := setupTest()
 	mockRC.Datacenter.Spec.Config = json.RawMessage("{}")
 	mockRC.Datacenter.Spec.ServerType = "cassandra"
-	parsedFQLisEnabled, _, recResult := parseFQLFromConfig(mockRC)
+	parsedFQLisEnabled, _, recResult := mockRC.parseFQLFromConfig()
 	assert.False(t, parsedFQLisEnabled)
 	assert.Equal(t, result.Continue(), recResult)
 	cleanupMockScr()
@@ -72,7 +72,7 @@ func Test_parseFQLFromConfig_malformedConfig(t *testing.T) {
 	}
 	mockRC.Datacenter.Spec.Config = corruptedCfg
 	mockRC.Datacenter.Spec.ServerType = "cassandra"
-	parsedFQLisEnabled, _, recResult := parseFQLFromConfig(mockRC)
+	parsedFQLisEnabled, _, recResult := mockRC.parseFQLFromConfig()
 	assert.False(t, parsedFQLisEnabled)
 	assert.IsType(t, result.Error(errors.New("")), recResult)
 	cleanupMockScr()
@@ -84,7 +84,7 @@ func Test_parseFQLFromConfig_3xFQLEnabled(t *testing.T) {
 	mockRC.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
 	mockRC.Datacenter.Spec.ServerVersion = "3.11.10"
 	mockRC.Datacenter.Spec.ServerType = "cassandra"
-	parsedFQLisEnabled, _, recResult := parseFQLFromConfig(mockRC)
+	parsedFQLisEnabled, _, recResult := mockRC.parseFQLFromConfig()
 	assert.False(t, parsedFQLisEnabled)
 	assert.IsType(t, result.Error(errors.New("")), recResult)
 	cleanupMockScr()
@@ -96,7 +96,7 @@ func Test_parseFQLFromConfig_DSEFQLEnabled(t *testing.T) {
 	mockRC.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
 	mockRC.Datacenter.Spec.ServerVersion = "4.0.0"
 	mockRC.Datacenter.Spec.ServerType = "dse"
-	parsedFQLisEnabled, _, recResult := parseFQLFromConfig(mockRC)
+	parsedFQLisEnabled, _, recResult := mockRC.parseFQLFromConfig()
 	assert.False(t, parsedFQLisEnabled)
 	assert.IsType(t, result.Error(errors.New("")), recResult)
 	cleanupMockScr()

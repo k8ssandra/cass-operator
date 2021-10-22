@@ -13,7 +13,7 @@ import (
 
 // parseFQLFromConfig parses the DC config field to determine whether FQL should be enabled based on the presence of full_query_logging_options within the cassandra-yaml field.
 // To ease integration into the reconciliation process, it returns (shouldFQLBeEnabled, serverMajorVersion, ReconcileResult) where the ReconcileResult may be result.Error() or result.Continue().
-func parseFQLFromConfig(rc *ReconciliationContext) (bool, int64, result.ReconcileResult) {
+func (rc *ReconciliationContext) parseFQLFromConfig() (bool, int64, result.ReconcileResult) {
 	dc := rc.GetDatacenter()
 	serverMajorVersion, err := strconv.ParseInt(strings.Split(dc.Spec.ServerVersion, ".")[0], 10, 8)
 	if err != nil {
@@ -56,7 +56,7 @@ func parseFQLFromConfig(rc *ReconciliationContext) (bool, int64, result.Reconcil
 
 // SetFullQueryLogging sets FQL enabled or disabled based on the `enableFQL` parameter, and takes serverMajorVersion for additional validation.
 // It calls the NodeMgmtClient which calls the Cassandra management API and returns a result.ReconcileResult.
-func SetFullQueryLogging(rc *ReconciliationContext, enableFQL bool, serverMajorVersion int64) result.ReconcileResult {
+func (rc *ReconciliationContext) SetFullQueryLogging(enableFQL bool, serverMajorVersion int64) result.ReconcileResult {
 	// This only checks if Cassandra serverMajorVersion is >= 4, DSE returns 0. No DSE version supports this
 	if serverMajorVersion >= 4 {
 		rc.ReqLogger.Info("setting FQL as server major version is ", "serverMajorVersion", serverMajorVersion)

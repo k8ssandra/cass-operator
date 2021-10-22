@@ -2263,7 +2263,7 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 
 	endpointData := rc.getCassMetadataEndpoints()
 
-	shouldFQLBeEnabled, serverMajorVersion, recResult := parseFQLFromConfig(rc)
+	shouldFQLBeEnabled, serverMajorVersion, recResult := rc.parseFQLFromConfig()
 	if recResult.Completed() {
 		return recResult.Output()
 	}
@@ -2362,7 +2362,7 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return recResult.Output()
 	}
 
-	if recResult := SetFullQueryLogging(rc, shouldFQLBeEnabled, serverMajorVersion); recResult.Completed() {
+	if recResult := rc.SetFullQueryLogging(shouldFQLBeEnabled, serverMajorVersion); recResult.Completed() {
 		return recResult.Output()
 	}
 

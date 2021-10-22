@@ -79,7 +79,7 @@ jobs:
           echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
           echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
       - name: Build and push
-        id: docker_build
+        id: docker_build_cass_operator
         uses: docker/build-push-action@v2
         with:
           file: Dockerfile
@@ -90,7 +90,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build and push
-        id: docker_build
+        id: docker_build_system_logger
         uses: docker/build-push-action@v2
         with:
           file: logger.Dockerfile

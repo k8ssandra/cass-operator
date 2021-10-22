@@ -43,7 +43,7 @@ func TestLifecycle(t *testing.T) {
 		}
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.Undeploy(opNamespace)
+		kustomize.UndeployDir(opNamespace, "cluster_wide_install")
 	})
 
 	RegisterFailHandler(Fail)

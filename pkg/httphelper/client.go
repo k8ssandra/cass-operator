@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -589,4 +590,56 @@ func (r *RequestError) Error() string {
 
 func (r *RequestError) NotFound() bool {
 	return r.StatusCode == http.StatusNotFound
+}
+
+func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod) (bool, error) {
+	client.Log.Info("client::callIsFullQueryLogEnabledEndpoint")
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return false, err
+	}
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/ops/node/fullquerylogging",
+		host:     podHost,
+		method:   http.MethodGet,
+		timeout:  time.Minute * 2,
+	}
+	apiResponse, err := callNodeMgmtEndpoint(client, request, "")
+	if err != nil {
+		client.Log.Error(err, "failed to call endpoint /api/v0/ops/node/fullquerylogging")
+		return false, err
+	}
+	var parsedResponse map[string]interface{}
+	err = json.Unmarshal([]byte(apiResponse), &parsedResponse)
+	if err != nil {
+		client.Log.Error(err, "failed to unmarshall JSON response from /api/v0/ops/node/fullquerylogging", "response", string(apiResponse))
+		return false, err
+	}
+	fqlIsEnabled, ok := parsedResponse["entity"]
+	if !ok {
+		err := errors.New("failed to retrieve Entity key from /api/v0/ops/node/fullquerylogging")
+		return false, err
+	}
+	fqlIsEnabledBool, ok := fqlIsEnabled.(bool)
+	if !ok {
+		err := errors.New("failed to cast response from /api/v0/ops/node/fullquerylogging to bool")
+		return false, err
+	}
+	return fqlIsEnabledBool, err
+}
+
+func (client *NodeMgmtClient) CallSetFullQueryLog(pod *corev1.Pod, enableFullQueryLogging bool) error {
+	client.Log.Info("client::callIsFullQueryLogEnabledEndpoint")
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/ops/node/fullquerylogging?enabled=" + strconv.FormatBool(enableFullQueryLogging),
+		host:     podHost,
+		method:   http.MethodPost,
+		timeout:  time.Minute * 2,
+	}
+	_, err = callNodeMgmtEndpoint(client, request, "")
+	return err
 }

@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
+* [ENHANCEMENT] #175 Add FQL reconciliation via parseFQLFromConfig and SetFullQueryLogging called from ReconcileAllRacks. CallIsFullQueryLogEnabledEndpoint and CallSetFullQueryLog functions to httphelper.
 
 ## v1.8.0
 * [CHANGE] #178 If clusterName includes characters not allowed in the serviceName, strip those chars from service name.

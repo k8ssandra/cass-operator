@@ -54,10 +54,14 @@ func NewWrapper(suiteName string, namespace string) NsWrapper {
 	}
 }
 
+// ExecVCapture runs KCmd via `kubectl` in the namspace (the receiver), where KCmd is a struct holding the kubectl command to run (not including `kubectl` itself), the args, and any flags.
+// Returns (stdout, stderr, error) and also logs logs output.
 func (k NsWrapper) ExecVCapture(kcmd kubectl.KCmd) (string, string, error) {
 	return kcmd.InNamespace(k.Namespace).ExecVCapture()
 }
 
+// ExecV runs KCmd via `kubectl` in the namspace (the receiver), where KCmd is a struct holding the kubectl command to run (not including `kubectl` itself), the args, and any flags.
+// Returns error only (no capture of results) and also logs logs output.
 func (k NsWrapper) ExecV(kcmd kubectl.KCmd) error {
 	err := kcmd.InNamespace(k.Namespace).ExecV()
 	return err

@@ -10,8 +10,6 @@ jobs:
     name: Run unit tests
     runs-on: ubuntu-latest
     env:
-      GOPATH: /home/runner/go
-      GOROOT: /usr/local/go1.16
       CGO_ENABLED: 0
     steps:
       - uses: actions/checkout@v2
@@ -39,11 +37,20 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: latest
+          # Temporary, do not fail this job even if we have issues (until we've fixed them)
+          args: --issues-exit-code=0
+          # Optional: show only new issues if it's a pull request. The default value is `false`.
+          # only-new-issues: true
+          skip-go-installation: true
+          skip-pkg-cache: true
+          skip-build-cache: true
       - name: Unit Tests
         run: |
-          export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
           make test
-          # TODO Verify that go fmt / vet did not modify anything?
   build_images:
     name: Build Cass Operator Docker Image
     runs-on: ubuntu-latest

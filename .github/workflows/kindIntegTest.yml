@@ -108,7 +108,6 @@ jobs:
       # GOPATH: /home/runner/go
       # GOROOT: /usr/local/go1.16
       CGO_ENABLED: 0
-      M_LOAD_TEST_IMAGES: false
       M_INTEG_DIR: ${{ matrix.integration_test }}
     steps:
       - uses: actions/checkout@v2

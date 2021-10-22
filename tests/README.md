@@ -7,7 +7,21 @@ Install kubectl using the instructions [here](https://kubernetes.io/docs/tasks/t
 
 The tests use Kustomize to deploy the cass-operator. Kustomize is installed if not present in the machine. We test against 4.1.x series of Kustomize at this point, but newer 3.x releases should work also. 
 
-You will also need a running Kubernetes cluster. We use [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), but others should work also. Note that the storageClass is set to ``default`` in the tests. The StorageClass has to have ``volumeBindingMode`` set to ``WaitForFirstConsumer``, otherwise tests might get stuck. 
+You will also need a running Kubernetes cluster. We use [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), but others should work also. Note that the storageClass is set to ``standard`` in the tests. The StorageClass has to have ``volumeBindingMode`` set to ``WaitForFirstConsumer``, otherwise tests might get stuck. 
+
+For example, the following is required in Docker for Desktop's Kubernetes installations:
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard
+provisioner: docker.io/hostpath
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+```
+
+Apply the storageClass with ``kubectl apply -f <filename>``. For minikube installations, replace the ``provisioner`` part with ``provisioner: k8s.io/minikube-hostpath``. The local provisioner is ``provisioner: kubernetes.io/no-provisioner``.
 
 ## Running the tests
 The tests themselves expect a running k8s cluster, with at least 6 worker nodes, and kubectl to be configured to point at the cluster. You can find instructions to setup kind cluster [here](docs/developer/kind.md)

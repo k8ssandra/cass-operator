@@ -10,8 +10,6 @@ jobs:
     name: Run unit tests
     runs-on: ubuntu-latest
     env:
-      GOPATH: /home/runner/go
-      GOROOT: /usr/local/go1.16
       CGO_ENABLED: 0
     steps:
       - uses: actions/checkout@v2
@@ -39,12 +37,21 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: latest
+          # Temporary, do not fail this job even if we have issues (until we've fixed them)
+          args: --issues-exit-code=0 --timeout=10m
+          # Optional: show only new issues if it's a pull request. The default value is `false`.
+          # only-new-issues: true
+          skip-go-installation: true
+          skip-pkg-cache: true
+          skip-build-cache: true
       - name: Unit Tests
         run: |
-          export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
           make test
-          # TODO Verify that go fmt / vet did not modify anything?
-  build_operator_docker:
+  build_images:
     name: Build Cass Operator Docker Image
     runs-on: ubuntu-latest
     needs: testing
@@ -72,7 +79,7 @@ jobs:
           echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
           echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
       - name: Build and push
-        id: docker_build
+        id: docker_build_cass_operator
         uses: docker/build-push-action@v2
         with:
           file: Dockerfile
@@ -82,35 +89,8 @@ jobs:
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
-  build_system_logger:
-    name: Build System logger Docker Image
-    runs-on: ubuntu-latest
-    needs: testing
-    if: github.ref == 'refs/heads/master'
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      - name: Cache Docker layers
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
-      - name: Set git parsed values
-        id: vars
-        run: |
-          echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
-          echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
       - name: Build and push
-        id: docker_build
+        id: docker_build_system_logger
         uses: docker/build-push-action@v2
         with:
           file: logger.Dockerfile

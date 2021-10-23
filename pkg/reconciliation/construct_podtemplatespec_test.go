@@ -87,8 +87,8 @@ func TestCassandraDatacenter_buildInitContainer_resources_set(t *testing.T) {
 	assert.NotNil(t, initContainers, "Unexpected init containers received")
 	assert.Nil(t, err, "Unexpected error encountered")
 
-	assert.Len(t, initContainers, 1, "Unexpected number of init containers returned")
-	if !reflect.DeepEqual(dc.Spec.ConfigBuilderResources, initContainers[0].Resources) {
+	assert.Len(t, initContainers, 2, "Unexpected number of init containers returned")
+	if !reflect.DeepEqual(dc.Spec.ConfigBuilderResources, initContainers[1].Resources) {
 		t.Errorf("system-config-init container resources not correctly set")
 		t.Errorf("got: %v", initContainers[0])
 	}
@@ -109,8 +109,8 @@ func TestCassandraDatacenter_buildInitContainer_resources_set_when_not_specified
 	assert.NotNil(t, initContainers, "Unexpected init containers received")
 	assert.Nil(t, err, "Unexpected error encountered")
 
-	assert.Len(t, initContainers, 1, "Unexpected number of init containers returned")
-	if !reflect.DeepEqual(initContainers[0].Resources, DefaultsConfigInitContainer) {
+	assert.Len(t, initContainers, 2, "Unexpected number of init containers returned")
+	if !reflect.DeepEqual(initContainers[1].Resources, DefaultsConfigInitContainer) {
 		t.Error("Unexpected default resources allocated for the init container.")
 	}
 }
@@ -145,15 +145,15 @@ func TestCassandraDatacenter_buildInitContainer_with_overrides(t *testing.T) {
 	assert.NotNil(t, initContainers, "Unexpected init containers received")
 	assert.Nil(t, err, "Unexpected error encountered")
 
-	assert.Len(t, initContainers, 1, "Unexpected number of init containers returned")
-	if !reflect.DeepEqual(initContainers[0].Resources, DefaultsConfigInitContainer) {
+	assert.Len(t, initContainers, 2, "Unexpected number of init containers returned")
+	if !reflect.DeepEqual(initContainers[1].Resources, DefaultsConfigInitContainer) {
 		t.Error("Unexpected default resources allocated for the init container.")
 	}
 
-	assert.Contains(t, initContainers[0].Env, corev1.EnvVar{Name: "k1", Value: "v1"},
+	assert.Contains(t, initContainers[1].Env, corev1.EnvVar{Name: "k1", Value: "v1"},
 		fmt.Sprintf("Unexpected env vars allocated for the init container: %v", initContainers[0].Env))
 
-	assert.Contains(t, initContainers[0].Env, corev1.EnvVar{Name: "USE_HOST_IP_FOR_BROADCAST", Value: "false"},
+	assert.Contains(t, initContainers[1].Env, corev1.EnvVar{Name: "USE_HOST_IP_FOR_BROADCAST", Value: "false"},
 		fmt.Sprintf("Unexpected env vars allocated for the init container: %v", initContainers[0].Env))
 }
 
@@ -339,9 +339,9 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 		}
 
 		if err := buildInitContainers(dc, rack, templateSpec); err == nil {
-			assert.Equal(t, 1, len(templateSpec.Spec.InitContainers), fmt.Sprintf("%s: expected to find 1 init container", tt.name))
+			assert.Equal(t, 2, len(templateSpec.Spec.InitContainers), fmt.Sprintf("%s: expected to find 1 init container", tt.name))
 
-			initContainer := templateSpec.Spec.InitContainers[0]
+			initContainer := templateSpec.Spec.InitContainers[1]
 			assert.Equal(t, ServerConfigContainerName, initContainer.Name, fmt.Sprintf("%s: expected to find %s init container", tt.name, ServerConfigContainerName))
 
 			assert.True(t, envVarsMatch(tt.want, initContainer.Env), fmt.Sprintf("%s: wanted %+v, got %+v", tt.name, tt.want, initContainer.Env))
@@ -449,8 +449,8 @@ func TestCassandraDatacenter_buildPodTemplateSpec_initcontainers_merge(t *testin
 	got, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack")
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
-	assert.Equal(t, 2, len(got.Spec.InitContainers))
-	if !reflect.DeepEqual(testContainer, got.Spec.InitContainers[0]) {
+	assert.Equal(t, 3, len(got.Spec.InitContainers))
+	if !reflect.DeepEqual(testContainer, got.Spec.InitContainers[1]) {
 		t.Errorf("second init container = %v, want %v", got, testContainer)
 	}
 }
@@ -489,9 +489,10 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_after_config
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
 	initContainers := podTemplateSpec.Spec.InitContainers
-	assert.Equal(t, 2, len(initContainers))
-	assert.Equal(t, initContainers[0].Name, ServerConfigContainerName)
-	assert.Equal(t, initContainers[1].Name, initContainer.Name)
+	assert.Equal(t, 3, len(initContainers))
+	assert.Equal(t, initContainers[0].Name, baseConfigInitContainerName)
+	assert.Equal(t, initContainers[1].Name, ServerConfigContainerName)
+	assert.Equal(t, initContainers[2].Name, initContainer.Name)
 }
 
 func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes(t *testing.T) {
@@ -546,21 +547,21 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes
 
 	initContainers := podTemplateSpec.Spec.InitContainers
 
-	assert.Equal(t, 2, len(initContainers))
-	assert.Equal(t, "test", initContainers[0].Name)
-	assert.Equal(t, 3, len(initContainers[0].VolumeMounts))
+	assert.Equal(t, 3, len(initContainers))
+	assert.Equal(t, "test", initContainers[1].Name)
+	assert.Equal(t, 3, len(initContainers[1].VolumeMounts))
 	// We use a contains check here because the ordering is not important
-	assert.True(t, volumeMountsContains(initContainers[0].VolumeMounts, volumeMountNameMatcher(PvcName)))
-	assert.True(t, volumeMountsContains(initContainers[0].VolumeMounts, volumeMountNameMatcher("test-data")))
-	assert.True(t, volumeMountsContains(initContainers[0].VolumeMounts, volumeMountNameMatcher("server-config")))
-
-	assert.Equal(t, ServerConfigContainerName, initContainers[1].Name)
-	assert.Equal(t, 1, len(initContainers[1].VolumeMounts))
-	// We use a contains check here because the ordering is not important
+	assert.True(t, volumeMountsContains(initContainers[1].VolumeMounts, volumeMountNameMatcher(PvcName)))
+	assert.True(t, volumeMountsContains(initContainers[1].VolumeMounts, volumeMountNameMatcher("test-data")))
 	assert.True(t, volumeMountsContains(initContainers[1].VolumeMounts, volumeMountNameMatcher("server-config")))
 
+	assert.Equal(t, ServerConfigContainerName, initContainers[2].Name)
+	assert.Equal(t, 1, len(initContainers[2].VolumeMounts))
+	// We use a contains check here because the ordering is not important
+	assert.True(t, volumeMountsContains(initContainers[2].VolumeMounts, volumeMountNameMatcher("server-config")))
+
 	volumes := podTemplateSpec.Spec.Volumes
-	assert.Equal(t, 4, len(volumes))
+	assert.Equal(t, 8, len(volumes))
 	// We use a contains check here because the ordering is not important
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("server-config")))
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("test-data")))
@@ -574,7 +575,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes
 	assert.NotNil(t, cassandraContainer)
 
 	cassandraVolumeMounts := cassandraContainer.VolumeMounts
-	assert.Equal(t, 4, len(cassandraVolumeMounts))
+	assert.Equal(t, 7, len(cassandraVolumeMounts))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-config")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-logs")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("encryption-cred-storage")))
@@ -650,16 +651,16 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 
 	initContainers := podTemplateSpec.Spec.InitContainers
 
-	assert.Equal(t, 1, len(initContainers))
-	assert.Equal(t, ServerConfigContainerName, initContainers[0].Name)
+	assert.Equal(t, 2, len(initContainers))
+	assert.Equal(t, ServerConfigContainerName, initContainers[1].Name)
 
-	serverConfigInitContainer := initContainers[0]
+	serverConfigInitContainer := initContainers[1]
 	assert.Equal(t, 1, len(serverConfigInitContainer.VolumeMounts))
 	// We use a contains check here because the ordering is not important
 	assert.True(t, volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config")))
 
 	volumes := podTemplateSpec.Spec.Volumes
-	assert.Equal(t, 4, len(volumes))
+	assert.Equal(t, 8, len(volumes))
 	// We use a contains check here because the ordering is not important
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("server-config")))
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("test-data")))
@@ -682,7 +683,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 	assert.NotNil(t, cassandraContainer)
 
 	cassandraVolumeMounts := cassandraContainer.VolumeMounts
-	assert.Equal(t, 5, len(cassandraVolumeMounts))
+	assert.Equal(t, 8, len(cassandraVolumeMounts))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-config")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-logs")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("encryption-cred-storage")))
@@ -860,10 +861,10 @@ func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *te
 
 	initContainers := spec.Spec.InitContainers
 
-	assert.Equal(t, 1, len(initContainers))
-	assert.Equal(t, ServerConfigContainerName, initContainers[0].Name)
+	assert.Equal(t, 2, len(initContainers))
+	assert.Equal(t, ServerConfigContainerName, initContainers[1].Name)
 
-	serverConfigInitContainer := initContainers[0]
+	serverConfigInitContainer := initContainers[1]
 	assert.Equal(t, 2, len(serverConfigInitContainer.VolumeMounts))
 	// We use a contains check here because the ordering is not important
 	assert.True(t, volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config")))
@@ -874,7 +875,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *te
 	assert.NotNil(t, cassandraContainer)
 
 	cassandraVolumeMounts := cassandraContainer.VolumeMounts
-	assert.Equal(t, 4, len(cassandraVolumeMounts))
+	assert.Equal(t, 7, len(cassandraVolumeMounts))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-config")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-logs")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("encryption-cred-storage")))

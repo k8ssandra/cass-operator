@@ -166,33 +166,35 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 		assert.Equal(t, "cassandra-commitlogs", got.Spec.VolumeClaimTemplates[2].Name)
 		assert.Equal(t, customCassandraCommitLogsStorageClass, *got.Spec.VolumeClaimTemplates[2].Spec.StorageClassName)
 
-		assert.Equal(t, 2, len(got.Spec.Template.Spec.Volumes))
-		assert.Equal(t, "server-config", got.Spec.Template.Spec.Volumes[0].Name)
-		assert.Equal(t, "encryption-cred-storage", got.Spec.Template.Spec.Volumes[1].Name)
+		volumes := got.Spec.Template.Spec.Volumes
+		assert.Equal(t, 7, len(volumes))
+		assert.True(t, volumesContains(volumes, volumeNameMatcher("server-config")))
+		assert.True(t, volumesContains(volumes, volumeNameMatcher("encryption-cred-storage")))
 
 		assert.Equal(t, 2, len(got.Spec.Template.Spec.Containers))
 
-		assert.Equal(t, 5, len(got.Spec.Template.Spec.Containers[0].VolumeMounts))
-		assert.Equal(t, "server-logs", got.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
-		assert.Equal(t, "cassandra-commitlogs", got.Spec.Template.Spec.Containers[0].VolumeMounts[1].Name)
-		assert.Equal(t, "server-data", got.Spec.Template.Spec.Containers[0].VolumeMounts[2].Name)
-		assert.Equal(t, "encryption-cred-storage", got.Spec.Template.Spec.Containers[0].VolumeMounts[3].Name)
-		assert.Equal(t, "server-config", got.Spec.Template.Spec.Containers[0].VolumeMounts[4].Name)
+		volumeMounts := got.Spec.Template.Spec.Containers[0].VolumeMounts
+		assert.Equal(t, 9, len(volumeMounts))
+		assert.True(t, volumeMountsContains(volumeMounts, volumeMountNameMatcher("server-logs")))
+		assert.True(t, volumeMountsContains(volumeMounts, volumeMountNameMatcher("cassandra-commitlogs")))
+		assert.True(t, volumeMountsContains(volumeMounts, volumeMountNameMatcher("server-data")))
+		assert.True(t, volumeMountsContains(volumeMounts, volumeMountNameMatcher("encryption-cred-storage")))
+		assert.True(t, volumeMountsContains(volumeMounts, volumeMountNameMatcher("server-config")))
 
 		assert.Equal(t, 2, len(got.Spec.Template.Spec.Containers[1].VolumeMounts))
-		assert.Equal(t, 2, len(got.Spec.Template.Spec.InitContainers))
+		assert.Equal(t, 3, len(got.Spec.Template.Spec.InitContainers))
 
-		assert.Equal(t, "initContainer1", got.Spec.Template.Spec.InitContainers[0].Name)
-		assert.Equal(t, "initImage1", got.Spec.Template.Spec.InitContainers[0].Image)
-		assert.Equal(t, 1, len(got.Spec.Template.Spec.InitContainers[0].VolumeMounts))
-		assert.Equal(t, "server-logs", got.Spec.Template.Spec.InitContainers[0].VolumeMounts[0].Name)
-		assert.Equal(t, "/var/log/cassandra", got.Spec.Template.Spec.InitContainers[0].VolumeMounts[0].MountPath)
-
-		assert.Equal(t, "server-config-init", got.Spec.Template.Spec.InitContainers[1].Name)
-		assert.Equal(t, "datastax/cass-config-builder:1.0.4-ubi7", got.Spec.Template.Spec.InitContainers[1].Image)
+		assert.Equal(t, "initContainer1", got.Spec.Template.Spec.InitContainers[1].Name)
+		assert.Equal(t, "initImage1", got.Spec.Template.Spec.InitContainers[1].Image)
 		assert.Equal(t, 1, len(got.Spec.Template.Spec.InitContainers[1].VolumeMounts))
-		assert.Equal(t, "server-config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].Name)
-		assert.Equal(t, "/config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].MountPath)
+		assert.Equal(t, "server-logs", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].Name)
+		assert.Equal(t, "/var/log/cassandra", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].MountPath)
+
+		assert.Equal(t, "server-config-init", got.Spec.Template.Spec.InitContainers[2].Name)
+		assert.Equal(t, "datastax/cass-config-builder:1.0.4-ubi7", got.Spec.Template.Spec.InitContainers[2].Image)
+		assert.Equal(t, 1, len(got.Spec.Template.Spec.InitContainers[2].VolumeMounts))
+		assert.Equal(t, "server-config", got.Spec.Template.Spec.InitContainers[2].VolumeMounts[0].Name)
+		assert.Equal(t, "/config", got.Spec.Template.Spec.InitContainers[2].VolumeMounts[0].MountPath)
 	}
 }
 
@@ -205,12 +207,6 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 		CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 			StorageClassName: &storageClass,
 		},
-	}
-
-	defaultSecurityContext := &corev1.PodSecurityContext{
-		RunAsUser:  int64Ptr(999),
-		RunAsGroup: int64Ptr(999),
-		FSGroup:    int64Ptr(999),
 	}
 
 	tests := []struct {
@@ -229,7 +225,7 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 					StorageConfig:              storageConfig,
 				},
 			},
-			expected: defaultSecurityContext,
+			expected: defaultPodSecurityContext(),
 		},
 		{
 			name: "run cassandra as root user",
@@ -242,7 +238,9 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 					StorageConfig:              storageConfig,
 				},
 			},
-			expected: nil,
+			// TODO If we want to run as non-root with read-only root file system does it make sense to give the option to run as root user?
+			//expected: nil,
+			expected: defaultPodSecurityContext(),
 		},
 		{
 			// Note that DSE only supports running as non-root
@@ -255,7 +253,7 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 					StorageConfig: storageConfig,
 				},
 			},
-			expected: defaultSecurityContext,
+			expected: defaultPodSecurityContext(),
 		},
 		{
 			name: "run cassandra with pod security context override",

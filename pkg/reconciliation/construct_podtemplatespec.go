@@ -442,11 +442,11 @@ func createBaseConfigInitContainer(dc *api.CassandraDatacenter) (*corev1.Contain
 				MountPath: "/cassandra",
 			},
 			{
-				Name: "config",
+				Name:      "config",
 				MountPath: "/cassandra-base-config",
 			},
 			{
-				Name: "mcac-config",
+				Name:      "mcac-config",
 				MountPath: "/mcac-config",
 			},
 		}
@@ -645,17 +645,17 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, confiigVol, binVol)
 	} else {
 		configVol := corev1.VolumeMount{
-			Name: "config",
+			Name:      "config",
 			MountPath: "/opt/cassandra/conf",
 		}
 
 		mcacVol := corev1.VolumeMount{
-			Name: "mcac-config",
+			Name:      "mcac-config",
 			MountPath: "/opt/metrics-collector/config",
 		}
 
 		cassandraHomeVol := corev1.VolumeMount{
-			Name: "cassandra-home",
+			Name:      "cassandra-home",
 			MountPath: "/opt/cassandra",
 		}
 
@@ -738,17 +738,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 	}
 
 	if baseTemplate.Spec.SecurityContext == nil {
-		uid := cassandraUid
-		gid := cassandraGid
-		fsGroup := cassandraUid
-		runAsNonRoot := true
-
-		baseTemplate.Spec.SecurityContext = &corev1.PodSecurityContext{
-			RunAsUser: &uid,
-			RunAsGroup: &gid,
-			FSGroup: &fsGroup,
-			RunAsNonRoot: &runAsNonRoot,
-		}
+		baseTemplate.Spec.SecurityContext = defaultPodSecurityContext()
 	}
 
 	// Adds custom registry pull secret if needed
@@ -812,9 +802,23 @@ func newSecurityContext() *corev1.SecurityContext {
 	allowPrivilegedEscalation := false
 
 	return &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: &readOnlyRootFs,
-		Privileged: &privileged,
+		ReadOnlyRootFilesystem:   &readOnlyRootFs,
+		Privileged:               &privileged,
 		AllowPrivilegeEscalation: &allowPrivilegedEscalation,
+	}
+}
+
+func defaultPodSecurityContext() *corev1.PodSecurityContext {
+	uid := cassandraUid
+	gid := cassandraGid
+	fsGroup := cassandraUid
+	runAsNonRoot := true
+
+	return &corev1.PodSecurityContext{
+		RunAsUser:    &uid,
+		RunAsGroup:   &gid,
+		FSGroup:      &fsGroup,
+		RunAsNonRoot: &runAsNonRoot,
 	}
 }
 

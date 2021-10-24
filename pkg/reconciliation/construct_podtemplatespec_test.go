@@ -561,7 +561,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes
 	assert.True(t, volumeMountsContains(initContainers[2].VolumeMounts, volumeMountNameMatcher("server-config")))
 
 	volumes := podTemplateSpec.Spec.Volumes
-	assert.Equal(t, 8, len(volumes))
+	assert.Equal(t, 9, len(volumes))
 	// We use a contains check here because the ordering is not important
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("server-config")))
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("test-data")))
@@ -575,7 +575,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes
 	assert.NotNil(t, cassandraContainer)
 
 	cassandraVolumeMounts := cassandraContainer.VolumeMounts
-	assert.Equal(t, 7, len(cassandraVolumeMounts))
+	assert.Equal(t, 8, len(cassandraVolumeMounts))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-config")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-logs")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("encryption-cred-storage")))
@@ -660,7 +660,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 	assert.True(t, volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config")))
 
 	volumes := podTemplateSpec.Spec.Volumes
-	assert.Equal(t, 8, len(volumes))
+	assert.Equal(t, 9, len(volumes))
 	// We use a contains check here because the ordering is not important
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("server-config")))
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("test-data")))
@@ -683,7 +683,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 	assert.NotNil(t, cassandraContainer)
 
 	cassandraVolumeMounts := cassandraContainer.VolumeMounts
-	assert.Equal(t, 8, len(cassandraVolumeMounts))
+	assert.Equal(t, 9, len(cassandraVolumeMounts))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-config")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-logs")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("encryption-cred-storage")))
@@ -875,7 +875,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *te
 	assert.NotNil(t, cassandraContainer)
 
 	cassandraVolumeMounts := cassandraContainer.VolumeMounts
-	assert.Equal(t, 7, len(cassandraVolumeMounts))
+	assert.Equal(t, 8, len(cassandraVolumeMounts))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-config")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-logs")))
 	assert.True(t, volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("encryption-cred-storage")))

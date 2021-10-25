@@ -5,6 +5,7 @@ package v1beta1
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -745,6 +746,28 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 	}
 
 	return ports, nil
+}
+
+func (dc *CassandraDatacenter) GetFullQueryStatus() (bool, error) {
+	// TODO Cleanup to more common processing after ModelValues is moved to apis
+	var dcConfig map[string]interface{}
+	if err := json.Unmarshal(dc.Spec.Config, &dcConfig); err != nil {
+		return false, err
+	}
+	casYaml, found := dcConfig["cassandra-yaml"]
+	if !found {
+		return false, nil
+	}
+	casYamlMap, ok := casYaml.(map[string]interface{})
+	if !ok {
+		err := fmt.Errorf("failed to parse cassandra-yaml")
+		return false, err
+	}
+	if _, found := casYamlMap["full_query_logging_options"]; found {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func SplitRacks(nodeCount, rackCount int) []int {

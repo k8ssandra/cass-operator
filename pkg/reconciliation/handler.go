@@ -203,6 +203,9 @@ func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
 	// validate any other defined users
 	errs = append(errs, rc.validateCassandraUserSecrets()...)
 
+	// Validate FQL config
+	errs = append(errs, dc.ValidateFQLConfig())
+
 	// Validate Management API config
 	errs = append(errs, httphelper.ValidateManagementApiConfig(dc, rc.Client, rc.Ctx)...)
 	if len(errs) > 0 {

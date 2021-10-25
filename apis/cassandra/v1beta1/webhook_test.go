@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	corev1 "k8s.io/api/core/v1"
@@ -757,4 +758,107 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 			}
 		})
 	}
+}
+
+var fqlEnabledConfig string = `{"cassandra-yaml": { 
+	"full_query_logging_options": {
+		"log_dir": "/var/log/cassandra/fql" 
+		}
+	}
+}
+`
+
+func getCassDc(serverType string) *CassandraDatacenter {
+	dc := &CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "exampleDC",
+		},
+		Spec: CassandraDatacenterSpec{
+			ServerType: serverType,
+		},
+	}
+
+	if serverType == "dse" {
+		dc.Spec.ServerVersion = "6.8.13"
+	} else {
+		dc.Spec.ServerVersion = "4.0.1"
+	}
+
+	return dc
+}
+
+func Test_parseFQLFromConfig_fqlEnabled(t *testing.T) {
+	// Test parsing when fql is set, should return (true, continue).
+	dc := getCassDc("cassandra")
+	dc.Spec.Config = json.RawMessage(fqlEnabledConfig)
+	assert.NoError(t, dc.ValidateFQLConfig())
+	parsedFQLisEnabled, err := dc.GetFullQueryStatus()
+	assert.True(t, parsedFQLisEnabled)
+	assert.NoError(t, err)
+}
+
+var fqlDisabledConfig string = `{"cassandra-yaml": {
+"key_cache_size_in_mb": 256
+}
+}
+`
+
+func Test_parseFQLFromConfig_fqlDisabled(t *testing.T) {
+	// Test parsing when config exists + fql not set, should return (false, continue()).
+	dc := getCassDc("cassandra")
+	dc.Spec.Config = json.RawMessage(fqlDisabledConfig)
+	assert.NoError(t, dc.ValidateFQLConfig())
+	parsedFQLisEnabled, err := dc.GetFullQueryStatus()
+	assert.False(t, parsedFQLisEnabled)
+	assert.NoError(t, err)
+}
+
+func Test_parseFQLFromConfig_noConfig(t *testing.T) {
+	// Test parsing when DC config key does not exist at all, should return (false, continue()).
+	dc := getCassDc("cassandra")
+	dc.Spec.Config = json.RawMessage("{}")
+	assert.NoError(t, dc.ValidateFQLConfig())
+	parsedFQLisEnabled, err := dc.GetFullQueryStatus()
+	assert.False(t, parsedFQLisEnabled)
+	assert.NoError(t, err)
+}
+
+func Test_parseFQLFromConfig_malformedConfig(t *testing.T) {
+	// Test parsing when dcConfig is malformed, should return (false, error).
+	dc := getCassDc("cassandra")
+	var corruptedCfg []byte
+	for _, b := range json.RawMessage(fqlEnabledConfig) {
+		corruptedCfg = append(corruptedCfg, b<<3) // corrupt the byte array.
+	}
+	dc.Spec.Config = corruptedCfg
+
+	assert.Error(t, dc.ValidateFQLConfig())
+	parsedFQLisEnabled, err := dc.GetFullQueryStatus()
+	assert.False(t, parsedFQLisEnabled)
+	assert.Error(t, err)
+}
+
+func Test_parseFQLFromConfig_3xFQLEnabled(t *testing.T) {
+	// Test parsing when dcConfig asks for FQL on a non-4x server, should return (false, error).
+	dc := getCassDc("cassandra")
+	dc.Spec.Config = json.RawMessage(fqlEnabledConfig)
+	dc.Spec.ServerVersion = "3.11.10"
+	assert.Error(t, dc.ValidateFQLConfig())
+
+	parsedFQLisEnabled, err := dc.GetFullQueryStatus()
+	assert.True(t, parsedFQLisEnabled)
+	assert.NoError(t, err)
+}
+
+func Test_parseFQLFromConfig_DSEFQLEnabled(t *testing.T) {
+	// Test parsing when dcConfig asks for FQL on a non-4x server, should return (false, error).
+	dc := getCassDc("dse")
+	dc.Spec.Config = json.RawMessage(fqlEnabledConfig)
+	assert.Error(t, dc.ValidateFQLConfig())
+
+	dc.Spec.ServerVersion = "4.0.0"
+	assert.Error(t, dc.ValidateFQLConfig())
+	parsedFQLisEnabled, err := dc.GetFullQueryStatus()
+	assert.True(t, parsedFQLisEnabled)
+	assert.NoError(t, err)
 }

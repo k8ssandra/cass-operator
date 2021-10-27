@@ -5,6 +5,12 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 1.8.0
 
+# TODO For daily pushes, create dev channel (k8ssandra bundle, not datastax) - or set these in the
+# .github
+# Or add --package and define k8ssandra/cass-operator and datastax/cass-operator? 
+DEFAULT_CHANNEL ?= "stable" 
+CHANNELS ?= "stable"
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:

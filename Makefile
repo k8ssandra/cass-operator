@@ -219,7 +219,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(OPSDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/manifests | $(OPSDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-	scripts/add-redhat-labels.sh
+	scripts/postprocess-bundle.sh
 	$(OPSDK) bundle validate ./bundle
 
 .PHONY: bundle-build

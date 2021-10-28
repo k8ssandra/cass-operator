@@ -34,7 +34,7 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 			t.Errorf("expected secret in namespace '%s' but was '%s", dc.ObjectMeta.Namespace, secret.ObjectMeta.Namespace)
 		}
 
-		expectedSecretName := fmt.Sprintf("%s-superuser", dc.Spec.ClusterName)
+		expectedSecretName := fmt.Sprintf("%s-superuser", api.CleanupForKubernetes(dc.Spec.ClusterName))
 		if secret.ObjectMeta.Name != expectedSecretName {
 			t.Errorf("expected default secret name '%s' but was '%s'", expectedSecretName, secret.ObjectMeta.Name)
 		}

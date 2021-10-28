@@ -64,7 +64,7 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 				Namespace: secretNamespacedName.Namespace,
 			},
 		}
-		username := dc.Spec.ClusterName + "-superuser"
+		username := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-superuser"
 		password, err := generateUtf8Password()
 		if err != nil {
 			return nil, fmt.Errorf("Failed to generate superuser password: %w", err)

@@ -18,6 +18,19 @@ configMapGenerator:
 # Do NOT uncomment sections with prefix [CERTMANAGER], as OLM does not support cert-manager.
 # These patches remove the unnecessary "cert" volume and its manager container volumeMount.
 patchesJson6902:
+- target:
+    group: operators.coreos.com
+    version: v1alpha1
+    kind: ClusterServiceVersion
+    name: cass-operator.v0.0.0
+  path: patches/spec-descriptors.yaml 
+- target:
+    group: operators.coreos.com
+    version: v1alpha1
+    kind: ClusterServiceVersion
+    name: cass-operator.v0.0.0
+  path: patches/status-descriptors.yaml 
+
 # - target:
 #     group: apps
 #     version: v1

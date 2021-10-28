@@ -22,7 +22,7 @@ spec:
       kind: CassandraDatacenter
       name: cassandradatacenters.cassandra.datastax.com
       version: v1beta1
-  description: ${CSV_DESCRIPTION}
+  description: ../../docs/developer/csv-description.md
   displayName: DataStax Kubernetes Operator for Apache Cassandra
   icon:
   - base64data: |

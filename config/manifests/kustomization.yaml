@@ -6,6 +6,14 @@ resources:
 - ../samples
 - ../scorecard
 
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+- files:
+  - ../../docs/developer/csv-description.md
+  name: field-config
+
 # [WEBHOOK] To enable webhooks, uncomment all the sections with [WEBHOOK] prefix.
 # Do NOT uncomment sections with prefix [CERTMANAGER], as OLM does not support cert-manager.
 # These patches remove the unnecessary "cert" volume and its manager container volumeMount.
@@ -25,3 +33,6 @@ patchesJson6902:
 #     # Update the indices in this path if adding or removing volumes in the manager's Deployment.
 #     - op: remove
 #       path: /spec/template/spec/volumes/0
+
+replacements:
+  - path: patches/description-replacement.yaml

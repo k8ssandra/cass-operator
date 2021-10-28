@@ -1,0 +1,10 @@
+source:
+  kind: ConfigMap
+  name: field-config
+  fieldPath: data.csv-description\.md
+targets:
+  - select:
+      kind: ClusterServiceVersion
+      name: cass-operator.v0.0.0
+    fieldPaths:
+      - spec.description

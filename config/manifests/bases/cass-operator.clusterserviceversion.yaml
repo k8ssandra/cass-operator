@@ -6,9 +6,6 @@ metadata:
     capabilities: Auto Pilot
     categories: Database,Big Data,OpenShift Optional
     certified: "true"
-    # TODO Create a plugin to add the containerImage and createdAt
-    #containerImage: registry.connect.redhat.com/datastax/cass-operator:1.7.1-ubi7
-    #createdAt: "2021-05-27"
     description: |
       Simple provisioning, turn-key operations, and automated remediation of Apache Cassandra clusters
     repository: https://github.com/k8ssandra/cass-operator
@@ -25,8 +22,7 @@ spec:
       kind: CassandraDatacenter
       name: cassandradatacenters.cassandra.datastax.com
       version: v1beta1
-  # TODO Add patch / plugin to add description field
-  description: '-'
+  description: ${CSV_DESCRIPTION}
   displayName: DataStax Kubernetes Operator for Apache Cassandra
   icon:
   - base64data: |
@@ -161,10 +157,10 @@ spec:
     url: https://github.com/k8ssandra/cass-operator/tree/master/docs/user
   - name: Documentation [2]
     url: https://docs.datastax.com/en/cass-operator/doc/cass-operator/cassOperatorTOC.html
-  maturity: stable
   maintainers:
   - email: cass-operator@datastax.com
     name: DataStax Operator Team
+  maturity: stable
   provider:
     name: DataStax
   version: 0.0.0

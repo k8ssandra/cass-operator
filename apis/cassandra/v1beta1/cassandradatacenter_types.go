@@ -509,7 +509,7 @@ func (dc *CassandraDatacenter) GetClusterLabels() map[string]string {
 // apimachinery validation does not expose this, copied here
 const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 
-func cleanupForKubernetes(input string) string {
+func CleanupForKubernetes(input string) string {
 	if len(validation.IsDNS1035Label(input)) > 0 {
 		r := regexp.MustCompile(dns1035LabelFmt)
 
@@ -524,23 +524,23 @@ func cleanupForKubernetes(input string) string {
 }
 
 func (dc *CassandraDatacenter) GetSeedServiceName() string {
-	return cleanupForKubernetes(dc.Spec.ClusterName) + "-seed-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-seed-service"
 }
 
 func (dc *CassandraDatacenter) GetAdditionalSeedsServiceName() string {
-	return cleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-additional-seed-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-additional-seed-service"
 }
 
 func (dc *CassandraDatacenter) GetAllPodsServiceName() string {
-	return cleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-all-pods-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-all-pods-service"
 }
 
 func (dc *CassandraDatacenter) GetDatacenterServiceName() string {
-	return cleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-service"
 }
 
 func (dc *CassandraDatacenter) GetNodePortServiceName() string {
-	return cleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-node-port-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-node-port-service"
 }
 
 func (dc *CassandraDatacenter) ShouldGenerateSuperuserSecret() bool {
@@ -548,7 +548,7 @@ func (dc *CassandraDatacenter) ShouldGenerateSuperuserSecret() bool {
 }
 
 func (dc *CassandraDatacenter) GetSuperuserSecretNamespacedName() types.NamespacedName {
-	name := dc.Spec.ClusterName + "-superuser"
+	name := CleanupForKubernetes(dc.Spec.ClusterName) + "-superuser"
 	namespace := dc.ObjectMeta.Namespace
 	if len(dc.Spec.SuperuserSecretName) > 0 {
 		name = dc.Spec.SuperuserSecretName

@@ -125,7 +125,7 @@ func getConfigFromConfigSecret(dc *api.CassandraDatacenter, secret *corev1.Secre
 
 // getDatacenterConfigSecretName The format is clusterName-dcName-config
 func getDatacenterConfigSecretName(dc *api.CassandraDatacenter) string {
-	return dc.Spec.ClusterName + "-" + dc.Name + "-config"
+	return api.CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-config"
 }
 
 // getDatacenterConfigSecret Fetches the secret from the api server or creates a new secret

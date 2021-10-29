@@ -175,7 +175,6 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 			serverConfigVol, serverLogsVol, tmpVol, mcacConfigVol, cassandraHomeVol, serverConfigInitVol, PvcName,
 			"cassandra-commitlogs")
 
-
 		assert.Equal(t, SystemLoggerContainerName, got.Spec.Template.Spec.Containers[1].Name)
 		assertVolumeMountsMatchByName(t, got.Spec.Template.Spec.Containers[1].VolumeMounts, serverLogsVol,
 			"cassandra-commitlogs")

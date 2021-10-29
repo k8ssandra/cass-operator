@@ -819,7 +819,6 @@ func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *te
 	assertVolumeMountsMatchByName(t, cassandraContainer.VolumeMounts, serverConfigInitVol, serverLogsVol,
 		encyptionCredsVol, PvcName, tmpVol, cassandraHomeVol, mcacConfigVol, serverConfigVol)
 
-
 	systemLoggerContainer := findContainer(containers, SystemLoggerContainerName)
 	assert.NotNil(t, systemLoggerContainer)
 

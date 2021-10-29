@@ -25,20 +25,20 @@ import (
 
 const (
 	DefaultTerminationGracePeriodSeconds = 120
-	baseConfigInitContainerName           = "base-config-init"
-	ServerConfigContainerName             = "server-config-init"
+	baseConfigInitContainerName          = "base-config-init"
+	ServerConfigContainerName            = "server-config-init"
 	CassandraContainerName               = "cassandra"
 	PvcName                              = "server-data"
 	SystemLoggerContainerName            = "server-system-logger"
 	cassandraUid                         = int64(999)
 	cassandraGid                         = int64(999)
-	serverConfigInitVol                   = "server-config"
-	serverConfigVol                       = "config"
+	serverConfigInitVol                  = "server-config"
+	serverConfigVol                      = "config"
 	serverLogsVol                        = "server-logs"
 	encyptionCredsVol                    = "encryption-cred-storage"
 	tmpVol                               = "tmp"
 	dseBinVol                            = "dse-bin"
-	mcacConfigVol                         = "mcac-config"
+	mcacConfigVol                        = "mcac-config"
 	cassandraHomeVol                     = "cassandra-home"
 )
 

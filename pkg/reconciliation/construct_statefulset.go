@@ -49,20 +49,6 @@ func newNamespacedNameForStatefulSet(
 	}
 }
 
-// Check if we need to define a SecurityContext.
-// If the user defines the DockerImageRunsAsCassandra field, we trust that.
-// Otherwise if ServerType is "dse", the answer is true.
-// Otherwise we use the logic in CalculateDockerImageRunsAsCassandra
-// to calculate a reasonable answer.
-func shouldDefineSecurityContext(dc *api.CassandraDatacenter) bool {
-	// The override field always wins
-	if dc.Spec.DockerImageRunsAsCassandra != nil {
-		return *dc.Spec.DockerImageRunsAsCassandra
-	}
-
-	return true
-}
-
 func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[string]string, error) {
 	var nodeAffinityLabels map[string]string
 	var log = logf.Log.WithName("construct_statefulset")

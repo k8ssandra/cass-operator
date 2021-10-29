@@ -81,7 +81,7 @@ var _ = Describe(testName, func() {
 
 			step = "checking cassandra.yaml"
 			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", "/etc/cassandra/cassandra.yaml")
-			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 25000", 120)
+			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 25000", 180)
 
 			step = "use config secret again"
 			json = `{"spec": {"config": null, "configSecret": "test-config"}}`
@@ -93,7 +93,7 @@ var _ = Describe(testName, func() {
 
 			step = "checking cassandra.yaml"
 			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", "/etc/cassandra/cassandra.yaml")
-			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 10000", 60)
+			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 10000", 180)
 		})
 	})
 })

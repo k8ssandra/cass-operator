@@ -10,8 +10,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
-* [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
-* [ENHANCEMENT] #175 Add FQL reconciliation via parseFQLFromConfig and SetFullQueryLogging called from ReconcileAllRacks. CallIsFullQueryLogEnabledEndpoint and CallSetFullQueryLog functions to httphelper.
+* [CHANGE] [#202](https://github.com/k8ssandra/cass-operator/issues/202) Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
+* [ENHANCEMENT] [#175](https://github.com/k8ssandra/cass-operator/issues/175) Add FQL reconciliation via parseFQLFromConfig and SetFullQueryLogging called from ReconcileAllRacks. CallIsFullQueryLogEnabledEndpoint and CallSetFullQueryLog functions to httphelper.
+* [ENHANCEMENT] [#218](https://github.com/k8ssandra/cass-operator/pull/218) Make root file system read-only for all containers. Configure all containers to run with non-root, non-privileged user.
 
 ## v1.8.0
 * [CHANGE] #178 If clusterName includes characters not allowed in the serviceName, strip those chars from service name.

@@ -10,3 +10,10 @@ EOF
 
 # This file is extra from creation process on config/manifests, should not be in the bundle itself
 rm -f bundle/field-config_v1_configmap.yaml
+
+createdAt=$(date +%Y-%m-%d)
+# Use yq to set that date to the createdAt field
+yq eval '.metadata.annotations.createdAt = env(createdAt)' -i bundle/manifests/cass-operator.clusterserviceversion.yaml 
+
+# Use the correct containerImage from the deployment
+yq eval '.metadata.annotations.containerImage = .spec.install.spec.deployments[0].spec.template.spec.containers[0].image' -i bundle/manifests/cass-operator.clusterserviceversion.yaml

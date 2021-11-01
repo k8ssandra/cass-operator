@@ -23,14 +23,13 @@ patchesJson6902:
     version: v1alpha1
     kind: ClusterServiceVersion
     name: cass-operator.v0.0.0
-  path: patches/spec-descriptors.yaml 
+  path: patches/spec-descriptors.yaml
 - target:
     group: operators.coreos.com
     version: v1alpha1
     kind: ClusterServiceVersion
     name: cass-operator.v0.0.0
-  path: patches/status-descriptors.yaml 
-
+  path: patches/status-descriptors.yaml
 # - target:
 #     group: apps
 #     version: v1

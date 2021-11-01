@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 1.8.0
+VERSION ?= 1.9.0
 
 # TODO For daily pushes, create dev channel (k8ssandra bundle, not datastax) - or set these in the
 # .github

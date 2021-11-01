@@ -3,7 +3,12 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
+
 VERSION ?= 1.9.0
+
+COMMIT := $(shell git rev-parse --short HEAD)
+DATE := $(shell date +%Y%m%d)
+VERSION := $(VERSION)-dev.$(COMMIT)-$(DATE)
 
 # TODO For daily pushes, create dev channel (k8ssandra bundle, not datastax) - or set these in the
 # .github
@@ -35,7 +40,9 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # cassandra.datastax.com/cass-oper-bundle:$VERSION and cassandra.datastax.com/cass-oper-catalog:$VERSION.
-IMAGE_TAG_BASE ?= k8ssandra/cass-operator
+
+ORG ?= k8ssandra
+IMAGE_TAG_BASE ?= $(ORG)/cass-operator
 
 M_INTEG_DIR ?= all
 
@@ -44,7 +51,8 @@ M_INTEG_DIR ?= all
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # Image URL to use all building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):latest
+IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
+IMG_LATEST ?= $(IMAGE_TAG_BASE):latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 #CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 CRD_OPTIONS ?= "crd"
@@ -122,16 +130,18 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 docker-build: ## Build docker image with the manager.
-	docker buildx build -t ${IMG} . --load
+	docker buildx build -t ${IMG} -t ${IMG_LATEST} . --load
 
 docker-kind: docker-build ## Build docker image and load to kind cluster
 	kind load docker-image ${IMG}
+	kind load docker-image ${IMG_LATEST}
 
 docker-push: ## Build and push docker image with the manager.
 	docker push ${IMG}
+	docker push ${IMG_LATEST}
 
 docker-logger-build: ## Build system-logger image.
-	docker buildx build -t ${LOG_IMG} -f operator/docker/system-logger/Dockerfile . --load
+	docker buildx build -t ${LOG_IMG} -f logger.Dockerfile . --load
 
 docker-logger-push: ## Push system-logger-image
 	docker push ${LOG_IMG}

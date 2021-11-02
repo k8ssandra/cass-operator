@@ -123,7 +123,17 @@ func ValidateSingleDatacenter(dc CassandraDatacenter) error {
 		return err
 	}
 
-	return ValidateFQLConfig(dc)
+	if err := ValidateFQLConfig(dc); err != nil {
+		return err
+	}
+	if !isDse {
+		err := ValidateConfig(&dc)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ValidateDatacenterFieldChanges checks that no values are improperly changing while updating
@@ -237,6 +247,38 @@ func (dc *CassandraDatacenter) ValidateDelete() error {
 var (
 	ErrFQLNotSupported = fmt.Errorf("full query logging is only supported on OSS Cassandra 4.0+")
 )
+
+func ValidateConfig(dc *CassandraDatacenter) error {
+	// TODO Cleanup to more common processing after ModelValues is moved to apis
+	if dc.Spec.Config != nil {
+		var dcConfig map[string]interface{}
+		if err := json.Unmarshal(dc.Spec.Config, &dcConfig); err != nil {
+			return err
+		}
+		casYaml, found := dcConfig["cassandra-yaml"]
+		if !found {
+			return nil
+		}
+
+		casYamlMap, ok := casYaml.(map[string]interface{})
+		if !ok {
+			err := fmt.Errorf("failed to parse cassandra-yaml")
+			return err
+		}
+
+		configValues, err := GetCassandraConfigValues(dc.Spec.ServerVersion)
+		if err != nil {
+			return err
+		}
+		for k := range casYamlMap {
+			if !configValues.HasProperty(k) {
+				// We should probably add an event to tell the user that they're using old values
+				return fmt.Errorf("property %s is not valid for serverVersion %s", k, dc.Spec.ServerVersion)
+			}
+		}
+	}
+	return nil
+}
 
 func ValidateFQLConfig(dc CassandraDatacenter) error {
 	if dc.Spec.Config != nil {

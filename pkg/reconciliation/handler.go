@@ -204,7 +204,7 @@ func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
 	errs = append(errs, rc.validateCassandraUserSecrets()...)
 
 	// Validate FQL config
-	errs = append(errs, dc.ValidateFQLConfig())
+	errs = append(errs, api.ValidateFQLConfig(*dc))
 
 	// Validate Management API config
 	errs = append(errs, httphelper.ValidateManagementApiConfig(dc, rc.Client, rc.Ctx)...)

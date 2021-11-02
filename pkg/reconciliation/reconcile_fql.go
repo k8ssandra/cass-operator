@@ -11,7 +11,7 @@ import (
 // It calls the NodeMgmtClient which calls the Cassandra management API and returns a result.ReconcileResult.
 func (rc *ReconciliationContext) CheckFullQueryLogging() result.ReconcileResult {
 	dc := rc.GetDatacenter()
-	enableFQL, err := dc.GetFullQueryStatus()
+	enableFQL, err := dc.FullQueryEnabled()
 	if err != nil {
 		return result.Error(err)
 	}

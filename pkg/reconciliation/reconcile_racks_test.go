@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,7 +50,8 @@ func Test_validateLabelsForCluster(t *testing.T) {
 							Name: "exampleDC",
 						},
 						Spec: api.CassandraDatacenterSpec{
-							ClusterName: "exampleCluster",
+							ClusterName:   "exampleCluster",
+							ServerVersion: "4.0.1",
 						},
 					},
 				},
@@ -60,6 +60,9 @@ func Test_validateLabelsForCluster(t *testing.T) {
 			wantLabels: map[string]string{
 				api.ClusterLabel:        "exampleCluster",
 				oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+				oplabels.NameLabel:      oplabels.NameLabelValue,
+				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
+				oplabels.VersionLabel:   "4.0.1",
 			},
 		}, {
 			name: "Nil labels",
@@ -71,7 +74,8 @@ func Test_validateLabelsForCluster(t *testing.T) {
 							Name: "exampleDC",
 						},
 						Spec: api.CassandraDatacenterSpec{
-							ClusterName: "exampleCluster",
+							ClusterName:   "exampleCluster",
+							ServerVersion: "4.0.1",
 						},
 					},
 				},
@@ -80,6 +84,9 @@ func Test_validateLabelsForCluster(t *testing.T) {
 			wantLabels: map[string]string{
 				api.ClusterLabel:        "exampleCluster",
 				oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+				oplabels.NameLabel:      oplabels.NameLabelValue,
+				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
+				oplabels.VersionLabel:   "4.0.1",
 			},
 		},
 		{
@@ -88,6 +95,9 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				resourceLabels: map[string]string{
 					api.ClusterLabel:        "exampleCluster",
 					oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+					oplabels.NameLabel:      oplabels.NameLabelValue,
+					oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
+					oplabels.VersionLabel:   "4.0.1",
 				},
 				rc: &ReconciliationContext{
 					Datacenter: &api.CassandraDatacenter{
@@ -95,7 +105,8 @@ func Test_validateLabelsForCluster(t *testing.T) {
 							Name: "exampleDC",
 						},
 						Spec: api.CassandraDatacenterSpec{
-							ClusterName: "exampleCluster",
+							ClusterName:   "exampleCluster",
+							ServerVersion: "4.0.1",
 						},
 					},
 				},
@@ -104,6 +115,9 @@ func Test_validateLabelsForCluster(t *testing.T) {
 			wantLabels: map[string]string{
 				api.ClusterLabel:        "exampleCluster",
 				oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+				oplabels.NameLabel:      oplabels.NameLabelValue,
+				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
+				oplabels.VersionLabel:   "4.0.1",
 			},
 		}, {
 			name: "DC Label, No Cluster Label",
@@ -117,7 +131,8 @@ func Test_validateLabelsForCluster(t *testing.T) {
 							Name: "exampleDC",
 						},
 						Spec: api.CassandraDatacenterSpec{
-							ClusterName: "exampleCluster",
+							ClusterName:   "exampleCluster",
+							ServerVersion: "6.8.13",
 						},
 					},
 				},
@@ -127,6 +142,9 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				api.DatacenterLabel:     "exampleDC",
 				api.ClusterLabel:        "exampleCluster",
 				oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+				oplabels.NameLabel:      oplabels.NameLabelValue,
+				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
+				oplabels.VersionLabel:   "6.8.13",
 			},
 		},
 	}
@@ -358,11 +376,11 @@ func TestReconcilePods_WithVolumes(t *testing.T) {
 			Name:      "cassandradatacenter-example-cluster-cassandradatacenter-example-default-sts-0",
 			Namespace: statefulSet.Namespace,
 		},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{{
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{{
 				Name: "server-data",
-				VolumeSource: v1.VolumeSource{
-					PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: "cassandra-data-example-cluster1-example-cassandradatacenter1-rack0-sts-0",
 					},
 				},
@@ -1194,7 +1212,8 @@ func Test_shouldUpdateLabelsForRackResource(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: clusterName,
+			ClusterName:   clusterName,
+			ServerVersion: "4.0.1",
 		},
 	}
 
@@ -1203,6 +1222,9 @@ func Test_shouldUpdateLabelsForRackResource(t *testing.T) {
 		api.DatacenterLabel:     dcName,
 		api.RackLabel:           rackName,
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, clusterName),
+		oplabels.VersionLabel:   "4.0.1",
 	}
 
 	type args struct {
@@ -1284,6 +1306,9 @@ func Test_shouldUpdateLabelsForRackResource(t *testing.T) {
 					api.DatacenterLabel:     dcName,
 					api.RackLabel:           rackName,
 					oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+					oplabels.NameLabel:      oplabels.NameLabelValue,
+					oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, clusterName),
+					oplabels.VersionLabel:   "4.0.1",
 				},
 			},
 			want: result{
@@ -1298,6 +1323,9 @@ func Test_shouldUpdateLabelsForRackResource(t *testing.T) {
 					api.DatacenterLabel:     dcName,
 					api.RackLabel:           rackName,
 					oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+					oplabels.NameLabel:      oplabels.NameLabelValue,
+					oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, clusterName),
+					oplabels.VersionLabel:   "4.0.1",
 					"foo":                   "bar",
 				},
 			},

@@ -1617,7 +1617,7 @@ func mergeInLabelsIfDifferent(existingLabels, newLabels map[string]string) (bool
 // resource. It will return the updated map and a boolean denoting whether the resource needs to be updated with the new labels.
 func shouldUpdateLabelsForClusterResource(resourceLabels map[string]string, dc *api.CassandraDatacenter) (bool, map[string]string) {
 	desired := dc.GetClusterLabels()
-	oplabels.AddManagedByLabel(desired)
+	oplabels.AddKubernetesLabels(desired, dc)
 	return mergeInLabelsIfDifferent(resourceLabels, desired)
 }
 
@@ -1625,7 +1625,7 @@ func shouldUpdateLabelsForClusterResource(resourceLabels map[string]string, dc *
 // resource. It will return the updated map and a boolean denoting whether the resource needs to be updated with the new labels.
 func shouldUpdateLabelsForRackResource(resourceLabels map[string]string, dc *api.CassandraDatacenter, rackName string) (bool, map[string]string) {
 	desired := dc.GetRackLabels(rackName)
-	oplabels.AddManagedByLabel(desired)
+	oplabels.AddKubernetesLabels(desired, dc)
 	return mergeInLabelsIfDifferent(resourceLabels, desired)
 }
 
@@ -1633,7 +1633,7 @@ func shouldUpdateLabelsForRackResource(resourceLabels map[string]string, dc *api
 // resource. It will return the updated map and a boolean denoting whether the resource needs to be updated with the new labels.
 func shouldUpdateLabelsForDatacenterResource(resourceLabels map[string]string, dc *api.CassandraDatacenter) (bool, map[string]string) {
 	desired := dc.GetDatacenterLabels()
-	oplabels.AddManagedByLabel(desired)
+	oplabels.AddKubernetesLabels(desired, dc)
 	return mergeInLabelsIfDifferent(resourceLabels, desired)
 }
 

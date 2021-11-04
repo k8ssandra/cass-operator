@@ -254,6 +254,11 @@ func PatchJson(resource string, data string) KCmd {
 	return KCmd{Command: "patch", Args: args}
 }
 
+func Patch(resource string, data string) KCmd {
+	args := []string{resource, "-p", data}
+	return KCmd{Command: "patch", Args: args}
+}
+
 func erasePreviousLine() {
 	//cursor up one line
 	fmt.Print("\033[A")

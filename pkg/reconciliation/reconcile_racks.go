@@ -220,6 +220,12 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			desiredSts.Labels = utils.MergeMap(map[string]string{}, statefulSet.Labels, desiredSts.Labels)
 			desiredSts.Annotations = utils.MergeMap(map[string]string{}, statefulSet.Annotations, desiredSts.Annotations)
 
+			// copy the stuff that can't be updated
+			desiredSts.Spec.VolumeClaimTemplates = statefulSet.Spec.VolumeClaimTemplates
+			// selector must match podTemplate.Labels, those can't be updated either
+			desiredSts.Spec.Selector = statefulSet.Spec.Selector
+			desiredSts.Spec.Template.Labels = statefulSet.Spec.Template.Labels
+
 			if dc.Spec.CanaryUpgrade {
 				var partition int32
 				if dc.Spec.CanaryUpgradeCount == 0 || dc.Spec.CanaryUpgradeCount > int32(rc.desiredRackInformation[idx].NodeCount) {

@@ -264,9 +264,10 @@ func TestCheckFullQueryNotSupportedTriedToUse(t *testing.T) {
 		Protocol: "http",
 	}
 
+	// The error is thrown in handler, but this test bypasses the validation - that's why we take Continue
+	// as correct result.
 	r := rc.CheckFullQueryLogging()
-	_, err := r.Output()
-	if err == nil {
-		t.Fatalf("expected result of result.Error() but got %s", r)
+	if r != result.Continue() {
+		t.Fatalf("expected result of result.Continue() but got %s", r)
 	}
 }

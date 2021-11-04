@@ -365,6 +365,167 @@ func (client *NodeMgmtClient) ListKeyspaces(pod *corev1.Pod) ([]string, error) {
 	return client.GetKeyspace(pod, "")
 }
 
+// GetKeyspaceReplication calls the management API to retrieve the replication settings of the
+// given keyspace.
+func (client *NodeMgmtClient) GetKeyspaceReplication(pod *corev1.Pod, keyspaceName string) (map[string]string, error) {
+	if keyspaceName == "" {
+		return nil, fmt.Errorf("keyspace name cannot be empty")
+	}
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+	endpoint := "/api/v0/ops/keyspace/replication?keyspaceName=" + keyspaceName
+	request := nodeMgmtRequest{
+		endpoint: endpoint,
+		host:     podHost,
+		method:   http.MethodGet,
+		timeout:  time.Second * 20,
+	}
+	body, err := callNodeMgmtEndpoint(client, request, "application/json")
+	if err != nil {
+		return nil, err
+	}
+	var replication map[string]string
+	if err := json.Unmarshal(body, &replication); err != nil {
+		return nil, err
+	}
+	return replication, nil
+}
+
+// ListTables calls the management API and returns the table names in the given keyspace
+func (client *NodeMgmtClient) ListTables(pod *corev1.Pod, keyspaceName string) ([]string, error) {
+	if keyspaceName == "" {
+		return nil, fmt.Errorf("keyspace name cannot be empty")
+	}
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+	endpoint := "/api/v0/ops/tables?keyspaceName=" + keyspaceName
+	request := nodeMgmtRequest{
+		endpoint: endpoint,
+		host:     podHost,
+		method:   http.MethodGet,
+		timeout:  time.Second * 20,
+	}
+	body, err := callNodeMgmtEndpoint(client, request, "application/json")
+	if err != nil {
+		return nil, err
+	}
+	var tables []string
+	if err := json.Unmarshal(body, &tables); err != nil {
+		return nil, err
+	}
+	return tables, nil
+}
+
+type TableDefinition struct {
+	KeyspaceName string                 `json:"keyspace_name"`
+	TableName    string                 `json:"table_name"`
+	Columns      []*ColumnDefinition    `json:"columns"`
+	Options      map[string]interface{} `json:"options,omitempty"`
+}
+
+func NewTableDefinition(keyspaceName string, tableName string, columns ...*ColumnDefinition) *TableDefinition {
+	return &TableDefinition{
+		KeyspaceName: keyspaceName,
+		TableName:    tableName,
+		Columns:      columns,
+	}
+}
+
+type ColumnKind string
+
+const (
+	ColumnKindPartitionKey     ColumnKind = "PARTITION_KEY"
+	ColumnKindClusteringColumn ColumnKind = "CLUSTERING_COLUMN"
+	ColumnKindRegular          ColumnKind = "REGULAR"
+	ColumnKindStatic           ColumnKind = "STATIC"
+)
+
+type ClusteringOrder string
+
+const (
+	ClusteringOrderAsc  ClusteringOrder = "ASC"
+	ClusteringOrderDesc ClusteringOrder = "DESC"
+)
+
+type ColumnDefinition struct {
+	Name     string          `json:"name"`
+	Type     string          `json:"type"`
+	Kind     ColumnKind      `json:"kind"`
+	Position int             `json:"position"`
+	Order    ClusteringOrder `json:"order,omitempty"`
+}
+
+func NewPartitionKeyColumn(name string, dataType string, position int) *ColumnDefinition {
+	return &ColumnDefinition{
+		Name:     name,
+		Type:     dataType,
+		Kind:     ColumnKindPartitionKey,
+		Position: position,
+	}
+}
+
+func NewClusteringColumn(name string, dataType string, position int, order ClusteringOrder) *ColumnDefinition {
+	return &ColumnDefinition{
+		Name:     name,
+		Type:     dataType,
+		Kind:     ColumnKindClusteringColumn,
+		Position: position,
+		Order:    order,
+	}
+}
+
+func NewRegularColumn(name string, dataType string) *ColumnDefinition {
+	return &ColumnDefinition{
+		Name: name,
+		Type: dataType,
+		Kind: ColumnKindRegular,
+	}
+}
+
+func NewStaticColumn(name string, dataType string) *ColumnDefinition {
+	return &ColumnDefinition{
+		Name: name,
+		Type: dataType,
+		Kind: ColumnKindStatic,
+	}
+}
+
+// CreateTable calls the management API to create a new table.
+func (client *NodeMgmtClient) CreateTable(pod *corev1.Pod, table *TableDefinition) error {
+	if table == nil {
+		return fmt.Errorf("table definition cannot be nil")
+	} else if table.KeyspaceName == "" {
+		return fmt.Errorf("keyspace name cannot be empty")
+	} else if table.TableName == "" {
+		return fmt.Errorf("table name cannot be empty")
+	} else if len(table.Columns) == 0 {
+		return fmt.Errorf("columns cannot be empty")
+	}
+	// The rest will be validated server-side
+	body, err := json.Marshal(table)
+	if err != nil {
+		return err
+	}
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+	endpoint := "/api/v0/ops/tables/create"
+	request := nodeMgmtRequest{
+		endpoint: endpoint,
+		host:     podHost,
+		method:   http.MethodPost,
+		timeout:  time.Second * 40,
+		body:     body,
+	}
+	_, err = callNodeMgmtEndpoint(client, request, "application/json")
+	return err
+}
+
 func (client *NodeMgmtClient) CallLifecycleStartEndpointWithReplaceIp(pod *corev1.Pod, replaceIp string) error {
 	// talk to the pod via IP because we are dialing up a pod that isn't ready,
 	// so it won't be reachable via the service and pod DNS

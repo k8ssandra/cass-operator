@@ -68,10 +68,11 @@ func (rc *ReconciliationContext) CheckConfigSecret() result.ReconcileResult {
 				rc.ReqLogger.Error(err, "failed to update datacenter config secret", "ConfigSecret", dcConfigSecret.Name)
 				return result.Error(err)
 			}
-		}
-		if err := rc.Client.Create(rc.Ctx, dcConfigSecret); err != nil {
-			rc.ReqLogger.Error(err, "failed to create datacenter config secret", "ConfigSecret", dcConfigSecret.Name)
-			return result.Error(err)
+		} else {
+			if err := rc.Client.Create(rc.Ctx, dcConfigSecret); err != nil {
+				rc.ReqLogger.Error(err, "failed to create datacenter config secret", "ConfigSecret", dcConfigSecret.Name)
+				return result.Error(err)
+			}
 		}
 	}
 

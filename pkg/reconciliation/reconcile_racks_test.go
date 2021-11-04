@@ -272,12 +272,19 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 		t.Fatalf("failed to add rack to cassandradatacenter: %s", err)
 	}
 
+	result = rc.CheckRackPodTemplate()
+	_, err := result.Output()
+
+	assert.True(t, result.Completed())
+	assert.Nil(t, err)
+	previousLabels := rc.statefulSets[0].Spec.Template.Labels
+
 	rc.Datacenter.Spec.CanaryUpgrade = true
 	rc.Datacenter.Spec.CanaryUpgradeCount = 1
 	rc.Datacenter.Spec.ServerVersion = "6.8.3"
 
 	result = rc.CheckRackPodTemplate()
-	_, err := result.Output()
+	_, err = result.Output()
 
 	assert.True(t, result.Completed())
 	assert.Nil(t, err)
@@ -300,6 +307,8 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 	rc.statefulSets[0].Status.UpdatedReplicas = 1
 
 	result = rc.CheckRackPodTemplate()
+
+	assert.EqualValues(t, previousLabels, rc.statefulSets[0].Spec.Template.Labels)
 
 	assert.True(t, result.Completed())
 }

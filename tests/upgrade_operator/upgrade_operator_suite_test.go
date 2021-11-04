@@ -11,19 +11,20 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
 	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
 )
 
 var (
-	testName         = "Upgrade Operator"
-	namespace        = "test-upgrade-operator"
-	oldOperatorChart = "../testdata/cass-operator-1.1.0-chart"
-	dcName           = "dc1"
-	dcYaml           = "../testdata/operator-1.1.0-oss-dc.yaml"
-	podName          = fmt.Sprintf("cluster1-%s-r1-sts-0", dcName)
-	podNameJson      = "jsonpath={.items[*].metadata.name}"
-	ns               = ginkgo_util.NewWrapper(testName, namespace)
+	testName        = "Upgrade Operator"
+	namespace       = "test-upgrade-operator"
+	oldOperatorYaml = "../testdata/cass-operator-1.7.1-manifests.yaml"
+	dcName          = "dc1"
+	dcYaml          = "../testdata/operator-1.7.1-oss-dc.yaml"
+	dcResource      = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel         = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns              = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -38,21 +39,43 @@ func TestLifecycle(t *testing.T) {
 	RunSpecs(t, testName)
 }
 
+/*
+	Install operator 1.7.1
+		- Create CassDc with older 3.11.10 image and let it start correctly
+	Upgrade to current (remember to patch the CRD)
+		- Update the Cassandra to 3.11.11
+*/
+
+// InstallOldOperator installs the oldest supported upgrade path (this is the first k8ssandra/cass-operator release)
 func InstallOldOperator() {
-	step := "install old Cass Operator v1.1.0"
+	step := "install cass-operator 1.7.1"
 	By(step)
-	panic("NotImplemented")
-	// err := helm_util.Install(oldOperatorChart, "cass-operator", ns.Namespace, map[string]string{})
-	// mageutil.PanicOnError(err)
+
+	// kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.1/docs/user/cass-operator-manifests.yaml
+	k := kubectl.ApplyFiles(oldOperatorYaml)
+	ns.ExecAndLog(step, k)
 }
 
 func UpgradeOperator() {
 	step := "upgrade Cass Operator"
 	By(step)
-	panic("NotImplemented")
-	// var overrides = map[string]string{"image": cfgutil.GetOperatorImage()}
-	// err := helm_util.Upgrade("../../charts/cass-operator-chart", "cass-operator", ns.Namespace, overrides)
-	// mageutil.PanicOnError(err)
+
+	// Update steps needed for 1.7.1
+	// kubectl -n cass-operator delete deployment.apps/cass-operator
+	// kubectl -n cass-operator delete service/cassandradatacenter-webhook-service
+	// kubectl patch crd/cassandradatacenters.cassandra.datastax.com -p '{"spec":{"preserveUnknownFields":false}}'
+	k := kubectl.Delete("deployment.apps/cass-operator")
+	ns.ExecAndLog(step, k)
+
+	k = kubectl.Delete("service/cassandradatacenter-webhook-service")
+	ns.ExecAndLog(step, k)
+
+	k = kubectl.Patch("crd/cassandradatacenters.cassandra.datastax.com", `{"spec":{"preserveUnknownFields":false}}`)
+	ns.ExecAndLog(step, k)
+
+	// Then install as usual.
+	err := kustomize.Deploy(namespace)
+	Expect(err).ToNot(HaveOccurred())
 }
 
 var _ = Describe(testName, func() {
@@ -72,20 +95,14 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReady(dcName)
 
-			// sanity check
-			step = "sanity check that we have resources with defunct managed-by label value"
-			k = kubectl.Get("pods").WithFlag("selector", "app.kubernetes.io/managed-by=cassandra-operator")
-			output := ns.OutputAndLog(step, k)
-			Expect(output).ToNot(Equal(""), "Expected some resources to have managed-by value of 'cassandra-operator'")
-
-			step = "get name of 1.1.0 operator pod"
+			step = "get name of 1.7.1 operator pod"
 			json := "jsonpath={.items[].metadata.name}"
 			k = kubectl.Get("pods").WithFlag("selector", "name=cass-operator").FormatOutput(json)
 			oldOperatorName := ns.OutputAndLog(step, k)
 
 			UpgradeOperator()
 
-			step = "wait for 1.1.0 operator pod to be removed"
+			step = "wait for 1.7.1 operator pod to be removed"
 			k = kubectl.Get("pods").WithFlag("field-selector", fmt.Sprintf("metadata.name=%s", oldOperatorName))
 			ns.WaitForOutputAndLog(step, k, "", 60)
 
@@ -95,22 +112,44 @@ var _ = Describe(testName, func() {
 			time.Sleep(1 * time.Minute)
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 800, 60)
+			ns.ExpectDoneReconciling(dcName)
 
-			// check no longer using old managed-by value
-			step = "ensure no resources using defunct managed-by value after operator upgrade"
-			k = kubectl.Get("all,service").
-				WithFlag("selector", "app.kubernetes.io/managed-by=cassandra-operator").
-				FormatOutput(podNameJson)
-			output = ns.OutputAndLog(step, k)
-			Expect(output).To(Equal(""), "Expected no resources to have defunct managed-by value of 'cassandra-operator'")
+			// Update Cassandra version to ensure we can still do changes
+			step = "perform canary upgrade"
+			json = "{\"spec\": {\"serverVersion\": \"3.11.11\"}}"
+			k = kubectl.PatchMerge(dcResource, json)
+			ns.ExecAndLog(step, k)
 
-			// check using new managed-by value
-			step = "ensure resources using managed-by value of 'cass-operator'"
-			k = kubectl.Get("pods").
-				WithFlag("selector", "app.kubernetes.io/managed-by=cass-operator").
-				FormatOutput(podNameJson)
-			output = ns.OutputAndLog(step, k)
-			Expect(output).To(Equal(podName), "Expected resources to have managed-by value of 'cass-operator'")
+			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
+			ns.WaitForDatacenterReadyPodCount(dcName, 1)
+			ns.ExpectDoneReconciling(dcName)
+
+			// Verify delete still works correctly and that we won't leave any resources behind
+			step = "deleting the dc"
+			k = kubectl.DeleteFromFiles(dcYaml)
+			ns.ExecAndLog(step, k)
+
+			step = "checking that the dc no longer exists"
+			json = "jsonpath={.items}"
+			k = kubectl.Get("CassandraDatacenter").
+				WithLabel(dcLabel).
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "[]", 300)
+
+			step = "checking that the pvcs no longer exists"
+			json = "jsonpath={.items}"
+			k = kubectl.Get("pvc").
+				WithLabel(dcLabel).
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "[]", 300)
+
+			step = "checking that nothing was left behind"
+			json = "jsonpath={.items}"
+			k = kubectl.Get("all").
+				WithLabel(dcLabel).
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "[]", 300)
+
 		})
 	})
 })

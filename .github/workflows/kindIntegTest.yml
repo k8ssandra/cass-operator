@@ -67,7 +67,7 @@ jobs:
         - smoke_test_dse
         # - terminate # Completes too fast, the test doesn't catch it
         - timeout_prestop_termination
-        # - upgrade_operator # Should be updated to datastax 1.6.0 -> k8ssandra/latest test
+        - upgrade_operator
         - webhook_validation
         # Three worker tests:
         - canary_upgrade

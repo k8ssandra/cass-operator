@@ -7,8 +7,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 )
 
-// CheckFullQueryLogging sets FQL enabled or disabled based on the `enableFQL` parameter, and takes serverMajorVersion for additional validation.
-// It calls the NodeMgmtClient which calls the Cassandra management API and returns a result.ReconcileResult.
+// CheckFullQueryLogging sets FQL enabled or disabled. It calls the NodeMgmtClient which calls the Cassandra management API and returns a result.ReconcileResult.
 func (rc *ReconciliationContext) CheckFullQueryLogging() result.ReconcileResult {
 	dc := rc.GetDatacenter()
 	enableFQL, err := dc.FullQueryEnabled()
@@ -40,9 +39,8 @@ func (rc *ReconciliationContext) CheckFullQueryLogging() result.ReconcileResult 
 			rc.ReqLogger.Error(err, "can't get whether query logging enabled for pod ", "podName", podPtr.Name)
 			return result.RequeueSoon(2)
 		}
-		rc.ReqLogger.Info("full query logging status:", "isEnabled", fqlEnabledForPod, "shouldBeEnabled", enableFQL)
 		if fqlEnabledForPod != enableFQL {
-			rc.ReqLogger.Info("Setting full query logging on ", "podIP", podPtr.Status.PodIP, "podName", podPtr.Name, "fqlDesiredState", enableFQL)
+			rc.ReqLogger.Info("Modifying full query logging on ", "podIP", podPtr.Status.PodIP, "podName", podPtr.Name, "fqlDesiredState", enableFQL)
 			err := rc.NodeMgmtClient.CallSetFullQueryLog(podPtr, enableFQL)
 			if err != nil {
 				rc.ReqLogger.Error(err, "couldn't enable full query logging on ", "podIP", podPtr.Status.PodIP, "podName", podPtr.Name)

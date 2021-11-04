@@ -750,6 +750,9 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 
 func (dc *CassandraDatacenter) FullQueryEnabled() (bool, error) {
 	// TODO Cleanup to more common processing after ModelValues is moved to apis
+	if dc.Spec.Config == nil {
+		return false, nil
+	}
 	var dcConfig map[string]interface{}
 	if err := json.Unmarshal(dc.Spec.Config, &dcConfig); err != nil {
 		return false, err

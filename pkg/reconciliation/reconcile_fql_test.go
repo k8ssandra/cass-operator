@@ -112,10 +112,17 @@ func mockFullQueryLoggingRequestToFalse(mockHttpClient *mocks.HttpClient) {
 		Twice()
 }
 
-func TestCheckFullQueryLoggingNoChangeEnabled(t *testing.T) {
+func setupTestEnv() (*ReconciliationContext, func()) {
 	rc, _, cleanupMockScr := setupTest()
-	defer cleanupMockScr()
 	setupPodList(rc)
+	rc.Datacenter.Spec.ServerType = "cassandra"
+	rc.Datacenter.Spec.ServerVersion = "4.0.1"
+	return rc, cleanupMockScr
+}
+
+func TestCheckFullQueryLoggingNoChangeEnabled(t *testing.T) {
+	rc, cleanupMockScr := setupTestEnv()
+	defer cleanupMockScr()
 
 	mockHttpClient := &mocks.HttpClient{}
 
@@ -141,9 +148,8 @@ func TestCheckFullQueryLoggingNoChangeEnabled(t *testing.T) {
 }
 
 func TestCheckFullQueryLoggingNoChangeDisabled(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-	setupPodList(rc)
 
 	mockHttpClient := &mocks.HttpClient{}
 
@@ -169,9 +175,8 @@ func TestCheckFullQueryLoggingNoChangeDisabled(t *testing.T) {
 }
 
 func TestCheckFullQueryNotSupported(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-	setupPodList(rc)
 
 	mockHttpClient := &mocks.HttpClient{}
 
@@ -191,9 +196,8 @@ func TestCheckFullQueryNotSupported(t *testing.T) {
 }
 
 func TestCheckFullQueryLoggingChangeToEnabled(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-	setupPodList(rc)
 
 	mockHttpClient := &mocks.HttpClient{}
 
@@ -219,9 +223,8 @@ func TestCheckFullQueryLoggingChangeToEnabled(t *testing.T) {
 }
 
 func TestCheckFullQueryLoggingChangeToDisabled(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-	setupPodList(rc)
 
 	mockHttpClient := &mocks.HttpClient{}
 
@@ -246,9 +249,8 @@ func TestCheckFullQueryLoggingChangeToDisabled(t *testing.T) {
 }
 
 func TestCheckFullQueryNotSupportedTriedToUse(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-	setupPodList(rc)
 
 	mockHttpClient := &mocks.HttpClient{}
 
@@ -266,6 +268,21 @@ func TestCheckFullQueryNotSupportedTriedToUse(t *testing.T) {
 
 	// The error is thrown in handler, but this test bypasses the validation - that's why we take Continue
 	// as correct result.
+	r := rc.CheckFullQueryLogging()
+	_, err := r.Output()
+	if err == nil {
+		t.Fatalf("expected result of result.Error() but got %s", r)
+	}
+}
+
+func TestNotSupportedVersion(t *testing.T) {
+	rc, cleanupMockScr := setupTestEnv()
+	defer cleanupMockScr()
+
+	rc.Datacenter.Spec.ServerVersion = "3.11.11"
+
+	// Don't mock any calls, if they're called (and they shouldn't be), then this
+	// test will fail
 	r := rc.CheckFullQueryLogging()
 	if r != result.Continue() {
 		t.Fatalf("expected result of result.Continue() but got %s", r)

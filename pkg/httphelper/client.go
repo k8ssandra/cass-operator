@@ -781,8 +781,8 @@ func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod)
 		err := errors.New("failed to retrieve Entity key from /api/v0/ops/node/fullquerylogging")
 		return false, err
 	}
-	fqlIsEnabledBool, ok := fqlIsEnabled.(bool)
-	if !ok {
+	fqlIsEnabledBool, err := strconv.ParseBool(fmt.Sprintf("%v", fqlIsEnabled))
+	if err != nil {
 		err := errors.New("failed to cast response from /api/v0/ops/node/fullquerylogging to bool")
 		return false, err
 	}

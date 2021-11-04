@@ -5,7 +5,9 @@ package v1beta1
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/Jeffail/gabs"
@@ -745,6 +747,43 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 	}
 
 	return ports, nil
+}
+
+func (dc *CassandraDatacenter) FullQueryEnabled() (bool, error) {
+	// TODO Cleanup to more common processing after ModelValues is moved to apis
+	if dc.Spec.Config != nil {
+		var dcConfig map[string]interface{}
+		if err := json.Unmarshal(dc.Spec.Config, &dcConfig); err != nil {
+			return false, err
+		}
+		casYaml, found := dcConfig["cassandra-yaml"]
+		if !found {
+			return false, nil
+		}
+		casYamlMap, ok := casYaml.(map[string]interface{})
+		if !ok {
+			err := fmt.Errorf("failed to parse cassandra-yaml")
+			return false, err
+		}
+		if _, found := casYamlMap["full_query_logging_options"]; found {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (dc *CassandraDatacenter) DeploymentSupportsFQL() bool {
+	serverMajorVersion, err := strconv.ParseInt(strings.Split(dc.Spec.ServerVersion, ".")[0], 10, 8)
+	if err != nil {
+		return false
+	}
+	if serverMajorVersion < 4 || dc.Spec.ServerType != "cassandra" {
+		// DSE does not support FQL
+		return false
+	}
+
+	return true
 }
 
 func SplitRacks(nodeCount, rackCount int) []int {

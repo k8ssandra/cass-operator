@@ -116,7 +116,7 @@ func ValidateSingleDatacenter(dc CassandraDatacenter) error {
 		}
 	}
 
-	return nil
+	return ValidateFQLConfig(dc)
 }
 
 // ValidateDatacenterFieldChanges checks that no values are improperly changing while updating
@@ -224,5 +224,24 @@ func (dc *CassandraDatacenter) ValidateUpdate(old runtime.Object) error {
 }
 
 func (dc *CassandraDatacenter) ValidateDelete() error {
+	return nil
+}
+
+var (
+	ErrFQLNotSupported = fmt.Errorf("full query logging is only supported on OSS Cassandra 4.0+")
+)
+
+func ValidateFQLConfig(dc CassandraDatacenter) error {
+	if dc.Spec.Config != nil {
+		enabled, err := dc.FullQueryEnabled()
+		if err != nil {
+			return err
+		}
+
+		if enabled && !dc.DeploymentSupportsFQL() {
+			return ErrFQLNotSupported
+		}
+	}
+
 	return nil
 }

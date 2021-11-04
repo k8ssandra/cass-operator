@@ -13,7 +13,6 @@ import (
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -84,7 +83,7 @@ var _ = Describe(testName, func() {
 	var inputFilepath string
 
 	singleClusterVerify := func() {
-		Context("the operator can stand up a one node cluster", func() {
+		Specify("the operator can stand up a one node cluster", func() {
 			step := "waiting for the operator to become ready"
 			json := "jsonpath={.items[0].status.containerStatuses[0].ready}"
 			k := kubectl.Get("pods").
@@ -149,7 +148,13 @@ var _ = Describe(testName, func() {
 		ServerImage   string
 	}
 
-	DescribeTable("the operator can stand up a one node cluster", func(s ServerDetails) {
+	Context("the operator can stand up a one node cluster", func() {
+		serverVersion := os.Getenv("M_SERVER_VERSION")
+		serverImage := os.Getenv("M_SERVER_IMAGE")
+		s := ServerDetails{
+			ServerVersion: serverVersion,
+			ServerImage:   serverImage,
+		}
 		namespace = fmt.Sprintf("test-smoke-test-oss-%s", rand.String(6))
 
 		err := kustomize.Deploy(namespace)
@@ -160,28 +165,5 @@ var _ = Describe(testName, func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		singleClusterVerify()
-	},
-		Entry("3.11.11", ServerDetails{
-			ServerVersion: "3.11.11",
-		}),
-
-		Entry("4.0.0", ServerDetails{
-			ServerVersion: "4.0.0",
-		}),
-
-		Entry("4.0.1", ServerDetails{
-			ServerVersion: "4.0.1",
-		}),
-
-		Entry("3.11.7 k8ssandra 1.1", ServerDetails{
-			ServerVersion: "3.11.7",
-			ServerImage:   "k8ssandra/cass-management-api:3.11.7-v0.1.24",
-		}),
-
-		Entry("4.0.0 k8ssandra 1.3", ServerDetails{
-			ServerVersion: "4.0.0",
-			ServerImage:   "k8ssandra/cass-management-api:4.0.0-v0.1.28",
-		}),
-	)
-
+	})
 })

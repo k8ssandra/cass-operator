@@ -10,6 +10,10 @@ import (
 // CheckFullQueryLogging sets FQL enabled or disabled. It calls the NodeMgmtClient which calls the Cassandra management API and returns a result.ReconcileResult.
 func (rc *ReconciliationContext) CheckFullQueryLogging() result.ReconcileResult {
 	dc := rc.GetDatacenter()
+	if !dc.DeploymentSupportsFQL() {
+		return result.Continue()
+	}
+
 	enableFQL, err := dc.FullQueryEnabled()
 	if err != nil {
 		return result.Error(err)

@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/k8ssandra/cass-operator/pkg/images"
@@ -239,15 +238,8 @@ func ValidateFQLConfig(dc CassandraDatacenter) error {
 			return err
 		}
 
-		if enabled {
-			serverMajorVersion, err := strconv.ParseInt(strings.Split(dc.Spec.ServerVersion, ".")[0], 10, 8)
-			if err != nil {
-				return err
-			}
-			if serverMajorVersion < 4 || dc.Spec.ServerType != "cassandra" {
-				// DSE does not support FQL
-				return ErrFQLNotSupported
-			}
+		if enabled && !dc.DeploymentSupportsFQL() {
+			return ErrFQLNotSupported
 		}
 	}
 

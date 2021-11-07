@@ -1,7 +1,12 @@
-FROM alpine:3.13
+FROM redhat/ubi8-micro:latest
 
 # Add Tini
-RUN apk add --no-cache tini
+ENV TINI_VERSION v0.19.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /sbin/tini
+RUN chmod +x /sbin/tini
+
+# Non-root user, cassandra as default
+USER cassandra:cassandra
 ENTRYPOINT ["/sbin/tini", "--"]
 
 # Run your program under Tini

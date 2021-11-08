@@ -41,7 +41,6 @@ jobs:
           platforms: linux/amd64
           build-args: |
             VERSION_STAMP=1.7.1-ubi7-1
-            release=1.7.1-ubi7-1
             BASE_OS=registry.access.redhat.com/ubi7/ubi-minimal:7.9
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
@@ -51,7 +50,7 @@ jobs:
         with:
           file: operator/docker/system-logger/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}, k8ssandra/system-logger:latest
+          tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache

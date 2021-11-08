@@ -102,6 +102,7 @@ COPY --from=cass-operator /go/bin/operator /operator
 COPY ./operator/docker/ubi/LICENSE /licenses/
 
 RUN mkdir -p /var/lib/cass-operator/
+RUN echo ${BASE_OS} > /var/lib/cass-operator/base_os
 
 RUN chown cassandra:root /operator && \
     chmod 0555 /operator

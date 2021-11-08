@@ -6786,7 +6786,7 @@ spec:
           value: cass-operator
         - name: SKIP_VALIDATING_WEBHOOK
           value: "FALSE"
-        image: k8ssandra/cass-operator:v1.7.1
+        image: k8ssandra/cass-operator:v1.7.1-ubi7
         imagePullPolicy: IfNotPresent
         livenessProbe:
           exec:

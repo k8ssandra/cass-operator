@@ -41,7 +41,7 @@ jobs:
           tags: k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           build-args: |
-            VERSION_STAMP=1.7.1-ubi7-1
+            VERSION_STAMP=v1.7.1-ubi7
             BASE_OS=registry.access.redhat.com/ubi7/ubi-minimal:7.9
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache

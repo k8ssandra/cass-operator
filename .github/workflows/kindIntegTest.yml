@@ -63,7 +63,7 @@ jobs:
         - additional_volumes
         - delete_node_terminated_container
         - podspec_simple
-        - smoke_test_oss
+        # - smoke_test_oss # See next job
         - smoke_test_dse
         # - terminate # Completes too fast, the test doesn't catch it
         - timeout_prestop_termination
@@ -124,4 +124,43 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: k8s-logs-${{ matrix.integration_test }}
+          path: ./build/kubectl_dump
+  kind_smoke_tests:
+    needs: build_docker_images
+    strategy:
+      matrix:
+        version:
+        - "3.11.7"
+        - "3.11.11"
+        - "4.0.0"
+        - "4.0.1"
+        include:
+          - version: 3.11.7
+            serverImage: k8ssandra/cass-management-api:3.11.7-v0.1.24 # k8ssandra 1.1
+          - version: 4.0.0
+            serverImage: k8ssandra/cass-management-api:4.0.0-v0.1.28 # k8ssandra 1.3
+      fail-fast: true
+    runs-on: ubuntu-latest
+    env:
+      # GOPATH: /home/runner/go
+      # GOROOT: /usr/local/go1.16
+      CGO_ENABLED: 0
+      M_INTEG_DIR: smoke_test_oss
+      M_SERVER_VERSION: ${{ matrix.version }}
+      M_SERVER_IMAGE: ${{ matrix.serverImage }}
+    steps:
+      - uses: actions/checkout@v2
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v2
+        if: github.event_name != 'pull_request'
+      - uses: ./.github/actions/run-integ-test
+        with:
+          integration_test: smoke_test_oss
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: k8s-logs-smoke_test_oss-${{ matrix.version }}-${{ matrix.serverImage }}
           path: ./build/kubectl_dump

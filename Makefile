@@ -161,6 +161,7 @@ endif
 cert-manager: ## Install cert-manager to the cluster
 	kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.5.3/cert-manager.yaml
 	kubectl wait --for=condition=Established crd certificates.cert-manager.io
+	kubectl -n cert-manager wait --for=condition=Ready pod -l app=cert-manager
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.

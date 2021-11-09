@@ -115,6 +115,7 @@ func (f *FeatureSet) UnmarshalJSON(b []byte) error {
 
 // Supports returns true if the target pod's management-api supports certain feature
 func (f *FeatureSet) Supports(feature Feature) bool {
+	// TODO Or we could do a HEAD request here to the endpoint URL (define FeatureSet as struct instead of string)
 	_, found := f.Features[string(feature)]
 	return found
 }
@@ -246,11 +247,23 @@ func (client *NodeMgmtClient) CallDrainEndpoint(pod *corev1.Pod) error {
 	return err
 }
 
+// CallKeyspaceCleanupEndpoint is deprecated. Use it only when accessing old management-api versions. Otherwise, use CallKeyspaceCleanup
 func (client *NodeMgmtClient) CallKeyspaceCleanupEndpoint(pod *corev1.Pod, jobs int, keyspaceName string, tables []string) error {
 	client.Log.Info(
 		"calling Management API keyspace cleanup - POST /api/v0/ops/keyspace/cleanup",
 		"pod", pod.Name,
 	)
+
+	req, err := createKeySpaceRequest(pod, jobs, keyspaceName, tables, "/api/v0/ops/keyspace/cleanup")
+	if err != nil {
+		return err
+	}
+
+	_, err = callNodeMgmtEndpoint(client, *req, "application/json")
+	return err
+}
+
+func createKeySpaceRequest(pod *corev1.Pod, jobs int, keyspaceName string, tables []string, endpoint string) (*nodeMgmtRequest, error) {
 	postData := make(map[string]interface{})
 	if jobs > -1 {
 		postData["jobs"] = strconv.Itoa(jobs)
@@ -266,23 +279,44 @@ func (client *NodeMgmtClient) CallKeyspaceCleanupEndpoint(pod *corev1.Pod, jobs 
 
 	body, err := json.Marshal(postData)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	podHost, err := BuildPodHostFromPod(pod)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	request := nodeMgmtRequest{
-		endpoint: "/api/v0/ops/keyspace/cleanup",
+	request := &nodeMgmtRequest{
+		endpoint: endpoint,
 		host:     podHost,
 		method:   http.MethodPost,
 		body:     body,
 	}
 
-	_, err = callNodeMgmtEndpoint(client, request, "application/json")
-	return err
+	return request, nil
+}
+
+// CallKeyspaceCleanup returns the job id of the cleanup job
+func (client *NodeMgmtClient) CallKeyspaceCleanup(pod *corev1.Pod, jobs int, keyspaceName string, tables []string) (string, error) {
+	client.Log.Info(
+		"calling Management API keyspace cleanup - POST /api/v1/ops/keyspace/cleanup",
+		"pod", pod.Name,
+	)
+
+	req, err := createKeySpaceRequest(pod, jobs, keyspaceName, tables, "/api/v1/ops/keyspace/cleanup")
+	if err != nil {
+		return "", err
+	}
+
+	req.timeout = 20 * time.Second
+
+	jobId, err := callNodeMgmtEndpoint(client, *req, "application/json")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jobId), nil
 }
 
 // CreateKeyspace calls management API to create a new Keyspace.

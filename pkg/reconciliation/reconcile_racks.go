@@ -4,9 +4,11 @@
 package reconciliation
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/go-logr/logr"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
@@ -2093,12 +2094,146 @@ func (rc *ReconciliationContext) CheckConditionInitializedAndReady() result.Reco
 	return result.Continue()
 }
 
-func cleanupAfterScaling(nodeClient *httphelper.NodeMgmtClient, logger logr.Logger, pods []*corev1.Pod) {
-	for _, pod := range pods {
-		if err := nodeClient.CallKeyspaceCleanupEndpoint(pod, -1, "", nil); err != nil {
-			logger.Error(err, "error cleaning up after scaling datacenter", "Pod", pod.GetName())
+const (
+	podJobIdAnnotation     = "cassandra.datastax.com/job-id"
+	podJobStatusAnnotation = "cassandra.datastax.com/job-status"
+	podJobHandler          = "cassandra.datastax.com/job-runner"
+	jobHandlerMgmtApi      = "management-api"
+
+	podJobCompleted = "completed"
+	podJobError     = "error"
+)
+
+var (
+	jobRunner chan int
+)
+
+func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
+	// We sort to ensure we process the pods in the same order
+	sort.Slice(rc.dcPods, func(i, j int) bool {
+		return rc.dcPods[i].UID < rc.dcPods[j].UID
+	})
+
+	for idx, pod := range rc.dcPods {
+		features, err := rc.NodeMgmtClient.FeatureSet(pod)
+		if err != nil {
+			return result.Error(err)
 		}
+
+		if pod.Annotations == nil {
+			pod.Annotations = make(map[string]string)
+		}
+
+		if podJobId, found := pod.Annotations[podJobIdAnnotation]; found {
+			if features.Supports(httphelper.AsyncSSTableTasks) {
+				_, found := pod.Annotations[podJobStatusAnnotation]
+				if !found {
+					// Pod is currently processing something, or has finished processing.. update the status
+					details, err := rc.NodeMgmtClient.JobDetails(pod, podJobId)
+					if err != nil {
+						rc.ReqLogger.Error(err, "Could not get JobDetails for pod", "Pod", pod)
+						// TODO What if the pod crashed during cleanup? What kind of data would we receive from jobDetails? If it crashed and job details
+						// are not known, should we start from the scratch or simply skip this one?
+						return result.Error(err)
+					}
+
+					if details.Status == podJobError {
+						// Log the error, move on
+						rc.ReqLogger.Error(fmt.Errorf("cleanup failed: %s", details.Error), "Pod", pod)
+						pod.Annotations[podJobStatusAnnotation] = podJobError
+						err = rc.Client.Update(context.Background(), pod)
+						if err != nil {
+							return result.Error(err)
+						}
+						continue
+					} else if details.Status == podJobCompleted {
+						// Pod has finished, remove the job_id and let us move to the next pod
+						pod.Annotations[podJobStatusAnnotation] = podJobCompleted
+						err = rc.Client.Update(context.Background(), pod)
+						if err != nil {
+							return result.Error(err)
+						}
+						continue
+					} else if details.Status == "running" {
+						// We will not update running status, instead - keep running
+						return result.RequeueSoon(2)
+					}
+				} else {
+					// This pod has finished since it has a status
+					continue
+				}
+			} else {
+				if len(jobRunner) > 0 {
+					// Something is still holding the worker
+					return result.RequeueSoon(2)
+				}
+
+				// Nothing is holding the job, has this pod finished or hasn't it ran anything?
+				if _, found := pod.Annotations[podJobStatusAnnotation]; found {
+					// Pod has finished, check next one
+					continue
+				}
+			}
+		}
+
+		if features.Supports(httphelper.AsyncSSTableTasks) {
+			// Pod isn't running anything at the moment, this pod should run next
+			jobId, err := rc.NodeMgmtClient.CallKeyspaceCleanup(pod, -1, "", nil)
+			if err != nil {
+				// We can retry this later, it will only restart the cleanup but won't otherwise hurt
+				return result.Error(err)
+			}
+			pod.Annotations[podJobHandler] = jobHandlerMgmtApi
+			pod.Annotations[podJobIdAnnotation] = jobId
+
+			err = rc.Client.Update(context.Background(), pod)
+			if err != nil {
+				rc.ReqLogger.Error(err, "Pod", pod)
+				return result.Error(err)
+			}
+		} else {
+			jobId := strconv.Itoa(idx)
+
+			// This pod should run next, mark it
+			pod.Annotations[podJobHandler] = oplabels.ManagedByLabelValue
+			pod.Annotations[podJobIdAnnotation] = jobId
+
+			err = rc.Client.Update(context.Background(), pod)
+			if err != nil {
+				rc.ReqLogger.Error(err, "Pod", pod)
+				return result.Error(err)
+			}
+
+			pod := pod
+			go func(targetPod *corev1.Pod) {
+				// Write value to the jobRunner to indicate we're running
+				jobRunner <- idx
+				defer func() {
+					// Read the value from the jobRunner
+					<-jobRunner
+				}()
+
+				if err = rc.NodeMgmtClient.CallKeyspaceCleanupEndpoint(targetPod, -1, "", nil); err != nil {
+					// We only log, nothing else to do - we won't even retry this pod
+					rc.ReqLogger.Error(err, "Pod", targetPod)
+					pod.Annotations[podJobStatusAnnotation] = podJobError
+				} else {
+					pod.Annotations[podJobStatusAnnotation] = podJobCompleted
+				}
+
+				err = rc.Client.Update(context.Background(), pod)
+				if err != nil {
+					rc.ReqLogger.Error(err, "Pod", targetPod)
+				}
+			}(pod)
+		}
+
+		// We have a job going on, return back later to check the status
+		return result.RequeueSoon(2)
 	}
+	// }
+	// All pods have cleaned up, we're good to continue
+	return result.Continue()
 }
 
 func (rc *ReconciliationContext) CheckCassandraNodeStatuses() result.ReconcileResult {
@@ -2138,7 +2273,10 @@ func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileRe
 
 	// Explicitly handle scaling up here because we want to run a cleanup afterwards
 	if dc.GetConditionStatus(api.DatacenterScalingUp) == corev1.ConditionTrue {
-		go cleanupAfterScaling(&rc.NodeMgmtClient, logger, rc.dcPods)
+		// Call the first node with cleanup, wait until it has finished and then move on to the next pod..
+		if res := rc.cleanupAfterScaling(); !res.Completed() {
+			return res
+		}
 
 		updated = rc.setCondition(
 			api.NewDatacenterCondition(api.DatacenterScalingUp, corev1.ConditionFalse)) || updated

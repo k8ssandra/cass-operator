@@ -61,7 +61,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionTrue))
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
 
 			// Ensure that when 'ScaleUp' becomes 'false' that our pods are in fact up and running
@@ -69,21 +69,21 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReady(dcName)
 
-			step = "scale up to 4 nodes"
-			json = "{\"spec\": {\"size\": 4}}"
-			k = kubectl.PatchMerge(dcResource, json)
-			ns.ExecAndLog(step, k)
+			// step = "scale up to 4 nodes"
+			// json = "{\"spec\": {\"size\": 4}}"
+			// k = kubectl.PatchMerge(dcResource, json)
+			// ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
-			ns.WaitForDatacenterReady(dcName)
+			// ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
+			// ns.WaitForDatacenterReady(dcName)
 
-			step = "scale up to 5 nodes"
-			json = "{\"spec\": {\"size\": 5}}"
-			k = kubectl.PatchMerge(dcResource, json)
-			ns.ExecAndLog(step, k)
+			// step = "scale up to 5 nodes"
+			// json = "{\"spec\": {\"size\": 5}}"
+			// k = kubectl.PatchMerge(dcResource, json)
+			// ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
-			ns.WaitForDatacenterReady(dcName)
+			// ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
+			// ns.WaitForDatacenterReady(dcName)
 
 			step = "check recorded host IDs"
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)

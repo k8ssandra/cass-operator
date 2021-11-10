@@ -696,13 +696,17 @@ func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDet
 		method:   http.MethodGet,
 	}
 
+	job := &JobDetails{}
 	data, err := callNodeMgmtEndpoint(client, request, "")
 	if err != nil {
+		if re, ok := err.(*RequestError); ok && re.NotFound() {
+			// Job was not found, the request did succeed
+			return job, nil
+		}
 		client.Log.Error(err, "failed to fetch job details from management-api")
 		return nil, err
 	}
 
-	job := &JobDetails{}
 	if err := json.Unmarshal(data, &job); err != nil {
 		return nil, err
 	}

@@ -15,6 +15,7 @@ import (
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
@@ -1473,4 +1474,145 @@ func Test_callPodEndpoint_RequestFail(t *testing.T) {
 	if err := client.CallReloadSeedsEndpoint(pod); err == nil {
 		assert.Fail(t, "Should have returned error")
 	}
+}
+
+func TestCleanupAfterScalingAsyncFeatures(t *testing.T) {
+	rc, cleanupMockScr := setupTestEnv()
+	defer cleanupMockScr()
+	assert := assert.New(t)
+
+	mockHttpClient := &mocks.HttpClient{}
+
+	// Mock features request to support AsyncSSTableTasks
+	mockFeaturesEnabled(mockHttpClient)
+
+	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
+		Client:   mockHttpClient,
+		Log:      rc.ReqLogger,
+		Protocol: "http",
+	}
+
+	k8sMockClientUpdate(rc.Client.(*mocks.Client), nil).
+		Run(func(args mock.Arguments) {
+			arg := args.Get(1).(*corev1.Pod)
+			rc.dcPods[0].Annotations = arg.Annotations
+		}).Times(200)
+
+	// Mock async callKeyspaceCleanup
+	mockCallKeyspaceCleanup(mockHttpClient)
+
+	r := rc.cleanupAfterScaling()
+	if r != result.RequeueSoon(2) {
+		t.Fatalf("expected result of result.RequeueSoon(2) but got %s", r)
+	}
+
+	// Mock jobDetails to return success
+	mockJobDetailsResponse(mockHttpClient)
+
+	// Job should be done on the next pass
+	assert.Eventually(func() bool {
+		// Mock features request to support AsyncSSTableTasks
+		mockFeaturesEnabled(mockHttpClient)
+
+		r = rc.cleanupAfterScaling()
+		if r.Completed() && r != result.Continue() {
+			fmt.Printf("This shouldn't happen..\n")
+			t.FailNow()
+		}
+		return r == result.Continue()
+
+	}, 500*time.Millisecond, 50*time.Millisecond, "expected result of result.Continue()")
+
+	assert.True(rc.dcPods[0].Annotations[podJobStatusAnnotation] == podJobCompleted)
+	assert.NotEmpty(rc.dcPods[0].Annotations[podJobIdAnnotation])
+}
+
+func TestCleanupAfterScalingNoAsyncFeatures(t *testing.T) {
+	rc, cleanupMockScr := setupTestEnv()
+	defer cleanupMockScr()
+	assert := assert.New(t)
+	// Verify we have at least one pod..
+	assert.True(len(rc.dcPods) > 0)
+
+	mockHttpClient := &mocks.HttpClient{}
+
+	// Mock AsyncSSTableTasks not available
+	mockFeaturesNotAvailable(mockHttpClient)
+
+	// Mock old cleanup
+	mockCallKeyspaceCleanupEndpoint(mockHttpClient)
+
+	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
+		Client:   mockHttpClient,
+		Log:      rc.ReqLogger,
+		Protocol: "http",
+	}
+
+	k8sMockClientUpdate(rc.Client.(*mocks.Client), nil).
+		Run(func(args mock.Arguments) {
+			arg := args.Get(1).(*corev1.Pod)
+			rc.dcPods[0].Annotations = arg.Annotations
+		}).Times(200)
+
+	r := rc.cleanupAfterScaling()
+	if r != result.RequeueSoon(2) {
+		t.Fatalf("expected result of result.RequeueSoon(2) but got %s", r)
+	}
+
+	// Job should be done on the next pass
+	assert.Eventually(func() bool {
+		// Mock AsyncSSTableTasks not available
+		mockFeaturesNotAvailable(mockHttpClient)
+
+		r = rc.cleanupAfterScaling()
+		return r == result.Continue()
+
+	}, 500*time.Millisecond, 50*time.Millisecond, "expected result of result.Continue()")
+
+	assert.True(rc.dcPods[0].Annotations[podJobStatusAnnotation] == podJobCompleted)
+	assert.NotEmpty(rc.dcPods[0].Annotations[podJobIdAnnotation])
+}
+
+var jobDetailsOne = `{ "id": "1", "status": "COMPLETED", "type": "Cleanup" }`
+
+func mockJobDetailsResponse(mockHttpClient *mocks.HttpClient) {
+	resFullQueryStatus := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(strings.NewReader(jobDetailsOne)),
+	}
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/api/v0/ops/executor/job"
+			})).
+		Return(resFullQueryStatus, nil).
+		Twice()
+}
+
+func mockCallKeyspaceCleanup(mockHttpClient *mocks.HttpClient) {
+	resFullQueryStatus := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(strings.NewReader("1")),
+	}
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/api/v1/ops/keyspace/cleanup"
+			})).
+		Return(resFullQueryStatus, nil).
+		Twice()
+}
+
+func mockCallKeyspaceCleanupEndpoint(mockHttpClient *mocks.HttpClient) {
+	resFullQueryStatus := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+	}
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/api/v0/ops/keyspace/cleanup"
+			})).
+		Return(resFullQueryStatus, nil).
+		Once()
 }

@@ -2106,7 +2106,7 @@ const (
 )
 
 var (
-	jobRunner chan int
+	jobRunner chan int = make(chan int, 1)
 )
 
 func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
@@ -2209,6 +2209,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 			}
 
 			pod := pod
+
 			go func(targetPod *corev1.Pod) {
 				// Write value to the jobRunner to indicate we're running
 				jobRunner <- idx

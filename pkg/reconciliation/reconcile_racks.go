@@ -2100,8 +2100,9 @@ const (
 	podJobHandler          = "cassandra.datastax.com/job-runner"
 	jobHandlerMgmtApi      = "management-api"
 
-	podJobCompleted = "completed"
-	podJobError     = "error"
+	podJobCompleted = "COMPLETED"
+	podJobError     = "ERROR"
+	podJobWaiting   = "WAITING"
 )
 
 var (
@@ -2137,7 +2138,10 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 						return result.Error(err)
 					}
 
-					if details.Status == podJobError {
+					if details.Id == "" {
+						// This job was not found, pod most likely restarted. Let the next stage restart it
+						delete(pod.Annotations, podJobIdAnnotation)
+					} else if details.Status == podJobError {
 						// Log the error, move on
 						rc.ReqLogger.Error(fmt.Errorf("cleanup failed: %s", details.Error), "Pod", pod)
 						pod.Annotations[podJobStatusAnnotation] = podJobError
@@ -2154,8 +2158,8 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 							return result.Error(err)
 						}
 						continue
-					} else if details.Status == "running" {
-						// We will not update running status, instead - keep running
+					} else if details.Status == podJobWaiting {
+						// Job is still running or waiting
 						return result.RequeueSoon(2)
 					}
 				} else {
@@ -2231,8 +2235,6 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 		// We have a job going on, return back later to check the status
 		return result.RequeueSoon(2)
 	}
-	// }
-	// All pods have cleaned up, we're good to continue
 	return result.Continue()
 }
 

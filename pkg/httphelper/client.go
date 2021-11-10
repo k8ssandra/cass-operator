@@ -115,7 +115,6 @@ func (f *FeatureSet) UnmarshalJSON(b []byte) error {
 
 // Supports returns true if the target pod's management-api supports certain feature
 func (f *FeatureSet) Supports(feature Feature) bool {
-	// TODO Or we could do a HEAD request here to the endpoint URL (define FeatureSet as struct instead of string)
 	_, found := f.Features[string(feature)]
 	return found
 }

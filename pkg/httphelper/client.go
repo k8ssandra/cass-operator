@@ -707,7 +707,7 @@ func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDet
 		return nil, err
 	}
 
-	if err := json.Unmarshal(data, &job); err != nil {
+	if err := json.Unmarshal(data, job); err != nil {
 		return nil, err
 	}
 

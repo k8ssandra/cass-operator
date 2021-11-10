@@ -2133,14 +2133,17 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 					details, err := rc.NodeMgmtClient.JobDetails(pod, podJobId)
 					if err != nil {
 						rc.ReqLogger.Error(err, "Could not get JobDetails for pod", "Pod", pod)
-						// TODO What if the pod crashed during cleanup? What kind of data would we receive from jobDetails? If it crashed and job details
-						// are not known, should we start from the scratch or simply skip this one?
 						return result.Error(err)
 					}
 
 					if details.Id == "" {
-						// This job was not found, pod most likely restarted. Let the next stage restart it
+						// This job was not found, pod most likely restarted. Let's retry..
 						delete(pod.Annotations, podJobIdAnnotation)
+						err = rc.Client.Update(context.Background(), pod)
+						if err != nil {
+							return result.Error(err)
+						}
+						return result.RequeueSoon(2)
 					} else if details.Status == podJobError {
 						// Log the error, move on
 						rc.ReqLogger.Error(fmt.Errorf("cleanup failed: %s", details.Error), "Pod", pod)

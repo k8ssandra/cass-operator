@@ -129,13 +129,12 @@
       displayName: Access Modes
       x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:select:ReadWriteOnce
-    - path: storageConfig.cassandraDataVolumeClaimSpec.resources
+    - path: storageConfig.cassandraDataVolumeClaimSpec.resources.requests.storage
       description: |
-        Storage requirements for the Cassandra data volume. Only specify
-        the Storage column here.
-      displayName: Resources
+        Storage requirements for the Cassandra data volume.
+      displayName: Data volume size
       x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+        - urn:alm:descriptor:com.tectonic.number
     - path: storageConfig.additionalVolumes
       description: |
         Collection of additional storage volumes
@@ -152,13 +151,12 @@
         Volume access modes
       x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
-    - path: storageConfig.additionalVolumes[0].resources
+    - path: storageConfig.additionalVolumes[0].resources.requests.storage
       description: |
-        Storage requirements for the additional data volume. Only specify
-        the Storage column here.
-      displayName: Resources
+        Storage requirements for the additional data volume.
+      displayName: Data volume size
       x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+        - urn:alm:descriptor:com.tectonic.number
     - path: storageConfig.additionalVolumes[0].storageClassName
       description: |
         Name of the storage class this volume should use

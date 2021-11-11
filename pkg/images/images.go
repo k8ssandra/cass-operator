@@ -23,10 +23,10 @@ var (
 )
 
 const (
-	ValidDseVersionRegexp   = "6\\.8\\.\\d+"
-	ValidOssVersionRegexp   = "(3\\.11\\.\\d+)|(4\\.0\\.\\d+)"
-	CassandraImageComponent = "k8ssandra/cass-management-api"
-	DSEImageComponent       = "datastax/dse-server"
+	ValidDseVersionRegexp      = "6\\.8\\.\\d+"
+	ValidOssVersionRegexp      = "(3\\.11\\.\\d+)|(4\\.0\\.\\d+)"
+	DefaultCassandraRepository = "k8ssandra/cass-management-api"
+	DefaultDSERepository       = "datastax/dse-server"
 )
 
 func init() {
@@ -113,25 +113,52 @@ func getCassandraContainerImageOverride(serverType, version string) (bool, strin
 	return false, ""
 }
 
+func getImageComponents(serverType string) (string, string) {
+	var defaultPrefix string
+
+	if serverType == "dse" {
+		defaultPrefix = DefaultDSERepository
+	}
+	if serverType == "cassandra" {
+		defaultPrefix = DefaultCassandraRepository
+	}
+
+	defaults := GetImageConfig().DefaultImages
+	if defaults != nil {
+		var component configv1beta1.ImageComponent
+		if serverType == "dse" {
+			component = defaults.DSEImageComponent
+		}
+		if serverType == "cassandra" {
+			component = defaults.CassandraImageComponent
+		}
+
+		if component.Repository != "" {
+			return component.Repository, component.Suffix
+		}
+	}
+
+	return defaultPrefix, ""
+}
+
 func GetCassandraImage(serverType, version string) (string, error) {
 	if found, image := getCassandraContainerImageOverride(serverType, version); found {
 		return ApplyRegistry(image), nil
 	}
 
-	imagePrefix := CassandraImageComponent
-
 	if serverType == "dse" {
 		if !IsDseVersionSupported(version) {
 			return "", fmt.Errorf("server 'dse' and version '%s' do not work together", version)
 		}
-		imagePrefix = DSEImageComponent
 	} else {
 		if !IsOssVersionSupported(version) {
 			return "", fmt.Errorf("server 'cassandra' and version '%s' do not work together", version)
 		}
 	}
 
-	return ApplyRegistry(fmt.Sprintf("%s:%s", imagePrefix, version)), nil
+	prefix, suffix := getImageComponents(serverType)
+
+	return ApplyRegistry(fmt.Sprintf("%s:%s%s", prefix, version, suffix)), nil
 }
 
 func GetConfigBuilderImage() string {

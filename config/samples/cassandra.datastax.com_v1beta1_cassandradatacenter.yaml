@@ -17,6 +17,12 @@ spec:
         resources:
           requests:
             storage: 1Gi
+  dockerImageRunsAsCassandra: false
+  podTemplateSpec:
+    securityContext: {}
+    containers:
+      - name: cassandra
+        securityContext: {}
   racks:
     - name: r1
   config:

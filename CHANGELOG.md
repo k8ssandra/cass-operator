@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
 * [CHANGE] #213 Integration tests in Github Actions are now reusable across different workflows
+* [CHANGE] Prevent instant requeues, every requeue must wait at least 500ms.
 * [FEATURE] #193 Add new Management API endpoints to HTTP Helper: GetKeyspaceReplication, ListTables, CreateTable
 * [FEATURE] #175 Add FQL reconciliation via parseFQLFromConfig and SetFullQueryLogging called from ReconcileAllRacks. CallIsFullQueryLogEnabledEndpoint and CallSetFullQueryLog functions to httphelper.
 * [ENHANCEMENT] #185 Add more app.kubernetes.io labels to all the managed resources

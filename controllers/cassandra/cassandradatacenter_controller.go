@@ -142,6 +142,13 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 		logger.Error(err, "calculateReconciliationActions returned an error")
 		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ReconcileFailed", err.Error())
 	}
+
+	// Prevent immediate requeue
+	if res.Requeue {
+		if res.RequeueAfter.Milliseconds() < 500 {
+			res.RequeueAfter = time.Duration(500 * time.Millisecond)
+		}
+	}
 	return res, err
 }
 

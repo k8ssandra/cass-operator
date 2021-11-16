@@ -39,13 +39,6 @@ func TestLifecycle(t *testing.T) {
 	RunSpecs(t, testName)
 }
 
-/*
-	Install operator 1.7.1
-		- Create CassDc with older 3.11.10 image and let it start correctly
-	Upgrade to current (remember to patch the CRD)
-		- Update the Cassandra to 3.11.11
-*/
-
 // InstallOldOperator installs the oldest supported upgrade path (this is the first k8ssandra/cass-operator release)
 func InstallOldOperator() {
 	step := "install cass-operator 1.7.1"
@@ -80,7 +73,7 @@ func UpgradeOperator() {
 
 var _ = Describe(testName, func() {
 	Context("when upgrading the Cass Operator", func() {
-		Specify("the managed-by label is set correctly", func() {
+		Specify("the upgrade process from earlier operator-sdk should work", func() {
 			By("creating a namespace")
 			err := kubectl.CreateNamespace(namespace).ExecV()
 			Expect(err).ToNot(HaveOccurred())
@@ -112,16 +105,19 @@ var _ = Describe(testName, func() {
 			time.Sleep(1 * time.Minute)
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 800, 60)
+
 			ns.ExpectDoneReconciling(dcName)
 
 			// Update Cassandra version to ensure we can still do changes
-			step = "perform canary upgrade"
+			step = "perform cassandra upgrade"
 			json = "{\"spec\": {\"serverVersion\": \"3.11.11\"}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
 			ns.WaitForDatacenterReadyPodCount(dcName, 1)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, 800, 60)
+
 			ns.ExpectDoneReconciling(dcName)
 
 			// Verify delete still works correctly and that we won't leave any resources behind

@@ -2111,7 +2111,14 @@ var (
 func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	// We sort to ensure we process the pods in the same order
 	sort.Slice(rc.dcPods, func(i, j int) bool {
-		return rc.dcPods[i].UID < rc.dcPods[j].UID
+		rackI := rc.dcPods[i].Labels[api.RackLabel]
+		rackJ := rc.dcPods[j].Labels[api.RackLabel]
+
+		if rackI != rackJ {
+			return rackI < rackJ
+		}
+
+		return rc.dcPods[i].Name < rc.dcPods[j].Name
 	})
 
 	for idx, pod := range rc.dcPods {

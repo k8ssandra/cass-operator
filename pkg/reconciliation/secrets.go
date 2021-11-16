@@ -192,14 +192,10 @@ func (rc *ReconciliationContext) keystoreCASecret() types.NamespacedName {
 
 func (rc *ReconciliationContext) retrieveInternodeCredentialSecretOrCreateDefault() (*corev1.Secret, error) {
 	secret, retrieveErr := rc.retrieveSecret(rc.keystoreCASecret())
-	_, retrieveBootStrappingErr := rc.retrieveSecret(types.NamespacedName{
-		Name:      fmt.Sprintf("%s-keystore", rc.Datacenter.Name),
-		Namespace: rc.Datacenter.Namespace,
-	})
-	if retrieveErr != nil || retrieveBootStrappingErr != nil {
-		if errors.IsNotFound(retrieveErr) && errors.IsNotFound(retrieveBootStrappingErr) {
-			// both secrets are not found
-			secret, err := rc.createInternodeCACredential()
+	if retrieveErr != nil {
+		if errors.IsNotFound(retrieveErr) {
+			var err error
+			secret, err = rc.createInternodeCACredential()
 
 			if err == nil && secret == nil {
 				return nil, retrieveErr
@@ -209,19 +205,20 @@ func (rc *ReconciliationContext) retrieveInternodeCredentialSecretOrCreateDefaul
 				err = rc.Client.Create(rc.Ctx, secret)
 			}
 
-			if err == nil {
-				var jksBlob []byte
-				jksBlob, err = utils.GenerateJKS(secret, rc.Datacenter.Name, rc.Datacenter.Name)
-				if err == nil {
-					err = rc.createCABootstrappingSecret(jksBlob)
-				}
-			}
-
 			if err != nil {
-				return nil, fmt.Errorf("Failed to create default superuser secret: %w", err)
+				return nil, fmt.Errorf("Failed to create internode CA credential: %w", err)
 			}
-		} else if retrieveErr == nil && errors.IsNotFound(retrieveBootStrappingErr) {
-			// CACredential exists, but BootStrappingSecret is not found
+		} else {
+			return nil, retrieveErr
+		}
+	}
+
+	_, retrieveBootStrappingSecretErr := rc.retrieveSecret(types.NamespacedName{
+		Name:      fmt.Sprintf("%s-keystore", rc.Datacenter.Name),
+		Namespace: rc.Datacenter.Namespace,
+	})
+	if retrieveBootStrappingSecretErr != nil {
+		if errors.IsNotFound(retrieveBootStrappingSecretErr) {
 			var jksBlob []byte
 			jksBlob, err := utils.GenerateJKS(secret, rc.Datacenter.Name, rc.Datacenter.Name)
 			if err == nil {
@@ -231,10 +228,8 @@ func (rc *ReconciliationContext) retrieveInternodeCredentialSecretOrCreateDefaul
 			if err != nil {
 				return nil, fmt.Errorf("Failed to create default superuser secret: %w", err)
 			}
-		} else if retrieveErr != nil {
-			return nil, retrieveErr
 		} else {
-			return nil, retrieveBootStrappingErr
+			return nil, retrieveBootStrappingSecretErr
 		}
 	}
 

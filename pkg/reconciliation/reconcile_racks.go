@@ -4,7 +4,6 @@
 package reconciliation
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -2129,6 +2128,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 			if features.Supports(httphelper.AsyncSSTableTasks) {
 				_, found := pod.Annotations[podJobStatusAnnotation]
 				if !found {
+					podPatch := client.MergeFrom(pod.DeepCopy())
 					// Pod is currently processing something, or has finished processing.. update the status
 					details, err := rc.NodeMgmtClient.JobDetails(pod, podJobId)
 					if err != nil {
@@ -2139,16 +2139,16 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 					if details.Id == "" {
 						// This job was not found, pod most likely restarted. Let's retry..
 						delete(pod.Annotations, podJobIdAnnotation)
-						err = rc.Client.Update(context.Background(), pod)
+						err = rc.Client.Update(rc.Ctx, pod)
 						if err != nil {
 							return result.Error(err)
 						}
 						return result.RequeueSoon(2)
 					} else if details.Status == podJobError {
 						// Log the error, move on
-						rc.ReqLogger.Error(fmt.Errorf("cleanup failed: %s", details.Error), "Pod", pod)
+						rc.ReqLogger.Error(fmt.Errorf("cleanup failed: %s", details.Error), "Job failed to successfully complete the cleanup", "Pod", pod)
 						pod.Annotations[podJobStatusAnnotation] = podJobError
-						err = rc.Client.Update(context.Background(), pod)
+						err = rc.Client.Patch(rc.GetContext(), pod, podPatch)
 						if err != nil {
 							return result.Error(err)
 						}
@@ -2156,7 +2156,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 					} else if details.Status == podJobCompleted {
 						// Pod has finished, remove the job_id and let us move to the next pod
 						pod.Annotations[podJobStatusAnnotation] = podJobCompleted
-						err = rc.Client.Update(context.Background(), pod)
+						err = rc.Client.Patch(rc.GetContext(), pod, podPatch)
 						if err != nil {
 							return result.Error(err)
 						}
@@ -2190,24 +2190,26 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 				// We can retry this later, it will only restart the cleanup but won't otherwise hurt
 				return result.Error(err)
 			}
+			podPatch := client.MergeFrom(pod.DeepCopy())
 			pod.Annotations[podJobHandler] = jobHandlerMgmtApi
 			pod.Annotations[podJobIdAnnotation] = jobId
 
-			err = rc.Client.Update(context.Background(), pod)
+			err = rc.Client.Patch(rc.GetContext(), pod, podPatch)
 			if err != nil {
-				rc.ReqLogger.Error(err, "Pod", pod)
+				rc.ReqLogger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
 				return result.Error(err)
 			}
 		} else {
 			jobId := strconv.Itoa(idx)
 
 			// This pod should run next, mark it
+			podPatch := client.MergeFrom(pod.DeepCopy())
 			pod.Annotations[podJobHandler] = oplabels.ManagedByLabelValue
 			pod.Annotations[podJobIdAnnotation] = jobId
 
-			err = rc.Client.Update(context.Background(), pod)
+			err = rc.Client.Patch(rc.GetContext(), pod, podPatch)
 			if err != nil {
-				rc.ReqLogger.Error(err, "Pod", pod)
+				rc.ReqLogger.Error(err, "Failed to patch pod's status to indicate its running local job", "Pod", pod)
 				return result.Error(err)
 			}
 
@@ -2221,6 +2223,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 					<-jobRunner
 				}()
 
+				podPatch := client.MergeFrom(targetPod.DeepCopy())
 				if err = rc.NodeMgmtClient.CallKeyspaceCleanupEndpoint(targetPod, -1, "", nil); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod
 					rc.ReqLogger.Error(err, "Pod", targetPod)
@@ -2229,9 +2232,9 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 					pod.Annotations[podJobStatusAnnotation] = podJobCompleted
 				}
 
-				err = rc.Client.Update(context.Background(), pod)
+				err = rc.Client.Patch(rc.GetContext(), pod, podPatch)
 				if err != nil {
-					rc.ReqLogger.Error(err, "Pod", targetPod)
+					rc.ReqLogger.Error(err, "Failed to update local job's status", "Pod", targetPod)
 				}
 			}(pod)
 		}

@@ -2146,7 +2146,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 					if details.Id == "" {
 						// This job was not found, pod most likely restarted. Let's retry..
 						delete(pod.Annotations, podJobIdAnnotation)
-						err = rc.Client.Update(rc.Ctx, pod)
+						err = rc.Client.Patch(rc.GetContext(), pod, podPatch)
 						if err != nil {
 							return result.Error(err)
 						}
@@ -2170,7 +2170,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 						continue
 					} else if details.Status == podJobWaiting {
 						// Job is still running or waiting
-						return result.RequeueSoon(2)
+						return result.RequeueSoon(1)
 					}
 				} else {
 					// This pod has finished since it has a status

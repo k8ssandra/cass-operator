@@ -41,9 +41,3 @@
     - path: conditions
       description: conditions
       displayName: Conditions
-    - path: message
-      description: message
-      displayName: Message
-    - path: reason
-      description: reason
-      displayName: Reason

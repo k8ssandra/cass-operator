@@ -26,10 +26,14 @@
       x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podCount
     - path: racks
-      description: "Collection of logical rack identifiers, these may be named \nand specify a zone to limit pod deployment.\n"
+      description: |
+        Collection of logical rack identifiers, these may be named 
+        and specify a zone to limit pod deployment."
       displayName: Racks
     - path: racks[0].name
-      description: "User friendly name of the rack. Limit characters to \nalphanumeric values, dashes, and underscores.\n"
+      description: |
+        "User friendly name of the rack. Limit characters to 
+        alphanumeric values, dashes, and underscores."
       displayName: Name
       x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
@@ -37,7 +41,7 @@
       description: NodeAffinityLabels to pin the rack, using node affinity
       path: racks[0].nodeAffinityLabels
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - "urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
     - path: racks[0].zone
       description: |
         failure-domain.beta.kubernetes.io/zone node label value
@@ -90,29 +94,25 @@
         Internode port to use when leveraging Node Port network configuration.
       displayName: Internode Port
       x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-        - urn:alm:descriptor:com.tectonic.ui:advanced
+        - urn:alm:descriptor:com.tectonic.ui:number
     - path: networking.nodePort.internodeSSL
       description: |
         Internode SSL port to use when leveraging Node Port network configuration.
       displayName: Internode SSL Port
       x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-        - urn:alm:descriptor:com.tectonic.ui:advanced
+        - urn:alm:descriptor:com.tectonic.ui:number
     - path: networking.nodePort.native
       description: |
         Native transport port to use when leveraging Node Port network configuration.
       displayName: Native Port
       x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-        - urn:alm:descriptor:com.tectonic.ui:advanced
+        - urn:alm:descriptor:com.tectonic.ui:number
     - path: networking.nodePort.nativeSSL
       description: |
         Native transport SSL port to use when leveraging Node Port network configuration.
       displayName: Native SSL Port
       x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-        - urn:alm:descriptor:com.tectonic.ui:advanced
+        - urn:alm:descriptor:com.tectonic.ui:number
     - path: storageConfig
       description: |
         Storage descriptors used during the provisioning and consumption
@@ -134,7 +134,7 @@
         Storage requirements for the Cassandra data volume.
       displayName: Data volume size
       x-descriptors:
-        - urn:alm:descriptor:com.tectonic.number
+        - urn:alm:descriptor:com.tectonic.ui:text
     - path: storageConfig.additionalVolumes
       description: |
         Collection of additional storage volumes
@@ -144,19 +144,19 @@
       description: |
         Volume name
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
+        - "urn:alm:descriptor:com.tectonic.ui:text"
     - path: storageConfig.additionalVolumes[0].accessModes
       displayName: Access Modes
       description: |
         Volume access modes
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
+        - "urn:alm:descriptor:com.tectonic.ui:text"
     - path: storageConfig.additionalVolumes[0].resources.requests.storage
       description: |
         Storage requirements for the additional data volume.
       displayName: Data volume size
       x-descriptors:
-        - urn:alm:descriptor:com.tectonic.number
+        - urn:alm:descriptor:com.tectonic.ui:text
     - path: storageConfig.additionalVolumes[0].storageClassName
       description: |
         Name of the storage class this volume should use
@@ -172,7 +172,7 @@
       description: NodeAffinityLabels to pin the Datacenter, using node affinity
       path: nodeAffinityLabels
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - "urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
     - path: nodeSelector
       description: |
         Selector for identifying which nodes the DC pods should be deployed on.
@@ -224,7 +224,10 @@
       x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
     - path: configBuilderImage
-      description: "Optional: Specify the name of the image to use when \nrendering configuration files as each node in the \ncluster is initialized.\n"
+      description: |
+        Optional: Specify the name of the image to use when
+        rendering configuration files as each node in the
+        cluster is initialized."
       displayName: Config Builder Image
       x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
@@ -278,7 +281,7 @@
     - path: additionalServiceConfig
       description: |
         AdditionalServiceConfig allows to define additional parameters
-        that are included in the created Services. Note, user can override
+        that are included in the created Services. Note, users can override
         values set by cass-operator and doing so could break cass-operator
         functionality. Avoid label "cass-operator" and anything that starts
         with "cassandra.datastax.com/"
@@ -287,49 +290,49 @@
         - urn:alm:descriptor:com.tectonic.ui:hidden
     - path: additionalServiceConfig.additionalSeedService
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.additionalSeedService.additionalAnnotations
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.additionalSeedService.additionalLabels
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.allpodsService
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.allpodsService.additionalAnnotations
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.allpodsService.additionalLabels
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.dcService
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.dcService.additionalAnnotations
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.dcService.additionalLabels
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.nodePortService
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.nodePortService.additionalAnnotations
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.nodePortService.additionalLabels
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.seedService
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.seedService.additionalAnnotations
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: additionalServiceConfig.seedService.additionalLabels
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: serviceAccount
       description: Service Account
       displayName: Service Account
@@ -345,25 +348,25 @@
         Deprecated: Enable reaper sidecar support
       displayName: Enable
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: reaper.image
       description: |
         Deprecated: Image coordinate for reaper sidecar
       displayName: Image
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: reaper.imagePullPolicy
       description: |
         Deprecated: Image pull policy for sidecar
       displayName: Image Pull Policy
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: reaper.resources
       description: |
         Deprecated: Reaper sidecar resources
       displayName: Resources
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
     - path: systemLoggerResources
       description: |
         Resources for the system logger sidecar container
@@ -442,10 +445,10 @@
       displayName: Users
     - path: users[0].secretName
       description: |
-        Kubernetes secret containing user credentials
+        Kubernetes secret containing user credentials within the keys `username` and `password`.
       displayName: Secret
       x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:selector:core:v1:Secret'
+        - "urn:alm:descriptor:com.tectonic.ui:selector:core:v1:Secret"
     - path: users[0].superuser
       description: |
         Whether the created user should have superuser credentials

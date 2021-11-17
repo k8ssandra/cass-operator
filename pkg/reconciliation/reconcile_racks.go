@@ -2150,7 +2150,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 						if err != nil {
 							return result.Error(err)
 						}
-						return result.RequeueSoon(2)
+						return result.RequeueSoon(1)
 					} else if details.Status == podJobError {
 						// Log the error, move on
 						rc.ReqLogger.Error(fmt.Errorf("cleanup failed: %s", details.Error), "Job failed to successfully complete the cleanup", "Pod", pod)
@@ -2170,7 +2170,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 						continue
 					} else if details.Status == podJobWaiting {
 						// Job is still running or waiting
-						return result.RequeueSoon(1)
+						return result.RequeueSoon(10)
 					}
 				} else {
 					// This pod has finished since it has a status
@@ -2179,7 +2179,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 			} else {
 				if len(jobRunner) > 0 {
 					// Something is still holding the worker
-					return result.RequeueSoon(2)
+					return result.RequeueSoon(10)
 				}
 
 				// Nothing is holding the job, has this pod finished or hasn't it ran anything?
@@ -2247,7 +2247,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 		}
 
 		// We have a job going on, return back later to check the status
-		return result.RequeueSoon(2)
+		return result.RequeueSoon(10)
 	}
 	return result.Continue()
 }

@@ -5,6 +5,8 @@ package reconciliation
 
 import (
 	"fmt"
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"testing"
 
@@ -49,6 +51,65 @@ func Test_newStatefulSetForCassandraDatacenter(t *testing.T) {
 		assert.NotNil(t, got, "newStatefulSetForCassandraDatacenter should not have returned a nil statefulset")
 		assert.Equal(t, map[string]string{"dedicated": "cassandra"}, got.Spec.Template.Spec.NodeSelector)
 	}
+}
+
+func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:        "piclem",
+			ServerType:         "cassandra",
+			ServerVersion:      "4.0.1",
+			PodTemplateSpec:    &corev1.PodTemplateSpec{},
+			NodeAffinityLabels: map[string]string{"label1": "dc", "label2": "dc"},
+			StorageConfig: api.StorageConfig{
+				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+			},
+			Racks: []api.Rack{
+				{
+					Name:               "rack1",
+					Zone:               "z1",
+					NodeAffinityLabels: map[string]string{"label2": "rack1", "label3": "rack1"},
+				},
+			},
+			AdditionalLabels: map[string]string{
+				"Add": "label",
+			},
+		},
+	}
+
+	expectedStatefulsetLabels := map[string]string{
+		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
+		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.VersionLabel:   "4.0.1",
+		api.DatacenterLabel:     "dc1",
+		api.ClusterLabel:        "piclem",
+		api.RackLabel:           dc.Spec.Racks[0].Name,
+		"Add":                   "label",
+	}
+
+	expectedPodTemplateLabels := map[string]string{
+		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
+		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.VersionLabel:   "4.0.1",
+		api.DatacenterLabel:     "dc1",
+		api.ClusterLabel:        "piclem",
+		api.RackLabel:           dc.Spec.Racks[0].Name,
+		api.CassNodeState:       stateReadyToStart,
+		"Add":                   "label",
+	}
+
+	statefulset, newStatefulSetForCassandraDatacenterError := newStatefulSetForCassandraDatacenter(nil, "rack1", dc, 1, false)
+
+	assert.NoError(t, newStatefulSetForCassandraDatacenterError,
+		"should not have gotten error when creating the new statefulset")
+
+	assert.Equal(t, expectedStatefulsetLabels, statefulset.Labels)
+	assert.Equal(t, expectedPodTemplateLabels, statefulset.Spec.Template.Labels)
 }
 
 func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing.T) {

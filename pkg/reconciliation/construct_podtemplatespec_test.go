@@ -955,7 +955,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "dse",
 				serverVersion: "6.8.0",
 			},
-			want:      "datastax/dse-server:6.8.0",
+			want:      "datastax/dse-server:6.8.0-ubi7",
 			errString: "",
 		},
 		{
@@ -1005,7 +1005,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "dse",
 				serverVersion: "6.8.1234",
 			},
-			want:      "datastax/dse-server:6.8.1234",
+			want:      "datastax/dse-server:6.8.1234-ubi7",
 			errString: "",
 		},
 		{
@@ -1015,7 +1015,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "dse",
 				serverVersion: "6.8.4",
 			},
-			want:      "datastax/dse-server:6.8.4",
+			want:      "datastax/dse-server:6.8.4-ubi7",
 			errString: "",
 		},
 	}

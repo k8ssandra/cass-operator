@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    # Allow to rerun this for a tag to get updated UBI-images
 
 jobs:
   release_cass_operator:
@@ -37,6 +39,22 @@ jobs:
           echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
           echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
           echo "TARGET_VERSION=$(echo ${GITHUB_REF#refs/tags/} | awk '{print substr($0,2)}')" >> $GITHUB_ENV
+      - name: Update imageConfig to match release version for system-logger
+        id: imageConfig
+        shell: bash
+        run: |
+          yq eval -i '.images.system-logger = "k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}"' config/manager/image_config.yaml
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          file: logger.Dockerfile
+          context: .
+          push: true
+          tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build and push
         id: docker_build
         uses: docker/build-push-action@v2

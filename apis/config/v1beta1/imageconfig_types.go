@@ -33,6 +33,8 @@ type ImageConfig struct {
 
 	Images *Images `json:"images,omitempty"`
 
+	DefaultImages *DefaultImages `json:"defaults,omitempty"`
+
 	ImageRegistry string `json:"imageRegistryOverride,omitempty"`
 
 	ImagePullSecret corev1.LocalObjectReference `json:"imagePullSecret,omitempty"`
@@ -53,6 +55,19 @@ type Images struct {
 	SystemLogger string `json:"system-logger"`
 
 	ConfigBuilder string `json:"config-builder"`
+}
+
+type DefaultImages struct {
+	metav1.TypeMeta `json:",inline"`
+
+	CassandraImageComponent ImageComponent `json:"cassandra,omitempty"`
+
+	DSEImageComponent ImageComponent `json:"dse,omitempty"`
+}
+
+type ImageComponent struct {
+	Repository string `json:"repository,omitempty"`
+	Suffix     string `json:"suffix,omitempty"`
 }
 
 func init() {

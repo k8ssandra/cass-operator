@@ -56,4 +56,26 @@ func TestImageConfigParsing(t *testing.T) {
 	assert.NotNil(GetImageConfig().Images)
 	assert.True(strings.HasPrefix(GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
 	assert.True(strings.HasPrefix(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
+
+	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.CassandraImageComponent.Repository)
+	assert.Equal("datastax/dse-server", GetImageConfig().DefaultImages.DSEImageComponent.Repository)
+
+	path, err := GetCassandraImage("dse", "6.8.17")
+	assert.NoError(err)
+	assert.Equal("datastax/dse-server:6.8.17-ubi7", path)
+}
+
+func TestDefaultRepositories(t *testing.T) {
+	assert := assert.New(t)
+	imageConfig = &configv1beta1.ImageConfig{}
+	imageConfig.Images = &configv1beta1.Images{}
+
+	path, err := GetCassandraImage("cassandra", "4.0.1")
+	assert.NoError(err)
+	assert.Equal("k8ssandra/cass-management-api:4.0.1", path)
+
+	path, err = GetCassandraImage("dse", "6.8.17")
+	assert.NoError(err)
+	assert.Equal("datastax/dse-server:6.8.17", path)
+
 }

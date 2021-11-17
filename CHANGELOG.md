@@ -15,7 +15,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] Prevent instant requeues, every requeue must wait at least 500ms.
 * [FEATURE] #193 Add new Management API endpoints to HTTP Helper: GetKeyspaceReplication, ListTables, CreateTable
 * [FEATURE] #175 Add FQL reconciliation via parseFQLFromConfig and SetFullQueryLogging called from ReconcileAllRacks. CallIsFullQueryLogEnabledEndpoint and CallSetFullQueryLog functions to httphelper.
+* [FEATURE] #233 Allow overriding default Cassandra and DSE repositories and give versions a default suffix
 * [ENHANCEMENT] #185 Add more app.kubernetes.io labels to all the managed resources
+* [ENHANCEMENT] #233 Simplify rebuilding the UBI images if vulnerability is found in the base images
 * [BUGFIX] #185 introduced a regression which caused labels to be updated in StatefulSet when updating a version. Keep the original as these are not allowed to be modified.
 * [BUGFIX] #222 There were still occasions where clusterName was not an allowed value, cleaning them before creating StatefulSet
 

@@ -13,3 +13,10 @@ images:
 # imagePullPolicy: Always
 # imagePullSecret:
 #   name: my-secret-pull-registry
+defaults:
+  # Note, postfix is ignored if repository is not set
+  cassandra:
+    repository: "k8ssandra/cass-management-api"
+  dse:
+    repository: "datastax/dse-server"
+    suffix: "-ubi7"

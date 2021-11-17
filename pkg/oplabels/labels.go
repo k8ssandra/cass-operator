@@ -27,6 +27,12 @@ func AddKubernetesLabels(m map[string]string, dc *api.CassandraDatacenter) {
 
 	instanceName := fmt.Sprintf("cassandra-%s", dc.Spec.ClusterName)
 	m[InstanceLabel] = instanceName
+
+	if len(dc.Spec.AdditionalLabels) != 0 {
+		for key, value := range dc.Spec.AdditionalLabels {
+			m[key] = value
+		}
+	}
 }
 
 func AddDefunctManagedByLabel(m map[string]string) {

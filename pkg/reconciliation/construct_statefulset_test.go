@@ -110,6 +110,11 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 
 	assert.Equal(t, expectedStatefulsetLabels, statefulset.Labels)
 	assert.Equal(t, expectedPodTemplateLabels, statefulset.Spec.Template.Labels)
+
+	for _, volumeClaim := range statefulset.Spec.VolumeClaimTemplates {
+		assert.Equal(t, expectedStatefulsetLabels, volumeClaim.Labels)
+	}
+
 }
 
 func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing.T) {

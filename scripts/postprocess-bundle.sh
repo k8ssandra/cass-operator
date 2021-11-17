@@ -22,3 +22,6 @@ createdAt=$(date +%Y-%m-%d) yq eval '.metadata.annotations.createdAt = env(creat
 
 # Use the correct containerImage from the deployment
 yq eval '.metadata.annotations.containerImage = .spec.install.spec.deployments[0].spec.template.spec.containers[0].image' -i bundle/manifests/cass-operator.clusterserviceversion.yaml
+
+# Add ds.png as base64 encoded icondata
+yq eval '.spec.icon[0].base64data = "'"$(base64 -b 80 -i config/manifests/images/ds.png)"'"' -i bundle/manifests/cass-operator.clusterserviceversion.yaml

@@ -789,6 +789,36 @@ func TestCassandraDatacenter_buildPodTemplateSpec_labels_merge(t *testing.T) {
 	}
 }
 
+func TestCassandraDatacenter_buildContainers_additional_labels(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:     "bob",
+			ServerType:      "cassandra",
+			ServerVersion:   "3.11.7",
+			PodTemplateSpec: &corev1.PodTemplateSpec{},
+			AdditionalLabels: map[string]string{
+				"Add": "Label",
+			},
+		},
+	}
+	dc.Spec.PodTemplateSpec.Labels = map[string]string{"abc": "123"}
+
+	spec, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack")
+	got := spec.Labels
+
+	expected := dc.GetRackLabels("testrack")
+	oplabels.AddKubernetesLabels(expected, dc)
+	expected[api.CassNodeState] = stateReadyToStart
+	expected["app.kubernetes.io/managed-by"] = oplabels.ManagedByLabelValue
+	expected["abc"] = "123"
+	expected["Add"] = "Label"
+
+	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("labels = %v, want %v", got, expected)
+	}
+}
+
 func TestCassandraDatacenter_buildPodTemplateSpec_overrideSecurityContext(t *testing.T) {
 	uid := int64(1111)
 	gid := int64(2222)

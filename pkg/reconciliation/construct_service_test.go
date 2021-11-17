@@ -74,3 +74,37 @@ func TestServiceNameGeneration(t *testing.T) {
 	service := newSeedServiceForCassandraDatacenter(dc)
 	assert.Equal(t, "notcool-bob-seed-service", service.Name)
 }
+
+func TestAddingAdditionalLabels(t *testing.T)  {
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "piclem",
+			ServerVersion: "4.0.1",
+			AdditionalLabels: map[string]string{
+				"Add": "label",
+			},
+		},
+	}
+
+	expected := map[string]string{
+		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
+		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.VersionLabel:   "4.0.1",
+		api.DatacenterLabel:     "dc1",
+		api.ClusterLabel:        "piclem",
+		"Add": "label",
+	}
+
+
+	service := newServiceForCassandraDatacenter(dc)
+
+	if !reflect.DeepEqual(expected, service.Labels) {
+		t.Errorf("service labels = %v, want %v", service.Labels, expected)
+	}
+
+
+}

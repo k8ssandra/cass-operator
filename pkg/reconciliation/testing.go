@@ -203,6 +203,24 @@ func k8sMockClientUpdate(mockClient *mocks.Client, returnArg interface{}) *mock.
 		Once()
 }
 
+func k8sMockClientPatch(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
+	return mockClient.On("Patch",
+		mock.MatchedBy(
+			func(ctx context.Context) bool {
+				return ctx != nil
+			}),
+		mock.MatchedBy(
+			func(obj runtime.Object) bool {
+				return obj != nil
+			}),
+		mock.MatchedBy(
+			func(patch client.Patch) bool {
+				return patch != nil
+			})).
+		Return(returnArg).
+		Once()
+}
+
 func k8sMockClientCreate(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
 	return mockClient.On("Create",
 		mock.MatchedBy(

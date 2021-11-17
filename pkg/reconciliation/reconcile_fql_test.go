@@ -25,6 +25,7 @@ var fqlEnabledConfig string = `{"cassandra-yaml": {
 
 var fullQueryIsSupported string = `{"cassandra_version": "4.0.1",
 	"features": [
+		"async_sstable_tasks",
 		"full_query_logging"
 	]
 }
@@ -38,17 +39,23 @@ func setupPodList(rc *ReconciliationContext) {
 
 	mockClient := &mocks.Client{}
 
+	pods := []corev1.Pod{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-sts-0",
+		},
+		Status: corev1.PodStatus{
+			PodIP: podIP,
+		},
+	}}
+
+	rc.dcPods = []*corev1.Pod{
+		&pods[0],
+	}
+
 	k8sMockClientList(mockClient, nil).
 		Run(func(args mock.Arguments) {
 			arg := args.Get(1).(*corev1.PodList)
-			arg.Items = []corev1.Pod{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pvc-1",
-				},
-				Status: corev1.PodStatus{
-					PodIP: podIP,
-				},
-			}}
+			arg.Items = pods
 		})
 
 	rc.Client = mockClient

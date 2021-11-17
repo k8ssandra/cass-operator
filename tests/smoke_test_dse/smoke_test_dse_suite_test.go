@@ -9,6 +9,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
@@ -60,6 +61,20 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReady(dcName)
 			ns.ExpectDoneReconciling(dcName)
+
+			step = "scale up to 2 nodes"
+			json = "{\"spec\": {\"size\": 2}}"
+			k = kubectl.PatchMerge(dcResource, json)
+			ns.ExecAndLog(step, k)
+
+			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionTrue))
+			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
+			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
+
+			// Ensure that when 'ScaleUp' becomes 'false' that our pods are in fact up and running
+			Expect(len(ns.GetDatacenterReadyPodNames(dcName))).To(Equal(2))
+
+			ns.WaitForDatacenterReady(dcName)
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(dcYaml)

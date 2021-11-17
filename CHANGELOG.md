@@ -1,4 +1,5 @@
 # Changelog
+
 Changelog for Cass Operator, new PRs should update the `main / unreleased` section with entries in the order:
 
 ```markdown
@@ -10,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] #235 Adding AdditionalLabels and AdditionalAnnotations to add on all resources managed by the operator
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
 * [CHANGE] #213 Integration tests in Github Actions are now reusable across different workflows
 * [CHANGE] Prevent instant requeues, every requeue must wait at least 500ms.
@@ -22,6 +24,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] #222 There were still occasions where clusterName was not an allowed value, cleaning them before creating StatefulSet
 
 ## v1.8.0
+
 * [CHANGE] #178 If clusterName includes characters not allowed in the serviceName, strip those chars from service name.
 * [CHANGE] #108 Integrate Fossa component/license scanning
 * [CHANGE] #120 Removed Helm charts, use k8ssandra helm charts instead
@@ -45,9 +48,11 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] #134 Fix cluster-wide-installation to happen with Kustomize also, from config/cluster
 
 ## v1.7.1
+
 * [BUGFIX] #103 Fix upgrade of StatefulSet, do not change service name
 
 ## v1.7.0
+
 * [CHANGE] #1 Repository move
 * [CHANGE] #19 Remove internode_encryption_test
 * [CHANGE] #12 Remove Reaper sidecar integration
@@ -67,30 +72,34 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## v1.6.0
 
 Features:
+
 * Upgrade to Go 1.14 [#347](https://github.com/datastax/cass-operator/commit/7d4a2451d22df762d1258b2de4a7711c3e6470d0)
 * Add support for specifying additional PersistentVolumeClaims [#327](https://github.com/datastax/cass-operator/commit/8553579844b846e83131825444486c0f63d030fe)
 * Add support for specify rack labels [#292](https://github.com/datastax/cass-operator/commit/61e286b959d886fd2fd1a572802d99efad8064ba)
 
 Bug fixes:
+
 * Retry decommission to prevent cluster from getting stuck in decommission state [#356](https://github.com/datastax/cass-operator/commit/4b8163c366155735b6f61af08623bb2edbfdf9ee)
 * Set explicit tag for busybox image [#339](https://github.com/datastax/cass-operator/commit/56d6ea60589a32e89495e7961dce1b835751a5ed)
-* Incorrect volume mounts are created when adding an init container with volume mounts 
+* Incorrect volume mounts are created when adding an init container with volume mounts
   [#309](https://github.com/datastax/cass-operator/commit/80852343858cd62b54e37146ada41f94efc3c85e)
 
 Docs/tests:
+
 * Introduce integration with [Go Report Card](https://goreportcard.com/) [#346](https://github.com/datastax/cass-operator/commit/694aebdaa88f09a5d9f0cc86e55e0a581a5beb1e)
-* Add more examples for running integration tests [#338](https://github.com/datastax/cass-operator/commit/f033fbf24ed89f0469c04df75306dfeab4fdb175) 
- 
+* Add more examples for running integration tests [#338](https://github.com/datastax/cass-operator/commit/f033fbf24ed89f0469c04df75306dfeab4fdb175)
+
 ## v1.5.1
 
 Bug fixes:
+
 * Fixed reconciling logic in VMware k8s environments [#361](https://github.com/datastax/cass-operator/commit/821e58e6b283ef77b25ac7791ae9b60fbc1f69a1) [#342](https://github.com/datastax/cass-operator/commit/ddc3a99c1b38fb54ba293aeef74f878a3bb7e07e)
 * Retry decommission if worker nodes are too slow to start it [#356](https://github.com/datastax/cass-operator/commit/475ea74eda629fa0038214dce5969a7f07d48615)
-
 
 ## v1.5.0
 
 Features:
+
 * Allow configuration of the system.log tail-er [#311](https://github.com/datastax/cass-operator/commit/14b1310164e57546cdf1995d44835b63f2dee471)
 * Update Kubernetes support to cover 1.15 to 1.19 [#296](https://github.com/datastax/cass-operator/commit/a75754989cd29a38dd6406fdb75a5bad010f782d) [#304](https://github.com/datastax/cass-operator/commit/f34593199c06bb2536d0957eaff487153e36041a)
 * Specify more named ports for advanced workloads, and additional ports for ClusterIP service [#289](https://github.com/datastax/cass-operator/commit/b0eae79dae3dc1466ace18b2008d3de81622db5d) [#291](https://github.com/datastax/cass-operator/commit/00c02be24779262a8b89f85e64eb02efb14e2d15)
@@ -108,32 +117,35 @@ Features:
 * Support for specific reconciliation logic in VMware k8s environments [#204](https://github.com/datastax/cass-operator/commit/e7d20fbb365bc7679856d2c84a1af70f73167b57) [#206](https://github.com/datastax/cass-operator/commit/a853063b9f08eb1a64cb248e23b5a4a5db92a5ac) [#203](https://github.com/datastax/cass-operator/commit/10ff0812aa0138a2eb04c588fbe625f6a69ce833) [#224](https://github.com/datastax/cass-operator/commit/b4d7ae4b0da149eb896bacfae824ed6547895dbb) [#259](https://github.com/datastax/cass-operator/commit/a90f03c17f3e9675c1ceff37a2a7c0c0c85950a1)  [#288](https://github.com/datastax/cass-operator/commit/c7c159d53d34b390e7966477b0fc2ed2f5ec333e)
 
 Bug fixes:
+
 * Increase default init container CPU for better startup performance [#261](https://github.com/datastax/cass-operator/commit/0eece8718b7a7a48868c260e88684c0f98cdc05b)
 * Re-enable the most common quiet period [#253](https://github.com/datastax/cass-operator/commit/67217d8fc384652753331f5a1ae9cadd45ebc0cb)
 * Added label to all-pods service to narrow metrics scrape selection [#277](https://github.com/datastax/cass-operator/commit/193afa5524e85a90cea84afe8167b356f67d365a)
 
-
 Docs/tests:
+
 * Add test for infinite reconcile [#220](https://github.com/datastax/cass-operator/commit/361ef2d5da59cd48fab7d4d58e3075051515b32c)
 * Added keys from datastax/charts and updated README [#221](https://github.com/datastax/cass-operator/commit/5a56e98856d0c483eb4c415bd3c8b8292ffffe4b)
 * Support integration tests with k3d v3 [#248](https://github.com/datastax/cass-operator/commit/06804bd0b3062900c10a4cad3d3124e83cf17bf0)
 * Default to KIND for integration tests [#252](https://github.com/datastax/cass-operator/commit/dcaec731c5d0aefc2d2249c32592a275c42a46f0)
 * Run oss/dse integration smoke tests in github workflow [#267](https://github.com/datastax/cass-operator/commit/08ecb0977e09b547c035e280b99f2c36fa1d5806)
 
-
 ## v1.4.1
 
 Features:
+
 * Use Cassandra 4.0-beta1 image [#237](https://github.com/datastax/cass-operator/commit/085cdbb1a50534d4087c344e1e1a7b28a5aa922e)
 * Update to cass-config-builder 1.0.3 [#235](https://github.com/datastax/cass-operator/commit/7c317ecaa287f175e9556b48140b648d2ec60aa2)
 * DSE 6.8.3 support [#233](https://github.com/datastax/cass-operator/commit/0b9885a654ab09bb4144934b217dbbc9d0869da3)
 
 Bug fixes:
+
 * Fix for enabling DSE advanced workloads [#230](https://github.com/datastax/cass-operator/commit/72248629b7de7944fe9e7e262ef8d3c7c838a8c6)
 
 ## v1.4.0
 
 Features:
+
 * Cassandra 3.11.7 support [#209](https://github.com/datastax/cass-operator/commit/ecf81573948cf239180ab62fa72b91c9a8354a4e)
 * DSE 6.8.2 support [#207](https://github.com/datastax/cass-operator/commit/4d566f4a4d16c975919726b95a51c3be8729bf3e)
 * Configurable resource requests and limits for init and system-logger containers. [#184](https://github.com/datastax/cass-operator/commit/94634ba9a4b04f33fe7dfee539d500e0d4a0c02f)
@@ -147,8 +159,8 @@ Features:
 * Experimental ability to run DSE advanced workloads [#158](https://github.com/datastax/cass-operator/commit/ade4246b811a644ace75f9f561344eb815d43d52)
 * More validation logic in the webhook [#165](https://github.com/datastax/cass-operator/commit/3b7578987057fd9f90b7aeafea1d71ebbf691984)
 
-
 Bug fixes:
+
 * Fix watching CassDC to not trigger on status update [#212](https://github.com/datastax/cass-operator/commit/3ae79e01398d8f281769ef079bff66c3937eca24)
 * Enumerate more container ports [#200](https://github.com/datastax/cass-operator/commit/b0c004dc02b22c34682a3602097c1e09b6261572)
 * Resuming a stopped CassDC should not use the ScalingUp condition [#198](https://github.com/datastax/cass-operator/commit/7f26e0fd532ce690de282d1377dd00539ea8c251)
@@ -157,16 +169,16 @@ Bug fixes:
 * Use the additional seeds service in the config [#189](https://github.com/datastax/cass-operator/commit/4aaaff7b4e4ff4df626aa12f149329b866a06d35)
 * Fix operator so it can watch multiple or all namespaces [#173](https://github.com/datastax/cass-operator/commit/bac509a81b6339219fe3fc313dbf384653563c59)
 
-
 Docs/tests:
+
 * Encryption documentation [#196](https://github.com/datastax/cass-operator/commit/3a139c5f717a165c0f32047b7813b103786132b8)
 * Fix link to sample-cluster-sample-dc.yaml [#191](https://github.com/datastax/cass-operator/commit/28039ee40ac582074a522d2a13f3dfe15350caac)
 * Kong Ingress Documentation [#160](https://github.com/datastax/cass-operator/commit/b70a995eaee988846e07f9da9b4ab07e443074c2)
 * Adding AKS storage example [#164](https://github.com/datastax/cass-operator/commit/721056a435492e552cd85d18e38ea85569ba755f)
 * Added ingress documentation and sample client application to docs [#140](https://github.com/datastax/cass-operator/commit/4dd8e7c5d53398bb827dda326762c2fa15c131f9)
 
-
 ## v1.3.0
+
 * Add DSE 6.8.1 support, and update to config-builder 1.0.1 [#139](https://github.com/datastax/cass-operator/commit/8026d3687ee6eb783743ea5481ee51e69e284e1c)
 * Experimental support for Cassandra Reaper running in sidecar mode [#116](https://github.com/datastax/cass-operator/commit/30ac85f3d71886b750414e90476c42394d439026)
 * Support using RedHat universal base image containers [#95](https://github.com/datastax/cass-operator/commit/6f383bd8d22491c5a784611620e1327dafc3ffae)
@@ -182,6 +194,7 @@ Docs/tests:
 * Improve validation for webhook configuration [#103](https://github.com/datastax/cass-operator/commit/6656d1a2fd9cdec1fe495c28dd3fbac9617341f6)
 
 ## v1.2.0
+
 * Support for several k8s versions in the helm chart [#97](https://github.com/datastax/cass-operator/commit/9d76ad8258aa4e1d4893a357546de7de80aef0a0)
 * Ability to roll back a broken upgrade / configuration change [#85](https://github.com/datastax/cass-operator/commit/86b869df65f8180524dc12ff11502f6f6889eef5)
 * Mount root as read-only and temp dir as memory emptyvol [#86](https://github.com/datastax/cass-operator/commit/0474057e8339da4f89b2e901ab697f10a2184d78)
@@ -199,6 +212,7 @@ Docs/tests:
 * Better support and safeguards for adding racks to a datacenter [#59](https://github.com/datastax/cass-operator/commit/0bffa2e8d084ac675e3e4e69da58c7546a285596)
 
 ## v1.1.0
+
 * #27 Added a helm chart to ease installing.
 * #23 #37 #46 Added a validating webhook for CassandraDatacenter.
 * #43 Emit more events when reconciling a CassandraDatacenter.
@@ -207,6 +221,7 @@ Docs/tests:
 * Several integration tests added.
 
 ## v1.0.0
+
 * Project renamed to `cass-operator`.
 * KO-281 Node replace added.
 * KO-310 The operator will work to revive nodes that fail readiness for over 10 minutes
@@ -216,9 +231,10 @@ Docs/tests:
 * KO-329 API version bump to v1beta1.
 
 ## v0.9.0
+
 * KO-146 Create a secret for superuser creation if one is not provided.
 * KO-288 The operator can provision Cassandra clusters using images from
-  https://github.com/datastax/management-api-for-apache-cassandra and the primary
+  <https://github.com/datastax/management-api-for-apache-cassandra> and the primary
   CRD the operator works on is a `v1alpha2` `cassandra.datastax.com/CassandraDatacenter`
 * KO-210 Certain `CassandraDatacenter` inputs were not rolled out to pods during
   rolling upgrades of the cluster. The new process considers everything in the
@@ -230,6 +246,7 @@ Docs/tests:
 * KO-92 Added a container that tails the system log.
 
 ## v0.4.1
+
 * KO-190 Fix bug introduced in v0.4.0 that prevented scaling up or deleting
   datacenters.
 * KO-177 Create a headless service that includes pods that are not ready. While
@@ -239,6 +256,7 @@ Docs/tests:
   failure.
 
 ## v0.4.0
+
 * KO-97  Faster cluster deployments
 * KO-123 Custom CQL super user. Clusters can now be provisioned without the
   publicly known super user `cassandra` and publicly known default password
@@ -254,4 +272,5 @@ Docs/tests:
 * KO-136 Rework how DSE images and versions are specified.
 
 ## v0.3.0
+
 * Initial labs release.

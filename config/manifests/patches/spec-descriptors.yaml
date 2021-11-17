@@ -255,7 +255,9 @@
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
     - path: dockerImageRunsAsCassandra
       description: |
-        Does the Server Docker image run as the Cassandra user?
+        Indicates whether the Cassandra container runs as the built-in `cassandra` user. 
+        On OpenShift clusters this field MUST be set to false given the random UID and GID
+        assigned to each pod / container.
       displayName: Docker image runs as Cassandra
       x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch

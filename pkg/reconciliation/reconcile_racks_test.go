@@ -1498,7 +1498,7 @@ func TestCleanupAfterScalingAsyncFeatures(t *testing.T) {
 	mockCallKeyspaceCleanup(mockHttpClient)
 
 	r := rc.cleanupAfterScaling()
-	if r != result.RequeueSoon(2) {
+	if r != result.RequeueSoon(10) {
 		t.Fatalf("expected result of result.RequeueSoon(2) but got %s", r)
 	}
 
@@ -1546,8 +1546,8 @@ func TestCleanupAfterScalingAsyncFeaturesMidCrash(t *testing.T) {
 	mockCallKeyspaceCleanup(mockHttpClient)
 
 	r := rc.cleanupAfterScaling()
-	if r != result.RequeueSoon(2) {
-		t.Fatalf("expected result of result.RequeueSoon(2) but got %s", r)
+	if r != result.RequeueSoon(10) {
+		t.Fatalf("expected result of result.RequeueSoon(10) but got %s", r)
 	}
 
 	mockFeaturesEnabled(mockHttpClient)
@@ -1557,8 +1557,8 @@ func TestCleanupAfterScalingAsyncFeaturesMidCrash(t *testing.T) {
 	mockNoJobDetailsResponse(mockHttpClient)
 
 	r = rc.cleanupAfterScaling()
-	if r != result.RequeueSoon(2) {
-		t.Fatalf("expected result of result.RequeueSoon(2) but got %s", r)
+	if r != result.RequeueSoon(1) {
+		t.Fatalf("expected result of result.RequeueSoon(1) but got %s", r)
 	}
 
 	// Job should still be done eventually
@@ -1607,7 +1607,7 @@ func TestCleanupAfterScalingNoAsyncFeatures(t *testing.T) {
 	}
 
 	r := rc.cleanupAfterScaling()
-	if r != result.RequeueSoon(2) {
+	if r != result.RequeueSoon(10) {
 		t.Fatalf("expected result of result.RequeueSoon(2) but got %s", r)
 	}
 
@@ -1685,7 +1685,7 @@ func mockCallKeyspaceCleanupEndpoint(mockHttpClient *mocks.HttpClient) {
 }
 
 func mockPodAnnotationsUpdate(rc *ReconciliationContext) {
-	k8sMockClientUpdate(rc.Client.(*mocks.Client), nil).
+	k8sMockClientPatch(rc.Client.(*mocks.Client), nil).
 		Run(func(args mock.Arguments) {
 			arg := args.Get(1).(*corev1.Pod)
 			rc.dcPods[0].Annotations = arg.Annotations

@@ -8,8 +8,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
-
+## v.1.9.0
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
 * [CHANGE] #213 Integration tests in Github Actions are now reusable across different workflows
 * [CHANGE] Prevent instant requeues, every requeue must wait at least 500ms.

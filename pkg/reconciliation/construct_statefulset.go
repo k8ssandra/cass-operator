@@ -106,10 +106,10 @@ func newStatefulSetForCassandraDatacenter(
 	if useDefunctManagedByForPvc {
 		oplabels.AddDefunctManagedByLabel(pvcLabels)
 	}
-	oplabels.AddKubernetesLabels(pvcLabels, dc)
+	oplabels.AddOperatorLabels(pvcLabels, dc)
 
 	statefulSetLabels := dc.GetRackLabels(rackName)
-	oplabels.AddKubernetesLabels(statefulSetLabels, dc)
+	oplabels.AddOperatorLabels(statefulSetLabels, dc)
 
 	statefulSetSelectorLabels := dc.GetRackLabels(rackName)
 

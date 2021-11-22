@@ -20,7 +20,7 @@ const (
 	CreatedByLabel             = "app.kubernetes.io/created-by"
 )
 
-func AddKubernetesLabels(m map[string]string, dc *api.CassandraDatacenter) {
+func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
 	m[ManagedByLabel] = ManagedByLabelValue
 	m[NameLabel] = NameLabelValue
 	m[VersionLabel] = dc.Spec.ServerVersion

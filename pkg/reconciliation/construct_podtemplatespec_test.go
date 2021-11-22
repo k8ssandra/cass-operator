@@ -778,7 +778,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_labels_merge(t *testing.T) {
 	got := spec.Labels
 
 	expected := dc.GetRackLabels("testrack")
-	oplabels.AddKubernetesLabels(expected, dc)
+	oplabels.AddOperatorLabels(expected, dc)
 	expected[api.CassNodeState] = stateReadyToStart
 	expected["app.kubernetes.io/managed-by"] = oplabels.ManagedByLabelValue
 	expected["abc"] = "123"
@@ -807,7 +807,7 @@ func TestCassandraDatacenter_buildContainers_additional_labels(t *testing.T) {
 	got := spec.Labels
 
 	expected := dc.GetRackLabels("testrack")
-	oplabels.AddKubernetesLabels(expected, dc)
+	oplabels.AddOperatorLabels(expected, dc)
 	expected[api.CassNodeState] = stateReadyToStart
 	expected["app.kubernetes.io/managed-by"] = oplabels.ManagedByLabelValue
 	expected["abc"] = "123"

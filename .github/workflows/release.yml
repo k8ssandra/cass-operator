@@ -45,7 +45,7 @@ jobs:
         run: |
           yq eval -i '.images.system-logger = "k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}"' config/manager/image_config.yaml
       - name: Build and push
-        id: docker_build
+        id: docker_build_system-logger
         uses: docker/build-push-action@v2
         with:
           file: logger.Dockerfile
@@ -56,7 +56,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build and push
-        id: docker_build
+        id: docker_build_cass-operator
         uses: docker/build-push-action@v2
         with:
           file: Dockerfile

@@ -213,10 +213,10 @@ type CassandraDatacenterSpec struct {
 	// Tolerations applied to the Cassandra pod. Note that these cannot be overridden with PodTemplateSpec.
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// Additional Labels allows to define additional labels that will be included in all object created by the operator. Not, user can override values set by default from the cass-operator and doing so could break cass-operator functionality.
+	// Additional Labels allows to define additional labels that will be included in all objects created by the operator. Note, user can override values set by default from the cass-operator and doing so could break cass-operator functionality.
 	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
 
-	// Additional annotations allows to define additional annotations that will be included in all object created by the operator. Not, user can override values set by default from the cass-operator and doing so could break cass-operator functionality.
+	// Additional annotations allows to define additional annotations that will be included in all objects created by the operator. Note, user can override values set by default from the cass-operator and doing so could break cass-operator functionality.
 	AdditionalAnnotations map[string]string `json:"additionalAnnotations,omitempty"`
 }
 

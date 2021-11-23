@@ -54,10 +54,9 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 IMG_LATEST ?= $(IMAGE_TAG_BASE):latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-#CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 CRD_OPTIONS ?= "crd"
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.21
+ENVTEST_K8S_VERSION = 1.22
 
 # Logger image
 LOG_IMG ?= k8ssandra/system-logger:latest
@@ -186,7 +185,7 @@ controller-gen: ## Download controller-gen locally if necessary.
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.4.0)
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.4.1)
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
@@ -202,7 +201,7 @@ ifeq (,$(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPSDK)) ;\
-	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.14.0/operator-sdk_${OS}_${ARCH} ;\
+	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.15.0/operator-sdk_${OS}_${ARCH} ;\
 	chmod +x $(OPSDK) ;\
 	}
 else

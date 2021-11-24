@@ -40,19 +40,11 @@ spec:
           spec:
             description: CassandraDatacenterSpec defines the desired state of a CassandraDatacenter
             properties:
-              additionalAnnotations:
-                additionalProperties:
-                  type: string
-                description: Additional annotations allows to define additional annotations
-                  that will be included in all object created by the operator. Not,
-                  user can override values set by default from the cass-operator and
-                  doing so could break cass-operator functionality.
-                type: object
               additionalLabels:
                 additionalProperties:
                   type: string
                 description: Additional Labels allows to define additional labels
-                  that will be included in all object created by the operator. Not,
+                  that will be included in all objects created by the operator. Note,
                   user can override values set by default from the cass-operator and
                   doing so could break cass-operator functionality.
                 type: object

@@ -10,8 +10,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ```
 
 ## unreleased
+* [ENHANCEMENT] #235 Adding AdditionalLabels to add on all resources managed by the operator
 
-* [ENHANCEMENT] #235 Adding AdditionalLabels and AdditionalAnnotations to add on all resources managed by the operator
+## v.1.9.0
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
 * [CHANGE] #213 Integration tests in Github Actions are now reusable across different workflows
 * [CHANGE] Prevent instant requeues, every requeue must wait at least 500ms.
@@ -22,6 +23,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] #233 Simplify rebuilding the UBI images if vulnerability is found in the base images
 * [BUGFIX] #185 introduced a regression which caused labels to be updated in StatefulSet when updating a version. Keep the original as these are not allowed to be modified.
 * [BUGFIX] #222 There were still occasions where clusterName was not an allowed value, cleaning them before creating StatefulSet
+* [BUGFIX] #186 Run cleanups in the background once per pod and poll its state instead of looping endlessly
 
 ## v1.8.0
 

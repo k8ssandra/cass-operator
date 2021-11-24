@@ -39,7 +39,7 @@ cass-operator-555577b9f8-zgx6j   1/1     Running   0          25h
 
 ### Upgrade instructions:
 
-Updates are supported from previous versions of ``k8ssandra/cass-operator``. If upgrading from versions older than 1.7.0 (released under ``datastax/cass-operator`` name), please upgrade first to version 1.7.1. The following instructions apply when upgrading from 1.7.1 to 1.8.0.
+Updates are supported from previous versions of ``k8ssandra/cass-operator``. If upgrading from versions older than 1.7.0 (released under ``datastax/cass-operator`` name), please upgrade first to version 1.7.1. The following instructions apply when upgrading from 1.7.1 to 1.8.0 or to 1.9.0.
 
 Due to the modifications to cass-operator’s underlying controller-runtime and updated Kubernetes versions, there is a need to do couple of manual steps before updating to a newest version of cass-operator. Newer Kubernetes versions require stricter validation and as such we need to remove ``preserveUnknownFields`` global property from the CRD to allow us to update to a newer CRD. The newer controller-runtime on the other hand modifies the liveness, readiness and configuration options, which require us to delete the older deployment. These commands do not delete your running Cassandra instances.
 
@@ -80,14 +80,14 @@ kind: Kustomization
 namespace: cass-operator
 
 resources:
-  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.8.0
+  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.9.0
 
 components:
   - github.com/k8ssandra/cass-operator/config/components/cluster
 
 images:
 - name: k8ssandra/cass-operator
-  newTag: v1.8.0
+  newTag: v1.9.0
 ```
 
 We provide both components to modify the installation as well as some additional resources for custom features. At the moment, you can modify the behavior of the installation in the following ways, or remove a component to
@@ -128,7 +128,7 @@ reclaimPolicy: Delete
 Paste the above to a file and apply:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.8.0/operator/k8s-flavors/gke/storage.yaml
+kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.9.0/operator/k8s-flavors/gke/storage.yaml
 ```
 
 ### Creating a CassandraDatacenter
@@ -256,6 +256,7 @@ All features are documented in the [User Documentation](docs/user/README.md).
 ### Containers
 
 The operator is comprised of the following container images working in concert:
+
 * The operator, built from sources using the kubebuilder v3 structure, from [controllers](controllers/) directory.
 * The config builder init container, built from sources in [datastax/cass-config-builder](https://github.com/datastax/cass-config-builder).
 * server-system-logger, a tiny tail logger for outputting Cassandra logs for kubectl. Implemented in [logger.Dockerfile](logger.Dockerfile)
@@ -266,7 +267,7 @@ The operator is comprised of the following container images working in concert:
 
 The Cassandra container must be built with support for management-api, otherwise cass-operator will fail to work correctly.
 
-### Overriding properties of cass-operator created Containers
+### Overriding properties of cass-operator created containers
 
 If the CassandraDatacenter specifies a podTemplateSpec field, then containers with specific names can be used to override default settings in containers that will be created by cass-operator.
 

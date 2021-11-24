@@ -157,6 +157,7 @@ func (client *NodeMgmtClient) CallMetadataEndpointsEndpoint(pod *corev1.Pod) (Ca
 		endpoint: "/api/v0/metadata/endpoints",
 		host:     podHost,
 		method:   http.MethodGet,
+		timeout:  60 * time.Second,
 	}
 
 	bytes, err := callNodeMgmtEndpoint(client, request, "")
@@ -195,6 +196,7 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 		endpoint: fmt.Sprintf("/api/v0/ops/auth/role?%s", postData.Encode()),
 		host:     podHost,
 		method:   http.MethodPost,
+		timeout:  60 * time.Second,
 	}
 	_, err = callNodeMgmtEndpoint(client, request, "")
 	return err
@@ -215,6 +217,7 @@ func (client *NodeMgmtClient) CallProbeClusterEndpoint(pod *corev1.Pod, consiste
 		endpoint: fmt.Sprintf("/api/v0/probes/cluster?consistency_level=%s&rf_per_dc=%d", consistencyLevel, rfPerDc),
 		host:     podHost,
 		method:   http.MethodGet,
+		timeout:  60 * time.Second,
 	}
 
 	_, err = callNodeMgmtEndpoint(client, request, "")
@@ -243,11 +246,23 @@ func (client *NodeMgmtClient) CallDrainEndpoint(pod *corev1.Pod) error {
 	return err
 }
 
+// CallKeyspaceCleanupEndpoint is deprecated. Use it only when accessing old management-api versions. Otherwise, use CallKeyspaceCleanup
 func (client *NodeMgmtClient) CallKeyspaceCleanupEndpoint(pod *corev1.Pod, jobs int, keyspaceName string, tables []string) error {
 	client.Log.Info(
 		"calling Management API keyspace cleanup - POST /api/v0/ops/keyspace/cleanup",
 		"pod", pod.Name,
 	)
+
+	req, err := createKeySpaceRequest(pod, jobs, keyspaceName, tables, "/api/v0/ops/keyspace/cleanup")
+	if err != nil {
+		return err
+	}
+
+	_, err = callNodeMgmtEndpoint(client, *req, "application/json")
+	return err
+}
+
+func createKeySpaceRequest(pod *corev1.Pod, jobs int, keyspaceName string, tables []string, endpoint string) (*nodeMgmtRequest, error) {
 	postData := make(map[string]interface{})
 	if jobs > -1 {
 		postData["jobs"] = strconv.Itoa(jobs)
@@ -263,24 +278,44 @@ func (client *NodeMgmtClient) CallKeyspaceCleanupEndpoint(pod *corev1.Pod, jobs 
 
 	body, err := json.Marshal(postData)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	podHost, err := BuildPodHostFromPod(pod)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	request := nodeMgmtRequest{
-		endpoint: "/api/v0/ops/keyspace/cleanup",
+	request := &nodeMgmtRequest{
+		endpoint: endpoint,
 		host:     podHost,
 		method:   http.MethodPost,
-		timeout:  time.Second * 20,
 		body:     body,
 	}
 
-	_, err = callNodeMgmtEndpoint(client, request, "application/json")
-	return err
+	return request, nil
+}
+
+// CallKeyspaceCleanup returns the job id of the cleanup job
+func (client *NodeMgmtClient) CallKeyspaceCleanup(pod *corev1.Pod, jobs int, keyspaceName string, tables []string) (string, error) {
+	client.Log.Info(
+		"calling Management API keyspace cleanup - POST /api/v1/ops/keyspace/cleanup",
+		"pod", pod.Name,
+	)
+
+	req, err := createKeySpaceRequest(pod, jobs, keyspaceName, tables, "/api/v1/ops/keyspace/cleanup")
+	if err != nil {
+		return "", err
+	}
+
+	req.timeout = 20 * time.Second
+
+	jobId, err := callNodeMgmtEndpoint(client, *req, "application/json")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jobId), nil
 }
 
 // CreateKeyspace calls management API to create a new Keyspace.
@@ -574,6 +609,7 @@ func (client *NodeMgmtClient) CallReloadSeedsEndpoint(pod *corev1.Pod) error {
 		endpoint: "/api/v0/ops/seeds/reload",
 		host:     podHost,
 		method:   http.MethodPost,
+		timeout:  60 * time.Second,
 	}
 
 	_, err = callNodeMgmtEndpoint(client, request, "")
@@ -595,6 +631,7 @@ func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) erro
 		endpoint: "/api/v0/ops/node/decommission",
 		host:     podHost,
 		method:   http.MethodPost,
+		timeout:  60 * time.Second,
 	}
 
 	_, err = callNodeMgmtEndpoint(client, request, "")
@@ -658,14 +695,18 @@ func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDet
 		method:   http.MethodGet,
 	}
 
+	job := &JobDetails{}
 	data, err := callNodeMgmtEndpoint(client, request, "")
 	if err != nil {
+		if re, ok := err.(*RequestError); ok && re.NotFound() {
+			// Job was not found, the request did succeed
+			return job, nil
+		}
 		client.Log.Error(err, "failed to fetch job details from management-api")
 		return nil, err
 	}
 
-	job := &JobDetails{}
-	if err := json.Unmarshal(data, &job); err != nil {
+	if err := json.Unmarshal(data, job); err != nil {
 		return nil, err
 	}
 
@@ -688,10 +729,6 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 		return nil, err
 	}
 	req.Close = true
-
-	if request.timeout == 0 {
-		request.timeout = 60 * time.Second
-	}
 
 	if request.timeout > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), request.timeout)

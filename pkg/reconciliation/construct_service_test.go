@@ -75,26 +75,26 @@ func TestServiceNameGeneration(t *testing.T) {
 	assert.Equal(t, "notcool-bob-seed-service", service.Name)
 }
 
-func TestLabelsWithNewSeedServiceForCassandraDatacenter(t *testing.T)  {
+func TestLabelsWithNewSeedServiceForCassandraDatacenter(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dc1",
 		},
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: "piclem",
+			ClusterName:   "piclem",
 			ServerVersion: "4.0.1",
 			AdditionalServiceConfig: api.ServiceConfig{
-				DatacenterService:     api.ServiceConfigAdditions{
+				DatacenterService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"DatacenterService": "add",
 					},
 				},
-				SeedService:           api.ServiceConfigAdditions{
+				SeedService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"SeedService": "add",
 					},
 				},
-				AllPodsService:        api.ServiceConfigAdditions{
+				AllPodsService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"AllPodsService": "add",
 					},
@@ -104,7 +104,7 @@ func TestLabelsWithNewSeedServiceForCassandraDatacenter(t *testing.T)  {
 						"AdditionalSeedService": "add",
 					},
 				},
-				NodePortService:       api.ServiceConfigAdditions{
+				NodePortService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"NodePortService": "add",
 					},
@@ -122,10 +122,9 @@ func TestLabelsWithNewSeedServiceForCassandraDatacenter(t *testing.T)  {
 		oplabels.NameLabel:      oplabels.NameLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
 		api.ClusterLabel:        "piclem",
-		"Add": "label",
-		"SeedService": "add",
+		"Add":                   "label",
+		"SeedService":           "add",
 	}
-
 
 	service := newSeedServiceForCassandraDatacenter(dc)
 
@@ -134,26 +133,26 @@ func TestLabelsWithNewSeedServiceForCassandraDatacenter(t *testing.T)  {
 	}
 }
 
-func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T)  {
+func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dc1",
 		},
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: "piclem",
+			ClusterName:   "piclem",
 			ServerVersion: "4.0.1",
 			AdditionalServiceConfig: api.ServiceConfig{
-				DatacenterService:     api.ServiceConfigAdditions{
+				DatacenterService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"DatacenterService": "add",
 					},
 				},
-				SeedService:           api.ServiceConfigAdditions{
+				SeedService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"SeedService": "add",
 					},
 				},
-				AllPodsService:        api.ServiceConfigAdditions{
+				AllPodsService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"AllPodsService": "add",
 					},
@@ -163,7 +162,7 @@ func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T)  {
 						"AdditionalSeedService": "add",
 					},
 				},
-				NodePortService:       api.ServiceConfigAdditions{
+				NodePortService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"NodePortService": "add",
 					},
@@ -182,10 +181,9 @@ func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T)  {
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
-		"Add": "label",
-		"NodePortService": "add",
+		"Add":                   "label",
+		"NodePortService":       "add",
 	}
-
 
 	service := newNodePortServiceForCassandraDatacenter(dc)
 
@@ -194,26 +192,26 @@ func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T)  {
 	}
 }
 
-func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T)  {
+func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dc1",
 		},
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: "piclem",
+			ClusterName:   "piclem",
 			ServerVersion: "4.0.1",
 			AdditionalServiceConfig: api.ServiceConfig{
-				DatacenterService:     api.ServiceConfigAdditions{
+				DatacenterService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"DatacenterService": "add",
 					},
 				},
-				SeedService:           api.ServiceConfigAdditions{
+				SeedService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"SeedService": "add",
 					},
 				},
-				AllPodsService:        api.ServiceConfigAdditions{
+				AllPodsService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"AllPodsService": "add",
 					},
@@ -223,7 +221,7 @@ func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T)  {
 						"AdditionalSeedService": "add",
 					},
 				},
-				NodePortService:       api.ServiceConfigAdditions{
+				NodePortService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"NodePortService": "add",
 					},
@@ -242,11 +240,10 @@ func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T)  {
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
-		api.PromMetricsLabel: "true",
-		"Add": "label",
-		"AllPodsService": "add",
+		api.PromMetricsLabel:    "true",
+		"Add":                   "label",
+		"AllPodsService":        "add",
 	}
-
 
 	service := newAllPodsServiceForCassandraDatacenter(dc)
 
@@ -255,26 +252,26 @@ func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T)  {
 	}
 }
 
-func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T)  {
+func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dc1",
 		},
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: "piclem",
+			ClusterName:   "piclem",
 			ServerVersion: "4.0.1",
 			AdditionalServiceConfig: api.ServiceConfig{
-				DatacenterService:     api.ServiceConfigAdditions{
+				DatacenterService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"DatacenterService": "add",
 					},
 				},
-				SeedService:           api.ServiceConfigAdditions{
+				SeedService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"SeedService": "add",
 					},
 				},
-				AllPodsService:        api.ServiceConfigAdditions{
+				AllPodsService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"AllPodsService": "add",
 					},
@@ -284,7 +281,7 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T)  {
 						"AdditionalSeedService": "add",
 					},
 				},
-				NodePortService:       api.ServiceConfigAdditions{
+				NodePortService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"NodePortService": "add",
 					},
@@ -303,10 +300,9 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T)  {
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
-		"Add": "label",
-		"DatacenterService": "add",
+		"Add":                   "label",
+		"DatacenterService":     "add",
 	}
-
 
 	service := newServiceForCassandraDatacenter(dc)
 
@@ -315,26 +311,26 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T)  {
 	}
 }
 
-func TestLabelsWithNewAdditionalSeedServiceForCassandraDatacenter(t *testing.T)  {
+func TestLabelsWithNewAdditionalSeedServiceForCassandraDatacenter(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dc1",
 		},
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: "piclem",
+			ClusterName:   "piclem",
 			ServerVersion: "4.0.1",
 			AdditionalServiceConfig: api.ServiceConfig{
-				DatacenterService:     api.ServiceConfigAdditions{
+				DatacenterService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"DatacenterService": "add",
 					},
 				},
-				SeedService:           api.ServiceConfigAdditions{
+				SeedService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"SeedService": "add",
 					},
 				},
-				AllPodsService:        api.ServiceConfigAdditions{
+				AllPodsService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"AllPodsService": "add",
 					},
@@ -344,7 +340,7 @@ func TestLabelsWithNewAdditionalSeedServiceForCassandraDatacenter(t *testing.T) 
 						"AdditionalSeedService": "add",
 					},
 				},
-				NodePortService:       api.ServiceConfigAdditions{
+				NodePortService: api.ServiceConfigAdditions{
 					Labels: map[string]string{
 						"NodePortService": "add",
 					},
@@ -363,10 +359,9 @@ func TestLabelsWithNewAdditionalSeedServiceForCassandraDatacenter(t *testing.T) 
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
-		"Add": "label",
+		"Add":                   "label",
 		"AdditionalSeedService": "add",
 	}
-
 
 	service := newAdditionalSeedServiceForCassandraDatacenter(dc)
 
@@ -375,13 +370,13 @@ func TestLabelsWithNewAdditionalSeedServiceForCassandraDatacenter(t *testing.T) 
 	}
 }
 
-func TestAddingAdditionalLabels(t *testing.T)  {
+func TestAddingAdditionalLabels(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dc1",
 		},
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName: "piclem",
+			ClusterName:   "piclem",
 			ServerVersion: "4.0.1",
 			AdditionalLabels: map[string]string{
 				"Add": "label",
@@ -396,9 +391,8 @@ func TestAddingAdditionalLabels(t *testing.T)  {
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
-		"Add": "label",
+		"Add":                   "label",
 	}
-
 
 	service := newServiceForCassandraDatacenter(dc)
 

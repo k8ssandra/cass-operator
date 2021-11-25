@@ -62,12 +62,14 @@ type CassandraTaskSpec struct {
 	/*
 		spec:
 			datacenter:
-				name: dc1
+				name: dc2
 				namespace: cass-operator
 			scheduledTime: "nnnnnn"
 			jobs:
 				- name: rebuild-dc1
 				  command: rebuild
+				  args:
+				    source_datacenter: dc1
 			restartPolicy: Never
 			concurrencyPolicy: Forbid
 			ttlSecondsAfterFinished: 86400
@@ -76,6 +78,9 @@ type CassandraTaskSpec struct {
 
 type CassandraJob struct {
 	// name, command.. anything else?
+	Name string `json:"name"`
+
+	// Should command be typed to restrict allowed values in this version?
 }
 
 // CassandraTaskStatus defines the observed state of CassandraJob

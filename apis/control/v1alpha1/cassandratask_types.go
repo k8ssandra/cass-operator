@@ -77,10 +77,13 @@ type CassandraTaskSpec struct {
 }
 
 type CassandraJob struct {
-	// name, command.. anything else?
 	Name string `json:"name"`
 
+	// TODO Should this be typed to match what jobs this version of cass-operator can run?
+	Command string `json:"command"`
+
 	// Should command be typed to restrict allowed values in this version?
+	Arguments map[string]string `json:"args,omitempty"`
 }
 
 // CassandraTaskStatus defines the observed state of CassandraJob

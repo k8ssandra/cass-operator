@@ -36,7 +36,6 @@ import (
 	cassapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	api "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 )
 
@@ -149,7 +148,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	for _ = range cassJob.Spec.Jobs {
 		// TODO Check if this part of the job has finished (from Status?)
 		// Job undefined at this point, define later
-		r.execOnEveryPod(ctx, &dc, cleanup())
+		r.reconcileEveryPodTask(ctx, &dc, cleanup())
 	}
 
 	// TODO Implement "cleanup" first
@@ -196,18 +195,14 @@ const (
 	podJobCompleted = "COMPLETED"
 	podJobError     = "ERROR"
 	podJobWaiting   = "WAITING"
+
+	jobRunningRequeue = time.Duration(10 * time.Second)
 )
 
 var (
 	// TODO This should be per Datacenter
 	jobRunner chan int = make(chan int, 1)
 )
-
-/*
-	We need to replicate following behavior:
-		* GetDcPods
-		* Initialize NodeMgmtClient
-*/
 
 // TODO These need some additional parameters passed to them (such as source datacenter with rebuild)
 func callCleanup(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod) (string, error) {
@@ -264,13 +259,13 @@ func (r *CassandraTaskReconciler) initializeMgmtClient(ctx context.Context, dc *
 // featureSet
 // NodeMgmtClient (or create it?)
 // command to execute
-func (r *CassandraTaskReconciler) execOnEveryPod(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig TaskConfiguration) result.ReconcileResult {
+func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig TaskConfiguration) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	// We sort to ensure we process the dcPods in the same order
 	dcPods, err := r.getDatacenterPods(ctx, dc)
 	if err != nil {
-		return err
+		return ctrl.Result{}, err
 	}
 
 	sort.Slice(dcPods, func(i, j int) bool {
@@ -286,13 +281,13 @@ func (r *CassandraTaskReconciler) execOnEveryPod(ctx context.Context, dc *cassap
 
 	nodeMgmtClient, err := r.initializeMgmtClient(ctx, dc)
 	if err != nil {
-		return err
+		return ctrl.Result{}, err
 	}
 
 	for idx, pod := range dcPods {
 		features, err := nodeMgmtClient.FeatureSet(&pod)
 		if err != nil {
-			return err
+			return ctrl.Result{}, err
 		}
 
 		if pod.Annotations == nil {
@@ -308,7 +303,7 @@ func (r *CassandraTaskReconciler) execOnEveryPod(ctx context.Context, dc *cassap
 					details, err := nodeMgmtClient.JobDetails(&pod, podJobId)
 					if err != nil {
 						logger.Error(err, "Could not get JobDetails for pod", "Pod", pod)
-						return result.Error(err)
+						return ctrl.Result{}, err
 					}
 
 					if details.Id == "" {
@@ -316,16 +311,16 @@ func (r *CassandraTaskReconciler) execOnEveryPod(ctx context.Context, dc *cassap
 						delete(pod.Annotations, podJobIdAnnotation)
 						err = r.Client.Patch(ctx, &pod, podPatch)
 						if err != nil {
-							return result.Error(err)
+							return ctrl.Result{}, err
 						}
-						return result.RequeueSoon(1)
+						return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 					} else if details.Status == podJobError {
 						// Log the error, move on
-						logger.Error(fmt.Errorf("cleanup failed: %s", details.Error), "Job failed to successfully complete the cleanup", "Pod", pod)
+						logger.Error(fmt.Errorf("task failed: %s", details.Error), "Job failed to successfully complete the task", "Pod", pod)
 						pod.Annotations[podJobStatusAnnotation] = podJobError
 						err = r.Client.Patch(ctx, &pod, podPatch)
 						if err != nil {
-							return result.Error(err)
+							return ctrl.Result{}, err
 						}
 						continue
 					} else if details.Status == podJobCompleted {
@@ -333,12 +328,12 @@ func (r *CassandraTaskReconciler) execOnEveryPod(ctx context.Context, dc *cassap
 						pod.Annotations[podJobStatusAnnotation] = podJobCompleted
 						err = r.Client.Patch(ctx, &pod, podPatch)
 						if err != nil {
-							return result.Error(err)
+							return ctrl.Result{}, err
 						}
 						continue
 					} else if details.Status == podJobWaiting {
 						// Job is still running or waiting
-						return result.RequeueSoon(10)
+						return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
 					}
 				} else {
 					// This pod has finished since it has a status
@@ -347,7 +342,7 @@ func (r *CassandraTaskReconciler) execOnEveryPod(ctx context.Context, dc *cassap
 			} else {
 				if len(jobRunner) > 0 {
 					// Something is still holding the worker
-					return result.RequeueSoon(10)
+					return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
 				}
 
 				// Nothing is holding the job, has this pod finished or hasn't it ran anything?
@@ -364,7 +359,7 @@ func (r *CassandraTaskReconciler) execOnEveryPod(ctx context.Context, dc *cassap
 			// jobId, err := rc.NodeMgmtClient.CallKeyspaceCleanup(pod, -1, "", nil)
 			if err != nil {
 				// We can retry this later, it will only restart the cleanup but won't otherwise hurt
-				return result.Error(err)
+				return ctrl.Result{}, err
 			}
 			podPatch := client.MergeFrom(pod.DeepCopy())
 			pod.Annotations[podJobHandler] = jobHandlerMgmtApi
@@ -373,7 +368,7 @@ func (r *CassandraTaskReconciler) execOnEveryPod(ctx context.Context, dc *cassap
 			err = r.Client.Patch(ctx, &pod, podPatch)
 			if err != nil {
 				logger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
-				return result.Error(err)
+				return ctrl.Result{}, err
 			}
 		} else {
 			jobId := strconv.Itoa(idx)
@@ -386,7 +381,7 @@ func (r *CassandraTaskReconciler) execOnEveryPod(ctx context.Context, dc *cassap
 			err = r.Client.Patch(ctx, &pod, podPatch)
 			if err != nil {
 				logger.Error(err, "Failed to patch pod's status to indicate its running a local job", "Pod", pod)
-				return result.Error(err)
+				return ctrl.Result{}, err
 			}
 
 			pod := pod
@@ -417,7 +412,7 @@ func (r *CassandraTaskReconciler) execOnEveryPod(ctx context.Context, dc *cassap
 		}
 
 		// We have a job going on, return back later to check the status
-		return result.RequeueSoon(10)
+		return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
 	}
-	return result.Continue()
+	return ctrl.Result{}, nil
 }

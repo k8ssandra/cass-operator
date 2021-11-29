@@ -318,6 +318,34 @@ func (client *NodeMgmtClient) CallKeyspaceCleanup(pod *corev1.Pod, jobs int, key
 	return string(jobId), nil
 }
 
+// CallDatacenterRebuild returns the job id of the rebuild job.
+func (client *NodeMgmtClient) CallDatacenterRebuild(pod *corev1.Pod, sourceDatacenter string) (string, error) {
+	client.Log.Info(
+		"calling Management API keyspace rebuild - POST /api/v1/ops/node/rebuild",
+		"pod", pod.Name,
+	)
+
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return "", err
+	}
+
+	queryUrl := fmt.Sprintf("/api/v1/ops/node/rebuild?src_dc=%s", sourceDatacenter)
+
+	req := nodeMgmtRequest{
+		endpoint: queryUrl,
+		host:     podHost,
+		method:   http.MethodPost,
+		timeout:  60 * time.Second,
+	}
+	jobId, err := callNodeMgmtEndpoint(client, req, "application/json")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jobId), nil
+}
+
 // CreateKeyspace calls management API to create a new Keyspace.
 func (client *NodeMgmtClient) CreateKeyspace(pod *corev1.Pod, keyspaceName string, replicationSettings []map[string]string) error {
 	return client.modifyKeyspace("create", pod, keyspaceName, replicationSettings)
@@ -332,7 +360,7 @@ func (client *NodeMgmtClient) modifyKeyspace(endpoint string, pod *corev1.Pod, k
 	postData := make(map[string]interface{})
 
 	if keyspaceName == "" || replicationSettings == nil {
-		return fmt.Errorf("Keyspacename and replication settings are required")
+		return fmt.Errorf("keyspacename and replication settings are required")
 	}
 
 	postData["keyspace_name"] = keyspaceName
@@ -616,6 +644,7 @@ func (client *NodeMgmtClient) CallReloadSeedsEndpoint(pod *corev1.Pod) error {
 	return err
 }
 
+// TODO Create async version of this also
 func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) error {
 	client.Log.Info(
 		"calling Management API decommission node - POST /api/v0/ops/node/decommission",
@@ -636,6 +665,34 @@ func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) erro
 
 	_, err = callNodeMgmtEndpoint(client, request, "")
 	return err
+}
+
+// CallDecommissionNode returns the job id of the decommission job.
+func (client *NodeMgmtClient) CallDecommissionNode(pod *corev1.Pod, force bool) (string, error) {
+	client.Log.Info(
+		"calling Management API keyspace rebuild - POST /api/v1/ops/node/decommission",
+		"pod", pod.Name,
+	)
+
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return "", err
+	}
+
+	queryUrl := fmt.Sprintf("/api/v1/ops/node/decommission?force=%t", force)
+
+	req := nodeMgmtRequest{
+		endpoint: queryUrl,
+		host:     podHost,
+		method:   http.MethodPost,
+		timeout:  60 * time.Second,
+	}
+	jobId, err := callNodeMgmtEndpoint(client, req, "application/json")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jobId), nil
 }
 
 // FeatureSet returns supported features on the target pod. If the target pod is too old, empty

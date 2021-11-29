@@ -94,6 +94,7 @@ type FeatureSet struct {
 const (
 	AsyncSSTableTasks Feature = "async_sstable_tasks"
 	FullQuerySupport  Feature = "full_query_logging"
+	Rebuild           Feature = "rebuild"
 )
 
 func (f *FeatureSet) UnmarshalJSON(b []byte) error {

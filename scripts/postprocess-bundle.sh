@@ -15,7 +15,7 @@ yq eval -i '.annotations."com.redhat.delivery.backport" = true' bundle/metadata/
 yq eval -i '.annotations."com.redhat.openshift.versions" headComment = "Certified Openshift required labels"' bundle/metadata/annotations.yaml
 
 # This file is extra from creation process on config/manifests, should not be in the bundle itself
-rm -f bundle/field-config_v1_configmap.yaml
+rm -f bundle/manifests/field-config_v1_configmap.yaml
 
 # Use yq to set that date to the createdAt field
 createdAt=$(date +%Y-%m-%d) yq eval '.metadata.annotations.createdAt = env(createdAt)' -i bundle/manifests/cass-operator.clusterserviceversion.yaml 

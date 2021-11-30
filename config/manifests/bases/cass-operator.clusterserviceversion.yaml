@@ -3,7 +3,13 @@ kind: ClusterServiceVersion
 metadata:
   annotations:
     alm-examples: '[]'
-    capabilities: Basic Install
+    capabilities: Auto Pilot
+    categories: Database,Big Data,OpenShift Optional
+    certified: "true"
+    description: |
+      Simple provisioning, turn-key operations, and automated remediation of Apache Cassandra clusters
+    repository: https://github.com/k8ssandra/cass-operator
+    support: DataStax
   name: cass-operator.v0.0.0
   namespace: placeholder
 spec:
@@ -16,33 +22,48 @@ spec:
       kind: CassandraDatacenter
       name: cassandradatacenters.cassandra.datastax.com
       version: v1beta1
-  description: '-'
-  displayName: DataStax Apache Cassandra Operator
+  description: ../../docs/developer/csv-description.md
+  displayName: DataStax Kubernetes Operator for Apache Cassandra
   icon:
-  - base64data: ""
-    mediatype: ""
+  - base64data: |
+      images/ds.png
+    mediatype: image/png
   install:
     spec:
       deployments: null
     strategy: ""
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
-  - supported: false
+  - supported: true
     type: SingleNamespace
-  - supported: false
+  - supported: true
     type: MultiNamespace
   - supported: true
     type: AllNamespaces
   keywords:
   - k8ssandra
   - cass-operator
-  - cassandra
+  - DataStax Enterprise
+  - Apache Cassandra
+  - DSE
+  - C*
+  - Cassandra
   links:
-  - name: Cass Operator
-    url: https://k8ssandra.io
-  maturity: alpha
+  - name: DataStax
+    url: https://datastax.com
+  - name: Operator GitHub Repo
+    url: https://github.com/k8ssandra/cass-operator
+  - name: Config Builder GitHub Repo
+    url: https://github.com/datastax/cass-config-builder
+  - name: Documentation [1]
+    url: https://github.com/k8ssandra/cass-operator/tree/master/docs/user
+  - name: Documentation [2]
+    url: https://docs.datastax.com/en/cass-operator/doc/cass-operator/cassOperatorTOC.html
+  maintainers:
+  - email: cass-operator@datastax.com
+    name: DataStax Operator Team
+  maturity: stable
   provider:
     name: DataStax
-    url: k8ssandra.io
   version: 0.0.0

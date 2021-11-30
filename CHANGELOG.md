@@ -17,6 +17,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [FEATURE] #233 Allow overriding default Cassandra and DSE repositories and give versions a default suffix
 * [ENHANCEMENT] #185 Add more app.kubernetes.io labels to all the managed resources
 * [ENHANCEMENT] #233 Simplify rebuilding the UBI images if vulnerability is found in the base images
+* [ENHANCEMENT] #221 Improve bundle creation to be compatible with Red Hat's certified bundle rules
 * [BUGFIX] #185 introduced a regression which caused labels to be updated in StatefulSet when updating a version. Keep the original as these are not allowed to be modified.
 * [BUGFIX] #222 There were still occasions where clusterName was not an allowed value, cleaning them before creating StatefulSet
 * [BUGFIX] #186 Run cleanups in the background once per pod and poll its state instead of looping endlessly

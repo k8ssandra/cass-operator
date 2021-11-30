@@ -1,7 +1,35 @@
 apiVersion: cassandra.datastax.com/v1beta1
 kind: CassandraDatacenter
 metadata:
-  name: cassandradatacenter-sample
+  name: dc1
 spec:
-  # Add fields here
-  foo: bar
+  clusterName: development
+  serverType: cassandra
+  serverVersion: "4.0.1"
+  managementApiAuth:
+    insecure: {}
+  size: 1
+  storageConfig:
+      cassandraDataVolumeClaimSpec:
+        storageClassName: server-storage
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  dockerImageRunsAsCassandra: false
+  podTemplateSpec:
+    securityContext: {}
+    containers:
+      - name: cassandra
+        securityContext: {}
+  racks:
+    - name: r1
+  config:
+    jvm-server-options:
+      initial_heap_size: "512m"
+      max_heap_size: "512m"
+    cassandra-yaml:
+      authenticator: PasswordAuthenticator
+      authorizer: CassandraAuthorizer
+      role_manager: CassandraRoleManager

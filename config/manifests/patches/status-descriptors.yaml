@@ -1,0 +1,43 @@
+- op: add
+  path: /spec/customresourcedefinitions/owned/0/statusDescriptors
+  value:
+    - path: cassandraOperatorProgress
+      description: Cassandra Operator Progress
+      displayName: Cassandra Operator Progress
+      x-descriptors:
+        - urn:alm:descriptor:text
+    - path: lastRollingRestart
+      description: Last Rolling Restart
+      displayName: Last Rolling Restart
+      x-descriptors:
+        - urn:alm:descriptor:text
+    - path: lastServerNodeStarted
+      description: Last Server Node Started
+      displayName: Last Server Node Started
+      x-descriptors:
+        - urn:alm:descriptor:text
+    - path: superUserUpserted
+      description: Super User Upserted
+      displayName: Super User Upserted
+      x-descriptors:
+        - urn:alm:descriptor:text
+    - path: nodeReplacements
+      description: |
+        List of all nodes that have been replaced.
+      displayName: Node Replacements
+    - path: nodeStatuses
+      description: |
+        Data structure containing information around the health
+        of all pods in the cluster.
+      displayName: Node Statuses
+    - path: observedGeneration
+      description: |
+        Holds information related to previous generations to detect when certain changes occur.
+      displayName: Observed Generation
+    - path: quietPeriod
+      description: |
+        Signals when reconcilliation should not occur due to waiting on other actions to complete.
+      displayName: Quiet Period
+    - path: conditions
+      description: conditions
+      displayName: Conditions

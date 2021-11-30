@@ -253,3 +253,7 @@ tags
 # make temps
 bin/
 testbin/
+
+# bundle files+directories are generated
+bundle.Dockerfile
+bundle/

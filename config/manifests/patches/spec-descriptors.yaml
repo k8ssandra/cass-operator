@@ -1,0 +1,457 @@
+- op: add
+  path: /spec/customresourcedefinitions/owned/0/specDescriptors
+  value:
+    - path: serverType
+      description: Server Type
+      displayName: Server Type
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:select:cassandra
+        - urn:alm:descriptor:com.tectonic.ui:select:dse
+    - path: serverVersion
+      description: Server Version
+      displayName: Server Version
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+    - path: clusterName
+      description: |
+        Name of the Cassandra cluster. Multiple CassandraDatacenter
+        objects in the same namespace and Cluster Name
+        will automatically be wired together as a single cluster.
+      displayName: Cluster Name
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+    - path: size
+      description: Size
+      displayName: Size
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podCount
+    - path: racks
+      description: |
+        Collection of logical rack identifiers, these may be named 
+        and specify a zone to limit pod deployment."
+      displayName: Racks
+    - path: racks[0].name
+      description: |
+        "User friendly name of the rack. Limit characters to 
+        alphanumeric values, dashes, and underscores."
+      displayName: Name
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+    - displayName: Rack Node Affinity Labels
+      description: NodeAffinityLabels to pin the rack, using node affinity
+      path: racks[0].nodeAffinityLabels
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
+    - path: racks[0].zone
+      description: |
+        failure-domain.beta.kubernetes.io/zone node label value
+        where pods related to this rack will be restricted. Note
+        the value may be in the topology.kubernetes.io/zone label
+        as well.
+      displayName: Zone
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+    - path: dseWorkloads.analyticsEnabled
+      description: |
+        Enables the analytics advanced workload on DSE pods
+      displayName: Analytics
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+    - path: dseWorkloads.searchEnabled
+      description: |
+        Enables the search advanced workload on DSE pods
+      displayName: Search
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+    - path: dseWorkloads.graphEnabled
+      description: |
+        Enables the graph advanced workloads on DSE pods
+      displayName: Graph
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+    - path: resources
+      description: "Resource requests and limits for each Cassandra pod in the \ncluster. Note: Only specify CPU and memory limits here.\n"
+      displayName: Resources
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+    - path: networking.hostNetwork
+      description: |
+        Enables host network configuration for pods. Note only one pod is permitted per worker in this configuration.
+      displayName: Host network
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+    - path: networking.nodePort
+      description: |
+        Exposed ports on the Kubernetes node level for forwarding services to Cassandra pods. Most deployments will not use this functionality.
+      displayName: Node Port Network Configuration
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+    - path: networking.nodePort.internode
+      description: |
+        Internode port to use when leveraging Node Port network configuration.
+      displayName: Internode Port
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:number
+    - path: networking.nodePort.internodeSSL
+      description: |
+        Internode SSL port to use when leveraging Node Port network configuration.
+      displayName: Internode SSL Port
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:number
+    - path: networking.nodePort.native
+      description: |
+        Native transport port to use when leveraging Node Port network configuration.
+      displayName: Native Port
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:number
+    - path: networking.nodePort.nativeSSL
+      description: |
+        Native transport SSL port to use when leveraging Node Port network configuration.
+      displayName: Native SSL Port
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:number
+    - path: storageConfig
+      description: |
+        Storage descriptors used during the provisioning and consumption
+        of Persistent Volumes.
+      displayName: Storage Configuration
+    - path: storageConfig.cassandraDataVolumeClaimSpec.storageClassName
+      description: "Name of the storage class where data will reside. This must be \ndefined within the Kubernetes prior to provisioning a datacenter.\n"
+      displayName: Storage Class
+      x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:StorageClass
+    - path: storageConfig.cassandraDataVolumeClaimSpec.accessModes[0]
+      description: |
+        Access mode of the volume
+      displayName: Access Modes
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:select:ReadWriteOnce
+    - path: storageConfig.cassandraDataVolumeClaimSpec.resources.requests.storage
+      description: |
+        Storage requirements for the Cassandra data volume.
+      displayName: Data volume size
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+    - path: storageConfig.additionalVolumes
+      description: |
+        Collection of additional storage volumes
+      displayName: Additional Volumes
+    - path: storageConfig.additionalVolumes[0].name
+      displayName: Name
+      description: |
+        Volume name
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:text"
+    - path: storageConfig.additionalVolumes[0].accessModes
+      displayName: Access Modes
+      description: |
+        Volume access modes
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:text"
+    - path: storageConfig.additionalVolumes[0].resources.requests.storage
+      description: |
+        Storage requirements for the additional data volume.
+      displayName: Data volume size
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+    - path: storageConfig.additionalVolumes[0].storageClassName
+      description: |
+        Name of the storage class this volume should use
+      displayName: Storage Class
+      x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:StorageClass
+    - path: superuserSecretName
+      description: "Kubernetes Secret containing a username and password for\nthe initial super user accout. Omitting this field will\nresult in a secret being created automatically with \nrandom values for each.\n"
+      displayName: Superuser Secret Name
+      x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:Secret
+    - displayName: DC Node Affinity Labels
+      description: NodeAffinityLabels to pin the Datacenter, using node affinity
+      path: nodeAffinityLabels
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
+    - path: nodeSelector
+      description: |
+        Selector for identifying which nodes the DC pods should be deployed on.
+      displayName: Node Selector
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+    - path: allowMultipleNodesPerWorker
+      description: "Allows multiple Cassandra pods per Kubernetes worker. \nEnsure appropriate limits and requests are set in the\nresource field to limit the number of pods per worker.\n"
+      displayName: Allow Multiple Nodes Per Worker
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+    - path: stopped
+      description: |
+        When enabled, stops all pods making up the cluster. Storage
+        is retained, but all compute instances are stopped.
+      displayName: Stopped
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+    - path: rollingRestartRequested
+      description: "Request a restart of all nodes in the cluster in a rolling \nfashion to prevent service interuptions. After the restart\nis complete this field is set back to false.\n"
+      displayName: Rolling Restart Requested
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+    - path: canaryUpgrade
+      description: "Informs the operator to apply the requested changes to\na single rack. After manual validation set this value \nback to false and the operator will continue deployment.\n"
+      displayName: Canary Upgrade
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+    - path: canaryUpgradeCount
+      description: |
+        The number of nodes that will be updated when CanaryUpgrade
+        is true. Note that the value is either 0 or greater than the rack
+        size, then all nodes in the rack will get updated.
+      displayName: Canary Upgrade Count
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podCount
+    - path: serverImage
+      description: |
+        Optional: Specify the name of the image to use for each
+        node in the cluster.
+      displayName: Server Image
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+    - path: systemLoggerImage
+      description: |
+        Container image for the log tailing sidecar container.
+      displayName: System Logger Image
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+    - path: configBuilderImage
+      description: |
+        Optional: Specify the name of the image to use when
+        rendering configuration files as each node in the
+        cluster is initialized."
+      displayName: Config Builder Image
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+    - path: configBuilderResource
+      description: "Resource requests and limits for each Cassandra pod in the \ncluster. Note: Only specify CPU and memory limits here.\n"
+      displayName: Config Builder Resources
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+    - path: replaceNodes
+      description: |
+        A list of pod names that need to be replaced
+      displayName: Replace Nodes
+    - path: replaceNodes[0]
+      description: |
+        A list of pod names that need to be replaced
+      displayName: Replace Nodes
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+    - path: disableSystemLoggerSidecar
+      description: |
+        Configuration for disabling the simple log tailing sidecar
+        container. Our default is to have it enabled.
+      displayName: Disable System Logger Sidecar
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+    - path: dockerImageRunsAsCassandra
+      description: |
+        Indicates whether the Cassandra container runs as the built-in `cassandra` user. 
+        On OpenShift clusters this field MUST be set to false given the random UID and GID
+        assigned to each pod / container.
+      displayName: Docker image runs as Cassandra
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+    - path: forceUpgradeRacks[0]
+      description: |
+        Force upgrading of racks
+      displayName: Force Upgrade Racks
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+    - path: additionalSeeds[0]
+      description: |
+        Additional seeds for Cassandra
+      displayName: Additional Seeds
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+    - path: additionalServiceConfig
+      description: |
+        AdditionalServiceConfig allows to define additional parameters
+        that are included in the created Services. Note, users can override
+        values set by cass-operator and doing so could break cass-operator
+        functionality. Avoid label "cass-operator" and anything that starts
+        with "cassandra.datastax.com/"
+      displayName: Additional Service Configuration
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+    - path: additionalServiceConfig.additionalSeedService
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.additionalSeedService.additionalAnnotations
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.additionalSeedService.additionalLabels
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.allpodsService
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.allpodsService.additionalAnnotations
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.allpodsService.additionalLabels
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.dcService
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.dcService.additionalAnnotations
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.dcService.additionalLabels
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.nodePortService
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.nodePortService.additionalAnnotations
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.nodePortService.additionalLabels
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.seedService
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.seedService.additionalAnnotations
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: additionalServiceConfig.seedService.additionalLabels
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: serviceAccount
+      description: Service Account
+      displayName: Service Account
+      x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:ServiceAccount
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+    - path: reaper
+      description: |
+        Deprecated: Reaper container settings
+      displayName: Reaper
+    - path: reaper.enabled
+      description: |
+        Deprecated: Enable reaper sidecar support
+      displayName: Enable
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: reaper.image
+      description: |
+        Deprecated: Image coordinate for reaper sidecar
+      displayName: Image
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: reaper.imagePullPolicy
+      description: |
+        Deprecated: Image pull policy for sidecar
+      displayName: Image Pull Policy
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: reaper.resources
+      description: |
+        Deprecated: Reaper sidecar resources
+      displayName: Resources
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:hidden"
+    - path: systemLoggerResources
+      description: |
+        Resources for the system logger sidecar container
+      displayName: System Logger Resources
+      x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+    - path: config
+      description: |
+        JSON object representing configuration overrides.
+      displayName: Config
+    - path: configSecret
+      description: "ConfigSecret is the name of a secret that contains configuration\nfor Cassandra. The secret is expected to have a property named config\nwhose value should be a JSON formatted string that should look like\nthis: \n\nconfig: |\n  {        \n    \"cassandra-yaml\": {\n      \"read_request_timeout_in_ms\": 10000\n    },\n    \"jvm-options\": {\n      \"max_heap_size\": 1024M\n    }\n  }\n\nConfigSecret is mutually exclusive with Config.\nConfigSecret takes precedence and will be used exclusively if both\nproperties are set. The operator sets a watch such that an update\nto the secret will trigger an update of the StatefulSets.\n"
+      displayName: Configuration Secret
+      x-descriptors:
+        - "urn:alm:descriptor:io.kubernetes:Secret"
+        - "urn:alm:descriptor:com.tectonic.ui:advanced"
+    - path: managementApiAuth
+      description: |
+        Configuration for connectivity between cass-operator and Management API
+      displayName: Management API Authentication
+    - path: tolerations
+      description: |
+        If specified, the pod's tolerations.
+
+        The pod this Toleration is attached to tolerates
+        any taint that matches the triple <key,value,effect> using
+        the matching operator <operator>.
+    - path: tolerations[0].effect
+      description: |
+        Effect indicates the taint effect to match.
+        Empty means match all taint effects. When specified,
+        allowed values are NoSchedule, PreferNoSchedule and
+        NoExecute.
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:select:NoSchedule"
+        - "urn:alm:descriptor:com.tectonic.ui:select:PreferNoSchedule"
+        - "urn:alm:descriptor:com.tectonic.ui:select:NoExecute"
+    - path: tolerations[0].key
+      description: |
+        Key is the taint key that the toleration
+        applies to. Empty means match all taint keys. If the
+        key is empty, operator must be Exists; this combination
+        means to match all values and all keys.
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:text"
+    - path: tolerations[0].operator
+      description: |
+        Operator represents a key's relationship
+        to the value. Valid operators are Exists and Equal.
+        Defaults to Equal. Exists is equivalent to wildcard
+        for value, so that a pod can tolerate all taints of
+        a particular category.
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:select:Exists"
+        - "urn:alm:descriptor:com.tectonic.ui:select:Equals"
+    - path: tolerations[0].tolerationSeconds
+      description: |
+        TolerationSeconds represents the period of
+        time the toleration (which must be of effect NoExecute,
+        otherwise this field is ignored) tolerates the taint.
+        By default, it is not set, which means tolerate the
+        taint forever (do not evict). Zero and negative values
+        will be treated as 0 (evict immediately) by the system.
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:number"
+    - path: tolerations[0].value
+      description: |
+        Value is the taint value the toleration matches
+        to. If the operator is Exists, the value should be empty,
+        otherwise just a regular string.
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:text"
+    - path: users
+      description: |
+        Cassandra users to bootstrap
+      displayName: Users
+    - path: users[0].secretName
+      description: |
+        Kubernetes secret containing user credentials within the keys `username` and `password`.
+      displayName: Secret
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:selector:core:v1:Secret"
+    - path: users[0].superuser
+      description: |
+        Whether the created user should have superuser credentials
+      displayName: Superuser
+      x-descriptors:
+        - "urn:alm:descriptor:com.tectonic.ui:booleanSwitch"

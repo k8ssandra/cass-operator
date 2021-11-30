@@ -26,16 +26,19 @@ derived  distributions. Apache Cassandra is a distributed database consisting of
 multiple nodes working in concert to store data and process queries along a
 number of fault domains. `cass-operator` has the deployment of a Cassandra
 cluster around the logical domain of a datacenter with the `CassandraDatacenter`
-custom resource. Upon submission of one of these resources it handles
-provisioning the underlying stateful sets (analogous to C\* logical racks),
-services, and configuration. Additionally through monitoring pod state via
-Kubernetes callbacks it handles day to day operations such as restarting failed
-processes, scaling clusters up, and deploying configuration changes in a
-rolling, non-disruptive, fashion. This operator is designed to be `Namespace`
-scoped. A single Kubernetes cluster may be running multiple instances of this
-operator, in separate namespaces, to support a number of C\* clusters and
-environments. Configuration is simple with the usage of YAML based overrides in
-the Custom Resource paired with an `init` container. In C\* clusters ordering and
-timing of certain operations are important to keep the system evenly
-distributed. `cass-operator` takes advantage of a sidecar process within the
+custom resource.
+    
+Upon submission of one of these resources it handles provisioning the underlying
+stateful sets (analogous to C\* logical racks), services, and configuration.
+Additionally through monitoring pod state via Kubernetes callbacks it handles day to day
+operations such as restarting failed processes, scaling clusters up, and deploying
+configuration changes in a rolling, non-disruptive, fashion.
+    
+This operator is designed to be `Namespace` scoped. A single Kubernetes cluster may
+be running multiple instances of this operator, in separate namespaces, to support
+a number of C\* clusters and environments. Configuration is simple with the usage of
+YAML based overrides in the Custom Resource paired with an `init` container.
+    
+In C\* clusters ordering and timing of certain operations are important to keep the system
+evenly distributed. `cass-operator` takes advantage of a sidecar process within the
 main container to handle the orchestration of starting our main C* process.

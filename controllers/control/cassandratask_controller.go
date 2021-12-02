@@ -19,6 +19,7 @@ package control
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sort"
 	"strconv"
 	"time"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cassapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -40,7 +40,7 @@ import (
 )
 
 const (
-	taskLabel               = "control.k8ssandra.io/status"
+	taskStatusLabel         = "control.k8ssandra.io/status"
 	activeTaskLabelValue    = "active"
 	completedTaskLabelValue = "completed"
 )
@@ -124,10 +124,10 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger = log.FromContext(ctx, "datacenterName", dc.Name, "clusterName", dc.Spec.ClusterName)
 	log.IntoContext(ctx, logger)
 
-	if err := controllerutil.SetOwnerReference(&dc.ObjectMeta, &cassJob.ObjectMeta, r.Scheme); err != nil {
-		logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassJob.Spec.Datacenter, "CassandraTask", req.NamespacedName)
-		return ctrl.Result{}, err
-	}
+	// if err := controllerutil.SetOwnerReference(&dc.ObjectMeta, &cassJob.ObjectMeta, r.Scheme); err != nil {
+	// 	logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassJob.Spec.Datacenter, "CassandraTask", req.NamespacedName)
+	// 	return ctrl.Result{}, err
+	// }
 
 	// TODO Does our concurrencypolicy allow the task to run? Are there any other active ones?
 	activeTasks, err := r.activeTasks(ctx, &dc)
@@ -136,9 +136,15 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// Remove current job from the slice
+	for index, task := range activeTasks {
+		if task.Name == req.Name && task.Namespace == req.Namespace {
+			activeTasks = append(activeTasks[:index], activeTasks[index+1:]...)
+		}
+	}
+
 	if len(activeTasks) > 0 {
-		// TODO Exclude this current job
-		if *cassJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+		if cassJob.Spec.ConcurrencyPolicy == nil || *cassJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 			// TODO Can't run right now, requeue
 			// TODO Or should we push an event?
 			logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
@@ -161,6 +167,8 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, fmt.Errorf("only a single job can be defined in this version of cass-operator")
 	}
 
+	// TODO We need to verify that the cluster is actually healthy before we run these..
+
 	for _, job := range cassJob.Spec.Jobs {
 		// TODO This should check the status of the job from Status, not reconciling it (we overwrite the jobId in those cases)
 		switch job.Command {
@@ -170,6 +178,9 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			res, err = r.reconcileEveryPodTask(ctx, &dc, cleanup())
 		case "decommission":
 			// res, err = r.reconcileEveryPodTask(ctx, &dc, decommission())
+		case "empty":
+			// For testing purposes only, execute nothing on every pod
+			res, err = r.reconcileEveryPodTask(ctx, &dc, empty())
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err
@@ -186,22 +197,37 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		completedCount++
 	}
 
-	// TODO Starting the run, set the Active label so we can quickly fetch the active ones
-	if taskLabel, found := cassJob.GetLabels()[taskLabel]; found {
-		if res.RequeueAfter == 0 {
+	if cassJob.GetLabels() == nil {
+		cassJob.Labels = make(map[string]string)
+	}
+
+	if _, found := cassJob.GetLabels()[taskStatusLabel]; found {
+		if res.RequeueAfter == 0 && !res.Requeue {
+			logger.Info("Setting this to be complete..\n")
 			// Job has been completed
-			cassJob.GetLabels()[taskLabel] = completedTaskLabelValue
+			cassJob.GetLabels()[taskStatusLabel] = completedTaskLabelValue
+			if err = r.Client.Update(ctx, &cassJob); err != nil {
+				return res, err
+			}
+
+			// This status update could be at the end also..
 			cassJob.Status.Active = 0
 			cassJob.Status.CompletionTime = &timeNow
-			if err = r.Client.Update(ctx, &cassJob); err != nil {
+			if err = r.Client.Status().Update(ctx, &cassJob); err != nil {
 				return res, err
 			}
 		}
 	} else {
-		cassJob.GetLabels()[taskLabel] = activeTaskLabelValue
+		// Starting the run, set the Active label so we can quickly fetch the active ones
+		cassJob.GetLabels()[taskStatusLabel] = activeTaskLabelValue
+
+		if err = r.Client.Update(ctx, &cassJob); err != nil {
+			return res, err
+		}
+
 		cassJob.Status.StartTime = &timeNow
 		cassJob.Status.Active = 1 // We don't have concurrency inside a task at the moment
-		if err = r.Client.Update(ctx, &cassJob); err != nil {
+		if err = r.Client.Status().Update(ctx, &cassJob); err != nil {
 			return res, err
 		}
 	}
@@ -230,7 +256,7 @@ func (r *CassandraTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *CassandraTaskReconciler) activeTasks(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]api.CassandraTask, error) {
 	var taskList api.CassandraTaskList
 	// TODO This should add per-datacenter active (we can execute concurrently in different datacenters)
-	if err := r.Client.List(ctx, &taskList, client.InNamespace(dc.Namespace), client.MatchingLabels{taskLabel: activeTaskLabelValue}); err != nil {
+	if err := r.Client.List(ctx, &taskList, client.InNamespace(dc.Namespace), client.MatchingLabels{taskStatusLabel: activeTaskLabelValue}); err != nil {
 		return nil, err
 	}
 
@@ -283,6 +309,17 @@ func rebuild(args map[string]string) TaskConfiguration {
 		AsyncFeature: httphelper.Rebuild,
 		AsyncFunc:    callRebuild,
 		Arguments:    args,
+	}
+}
+
+func callEmpty(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, args map[string]string) (string, error) {
+	return strconv.Itoa(rand.Int()), nil
+}
+
+func empty() TaskConfiguration {
+	return TaskConfiguration{
+		AsyncFeature: httphelper.AsyncSSTableTasks,
+		AsyncFunc:    callEmpty,
 	}
 }
 

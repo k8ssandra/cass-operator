@@ -748,7 +748,7 @@ func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDet
 	}
 
 	request := nodeMgmtRequest{
-		endpoint: "/api/v0/ops/executor/job",
+		endpoint: fmt.Sprintf("/api/v0/ops/executor/job?job_id=%s", jobId),
 		host:     podHost,
 		method:   http.MethodGet,
 	}

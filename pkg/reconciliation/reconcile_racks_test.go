@@ -1476,6 +1476,8 @@ func Test_callPodEndpoint_RequestFail(t *testing.T) {
 	}
 }
 
+// TODO Stuff below has to be refactored to task controller tests!
+
 func TestCleanupAfterScalingAsyncFeatures(t *testing.T) {
 	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()

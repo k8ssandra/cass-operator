@@ -84,6 +84,22 @@ spec:
                 description: Jobs defines the jobs this task will execute (and their
                   order)
                 items:
+                  properties:
+                    args:
+                      additionalProperties:
+                        type: string
+                      description: Should command be typed to restrict allowed values
+                        in this version?
+                      type: object
+                    command:
+                      description: TODO Should this be typed to match what jobs this
+                        version of cass-operator can run?
+                      type: string
+                    name:
+                      type: string
+                  required:
+                  - command
+                  - name
                   type: object
                 type: array
               restartPolicy:

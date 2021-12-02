@@ -194,7 +194,8 @@ func (rc *ReconciliationContext) retrieveInternodeCredentialSecretOrCreateDefaul
 	secret, retrieveErr := rc.retrieveSecret(rc.keystoreCASecret())
 	if retrieveErr != nil {
 		if errors.IsNotFound(retrieveErr) {
-			secret, err := rc.createInternodeCACredential()
+			var err error
+			secret, err = rc.createInternodeCACredential()
 
 			if err == nil && secret == nil {
 				return nil, retrieveErr
@@ -204,19 +205,31 @@ func (rc *ReconciliationContext) retrieveInternodeCredentialSecretOrCreateDefaul
 				err = rc.Client.Create(rc.Ctx, secret)
 			}
 
+			if err != nil {
+				return nil, fmt.Errorf("Failed to create internode CA credential: %w", err)
+			}
+		} else {
+			return nil, retrieveErr
+		}
+	}
+
+	_, retrieveBootStrappingSecretErr := rc.retrieveSecret(types.NamespacedName{
+		Name:      fmt.Sprintf("%s-keystore", rc.Datacenter.Name),
+		Namespace: rc.Datacenter.Namespace,
+	})
+	if retrieveBootStrappingSecretErr != nil {
+		if errors.IsNotFound(retrieveBootStrappingSecretErr) {
+			var jksBlob []byte
+			jksBlob, err := utils.GenerateJKS(secret, rc.Datacenter.Name, rc.Datacenter.Name)
 			if err == nil {
-				var jksBlob []byte
-				jksBlob, err = utils.GenerateJKS(secret, rc.Datacenter.Name, rc.Datacenter.Name)
-				if err == nil {
-					err = rc.createCABootstrappingSecret(jksBlob)
-				}
+				err = rc.createCABootstrappingSecret(jksBlob)
 			}
 
 			if err != nil {
 				return nil, fmt.Errorf("Failed to create default superuser secret: %w", err)
 			}
 		} else {
-			return nil, retrieveErr
+			return nil, retrieveBootStrappingSecretErr
 		}
 	}
 

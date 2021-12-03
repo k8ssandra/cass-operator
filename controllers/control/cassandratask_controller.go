@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -128,36 +127,39 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// 	logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassJob.Spec.Datacenter, "CassandraTask", req.NamespacedName)
 	// 	return ctrl.Result{}, err
 	// }
+	var err error
 
 	// TODO Does our concurrencypolicy allow the task to run? Are there any other active ones?
-	activeTasks, err := r.activeTasks(ctx, &dc)
-	if err != nil {
-		logger.Error(err, "unable to fetch active CassandraTasks", "Request", req.NamespacedName)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	// Remove current job from the slice
-	for index, task := range activeTasks {
-		if task.Name == req.Name && task.Namespace == req.Namespace {
-			activeTasks = append(activeTasks[:index], activeTasks[index+1:]...)
+	/*
+		activeTasks, err := r.activeTasks(ctx, &dc)
+		if err != nil {
+			logger.Error(err, "unable to fetch active CassandraTasks", "Request", req.NamespacedName)
+			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
-	}
 
-	if len(activeTasks) > 0 {
-		if cassJob.Spec.ConcurrencyPolicy == nil || *cassJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
-			// TODO Can't run right now, requeue
-			// TODO Or should we push an event?
-			logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
-			return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
+		// Remove current job from the slice
+		for index, task := range activeTasks {
+			if task.Name == req.Name && task.Namespace == req.Namespace {
+				activeTasks = append(activeTasks[:index], activeTasks[index+1:]...)
+			}
 		}
-		// TODO There are other tasks running, are they allowing or forbiding the concurrent work?
-		for _, task := range activeTasks {
-			if *task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+
+		if len(activeTasks) > 0 {
+			if cassJob.Spec.ConcurrencyPolicy == nil || *cassJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+				// TODO Can't run right now, requeue
+				// TODO Or should we push an event?
 				logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
 				return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
 			}
+			// TODO There are other tasks running, are they allowing or forbiding the concurrent work?
+			for _, task := range activeTasks {
+				if cassJob.Spec.ConcurrencyPolicy == nil || *task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+					logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
+					return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
+				}
+			}
 		}
-	}
+	*/
 
 	var res ctrl.Result
 	completedCount := int32(0)

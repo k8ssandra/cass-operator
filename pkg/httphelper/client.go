@@ -79,7 +79,7 @@ type JobDetails struct {
 	Id         string `json:"id"`
 	Type       string `json:"type"`
 	Status     string `json:"status"`
-	SubmitTime string `json:"submit_time"`
+	SubmitTime string `json:"submit_time,omitempty"`
 	EndTime    string `json:"end_time,omitempty"`
 	Error      string `json:"error,omitempty"`
 }

@@ -112,7 +112,7 @@ func newSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.S
 	service.ObjectMeta.Name = dc.GetSeedServiceName()
 
 	labels := dc.GetClusterLabels()
-	oplabels.AddKubernetesLabels(labels, dc)
+	oplabels.AddOperatorLabels(labels, dc)
 	service.ObjectMeta.Labels = labels
 
 	service.Spec.Selector = buildLabelSelectorForSeedService(dc)
@@ -129,7 +129,7 @@ func newSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.S
 // whether the additional seed pods are ready or not
 func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	labels := dc.GetDatacenterLabels()
-	oplabels.AddKubernetesLabels(labels, dc)
+	oplabels.AddOperatorLabels(labels, dc)
 	var service corev1.Service
 	service.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
 	service.ObjectMeta.Namespace = dc.Namespace
@@ -148,7 +148,7 @@ func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter)
 
 func newEndpointsForAdditionalSeeds(dc *api.CassandraDatacenter) (*corev1.Endpoints, error) {
 	labels := dc.GetDatacenterLabels()
-	oplabels.AddKubernetesLabels(labels, dc)
+	oplabels.AddOperatorLabels(labels, dc)
 	endpoints := corev1.Endpoints{}
 	endpoints.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
 	endpoints.ObjectMeta.Namespace = dc.Namespace
@@ -273,7 +273,7 @@ func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev
 // inside the k8s cluster.
 func makeGenericHeadlessService(dc *api.CassandraDatacenter) *corev1.Service {
 	labels := dc.GetDatacenterLabels()
-	oplabels.AddKubernetesLabels(labels, dc)
+	oplabels.AddOperatorLabels(labels, dc)
 	selector := dc.GetDatacenterLabels()
 	var service corev1.Service
 	service.ObjectMeta.Namespace = dc.Namespace

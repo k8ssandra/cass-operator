@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"unicode/utf8"
 
 	corev1 "k8s.io/api/core/v1"
@@ -53,6 +54,9 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 	var secret *corev1.Secret = nil
 
 	if dc.ShouldGenerateSuperuserSecret() {
+		labels := make(map[string]string)
+		oplabels.AddOperatorLabels(labels, dc)
+
 		secretNamespacedName := dc.GetSuperuserSecretNamespacedName()
 		secret = &corev1.Secret{
 			TypeMeta: metav1.TypeMeta{
@@ -62,6 +66,7 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretNamespacedName.Name,
 				Namespace: secretNamespacedName.Namespace,
+				Labels: labels,
 			},
 		}
 		username := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-superuser"

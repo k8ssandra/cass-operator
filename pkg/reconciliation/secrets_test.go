@@ -5,6 +5,8 @@ package reconciliation
 
 import (
 	"fmt"
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -22,6 +24,9 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 			},
 			Spec: api.CassandraDatacenterSpec{
 				ClusterName: "exampleCluster",
+				AdditionalLabels: map[string]string{
+					"piclem": "add",
+				},
 			},
 		}
 		secret, err := buildDefaultSuperuserSecret(dc)
@@ -42,6 +47,19 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 		errors := validateCassandraUserSecretContent(dc, secret)
 		if len(errors) > 0 {
 			t.Errorf("expected default secret to be valid, but was not: %w", errors[0])
+		}
+
+		expectedSecretLabels := map[string]string{
+			oplabels.InstanceLabel: "cassandra-exampleCluster",
+			oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+			oplabels.NameLabel: oplabels.NameLabelValue,
+			oplabels.VersionLabel: "",
+			"piclem": "add",
+		}
+
+
+		if !reflect.DeepEqual(expectedSecretLabels, secret.Labels) {
+			t.Errorf("labels = \n %v \n, want \n %v", secret.Labels, expectedSecretLabels)
 		}
 	})
 

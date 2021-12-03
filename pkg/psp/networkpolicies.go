@@ -27,7 +27,7 @@ type CheckNetworkPoliciesSPI interface {
 
 func newNetworkPolicyForCassandraDatacenter(dc *api.CassandraDatacenter) *networkingv1.NetworkPolicy {
 	labels := dc.GetDatacenterLabels()
-	oplabels.AddKubernetesLabels(labels, dc)
+	oplabels.AddOperatorLabels(labels, dc)
 	selector := dc.GetDatacenterLabels()
 
 	ingressRule := networkingv1.NetworkPolicyIngressRule{}

@@ -19,17 +19,18 @@ package control
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"sort"
 	"strconv"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cassapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -123,43 +124,42 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger = log.FromContext(ctx, "datacenterName", dc.Name, "clusterName", dc.Spec.ClusterName)
 	log.IntoContext(ctx, logger)
 
-	// if err := controllerutil.SetOwnerReference(&dc.ObjectMeta, &cassJob.ObjectMeta, r.Scheme); err != nil {
-	// 	logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassJob.Spec.Datacenter, "CassandraTask", req.NamespacedName)
-	// 	return ctrl.Result{}, err
-	// }
+	if err := controllerutil.SetOwnerReference(&dc, &cassJob, r.Scheme); err != nil {
+		logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassJob.Spec.Datacenter, "CassandraTask", req.NamespacedName)
+		return ctrl.Result{}, err
+	}
+
 	var err error
 
 	// TODO Does our concurrencypolicy allow the task to run? Are there any other active ones?
-	/*
-		activeTasks, err := r.activeTasks(ctx, &dc)
-		if err != nil {
-			logger.Error(err, "unable to fetch active CassandraTasks", "Request", req.NamespacedName)
-			return ctrl.Result{}, client.IgnoreNotFound(err)
-		}
+	activeTasks, err := r.activeTasks(ctx, &dc)
+	if err != nil {
+		logger.Error(err, "unable to fetch active CassandraTasks", "Request", req.NamespacedName)
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
-		// Remove current job from the slice
-		for index, task := range activeTasks {
-			if task.Name == req.Name && task.Namespace == req.Namespace {
-				activeTasks = append(activeTasks[:index], activeTasks[index+1:]...)
-			}
+	// Remove current job from the slice
+	for index, task := range activeTasks {
+		if task.Name == req.Name && task.Namespace == req.Namespace {
+			activeTasks = append(activeTasks[:index], activeTasks[index+1:]...)
 		}
+	}
 
-		if len(activeTasks) > 0 {
-			if cassJob.Spec.ConcurrencyPolicy == nil || *cassJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
-				// TODO Can't run right now, requeue
-				// TODO Or should we push an event?
+	if len(activeTasks) > 0 {
+		if cassJob.Spec.ConcurrencyPolicy == nil || *cassJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+			// TODO Can't run right now, requeue
+			// TODO Or should we push an event?
+			logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
+			return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
+		}
+		// TODO There are other tasks running, are they allowing or forbiding the concurrent work?
+		for _, task := range activeTasks {
+			if cassJob.Spec.ConcurrencyPolicy == nil || *task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 				logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
 				return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
 			}
-			// TODO There are other tasks running, are they allowing or forbiding the concurrent work?
-			for _, task := range activeTasks {
-				if cassJob.Spec.ConcurrencyPolicy == nil || *task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
-					logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
-					return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
-				}
-			}
 		}
-	*/
+	}
 
 	var res ctrl.Result
 	completedCount := int32(0)
@@ -180,9 +180,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			res, err = r.reconcileEveryPodTask(ctx, &dc, cleanup())
 		case "decommission":
 			// res, err = r.reconcileEveryPodTask(ctx, &dc, decommission())
-		case "empty":
-			// For testing purposes only, execute nothing on every pod
-			res, err = r.reconcileEveryPodTask(ctx, &dc, empty())
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err
@@ -277,13 +274,12 @@ const (
 	podJobCompleted = "COMPLETED"
 	podJobError     = "ERROR"
 	podJobWaiting   = "WAITING"
-
-	jobRunningRequeue = time.Duration(10 * time.Second)
 )
 
 var (
 	// TODO This should be per Datacenter
-	jobRunner chan int = make(chan int, 1)
+	jobRunner         chan int = make(chan int, 1)
+	jobRunningRequeue          = time.Duration(10 * time.Second)
 )
 
 func callCleanup(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, args map[string]string) (string, error) {
@@ -311,17 +307,6 @@ func rebuild(args map[string]string) TaskConfiguration {
 		AsyncFeature: httphelper.Rebuild,
 		AsyncFunc:    callRebuild,
 		Arguments:    args,
-	}
-}
-
-func callEmpty(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, args map[string]string) (string, error) {
-	return strconv.Itoa(rand.Int()), nil
-}
-
-func empty() TaskConfiguration {
-	return TaskConfiguration{
-		AsyncFeature: httphelper.AsyncSSTableTasks,
-		AsyncFunc:    callEmpty,
 	}
 }
 

@@ -1580,7 +1580,6 @@ func TestCleanupAfterScalingAsyncFeaturesMidCrash(t *testing.T) {
 	}, 2500*time.Millisecond, 50*time.Millisecond, "expected result of result.Continue()")
 
 	assert.True(rc.dcPods[0].Annotations[podJobStatusAnnotation] == podJobCompleted)
-	fmt.Printf("Annotations: %v\n", rc.dcPods[0].Annotations)
 	assert.NotEmpty(rc.dcPods[0].Annotations[podJobIdAnnotation])
 }
 

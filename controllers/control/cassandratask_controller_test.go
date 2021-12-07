@@ -52,7 +52,7 @@ func createDatacenter(dcName, namespace string) func() {
 				ClusterName:   clusterName,
 				ServerType:    "cassandra",
 				ServerVersion: "4.0.1",
-				Size:          1,
+				Size:          3,
 			},
 			Status: cassdcapi.CassandraDatacenterStatus{},
 		}
@@ -69,42 +69,73 @@ func createDatacenter(dcName, namespace string) func() {
 		}
 		Expect(k8sClient.Status().Patch(context.Background(), testDc, patchCassdc)).Should(Succeed())
 
-		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("test-cassdc-%s-pod1", dcName),
-				Namespace: namespace,
-				Labels: map[string]string{
-					cassdcapi.ClusterLabel:    clusterName,
-					cassdcapi.DatacenterLabel: dcName,
-				},
-			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:  "cassandra",
-						Image: "k8ssandra/cassandra-nothere:latest",
+		for i := 0; i < int(testDc.Spec.Size); i++ {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("test-cassdc-%s-pod%d", dcName, i),
+					Namespace: namespace,
+					Labels: map[string]string{
+						cassdcapi.ClusterLabel:    clusterName,
+						cassdcapi.DatacenterLabel: dcName,
 					},
 				},
-			},
-		}
-		Expect(k8sClient.Create(context.Background(), pod)).Should(Succeed())
-
-		podIP := "127.0.0.1"
-
-		patchPod := client.MergeFrom(pod.DeepCopy())
-		pod.Status = corev1.PodStatus{
-			PodIP: podIP,
-			PodIPs: []corev1.PodIP{
-				{
-					IP: podIP,
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "cassandra",
+							Image: "k8ssandra/cassandra-nothere:latest",
+						},
+					},
 				},
-			},
+			}
+			Expect(k8sClient.Create(context.Background(), pod)).Should(Succeed())
+
+			podIP := "127.0.0.1"
+
+			patchPod := client.MergeFrom(pod.DeepCopy())
+			pod.Status = corev1.PodStatus{
+				PodIP: podIP,
+				PodIPs: []corev1.PodIP{
+					{
+						IP: podIP,
+					},
+				},
+			}
+			Expect(k8sClient.Status().Patch(context.Background(), pod, patchPod)).Should(Succeed())
 		}
-		Expect(k8sClient.Status().Patch(context.Background(), pod, patchPod)).Should(Succeed())
 	}
 }
 
+func createTask(command, namespace string) (types.NamespacedName, *api.CassandraTask) {
+	taskKey := types.NamespacedName{
+		Name:      fmt.Sprintf("test-%s-task", command),
+		Namespace: namespace,
+	}
+	task := &api.CassandraTask{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      taskKey.Name,
+			Namespace: taskKey.Namespace,
+		},
+		Spec: api.CassandraTaskSpec{
+			Datacenter: corev1.ObjectReference{
+				Name:      testDatacenterName,
+				Namespace: namespace,
+			},
+			Jobs: []api.CassandraJob{
+				{
+					Name:    fmt.Sprintf("%s-dc1", command),
+					Command: command,
+				},
+			},
+		},
+		Status: api.CassandraTaskStatus{},
+	}
+
+	return taskKey, task
+}
+
 var _ = Describe("Execute jobs against all pods", func() {
+	jobRunningRequeue = time.Duration(1 * time.Millisecond)
 	Context("Async jobs", func() {
 		var testNamespaceName string
 		BeforeEach(func() {
@@ -124,34 +155,10 @@ var _ = Describe("Execute jobs against all pods", func() {
 		// TODO Cleanup shouldn't happen when cluster is created
 		// TODO The additional seeds logging in the cass-pod'
 
-		// testNamespaceName := "test-task-async-cleanup"
-
 		When("Running cleanup in datacenter", func() {
 			It("Run a cleanup task against the datacenter pods", func() {
 				By("Create a task for cleanup")
-				taskKey := types.NamespacedName{
-					Name:      "test-cleanup-task",
-					Namespace: testNamespaceName,
-				}
-				task := &api.CassandraTask{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      taskKey.Name,
-						Namespace: taskKey.Namespace,
-					},
-					Spec: api.CassandraTaskSpec{
-						Datacenter: corev1.ObjectReference{
-							Name:      testDatacenterName,
-							Namespace: testNamespaceName,
-						},
-						Jobs: []api.CassandraJob{
-							{
-								Name:    "cleanup-dc1",
-								Command: "cleanup",
-							},
-						},
-					},
-					Status: api.CassandraTaskStatus{},
-				}
+				taskKey, task := createTask("cleanup", testNamespaceName)
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				Eventually(func() bool {
@@ -162,44 +169,23 @@ var _ = Describe("Execute jobs against all pods", func() {
 					return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
 				}, time.Duration(5*time.Second)).Should(BeTrue())
 
-				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(1))
-				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 1))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
 
 				podList := corev1.PodList{}
 				Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
 
 				for _, pod := range podList.Items {
 					Expect(pod.GetAnnotations()[podJobStatusAnnotation]).To(Equal(podJobCompleted))
+					Expect(pod.GetAnnotations()[podJobIdAnnotation]).To(Not(BeEmpty()))
 				}
 			})
 		})
 		When("Running rebuild in datacenter", func() {
 			It("Run a rebuild task against the datacenter pods", func() {
 				By("Create a task for rebuild")
-				taskKey := types.NamespacedName{
-					Name:      "test-rebuild-task",
-					Namespace: testNamespaceName,
-				}
-				task := &api.CassandraTask{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      taskKey.Name,
-						Namespace: taskKey.Namespace,
-					},
-					Spec: api.CassandraTaskSpec{
-						Datacenter: corev1.ObjectReference{
-							Name:      testDatacenterName,
-							Namespace: testNamespaceName,
-						},
-						Jobs: []api.CassandraJob{
-							{
-								Name:    "rebuild-dc1",
-								Command: "rebuild",
-							},
-						},
-					},
-					Status: api.CassandraTaskStatus{},
-				}
+				taskKey, task := createTask("rebuild", testNamespaceName)
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				Eventually(func() bool {
@@ -210,15 +196,16 @@ var _ = Describe("Execute jobs against all pods", func() {
 					return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
 				}, time.Duration(5*time.Second)).Should(BeTrue())
 
-				Expect(callDetails.URLCounts["/api/v1/ops/node/rebuild"]).To(Equal(1))
-				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 1))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				Expect(callDetails.URLCounts["/api/v1/ops/node/rebuild"]).To(Equal(3))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
 
 				podList := corev1.PodList{}
 				Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
 
 				for _, pod := range podList.Items {
 					Expect(pod.GetAnnotations()[podJobStatusAnnotation]).To(Equal(podJobCompleted))
+					Expect(pod.GetAnnotations()[podJobIdAnnotation]).To(Not(BeEmpty()))
 				}
 			})
 		})
@@ -275,7 +262,7 @@ var _ = Describe("Execute jobs against all pods", func() {
 				return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
 			}, time.Duration(5*time.Second)).Should(BeTrue())
 
-			Expect(callDetails.URLCounts["/api/v0/ops/keyspace/cleanup"]).To(Equal(1))
+			Expect(callDetails.URLCounts["/api/v0/ops/keyspace/cleanup"]).To(Equal(3))
 			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
 			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
 
@@ -284,6 +271,7 @@ var _ = Describe("Execute jobs against all pods", func() {
 
 			for _, pod := range podList.Items {
 				Expect(pod.GetAnnotations()[podJobStatusAnnotation]).To(Equal(podJobCompleted))
+				Expect(pod.GetAnnotations()[podJobIdAnnotation]).To(Not(BeEmpty()))
 			}
 		})
 	})

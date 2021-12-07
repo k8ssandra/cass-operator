@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/http/httptest"
 	"time"
 
@@ -21,6 +22,8 @@ import (
 var (
 	mockServer  *httptest.Server
 	callDetails *httphelper.CallDetails
+	// testNamespaceName  = ""
+	testDatacenterName = "dc1"
 )
 
 func createDatacenter(dcName, namespace string) func() {
@@ -103,26 +106,144 @@ func createDatacenter(dcName, namespace string) func() {
 
 var _ = Describe("Execute jobs against all pods", func() {
 	Context("Async jobs", func() {
+		var testNamespaceName string
 		BeforeEach(func() {
 			var err error
-			callDetails := httphelper.NewCallDetails()
+			callDetails = httphelper.NewCallDetails()
 			mockServer, err = httphelper.FakeExecutorServerWithDetails(callDetails)
+			testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
 			Expect(err).ToNot(HaveOccurred())
 			mockServer.Start()
+			createDatacenter(testDatacenterName, testNamespaceName)()
 		})
 
 		AfterEach(func() {
 			mockServer.Close()
 		})
 
-		testNamespaceName := "test-task-async-cleanup"
-		testDatacenterName := "dc1"
+		// TODO Cleanup shouldn't happen when cluster is created
+		// TODO The additional seeds logging in the cass-pod'
 
-		It("Create necessary datacenter parts", createDatacenter(testDatacenterName, testNamespaceName))
+		// testNamespaceName := "test-task-async-cleanup"
+
+		When("Running cleanup in datacenter", func() {
+			It("Run a cleanup task against the datacenter pods", func() {
+				By("Create a task for cleanup")
+				taskKey := types.NamespacedName{
+					Name:      "test-cleanup-task",
+					Namespace: testNamespaceName,
+				}
+				task := &api.CassandraTask{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      taskKey.Name,
+						Namespace: taskKey.Namespace,
+					},
+					Spec: api.CassandraTaskSpec{
+						Datacenter: corev1.ObjectReference{
+							Name:      testDatacenterName,
+							Namespace: testNamespaceName,
+						},
+						Jobs: []api.CassandraJob{
+							{
+								Name:    "cleanup-dc1",
+								Command: "cleanup",
+							},
+						},
+					},
+					Status: api.CassandraTaskStatus{},
+				}
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				Eventually(func() bool {
+					emptyTask := &api.CassandraTask{}
+					err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
+					Expect(err).ToNot(HaveOccurred())
+
+					return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
+				}, time.Duration(5*time.Second)).Should(BeTrue())
+
+				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(1))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+
+				podList := corev1.PodList{}
+				Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
+
+				for _, pod := range podList.Items {
+					Expect(pod.GetAnnotations()[podJobStatusAnnotation]).To(Equal(podJobCompleted))
+				}
+			})
+		})
+		When("Running rebuild in datacenter", func() {
+			It("Run a rebuild task against the datacenter pods", func() {
+				By("Create a task for rebuild")
+				taskKey := types.NamespacedName{
+					Name:      "test-rebuild-task",
+					Namespace: testNamespaceName,
+				}
+				task := &api.CassandraTask{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      taskKey.Name,
+						Namespace: taskKey.Namespace,
+					},
+					Spec: api.CassandraTaskSpec{
+						Datacenter: corev1.ObjectReference{
+							Name:      testDatacenterName,
+							Namespace: testNamespaceName,
+						},
+						Jobs: []api.CassandraJob{
+							{
+								Name:    "rebuild-dc1",
+								Command: "rebuild",
+							},
+						},
+					},
+					Status: api.CassandraTaskStatus{},
+				}
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				Eventually(func() bool {
+					emptyTask := &api.CassandraTask{}
+					err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
+					Expect(err).ToNot(HaveOccurred())
+
+					return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
+				}, time.Duration(5*time.Second)).Should(BeTrue())
+
+				Expect(callDetails.URLCounts["/api/v1/ops/node/rebuild"]).To(Equal(1))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+
+				podList := corev1.PodList{}
+				Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
+
+				for _, pod := range podList.Items {
+					Expect(pod.GetAnnotations()[podJobStatusAnnotation]).To(Equal(podJobCompleted))
+				}
+			})
+		})
+	})
+	Context("Sync jobs", func() {
+		var testNamespaceName string
+		BeforeEach(func() {
+			var err error
+			callDetails = httphelper.NewCallDetails()
+			mockServer, err = httphelper.FakeServerWithoutFeaturesEndpoint(callDetails)
+			testNamespaceName = fmt.Sprintf("test-sync-task-%d", rand.Int31())
+			Expect(err).ToNot(HaveOccurred())
+			mockServer.Start()
+			createDatacenter(testDatacenterName, testNamespaceName)()
+		})
+
+		AfterEach(func() {
+			mockServer.Close()
+		})
+
+		// It("Create necessary datacenter parts", createDatacenter(testDatacenterName, testNamespaceName))
 		It("Run a cleanup task against the datacenter pods", func() {
 			By("Create a task for cleanup")
 			taskKey := types.NamespacedName{
-				Name:      "test-cleanup-task",
+				Name:      "test-cleanup-sync-task",
 				Namespace: testNamespaceName,
 			}
 			task := &api.CassandraTask{
@@ -151,12 +272,12 @@ var _ = Describe("Execute jobs against all pods", func() {
 				err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
 				Expect(err).ToNot(HaveOccurred())
 
-				// fmt.Printf("Details: %v ; %d ; %d\n", emptyTask.Status.CompletionTime, emptyTask.Status.Active, emptyTask.Status.Succeeded)
 				return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
 			}, time.Duration(5*time.Second)).Should(BeTrue())
 
-			// TODO Add CallDetails checks here
-			// Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(1))
+			Expect(callDetails.URLCounts["/api/v0/ops/keyspace/cleanup"]).To(Equal(1))
+			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
+			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
 
 			podList := corev1.PodList{}
 			Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
@@ -165,71 +286,5 @@ var _ = Describe("Execute jobs against all pods", func() {
 				Expect(pod.GetAnnotations()[podJobStatusAnnotation]).To(Equal(podJobCompleted))
 			}
 		})
-		It("Run a rebuild task against the datacenter pods", func() {
-			By("Create a task for cleanup")
-			taskKey := types.NamespacedName{
-				Name:      "test-rebuild-task",
-				Namespace: testNamespaceName,
-			}
-			task := &api.CassandraTask{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      taskKey.Name,
-					Namespace: taskKey.Namespace,
-				},
-				Spec: api.CassandraTaskSpec{
-					Datacenter: corev1.ObjectReference{
-						Name:      testDatacenterName,
-						Namespace: testNamespaceName,
-					},
-					Jobs: []api.CassandraJob{
-						{
-							Name:    "rebuild-dc1",
-							Command: "rebuild",
-						},
-					},
-				},
-				Status: api.CassandraTaskStatus{},
-			}
-			Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
-
-			Eventually(func() bool {
-				emptyTask := &api.CassandraTask{}
-				err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
-				Expect(err).ToNot(HaveOccurred())
-
-				// fmt.Printf("Details: %v ; %d ; %d\n", emptyTask.Status.CompletionTime, emptyTask.Status.Active, emptyTask.Status.Succeeded)
-				return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
-			}, time.Duration(5*time.Second)).Should(BeTrue())
-
-			// TODO Add CallDetails checks here
-			// Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(1))
-
-			/*
-				podList := corev1.PodList{}
-				Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
-
-				for _, pod := range podList.Items {
-					Expect(pod.GetAnnotations()[podJobStatusAnnotation]).To(Equal(podJobCompleted))
-				}
-			*/
-		})
-	})
-	Context("Sync jobs", func() {
-		BeforeEach(func() {
-			var err error
-			callDetails := httphelper.NewCallDetails()
-			mockServer, err = httphelper.FakeServerWithoutFeaturesEndpoint(callDetails)
-			Expect(err).ToNot(HaveOccurred())
-			mockServer.Start()
-		})
-
-		AfterEach(func() {
-			mockServer.Close()
-		})
-
-		testNamespaceName := "test-task-sync-cleanup"
-		testDatacenterName := "dc1"
-
-		It("Create necessary datacenter parts", createDatacenter(testDatacenterName, testNamespaceName))
 	})
 })

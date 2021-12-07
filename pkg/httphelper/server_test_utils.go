@@ -65,7 +65,7 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 		}
 
 		if callDetails != nil {
-			callDetails.incr(r.RequestURI)
+			callDetails.incr(r.URL.Path)
 		}
 
 		if r.Method == http.MethodGet && r.RequestURI == "/api/v0/metadata/versions/features" {
@@ -75,7 +75,7 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 			w.WriteHeader(http.StatusOK)
 			jobId := query.Get("job_id")
 			w.Write([]byte(fmt.Sprintf(jobDetailsCompleted, jobId)))
-		} else if r.Method == http.MethodPost && r.URL.Path == "/api/v1/ops/keyspace/cleanup" {
+		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild") {
 			w.WriteHeader(http.StatusOK)
 			// Write jobId
 			jobId++
@@ -99,7 +99,7 @@ func FakeServerWithoutFeaturesEndpoint(callDetails *CallDetails) (*httptest.Serv
 
 	managementMockServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if callDetails != nil {
-			callDetails.incr(r.RequestURI)
+			callDetails.incr(r.URL.Path)
 		}
 
 		if r.Method == http.MethodPost && r.URL.Path == "/api/v0/ops/keyspace/cleanup" {

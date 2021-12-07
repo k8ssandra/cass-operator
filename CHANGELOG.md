@@ -10,7 +10,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ```
 
 ## unreleased
-* [ENHANCEMENT] #235 Adding AdditionalLabels to add on all resources managed by the operator
+* [ENHANCEMENT] [#235](https://github.com/k8ssandra/cass-operator/issues/235) Adding AdditionalLabels to add on all resources managed by the operator
+* [ENHANCEMENT] [#244](https://github.com/k8ssandra/cass-operator/issues/244) Add ability to skip Casandra user creation
 
 ## v.1.9.0
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.

@@ -893,6 +893,11 @@ func (rc *ReconciliationContext) UpdateSecretWatches() error {
 func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 	dc := rc.Datacenter
 
+	if val, found := dc.Annotations[api.SkipUserCreationAnnotation]; found && val == "true" {
+		rc.ReqLogger.Info(api.SkipUserCreationAnnotation + " is set, skipping CreateUser")
+		return result.Continue()
+	}
+
 	if dc.Spec.Stopped {
 		rc.ReqLogger.Info("cluster is stopped, skipping CreateUser")
 		return result.Continue()

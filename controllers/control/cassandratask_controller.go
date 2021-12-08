@@ -65,9 +65,9 @@ type TaskConfiguration struct {
 	Arguments    map[string]string
 }
 
-//+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=cassandrajobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=cassandrajobs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=cassandrajobs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=cassandratasks,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=cassandratasks/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=cassandratasks/finalizers,verbs=update
 
 // Do we need to repeat this? It's already on the cassandradatacenter_controller.go
 //+kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods;events,verbs=get;list;watch;create;update;patch;delete

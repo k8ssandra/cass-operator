@@ -75,7 +75,7 @@ rules:
 - apiGroups:
   - control.k8ssandra.io
   resources:
-  - cassandrajobs
+  - cassandratasks
   verbs:
   - create
   - delete
@@ -87,13 +87,13 @@ rules:
 - apiGroups:
   - control.k8ssandra.io
   resources:
-  - cassandrajobs/finalizers
+  - cassandratasks/finalizers
   verbs:
   - update
 - apiGroups:
   - control.k8ssandra.io
   resources:
-  - cassandrajobs/status
+  - cassandratasks/status
   verbs:
   - get
   - patch

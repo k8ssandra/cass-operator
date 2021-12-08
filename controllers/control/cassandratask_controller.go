@@ -487,7 +487,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				if err = taskConfig.SyncFunc(nodeMgmtClient, targetPod, taskConfig.Arguments); err != nil {
 					// if err = rc.NodeMgmtClient.CallKeyspaceCleanupEndpoint(targetPod, -1, "", nil); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod
-					logger.Error(err, "Pod", targetPod)
+					logger.Error(err, "executing the sync task failed", "Pod", targetPod)
 					pod.Annotations[podJobStatusAnnotation] = podJobError
 				} else {
 					pod.Annotations[podJobStatusAnnotation] = podJobCompleted

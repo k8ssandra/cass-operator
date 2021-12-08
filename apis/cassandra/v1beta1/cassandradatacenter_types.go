@@ -44,6 +44,11 @@ const (
 	// ConfigHashAnnotation is the operator's annotation for the hash of the ConfigSecret
 	ConfigHashAnnotation = "cassandra.datastax.com/config-hash"
 
+	// SkipUserCreationAnnotation tells the operator to skip creating any Cassandra users
+	// including the default superuser. This is for multi-dc deployments when adding a
+	// DC to an existing cluster where the superuser has already been created.
+	SkipUserCreationAnnotation = "cassandra.datastax.com/skip-user-creation"
+
 	// CassNodeState
 	CassNodeState = "cassandra.datastax.com/node-state"
 

@@ -28,7 +28,8 @@ import (
 type CassandraTaskSpec struct {
 
 	// ScheduledTime indicates the earliest possible time this task is executed. This does not necessarily
-	// equal to the time it is actually executed (if other tasks are blocking for example)
+	// equal to the time it is actually executed (if other tasks are blocking for example). If not set,
+	// the task will be executed immediately.
 	// +optional
 	ScheduledTime *metav1.Time `json:"scheduledTime,omitempty"`
 

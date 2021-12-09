@@ -37,6 +37,7 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
 const (
@@ -69,32 +70,31 @@ type TaskConfiguration struct {
 //+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=cassandratasks/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=cassandratasks/finalizers,verbs=update
 
-// Do we need to repeat this? It's already on the cassandradatacenter_controller.go
 //+kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods;events,verbs=get;list;watch;create;update;patch;delete
 
 func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	var cassJob api.CassandraTask
-	if err := r.Get(ctx, req.NamespacedName, &cassJob); err != nil {
+	var cassTask api.CassandraTask
+	if err := r.Get(ctx, req.NamespacedName, &cassTask); err != nil {
 		logger.Error(err, "unable to fetch CassandraTask", "Request", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	timeNow := metav1.Now()
 
-	if cassJob.Spec.ScheduledTime != nil && timeNow.Before(cassJob.Spec.ScheduledTime) {
+	if cassTask.Spec.ScheduledTime != nil && timeNow.Before(cassTask.Spec.ScheduledTime) {
 		// TODO ScheduledTime is before current time, requeue for later processing
 		logger.V(1).Info("this job isn't scheduled to be run yet", "Request", req.NamespacedName)
-		nextRunTime := cassJob.Spec.ScheduledTime.Sub(timeNow.Time)
+		nextRunTime := cassTask.Spec.ScheduledTime.Sub(timeNow.Time)
 		return ctrl.Result{RequeueAfter: nextRunTime}, nil
 	}
 
 	// Check if job is finished, and if and only if, check the TTL from last finished time.
-	if cassJob.Status.CompletionTime != nil {
+	if cassTask.Status.CompletionTime != nil {
 		// Nothing more to do here, other than delete it..
-		if cassJob.Spec.TTLSecondsAfterFinished != nil {
-			deletionTime := cassJob.Status.CompletionTime.Add(time.Duration(*cassJob.Spec.TTLSecondsAfterFinished) * time.Second)
+		if cassTask.Spec.TTLSecondsAfterFinished != nil {
+			deletionTime := cassTask.Status.CompletionTime.Add(time.Duration(*cassTask.Spec.TTLSecondsAfterFinished) * time.Second)
 			if deletionTime.After(timeNow.Time) {
 				// TODO Delete this object
 				logger.V(1).Info("this task is scheduled to be deleted now", "Request", req.NamespacedName)
@@ -112,11 +112,11 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// Get the CassandraDatacenter
 	dc := cassapi.CassandraDatacenter{}
 	dcNamespacedName := types.NamespacedName{
-		Namespace: cassJob.Spec.Datacenter.Namespace,
-		Name:      cassJob.Spec.Datacenter.Name,
+		Namespace: cassTask.Spec.Datacenter.Namespace,
+		Name:      cassTask.Spec.Datacenter.Name,
 	}
 	if err := r.Get(ctx, dcNamespacedName, &dc); err != nil {
-		logger.Error(err, "unable to fetch CassandraDatacenter", "Datacenter", cassJob.Spec.Datacenter)
+		logger.Error(err, "unable to fetch CassandraDatacenter", "Datacenter", cassTask.Spec.Datacenter)
 		// This is unrecoverable error at this point, do not requeue
 		return ctrl.Result{}, err
 	}
@@ -124,8 +124,8 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger = log.FromContext(ctx, "datacenterName", dc.Name, "clusterName", dc.Spec.ClusterName)
 	log.IntoContext(ctx, logger)
 
-	if err := controllerutil.SetOwnerReference(&dc, &cassJob, r.Scheme); err != nil {
-		logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassJob.Spec.Datacenter, "CassandraTask", req.NamespacedName)
+	if err := controllerutil.SetOwnerReference(&dc, &cassTask, r.Scheme); err != nil {
+		logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassTask.Spec.Datacenter, "CassandraTask", req.NamespacedName)
 		return ctrl.Result{}, err
 	}
 
@@ -146,7 +146,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	if len(activeTasks) > 0 {
-		if cassJob.Spec.ConcurrencyPolicy == nil || *cassJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+		if cassTask.Spec.ConcurrencyPolicy == nil || *cassTask.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 			// TODO Can't run right now, requeue
 			// TODO Or should we push an event?
 			logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
@@ -154,7 +154,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		// TODO There are other tasks running, are they allowing or forbiding the concurrent work?
 		for _, task := range activeTasks {
-			if cassJob.Spec.ConcurrencyPolicy == nil || *task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+			if cassTask.Spec.ConcurrencyPolicy == nil || *task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 				logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
 				return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
 			}
@@ -165,13 +165,13 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	completedCount := int32(0)
 
 	// TODO We only support a single job at this stage (helps dev work)
-	if len(cassJob.Spec.Jobs) > 1 {
+	if len(cassTask.Spec.Jobs) > 1 {
 		return ctrl.Result{}, fmt.Errorf("only a single job can be defined in this version of cass-operator")
 	}
 
 	// TODO We need to verify that the cluster is actually healthy before we run these..
 
-	for _, job := range cassJob.Spec.Jobs {
+	for _, job := range cassTask.Spec.Jobs {
 		// TODO This should check the status of the job from Status, not reconciling it (we overwrite the jobId in those cases)
 		switch job.Command {
 		case "rebuild":
@@ -196,50 +196,44 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		completedCount++
 	}
 
-	if cassJob.GetLabels() == nil {
-		cassJob.Labels = make(map[string]string)
+	taskPatch := client.MergeFrom(cassTask.DeepCopy())
+
+	if cassTask.GetLabels() == nil {
+		cassTask.Labels = make(map[string]string)
 	}
 
-	if _, found := cassJob.GetLabels()[taskStatusLabel]; found {
+	if _, found := cassTask.GetLabels()[taskStatusLabel]; found {
 		if res.RequeueAfter == 0 && !res.Requeue {
 			logger.Info("Setting this to be complete..\n")
 			// Job has been completed
-			cassJob.GetLabels()[taskStatusLabel] = completedTaskLabelValue
-			if err = r.Client.Update(ctx, &cassJob); err != nil {
+			cassTask.GetLabels()[taskStatusLabel] = completedTaskLabelValue
+			if err = r.Client.Patch(ctx, &cassTask, taskPatch); err != nil {
 				return res, err
 			}
 
-			// This status update could be at the end also..
-			cassJob.Status.Active = 0
-			cassJob.Status.CompletionTime = &timeNow
-			if err = r.Client.Status().Update(ctx, &cassJob); err != nil {
-				return res, err
-			}
+			cassTask.Status.Active = 0
+			cassTask.Status.CompletionTime = &timeNow
 		}
 	} else {
 		// Starting the run, set the Active label so we can quickly fetch the active ones
-		cassJob.GetLabels()[taskStatusLabel] = activeTaskLabelValue
+		cassTask.GetLabels()[taskStatusLabel] = activeTaskLabelValue
 
-		if err = r.Client.Update(ctx, &cassJob); err != nil {
+		if err = r.Client.Patch(ctx, &cassTask, taskPatch); err != nil {
 			return res, err
 		}
 
-		cassJob.Status.StartTime = &timeNow
-		cassJob.Status.Active = 1 // We don't have concurrency inside a task at the moment
-		if err = r.Client.Status().Update(ctx, &cassJob); err != nil {
-			return res, err
-		}
+		cassTask.Status.StartTime = &timeNow
+		cassTask.Status.Active = 1 // We don't have concurrency inside a task at the moment
 	}
 
-	if cassJob.Status.Succeeded != completedCount {
-		cassJob.Status.Succeeded = completedCount
-
-		if err = r.Client.Status().Update(ctx, &cassJob); err != nil {
-			return res, err
-		}
+	if cassTask.Status.Succeeded != completedCount {
+		cassTask.Status.Succeeded = completedCount
 	}
 
 	// TODO Add conditions also
+	if err = r.Client.Status().Patch(ctx, &cassTask, taskPatch); err != nil {
+		return res, err
+	}
 
 	// log.V(1).Info for DEBUG logging
 	return res, err
@@ -254,8 +248,8 @@ func (r *CassandraTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *CassandraTaskReconciler) activeTasks(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]api.CassandraTask, error) {
 	var taskList api.CassandraTaskList
-	// TODO This should add per-datacenter active (we can execute concurrently in different datacenters)
-	if err := r.Client.List(ctx, &taskList, client.InNamespace(dc.Namespace), client.MatchingLabels{taskStatusLabel: activeTaskLabelValue}); err != nil {
+	matcher := client.MatchingLabels(utils.MergeMap(dc.GetDatacenterLabels(), map[string]string{taskStatusLabel: activeTaskLabelValue}))
+	if err := r.Client.List(ctx, &taskList, client.InNamespace(dc.Namespace), matcher); err != nil {
 		return nil, err
 	}
 
@@ -345,6 +339,8 @@ func (r *CassandraTaskReconciler) initializeMgmtClient(ctx context.Context, dc *
 
 func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig TaskConfiguration) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+
+	// TODO Should we track the pods with UID of the task? So we know this pod has participated..
 
 	// We sort to ensure we process the dcPods in the same order
 	dcPods, err := r.getDatacenterPods(ctx, dc)

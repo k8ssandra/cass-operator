@@ -314,29 +314,6 @@ func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cas
 	return pods.Items, nil
 }
 
-// TODO reconcile_racks has similar function, so refactor them to same place
-func (r *CassandraTaskReconciler) initializeMgmtClient(ctx context.Context, dc *cassapi.CassandraDatacenter) (httphelper.NodeMgmtClient, error) {
-	logger := log.FromContext(ctx)
-
-	httpClient, err := httphelper.BuildManagementApiHttpClient(dc, r.Client, ctx)
-	if err != nil {
-		logger.Error(err, "error in BuildManagementApiHttpClient")
-		return httphelper.NodeMgmtClient{}, err
-	}
-
-	protocol, err := httphelper.GetManagementApiProtocol(dc)
-	if err != nil {
-		logger.Error(err, "error in GetManagementApiProtocol")
-		return httphelper.NodeMgmtClient{}, err
-	}
-
-	return httphelper.NodeMgmtClient{
-		Client:   httpClient,
-		Log:      logger,
-		Protocol: protocol,
-	}, nil
-}
-
 func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig TaskConfiguration) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
@@ -359,7 +336,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 		return dcPods[i].Name < dcPods[j].Name
 	})
 
-	nodeMgmtClient, err := r.initializeMgmtClient(ctx, dc)
+	nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

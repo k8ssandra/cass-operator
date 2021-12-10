@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
@@ -174,8 +173,6 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 
 // For information on log usage, see:
 // https://godoc.org/github.com/go-logr/logr
-
-var log = logf.Log.WithName("reconciliation_handler")
 
 func (rc *ReconciliationContext) addFinalizer() error {
 	if len(rc.Datacenter.GetFinalizers()) < 1 && rc.Datacenter.GetDeletionTimestamp() == nil {

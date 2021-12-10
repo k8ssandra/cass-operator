@@ -66,7 +66,7 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretNamespacedName.Name,
 				Namespace: secretNamespacedName.Namespace,
-				Labels: labels,
+				Labels:    labels,
 			},
 		}
 		username := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-superuser"

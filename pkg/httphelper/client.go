@@ -18,7 +18,10 @@ import (
 
 	"github.com/go-logr/logr"
 
+	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type NodeMgmtClient struct {
@@ -118,6 +121,28 @@ func (f *FeatureSet) UnmarshalJSON(b []byte) error {
 func (f *FeatureSet) Supports(feature Feature) bool {
 	_, found := f.Features[string(feature)]
 	return found
+}
+
+func NewMgmtClient(ctx context.Context, client client.Client, dc *cassdcapi.CassandraDatacenter) (NodeMgmtClient, error) {
+	logger := log.FromContext(ctx)
+
+	httpClient, err := BuildManagementApiHttpClient(dc, client, ctx)
+	if err != nil {
+		logger.Error(err, "error in BuildManagementApiHttpClient")
+		return NodeMgmtClient{}, err
+	}
+
+	protocol, err := GetManagementApiProtocol(dc)
+	if err != nil {
+		logger.Error(err, "error in GetManagementApiProtocol")
+		return NodeMgmtClient{}, err
+	}
+
+	return NodeMgmtClient{
+		Client:   httpClient,
+		Log:      logger,
+		Protocol: protocol,
+	}, nil
 }
 
 func BuildPodHostFromPod(pod *corev1.Pod) (string, error) {

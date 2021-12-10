@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -89,6 +90,8 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 		// loopID is used to tie all events together that are spawned by the same reconciliation loop
 		WithValues("loopID", uuid.New().String())
 
+	log.IntoContext(ctx, logger)
+
 	defer func() {
 		reconcileDuration := time.Since(startReconcile).Seconds()
 		logger.Info("Reconcile loop completed",
@@ -97,7 +100,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 	logger.Info("======== handler::Reconcile has been called")
 
-	rc, err := reconciliation.CreateReconciliationContext(&request, r.Client, r.Scheme, r.Recorder, r.SecretWatches, logger)
+	rc, err := reconciliation.CreateReconciliationContext(ctx, &request, r.Client, r.Scheme, r.Recorder, r.SecretWatches)
 
 	if err != nil {
 		if errors.IsNotFound(err) {

@@ -22,8 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TODO Labels to add that indicate the status of the task? So they can be searched? Like jobs have.
-
 // CassandraTaskSpec defines the desired state of CassandraTask
 type CassandraTaskSpec struct {
 
@@ -57,24 +55,6 @@ type CassandraTaskSpec struct {
 	// The "Allow" property is only valid if all the other active Tasks have "Allow" as well.
 	// +optional
 	ConcurrencyPolicy *batchv1.ConcurrencyPolicy `json:"concurrencyPolicy,omitempty"`
-
-	// TODO Add webhook?
-
-	/*
-		spec:
-			datacenter:
-				name: dc2
-				namespace: cass-operator
-			scheduledTime: "nnnnnn"
-			jobs:
-				- name: rebuild-dc1
-				  command: rebuild
-				  args:
-				    source_datacenter: dc1
-			restartPolicy: Never
-			concurrencyPolicy: Forbid
-			ttlSecondsAfterFinished: 86400
-	*/
 }
 
 type CassandraJob struct {

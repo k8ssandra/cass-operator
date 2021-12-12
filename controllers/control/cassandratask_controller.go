@@ -18,6 +18,7 @@ package control
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -170,16 +171,17 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// TODO We need to verify that the cluster is actually healthy before we run these..
+	taskId := string(cassTask.UID)
 
 	for _, job := range cassTask.Spec.Jobs {
 		// TODO This should check the status of the job from Status, not reconciling it (we overwrite the jobId in those cases)
 		switch job.Command {
 		case "rebuild":
-			res, err = r.reconcileEveryPodTask(ctx, &dc, rebuild(job.Arguments))
+			res, err = r.reconcileEveryPodTask(ctx, taskId, &dc, rebuild(job.Arguments))
 		case "cleanup":
-			res, err = r.reconcileEveryPodTask(ctx, &dc, cleanup())
+			res, err = r.reconcileEveryPodTask(ctx, taskId, &dc, cleanup())
 		case "decommission":
-			// res, err = r.reconcileEveryPodTask(ctx, &dc, decommission())
+			// res, err = r.reconcileEveryPodTask(ctx, taskId, &dc, decommission())
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err
@@ -260,15 +262,51 @@ func (r *CassandraTaskReconciler) activeTasks(ctx context.Context, dc *cassapi.C
 	Jobs executing something on every pod in the datacenter
 **/
 const (
-	podJobIdAnnotation     = "control.k8ssandra.io/job-id"
-	podJobStatusAnnotation = "control.k8ssandra.io/job-status"
-	podJobHandler          = "control.k8ssandra.io/job-runner"
-	jobHandlerMgmtApi      = "management-api"
+	// PodJobAnnotationPrefix defines the prefix key for a job data (json serialized) in the annotations of the pod
+	PodJobAnnotationPrefix = "control.k8ssandra.io/job"
+	// podJobIdKey            = "control.k8ssandra.io/job-id"
+	// podJobStatusKey        = "control.k8ssandra.io/job-status"
+	// podJobHandlerKey       = "control.k8ssandra.io/job-runner"
+	jobHandlerMgmtApi = "management-api"
 
 	podJobCompleted = "COMPLETED"
 	podJobError     = "ERROR"
 	podJobWaiting   = "WAITING"
 )
+
+type JobStatus struct {
+	Id      string `json:"jobId,omitempty"`
+	Status  string `json:"jobStatus,omitempty"`
+	Handler string `json:"jobHandler,omitempty"`
+}
+
+func getJobAnnotationKey(taskId string) string {
+	return fmt.Sprintf("%s-%s", PodJobAnnotationPrefix, taskId)
+}
+
+// GetJobStatusFromPodAnnotations gets the json serialized pod job statusfrom Pod.Annotations
+// and converts it to the Affinity type in api.
+func GetJobStatusFromPodAnnotations(taskId string, annotations map[string]string) (JobStatus, error) {
+	annotationKey := getJobAnnotationKey(taskId)
+	var jobStatus JobStatus
+	if jobData, found := annotations[annotationKey]; found {
+		err := json.Unmarshal([]byte(jobData), &jobStatus)
+		if err != nil {
+			return jobStatus, err
+		}
+	}
+	return jobStatus, nil
+}
+
+func JobStatusToPodAnnotations(taskId string, annotations map[string]string, jobStatus JobStatus) error {
+	outputVal, err := json.Marshal(jobStatus)
+	if err != nil {
+		return err
+	}
+	annotationKey := getJobAnnotationKey(taskId)
+	annotations[annotationKey] = string(outputVal)
+	return nil
+}
 
 var (
 	// TODO This should be per Datacenter
@@ -314,7 +352,7 @@ func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cas
 	return pods.Items, nil
 }
 
-func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig TaskConfiguration) (ctrl.Result, error) {
+func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, taskId string, dc *cassapi.CassandraDatacenter, taskConfig TaskConfiguration) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	// TODO Should we track the pods with UID of the task? So we know this pod has participated..
@@ -351,62 +389,87 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 			pod.Annotations = make(map[string]string)
 		}
 
-		if podJobId, found := pod.Annotations[podJobIdAnnotation]; found {
+		jobStatus, err := GetJobStatusFromPodAnnotations(taskId, pod.Annotations)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		podPatch := client.MergeFrom(pod.DeepCopy())
+		if jobStatus.Id != "" {
+			if jobStatus.Status == podJobCompleted {
+				// Next pod, this is done
+				continue
+			}
+			// if podJobId, found := pod.Annotations[podJobIdKey]; found {
 			if features.Supports(taskConfig.AsyncFeature) {
-				_, found := pod.Annotations[podJobStatusAnnotation]
-				if !found {
-					podPatch := client.MergeFrom(pod.DeepCopy())
-					// Pod is currently processing something, or has finished processing.. update the status
-					details, err := nodeMgmtClient.JobDetails(&pod, podJobId)
+				// _, found := pod.Annotations[podJobStatusKey]
+				// if !found {
+				// Pod is currently processing something, or has finished processing.. update the status
+				details, err := nodeMgmtClient.JobDetails(&pod, jobStatus.Id)
+				if err != nil {
+					logger.Error(err, "Could not get JobDetails for pod", "Pod", pod)
+					return ctrl.Result{}, err
+				}
+
+				if details.Id == "" {
+					// This job was not found, pod most likely restarted. Let's retry..
+					delete(pod.Annotations, getJobAnnotationKey(taskId))
+					err = r.Client.Patch(ctx, &pod, podPatch)
 					if err != nil {
-						logger.Error(err, "Could not get JobDetails for pod", "Pod", pod)
+						return ctrl.Result{}, err
+					}
+					return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+				} else if details.Status == podJobError {
+					// Log the error, move on
+					logger.Error(fmt.Errorf("task failed: %s", details.Error), "Job failed to successfully complete the task", "Pod", pod)
+					jobStatus.Status = podJobError
+					if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
 						return ctrl.Result{}, err
 					}
 
-					if details.Id == "" {
-						// This job was not found, pod most likely restarted. Let's retry..
-						delete(pod.Annotations, podJobIdAnnotation)
-						err = r.Client.Patch(ctx, &pod, podPatch)
-						if err != nil {
-							return ctrl.Result{}, err
-						}
-						return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
-					} else if details.Status == podJobError {
-						// Log the error, move on
-						logger.Error(fmt.Errorf("task failed: %s", details.Error), "Job failed to successfully complete the task", "Pod", pod)
-						pod.Annotations[podJobStatusAnnotation] = podJobError
-						err = r.Client.Patch(ctx, &pod, podPatch)
-						if err != nil {
-							return ctrl.Result{}, err
-						}
-						continue
-					} else if details.Status == podJobCompleted {
-						// Pod has finished, remove the job_id and let us move to the next pod
-						pod.Annotations[podJobStatusAnnotation] = podJobCompleted
-						err = r.Client.Patch(ctx, &pod, podPatch)
-						if err != nil {
-							return ctrl.Result{}, err
-						}
-						continue
-					} else if details.Status == podJobWaiting {
-						// Job is still running or waiting
-						return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
+					if err = r.Client.Patch(ctx, &pod, podPatch); err != nil {
+						return ctrl.Result{}, err
 					}
-				} else {
-					// This pod has finished since it has a status
 					continue
+				} else if details.Status == podJobCompleted {
+					// Pod has finished, remove the job_id and let us move to the next pod
+					// TODO We should really delete the job_id, but also ensure that we don't run into line #366 again since it's gone.
+					// 		But at the same time, next run should work
+					jobStatus.Status = podJobCompleted
+					// TODO Repeating code - refactor
+					if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+						return ctrl.Result{}, err
+					}
+
+					if err = r.Client.Patch(ctx, &pod, podPatch); err != nil {
+						return ctrl.Result{}, err
+					}
+					continue
+				} else if details.Status == podJobWaiting {
+					// Job is still running or waiting
+					return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
 				}
+				// } else {
+				// // This pod has finished since it has a status
+				// continue
+				// }
 			} else {
 				if len(jobRunner) > 0 {
 					// Something is still holding the worker
 					return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
 				}
 
-				// Nothing is holding the job, has this pod finished or hasn't it ran anything?
-				if _, found := pod.Annotations[podJobStatusAnnotation]; found {
-					// Pod has finished, check next one
-					continue
+				// Nothing is holding the job, this pod has finished
+				jobStatus.Status = podJobCompleted
+				if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+					return ctrl.Result{}, err
 				}
+
+				if err = r.Client.Patch(ctx, &pod, podPatch); err != nil {
+					return ctrl.Result{}, err
+				}
+
+				continue
 			}
 		}
 
@@ -418,9 +481,16 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				// We can retry this later, it will only restart the cleanup but won't otherwise hurt
 				return ctrl.Result{}, err
 			}
-			podPatch := client.MergeFrom(pod.DeepCopy())
-			pod.Annotations[podJobHandler] = jobHandlerMgmtApi
-			pod.Annotations[podJobIdAnnotation] = jobId
+			// podPatch := client.MergeFrom(pod.DeepCopy())
+			// TODO This patch won't work anymore, we need to update the annotation key
+			jobStatus.Handler = jobHandlerMgmtApi
+			jobStatus.Id = jobId
+			// pod.Annotations[podJobHandlerKey] = jobHandlerMgmtApi
+			// pod.Annotations[podJobIdKey] = jobId
+
+			if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+				return ctrl.Result{}, err
+			}
 
 			err = r.Client.Patch(ctx, &pod, podPatch)
 			if err != nil {
@@ -436,9 +506,14 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 			jobId := strconv.Itoa(idx)
 
 			// This pod should run next, mark it
-			podPatch := client.MergeFrom(pod.DeepCopy())
-			pod.Annotations[podJobHandler] = oplabels.ManagedByLabelValue
-			pod.Annotations[podJobIdAnnotation] = jobId
+			// podPatch := client.MergeFrom(pod.DeepCopy())
+			jobStatus.Handler = oplabels.ManagedByLabelValue
+			jobStatus.Id = jobId
+			// pod.Annotations[podJobHandlerKey] = oplabels.ManagedByLabelValue
+			// pod.Annotations[podJobIdKey] = jobId
+			if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+				return ctrl.Result{}, err
+			}
 
 			err = r.Client.Patch(ctx, &pod, podPatch)
 			if err != nil {
@@ -461,9 +536,16 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					// if err = rc.NodeMgmtClient.CallKeyspaceCleanupEndpoint(targetPod, -1, "", nil); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod
 					logger.Error(err, "executing the sync task failed", "Pod", targetPod)
-					pod.Annotations[podJobStatusAnnotation] = podJobError
+					jobStatus.Status = podJobError
+					// pod.Annotations[podJobStatusKey] = podJobError
 				} else {
-					pod.Annotations[podJobStatusAnnotation] = podJobCompleted
+					jobStatus.Status = podJobCompleted
+					// pod.Annotations[podJobStatusKey] = podJobCompleted
+				}
+
+				// TODO This patch won't work anymore, we need to update the annotation key
+				if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+					logger.Error(err, "Failed to update local job's status", "Pod", targetPod)
 				}
 
 				err = r.Client.Patch(ctx, &pod, podPatch)

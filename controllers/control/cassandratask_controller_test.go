@@ -108,7 +108,6 @@ func createDatacenter(dcName, namespace string) func() {
 
 func createTask(command, namespace string) (types.NamespacedName, *api.CassandraTask) {
 	taskKey := types.NamespacedName{
-		// TODO Add random id here
 		Name:      fmt.Sprintf("test-%s-task-%d", command, rand.Int31()),
 		Namespace: namespace,
 	}
@@ -131,6 +130,8 @@ func createTask(command, namespace string) (types.NamespacedName, *api.Cassandra
 		},
 		Status: api.CassandraTaskStatus{},
 	}
+
+	Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 	return taskKey, task
 }
@@ -160,14 +161,14 @@ var _ = Describe("Execute jobs against all pods", func() {
 	Context("Async jobs", func() {
 		var testNamespaceName string
 		BeforeEach(func() {
-			By("Create a datacenter and fake mgmt-api server")
+			By("Create fake mgmt-api server")
 			var err error
 			callDetails = httphelper.NewCallDetails()
 			mockServer, err = httphelper.FakeExecutorServerWithDetails(callDetails)
 			testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
 			Expect(err).ToNot(HaveOccurred())
 			mockServer.Start()
-			createDatacenter(testDatacenterName, testNamespaceName)()
+			By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
 		})
 
 		AfterEach(func() {
@@ -180,7 +181,6 @@ var _ = Describe("Execute jobs against all pods", func() {
 			It("Run a rebuild task against the datacenter pods", func() {
 				By("Create a task for rebuild")
 				taskKey, task := createTask("rebuild", testNamespaceName)
-				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				waitForTaskCompletion(taskKey)
 
@@ -195,7 +195,6 @@ var _ = Describe("Execute jobs against all pods", func() {
 			It("Run a cleanup task against the datacenter pods", func() {
 				By("Create a task for cleanup")
 				taskKey, task := createTask("cleanup", testNamespaceName)
-				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				waitForTaskCompletion(taskKey)
 
@@ -203,19 +202,12 @@ var _ = Describe("Execute jobs against all pods", func() {
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
 				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
 
-				podList := corev1.PodList{}
-				Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
+				verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 
-				jobAnnotationKey := getJobAnnotationKey(string(task.UID))
-				for _, pod := range podList.Items {
-					Expect(pod.GetAnnotations()).To(HaveKey(jobAnnotationKey))
-				}
-
-				// TODO This is hacky approach to run two jobs twice in the same test
+				// This is hacky approach to run two jobs twice in the same test - resetting the callDetails
 				callDetails.URLCounts = make(map[string]int)
 				By("Create a task for second cleanup")
 				taskKey, task = createTask("cleanup", testNamespaceName)
-				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				waitForTaskCompletion(taskKey)
 
@@ -230,13 +222,14 @@ var _ = Describe("Execute jobs against all pods", func() {
 	Context("Sync jobs", func() {
 		var testNamespaceName string
 		BeforeEach(func() {
+			By("Create fake mgmt-api server")
 			var err error
 			callDetails = httphelper.NewCallDetails()
 			mockServer, err = httphelper.FakeServerWithoutFeaturesEndpoint(callDetails)
 			testNamespaceName = fmt.Sprintf("test-sync-task-%d", rand.Int31())
 			Expect(err).ToNot(HaveOccurred())
 			mockServer.Start()
-			createDatacenter(testDatacenterName, testNamespaceName)()
+			By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
 		})
 
 		AfterEach(func() {
@@ -245,34 +238,10 @@ var _ = Describe("Execute jobs against all pods", func() {
 
 		It("Run a cleanup task against the datacenter pods", func() {
 			By("Create a task for cleanup")
-			taskKey := types.NamespacedName{
-				Name:      "test-cleanup-sync-task",
-				Namespace: testNamespaceName,
-			}
-			task := &api.CassandraTask{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      taskKey.Name,
-					Namespace: taskKey.Namespace,
-				},
-				Spec: api.CassandraTaskSpec{
-					Datacenter: corev1.ObjectReference{
-						Name:      testDatacenterName,
-						Namespace: testNamespaceName,
-					},
-					Jobs: []api.CassandraJob{
-						{
-							Name:    "cleanup-dc1",
-							Command: "cleanup",
-						},
-					},
-				},
-				Status: api.CassandraTaskStatus{},
-			}
-			Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+			taskKey, task := createTask("cleanup", testNamespaceName)
 
 			waitForTaskCompletion(taskKey)
 
-			// TODO Investigate why cleanup is called multiple times per pod occasionally
 			Expect(callDetails.URLCounts["/api/v0/ops/keyspace/cleanup"]).To(Equal(3))
 			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
 			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))

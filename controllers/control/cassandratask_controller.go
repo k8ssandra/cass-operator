@@ -45,6 +45,7 @@ const (
 	taskStatusLabel         = "control.k8ssandra.io/status"
 	activeTaskLabelValue    = "active"
 	completedTaskLabelValue = "completed"
+	defaultTTL              = time.Duration(86400) * time.Second
 )
 
 // CassandraTaskReconciler reconciles a CassandraJob object
@@ -91,23 +92,33 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{RequeueAfter: nextRunTime}, nil
 	}
 
+	calculateDeletionTime := func() time.Time {
+		var deletionTime time.Time
+		if cassTask.Spec.TTLSecondsAfterFinished != nil {
+			deletionTime = cassTask.Status.CompletionTime.Add(time.Duration(*cassTask.Spec.TTLSecondsAfterFinished) * time.Second)
+		} else {
+			deletionTime = cassTask.Status.CompletionTime.Add(defaultTTL)
+		}
+
+		return deletionTime
+	}
+
 	// Check if job is finished, and if and only if, check the TTL from last finished time.
 	if cassTask.Status.CompletionTime != nil {
+		deletionTime := calculateDeletionTime()
+
 		// Nothing more to do here, other than delete it..
-		if cassTask.Spec.TTLSecondsAfterFinished != nil {
-			deletionTime := cassTask.Status.CompletionTime.Add(time.Duration(*cassTask.Spec.TTLSecondsAfterFinished) * time.Second)
-			if deletionTime.After(timeNow.Time) {
-				// TODO Delete this object
-				logger.V(1).Info("this task is scheduled to be deleted now", "Request", req.NamespacedName)
-			} else {
-				// Reschedule for later deletion
-				logger.V(1).Info("this task is scheduled to be deleted later", "Request", req.NamespacedName)
-				nextRunTime := deletionTime.Sub(timeNow.Time)
-				return ctrl.Result{RequeueAfter: nextRunTime}, nil
-			}
+		if deletionTime.Before(timeNow.Time) {
+			logger.V(1).Info("this task is scheduled to be deleted now", "Request", req.NamespacedName, "deletionTime", deletionTime.String())
+			err := r.Delete(ctx, &cassTask)
+			// Do not requeue anymore, this task has been completed
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		} else {
+			// Reschedule for later deletion
+			logger.V(1).Info("this task is scheduled to be deleted later", "Request", req.NamespacedName)
+			nextRunTime := deletionTime.Sub(timeNow.Time)
+			return ctrl.Result{RequeueAfter: nextRunTime}, nil
 		}
-		// Do not requeue anymore, this task has been completed
-		return ctrl.Result{}, nil
 	}
 
 	// Get the CassandraDatacenter
@@ -132,7 +143,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	var err error
 
-	// TODO Does our concurrencypolicy allow the task to run? Are there any other active ones?
+	// Does our concurrencypolicy allow the task to run? Are there any other active ones?
 	activeTasks, err := r.activeTasks(ctx, &dc)
 	if err != nil {
 		logger.Error(err, "unable to fetch active CassandraTasks", "Request", req.NamespacedName)
@@ -206,7 +217,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	if _, found := cassTask.GetLabels()[taskStatusLabel]; found {
 		if res.RequeueAfter == 0 && !res.Requeue {
-			logger.Info("Setting this to be complete..\n")
 			// Job has been completed
 			cassTask.GetLabels()[taskStatusLabel] = completedTaskLabelValue
 			if err = r.Client.Patch(ctx, &cassTask, taskPatch); err != nil {
@@ -215,6 +225,12 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 			cassTask.Status.Active = 0
 			cassTask.Status.CompletionTime = &timeNow
+
+			// Requeue for deletion later
+			deletionTime := calculateDeletionTime()
+			nextRunTime := deletionTime.Sub(timeNow.Time)
+			res.RequeueAfter = nextRunTime
+			logger.V(1).Info("This task has completed, scheduling for deletion in " + nextRunTime.String())
 		}
 	} else {
 		// Starting the run, set the Active label so we can quickly fetch the active ones
@@ -275,9 +291,9 @@ const (
 )
 
 type JobStatus struct {
-	Id      string `json:"jobId,omitempty"`
-	Status  string `json:"jobStatus,omitempty"`
-	Handler string `json:"jobHandler,omitempty"`
+	Id      string `json:"id,omitempty"`
+	Status  string `json:"status,omitempty"`
+	Handler string `json:"handler,omitempty"`
 }
 
 func getJobAnnotationKey(taskId string) string {
@@ -309,7 +325,7 @@ func JobStatusToPodAnnotations(taskId string, annotations map[string]string, job
 }
 
 var (
-	// TODO This should be per Datacenter
+	// TODO This should be per Datacenter for sync tasks also
 	jobRunner         chan int = make(chan int, 1)
 	jobRunningRequeue          = time.Duration(10 * time.Second)
 )
@@ -355,8 +371,6 @@ func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cas
 func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, taskId string, dc *cassapi.CassandraDatacenter, taskConfig TaskConfiguration) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	// TODO Should we track the pods with UID of the task? So we know this pod has participated..
-
 	// We sort to ensure we process the dcPods in the same order
 	dcPods, err := r.getDatacenterPods(ctx, dc)
 	if err != nil {
@@ -400,10 +414,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 				// Next pod, this is done
 				continue
 			}
-			// if podJobId, found := pod.Annotations[podJobIdKey]; found {
 			if features.Supports(taskConfig.AsyncFeature) {
-				// _, found := pod.Annotations[podJobStatusKey]
-				// if !found {
 				// Pod is currently processing something, or has finished processing.. update the status
 				details, err := nodeMgmtClient.JobDetails(&pod, jobStatus.Id)
 				if err != nil {
@@ -433,8 +444,6 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 					continue
 				} else if details.Status == podJobCompleted {
 					// Pod has finished, remove the job_id and let us move to the next pod
-					// TODO We should really delete the job_id, but also ensure that we don't run into line #366 again since it's gone.
-					// 		But at the same time, next run should work
 					jobStatus.Status = podJobCompleted
 					// TODO Repeating code - refactor
 					if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
@@ -449,10 +458,6 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 					// Job is still running or waiting
 					return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
 				}
-				// } else {
-				// // This pod has finished since it has a status
-				// continue
-				// }
 			} else {
 				if len(jobRunner) > 0 {
 					// Something is still holding the worker
@@ -476,17 +481,12 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 		if features.Supports(taskConfig.AsyncFeature) {
 			// Pod isn't running anything at the moment, this pod should run next
 			jobId, err := taskConfig.AsyncFunc(nodeMgmtClient, &pod, taskConfig.Arguments)
-			// jobId, err := rc.NodeMgmtClient.CallKeyspaceCleanup(pod, -1, "", nil)
 			if err != nil {
 				// We can retry this later, it will only restart the cleanup but won't otherwise hurt
 				return ctrl.Result{}, err
 			}
-			// podPatch := client.MergeFrom(pod.DeepCopy())
-			// TODO This patch won't work anymore, we need to update the annotation key
 			jobStatus.Handler = jobHandlerMgmtApi
 			jobStatus.Id = jobId
-			// pod.Annotations[podJobHandlerKey] = jobHandlerMgmtApi
-			// pod.Annotations[podJobIdKey] = jobId
 
 			if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
 				return ctrl.Result{}, err
@@ -500,17 +500,17 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 		} else {
 			if taskConfig.SyncFunc == nil {
 				// This feature is not supported in sync mode, mark everything as done
-				return ctrl.Result{}, nil
+				err := fmt.Errorf("this job isn't supported by the target pod")
+				logger.Error(err, "unable to execute requested job against pod", "Pod", pod)
+				return ctrl.Result{}, err
 			}
 
 			jobId := strconv.Itoa(idx)
 
 			// This pod should run next, mark it
-			// podPatch := client.MergeFrom(pod.DeepCopy())
 			jobStatus.Handler = oplabels.ManagedByLabelValue
 			jobStatus.Id = jobId
-			// pod.Annotations[podJobHandlerKey] = oplabels.ManagedByLabelValue
-			// pod.Annotations[podJobIdKey] = jobId
+
 			if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -525,6 +525,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 
 			go func(targetPod *corev1.Pod) {
 				// Write value to the jobRunner to indicate we're running
+				logger.V(1).Info("starting execution of sync blocking job", "Pod", targetPod)
 				jobRunner <- idx
 				defer func() {
 					// Read the value from the jobRunner
@@ -533,17 +534,13 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 
 				podPatch := client.MergeFrom(targetPod.DeepCopy())
 				if err = taskConfig.SyncFunc(nodeMgmtClient, targetPod, taskConfig.Arguments); err != nil {
-					// if err = rc.NodeMgmtClient.CallKeyspaceCleanupEndpoint(targetPod, -1, "", nil); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod
 					logger.Error(err, "executing the sync task failed", "Pod", targetPod)
 					jobStatus.Status = podJobError
-					// pod.Annotations[podJobStatusKey] = podJobError
 				} else {
 					jobStatus.Status = podJobCompleted
-					// pod.Annotations[podJobStatusKey] = podJobCompleted
 				}
 
-				// TODO This patch won't work anymore, we need to update the annotation key
 				if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
 					logger.Error(err, "Failed to update local job's status", "Pod", targetPod)
 				}

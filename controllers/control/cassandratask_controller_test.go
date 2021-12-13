@@ -135,12 +135,31 @@ func createTask(command, namespace string) (types.NamespacedName, *api.Cassandra
 	return taskKey, task
 }
 
+func waitForTaskCompletion(taskKey types.NamespacedName) {
+	Eventually(func() bool {
+		emptyTask := &api.CassandraTask{}
+		err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
+		Expect(err).ToNot(HaveOccurred())
+
+		return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
+	}, time.Duration(5*time.Second)).Should(BeTrue())
+}
+
+func verifyPodsHaveAnnotations(testNamespaceName, taskId string) {
+	podList := corev1.PodList{}
+	Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
+
+	jobAnnotationKey := getJobAnnotationKey(taskId)
+	for _, pod := range podList.Items {
+		Expect(pod.GetAnnotations()).To(HaveKey(jobAnnotationKey))
+	}
+}
+
 var _ = Describe("Execute jobs against all pods", func() {
 	jobRunningRequeue = time.Duration(1 * time.Millisecond)
 	Context("Async jobs", func() {
 		var testNamespaceName string
 		BeforeEach(func() {
-			fmt.Printf("Create datacenter\n")
 			By("Create a datacenter and fake mgmt-api server")
 			var err error
 			callDetails = httphelper.NewCallDetails()
@@ -157,88 +176,54 @@ var _ = Describe("Execute jobs against all pods", func() {
 
 		// TODO Cleanup shouldn't happen when cluster is created
 		// TODO The additional seeds logging in the cass-pod'
-
-		When("Running cleanup in datacenter", func() {
-			// TODO Run the same job twice ..
-			It("Run a cleanup task against the datacenter pods", func() {
-				By("Create a task for cleanup")
-				taskKey, task := createTask("cleanup", testNamespaceName)
-				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
-
-				Eventually(func() bool {
-					emptyTask := &api.CassandraTask{}
-					err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
-					Expect(err).ToNot(HaveOccurred())
-
-					return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
-				}, time.Duration(5*time.Second)).Should(BeTrue())
-
-				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
-				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
-
-				podList := corev1.PodList{}
-				Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
-
-				// for _, pod := range podList.Items {
-				// 	Expect(pod.GetAnnotations()[podJobStatusKey]).To(Equal(podJobCompleted))
-				// 	Expect(pod.GetAnnotations()[podJobIdKey]).To(Not(BeEmpty()))
-				// }
-				// })
-				// It("Run a cleanup task against the datacenter pods", func() {
-
-				// TODO This is hacky approach to run two jobs twice in the same test
-				callDetails.URLCounts = make(map[string]int)
-				By("Create a task for cleanup")
-				taskKey, task = createTask("cleanup", testNamespaceName)
-				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
-
-				Eventually(func() bool {
-					emptyTask := &api.CassandraTask{}
-					err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
-					Expect(err).ToNot(HaveOccurred())
-
-					return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
-				}, time.Duration(5*time.Second)).Should(BeTrue())
-
-				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
-				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
-
-				podList = corev1.PodList{}
-				Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
-
-				// for _, pod := range podList.Items {
-				// 	Expect(pod.GetAnnotations()[podJobStatusKey]).To(Equal(podJobCompleted))
-				// 	Expect(pod.GetAnnotations()[podJobIdKey]).To(Not(BeEmpty()))
-				// }
-			})
-		})
 		When("Running rebuild in datacenter", func() {
 			It("Run a rebuild task against the datacenter pods", func() {
 				By("Create a task for rebuild")
 				taskKey, task := createTask("rebuild", testNamespaceName)
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
-				Eventually(func() bool {
-					emptyTask := &api.CassandraTask{}
-					err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
-					Expect(err).ToNot(HaveOccurred())
-
-					return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
-				}, time.Duration(5*time.Second)).Should(BeTrue())
+				waitForTaskCompletion(taskKey)
 
 				Expect(callDetails.URLCounts["/api/v1/ops/node/rebuild"]).To(Equal(3))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
+
+				verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+			})
+		})
+		When("Running cleanup twice in the same datacenter", func() {
+			It("Run a cleanup task against the datacenter pods", func() {
+				By("Create a task for cleanup")
+				taskKey, task := createTask("cleanup", testNamespaceName)
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
 				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
 
 				podList := corev1.PodList{}
 				Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
 
-				// for _, pod := range podList.Items {
-				// 	Expect(pod.GetAnnotations()[podJobStatusKey]).To(Equal(podJobCompleted))
-				// 	Expect(pod.GetAnnotations()[podJobIdKey]).To(Not(BeEmpty()))
-				// }
+				jobAnnotationKey := getJobAnnotationKey(string(task.UID))
+				for _, pod := range podList.Items {
+					Expect(pod.GetAnnotations()).To(HaveKey(jobAnnotationKey))
+				}
+
+				// TODO This is hacky approach to run two jobs twice in the same test
+				callDetails.URLCounts = make(map[string]int)
+				By("Create a task for second cleanup")
+				taskKey, task = createTask("cleanup", testNamespaceName)
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
+
+				verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 			})
 		})
 	})
@@ -258,7 +243,6 @@ var _ = Describe("Execute jobs against all pods", func() {
 			mockServer.Close()
 		})
 
-		// It("Create necessary datacenter parts", createDatacenter(testDatacenterName, testNamespaceName))
 		It("Run a cleanup task against the datacenter pods", func() {
 			By("Create a task for cleanup")
 			taskKey := types.NamespacedName{
@@ -286,26 +270,14 @@ var _ = Describe("Execute jobs against all pods", func() {
 			}
 			Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
-			Eventually(func() bool {
-				emptyTask := &api.CassandraTask{}
-				err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
-				Expect(err).ToNot(HaveOccurred())
+			waitForTaskCompletion(taskKey)
 
-				return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
-			}, time.Duration(5*time.Second)).Should(BeTrue())
-
-			// TODO Investigate why cleanup is called multiple times per pod
+			// TODO Investigate why cleanup is called multiple times per pod occasionally
 			Expect(callDetails.URLCounts["/api/v0/ops/keyspace/cleanup"]).To(Equal(3))
 			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
 			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
 
-			podList := corev1.PodList{}
-			Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
-
-			// for _, pod := range podList.Items {
-			// 	Expect(pod.GetAnnotations()[podJobStatusKey]).To(Equal(podJobCompleted))
-			// 	Expect(pod.GetAnnotations()[podJobIdKey]).To(Not(BeEmpty()))
-			// }
+			verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 		})
 	})
 })

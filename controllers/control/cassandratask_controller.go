@@ -141,7 +141,11 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	oplabels.AddOperatorLabels(cassTask.GetAnnotations(), &dc)
+	if cassTask.GetLabels() == nil {
+		cassTask.Labels = make(map[string]string)
+	}
+	utils.MergeMap(cassTask.Labels, dc.GetDatacenterLabels())
+	oplabels.AddOperatorLabels(cassTask.GetLabels(), &dc)
 
 	// Does our concurrencypolicy allow the task to run? Are there any other active ones?
 	activeTasks, err := r.activeTasks(ctx, &dc)

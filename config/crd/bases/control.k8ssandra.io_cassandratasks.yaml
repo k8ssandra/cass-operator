@@ -16,7 +16,28 @@ spec:
     singular: cassandratask
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: Datacenter which the task targets
+      jsonPath: .spec.datacenter.name
+      name: Datacenter
+      type: string
+    - description: The job that is executed
+      jsonPath: .spec.jobs[0].Command
+      name: Job
+      type: string
+    - description: When the execution of the task is allowed at earliest
+      jsonPath: .spec.scheduledTime
+      name: Scheduled
+      type: date
+    - description: When the execution of the task started
+      jsonPath: .status.startTime
+      name: Started
+      type: date
+    - description: When the execution of the task finished
+      jsonPath: .status.completionTime
+      name: Completed
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: CassandraTask is the Schema for the cassandrajobs API

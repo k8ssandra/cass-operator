@@ -86,7 +86,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	timeNow := metav1.Now()
 
 	if cassTask.Spec.ScheduledTime != nil && timeNow.Before(cassTask.Spec.ScheduledTime) {
-		// TODO ScheduledTime is before current time, requeue for later processing
 		logger.V(1).Info("this job isn't scheduled to be run yet", "Request", req.NamespacedName)
 		nextRunTime := cassTask.Spec.ScheduledTime.Sub(timeNow.Time)
 		return ctrl.Result{RequeueAfter: nextRunTime}, nil
@@ -136,12 +135,13 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger = log.FromContext(ctx, "datacenterName", dc.Name, "clusterName", dc.Spec.ClusterName)
 	log.IntoContext(ctx, logger)
 
+	// Link this resource to the Datacenter and copy labels from it
 	if err := controllerutil.SetOwnerReference(&dc, &cassTask, r.Scheme); err != nil {
 		logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassTask.Spec.Datacenter, "CassandraTask", req.NamespacedName)
 		return ctrl.Result{}, err
 	}
 
-	var err error
+	oplabels.AddOperatorLabels(cassTask.GetAnnotations(), &dc)
 
 	// Does our concurrencypolicy allow the task to run? Are there any other active ones?
 	activeTasks, err := r.activeTasks(ctx, &dc)
@@ -159,12 +159,10 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	if len(activeTasks) > 0 {
 		if cassTask.Spec.ConcurrencyPolicy == nil || *cassTask.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
-			// TODO Can't run right now, requeue
 			// TODO Or should we push an event?
 			logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
 			return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
 		}
-		// TODO There are other tasks running, are they allowing or forbiding the concurrent work?
 		for _, task := range activeTasks {
 			if cassTask.Spec.ConcurrencyPolicy == nil || *task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 				logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
@@ -185,7 +183,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	taskId := string(cassTask.UID)
 
 	for _, job := range cassTask.Spec.Jobs {
-		// TODO This should check the status of the job from Status, not reconciling it (we overwrite the jobId in those cases)
 		switch job.Command {
 		case "rebuild":
 			res, err = r.reconcileEveryPodTask(ctx, taskId, &dc, rebuild(job.Arguments))

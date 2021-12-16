@@ -1,7 +1,7 @@
 apiVersion: cassandra.datastax.com/v1beta1
 kind: CassandraDatacenter
 metadata:
-  name: dc2
+  name: dc1
 spec:
   clusterName: cluster2
   serverType: cassandra

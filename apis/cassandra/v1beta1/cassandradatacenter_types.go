@@ -49,6 +49,11 @@ const (
 	// DC to an existing cluster where the superuser has already been created.
 	SkipUserCreationAnnotation = "cassandra.datastax.com/skip-user-creation"
 
+	// SkipDecommissionAnnotation allows to bypass decommission of the Datacenter in a multi-DC cluster when the
+	// CassandraDatacenter is deleted. This is incase the datacenter can't be correctly decommissioned or when
+	// tearing down a test environment.
+	SkipDecommissionAnnotation = "cassandra.datastax.com/skip-decommission"
+
 	// CassNodeState
 	CassNodeState = "cassandra.datastax.com/node-state"
 
@@ -327,6 +332,7 @@ const (
 	DatacenterResuming       DatacenterConditionType = "Resuming"
 	DatacenterRollingRestart DatacenterConditionType = "RollingRestart"
 	DatacenterValid          DatacenterConditionType = "Valid"
+	DatacenterDecommission   DatacenterConditionType = "Decommission"
 )
 
 type DatacenterCondition struct {

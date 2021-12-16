@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -52,12 +53,33 @@ func buildEndpoint(path string, queryParams ...string) string {
 }
 
 type EndpointState struct {
-	HostID                 string `json:"HOST_ID"`
-	IsAlive                string `json:"IS_ALIVE"`
-	NativeTransportAddress string `json:"NATIVE_TRANSPORT_ADDRESS"`
-	RpcAddress             string `json:"RPC_ADDRESS"`
-	Status                 string `json:"STATUS"`
-	Load                   string `json:"LOAD"`
+	Datacenter             string `json:"DC,omitempty"`
+	Rack                   string `json:"RACK,omitempty"`
+	ReleaseVersion         string `json:"RELEASE_VERSION,omitempty"`
+	SchemaVersion          string `json:"SCHEMA,omitempty"`
+	SSTableVersion         string `json:"SSTABLE_VERSIONS,omitempty"`
+	HostID                 string `json:"HOST_ID,omitempty"`
+	IsAlive                string `json:"IS_ALIVE,omitempty"`
+	NativeTransportAddress string `json:"NATIVE_TRANSPORT_ADDRESS,omitempty"`
+	RpcAddress             string `json:"RPC_ADDRESS,omitempty"`
+	Status                 string `json:"STATUS,omitempty"`
+	StatusWithPort         string `json:"STATUS_WITH_PORT,omitempty"`
+	Load                   string `json:"LOAD,omitempty"`
+}
+
+type EndpointStateStatus string
+
+const (
+	StatusNormal  EndpointStateStatus = "NORMAL"
+	StatusLeaving EndpointStateStatus = "LEAVING"
+	StatusLeft    EndpointStateStatus = "LEFT"
+	StatusMoving  EndpointStateStatus = "MOVING"
+	StatusRemoved EndpointStateStatus = "removed"
+)
+
+func (e *EndpointState) HasStatus(status EndpointStateStatus) bool {
+	// Verify if this is either in Status or StatusWithPort
+	return strings.HasPrefix(e.Status, string(status)) || strings.HasPrefix(e.StatusWithPort, string(status))
 }
 
 func (x *EndpointState) GetRpcAddress() string {
@@ -703,7 +725,7 @@ func (client *NodeMgmtClient) CallReloadSeedsEndpoint(pod *corev1.Pod) error {
 	return err
 }
 
-// TODO Create async version of this also
+// CallDecommissionNodeEndpoint is for the old /api/v0 decommission. Use the CallDecommissionNode for async behavior if available
 func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) error {
 	client.Log.Info(
 		"calling Management API decommission node - POST /api/v0/ops/node/decommission",
@@ -716,7 +738,7 @@ func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) erro
 	}
 
 	request := nodeMgmtRequest{
-		endpoint: "/api/v0/ops/node/decommission",
+		endpoint: "/api/v0/ops/node/decommission?force=true",
 		host:     podHost,
 		method:   http.MethodPost,
 		timeout:  60 * time.Second,

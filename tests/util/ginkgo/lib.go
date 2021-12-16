@@ -252,7 +252,7 @@ func (ns *NsWrapper) GetNodeStatusesHostIds(dcName string) []string {
 }
 
 func (ns *NsWrapper) WaitForDatacenterReadyPodCount(dcName string, count int) {
-	ns.WaitForDatacenterReadyPodCountWithTimeout(dcName, count, 400)
+	ns.WaitForDatacenterReadyPodCountWithTimeout(dcName, count, 600)
 }
 
 func (ns *NsWrapper) WaitForDatacenterReadyPodCountWithTimeout(dcName string, count int, podCountTimeout int) {

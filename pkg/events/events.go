@@ -29,11 +29,12 @@ const (
 	ReplacingNode                     string = "ReplacingNode"
 	StartingCassandraAndReplacingNode string = "StartingCassandraAndReplacingNode"
 	StartingCassandra                 string = "StartingCassandra"
+	DecommissionDatacenter            string = "DecommissionDatacenter"
 )
 
 type LoggingEventRecorder struct {
 	record.EventRecorder
-	ReqLogger logr.InfoLogger
+	ReqLogger logr.Logger
 }
 
 func (r *LoggingEventRecorder) Event(object runtime.Object, eventtype, reason, message string) {

@@ -55,7 +55,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReady(dcName)
 
 			step = "change the config"
-			json := "{\"spec\": {\"config\": {\"cassandra-yaml\": {\"roles_validity_in_ms\": 256000}, \"jvm-options\": {\"garbage_collector\": \"CMS\"}}}}"
+			json := "{\"spec\": {\"config\": {\"cassandra-yaml\": {\"roles_validity_in_ms\": 256000}, \"jvm-server-options\": {\"garbage_collector\": \"CMS\"}}}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 

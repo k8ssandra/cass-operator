@@ -224,6 +224,8 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				return res, err
 			}
 
+			r.cleanupJobAnnotations(ctx, &dc, taskId)
+
 			cassTask.Status.Active = 0
 			cassTask.Status.CompletionTime = &timeNow
 
@@ -281,10 +283,7 @@ func (r *CassandraTaskReconciler) activeTasks(ctx context.Context, dc *cassapi.C
 const (
 	// PodJobAnnotationPrefix defines the prefix key for a job data (json serialized) in the annotations of the pod
 	PodJobAnnotationPrefix = "control.k8ssandra.io/job"
-	// podJobIdKey            = "control.k8ssandra.io/job-id"
-	// podJobStatusKey        = "control.k8ssandra.io/job-status"
-	// podJobHandlerKey       = "control.k8ssandra.io/job-runner"
-	jobHandlerMgmtApi = "management-api"
+	jobHandlerMgmtApi      = "management-api"
 
 	podJobCompleted = "COMPLETED"
 	podJobError     = "ERROR"
@@ -367,6 +366,28 @@ func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cas
 	}
 
 	return pods.Items, nil
+}
+
+// cleanupJobAnnotations removes the job annotations from the pod once it has finished
+func (r *CassandraTaskReconciler) cleanupJobAnnotations(ctx context.Context, dc *cassapi.CassandraDatacenter, taskId string) error {
+	logger := log.FromContext(ctx)
+
+	// We sort to ensure we process the dcPods in the same order
+	dcPods, err := r.getDatacenterPods(ctx, dc)
+	if err != nil {
+		return err
+	}
+	for _, pod := range dcPods {
+		podPatch := client.MergeFrom(pod.DeepCopy())
+		annotationKey := getJobAnnotationKey(taskId)
+		delete(pod.GetAnnotations(), annotationKey)
+		err = r.Client.Patch(ctx, &pod, podPatch)
+		if err != nil {
+			logger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, taskId string, dc *cassapi.CassandraDatacenter, taskConfig TaskConfiguration) (ctrl.Result, error) {

@@ -106,8 +106,15 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return deletionTime
 	}
 
+	if cassTask.GetLabels() == nil {
+		cassTask.Labels = make(map[string]string)
+	}
+
+	// If we're active, we can proceed - otherwise verify if we're allowed to run
+	status, found := cassTask.GetLabels()[taskStatusLabel]
+
 	// Check if job is finished, and if and only if, check the TTL from last finished time.
-	if cassTask.Status.CompletionTime != nil {
+	if cassTask.Status.CompletionTime != nil || status == completedTaskLabelValue {
 		deletionTime := calculateDeletionTime()
 
 		// Nothing more to do here, other than delete it..
@@ -116,12 +123,12 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			err := r.Delete(ctx, &cassTask)
 			// Do not requeue anymore, this task has been completed
 			return ctrl.Result{}, client.IgnoreNotFound(err)
-		} else {
-			// Reschedule for later deletion
-			logger.V(1).Info("this task is scheduled to be deleted later", "Request", req.NamespacedName)
-			nextRunTime := deletionTime.Sub(timeNow.Time)
-			return ctrl.Result{RequeueAfter: nextRunTime}, nil
 		}
+
+		// Reschedule for later deletion
+		logger.V(1).Info("this task is scheduled to be deleted later", "Request", req.NamespacedName)
+		nextRunTime := deletionTime.Sub(timeNow.Time)
+		return ctrl.Result{RequeueAfter: nextRunTime}, nil
 	}
 
 	// Get the CassandraDatacenter
@@ -139,13 +146,12 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger = log.FromContext(ctx, "datacenterName", dc.Name, "clusterName", dc.Spec.ClusterName)
 	log.IntoContext(ctx, logger)
 
-	// If we're active, we can proceed - otherwise verify
 	if cassTask.GetLabels() == nil {
 		cassTask.Labels = make(map[string]string)
 	}
 
-	// taskPatch := client.MergeFromWithOptions(cassTask.DeepCopy(), client.MergeFromWithOptimisticLock{})
-	if _, found := cassTask.GetLabels()[taskStatusLabel]; !found {
+	// If we're active, we can proceed - otherwise verify if we're allowed to run
+	if !found {
 		// Does our concurrencypolicy allow the task to run? Are there any other active ones?
 		activeTasks, err := r.activeTasks(ctx, &dc)
 		if err != nil {
@@ -190,7 +196,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, err
 		}
 
-		// taskPatch = client.MergeFromWithOptions(cassTask.DeepCopy(), client.MergeFromWithOptimisticLock{})
 		cassTask.Status.StartTime = &timeNow
 		cassTask.Status.Active = 1 // We don't have concurrency inside a task at the moment
 	}
@@ -256,7 +261,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// TODO Add conditions also
 	if err = r.Client.Status().Update(ctx, &cassTask); err != nil {
-		return res, err
+		return ctrl.Result{}, err
 	}
 
 	// log.V(1).Info for DEBUG logging

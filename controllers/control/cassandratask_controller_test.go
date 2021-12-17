@@ -222,7 +222,7 @@ var _ = Describe("Execute jobs against all pods", func() {
 	Context("Sync jobs", func() {
 		var testNamespaceName string
 		BeforeEach(func() {
-			By("Create fake mgmt-api server")
+			By("Create fake synchronous mgmt-api server")
 			var err error
 			callDetails = httphelper.NewCallDetails()
 			mockServer, err = httphelper.FakeServerWithoutFeaturesEndpoint(callDetails)

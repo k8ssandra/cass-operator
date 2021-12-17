@@ -83,6 +83,10 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if cassTask.DeletionTimestamp != nil {
+		return ctrl.Result{}, nil
+	}
+
 	timeNow := metav1.Now()
 
 	if cassTask.Spec.ScheduledTime != nil && timeNow.Before(cassTask.Spec.ScheduledTime) {
@@ -135,44 +139,60 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger = log.FromContext(ctx, "datacenterName", dc.Name, "clusterName", dc.Spec.ClusterName)
 	log.IntoContext(ctx, logger)
 
-	// Link this resource to the Datacenter and copy labels from it
-	if err := controllerutil.SetOwnerReference(&dc, &cassTask, r.Scheme); err != nil {
-		logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassTask.Spec.Datacenter, "CassandraTask", req.NamespacedName)
-		return ctrl.Result{}, err
-	}
-
+	// If we're active, we can proceed - otherwise verify
 	if cassTask.GetLabels() == nil {
 		cassTask.Labels = make(map[string]string)
 	}
-	utils.MergeMap(cassTask.Labels, dc.GetDatacenterLabels())
-	oplabels.AddOperatorLabels(cassTask.GetLabels(), &dc)
 
-	// Does our concurrencypolicy allow the task to run? Are there any other active ones?
-	activeTasks, err := r.activeTasks(ctx, &dc)
-	if err != nil {
-		logger.Error(err, "unable to fetch active CassandraTasks", "Request", req.NamespacedName)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	// Remove current job from the slice
-	for index, task := range activeTasks {
-		if task.Name == req.Name && task.Namespace == req.Namespace {
-			activeTasks = append(activeTasks[:index], activeTasks[index+1:]...)
+	// taskPatch := client.MergeFromWithOptions(cassTask.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	if _, found := cassTask.GetLabels()[taskStatusLabel]; !found {
+		// Does our concurrencypolicy allow the task to run? Are there any other active ones?
+		activeTasks, err := r.activeTasks(ctx, &dc)
+		if err != nil {
+			logger.Error(err, "unable to fetch active CassandraTasks", "Request", req.NamespacedName)
+			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
-	}
 
-	if len(activeTasks) > 0 {
-		if cassTask.Spec.ConcurrencyPolicy == nil || *cassTask.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
-			// TODO Or should we push an event?
-			logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
-			return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
+		// Remove current job from the slice
+		for index, task := range activeTasks {
+			if task.Name == req.Name && task.Namespace == req.Namespace {
+				activeTasks = append(activeTasks[:index], activeTasks[index+1:]...)
+			}
 		}
-		for _, task := range activeTasks {
-			if cassTask.Spec.ConcurrencyPolicy == nil || *task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+
+		if len(activeTasks) > 0 {
+			if cassTask.Spec.ConcurrencyPolicy == nil || *cassTask.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+				// TODO Or should we push an event?
 				logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
 				return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
 			}
+			for _, task := range activeTasks {
+				if cassTask.Spec.ConcurrencyPolicy == nil || *task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+					logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
+					return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
+				}
+			}
 		}
+
+		// Link this resource to the Datacenter and copy labels from it
+		if err := controllerutil.SetOwnerReference(&dc, &cassTask, r.Scheme); err != nil {
+			logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassTask.Spec.Datacenter, "CassandraTask", req.NamespacedName)
+			return ctrl.Result{}, err
+		}
+
+		utils.MergeMap(cassTask.Labels, dc.GetDatacenterLabels())
+		oplabels.AddOperatorLabels(cassTask.GetLabels(), &dc)
+
+		// Starting the run, set the Active label so we can quickly fetch the active ones
+		cassTask.GetLabels()[taskStatusLabel] = activeTaskLabelValue
+
+		if err := r.Client.Update(ctx, &cassTask); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// taskPatch = client.MergeFromWithOptions(cassTask.DeepCopy(), client.MergeFromWithOptimisticLock{})
+		cassTask.Status.StartTime = &timeNow
+		cassTask.Status.Active = 1 // We don't have concurrency inside a task at the moment
 	}
 
 	var res ctrl.Result
@@ -186,6 +206,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// TODO We need to verify that the cluster is actually healthy before we run these..
 	taskId := string(cassTask.UID)
 
+	var err error
 	for _, job := range cassTask.Spec.Jobs {
 		switch job.Command {
 		case "rebuild":
@@ -210,41 +231,23 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		completedCount++
 	}
 
-	taskPatch := client.MergeFrom(cassTask.DeepCopy())
-
-	if cassTask.GetLabels() == nil {
-		cassTask.Labels = make(map[string]string)
-	}
-
-	if _, found := cassTask.GetLabels()[taskStatusLabel]; found {
-		if res.RequeueAfter == 0 && !res.Requeue {
-			// Job has been completed
-			cassTask.GetLabels()[taskStatusLabel] = completedTaskLabelValue
-			if err = r.Client.Patch(ctx, &cassTask, taskPatch); err != nil {
-				return res, err
-			}
-
-			r.cleanupJobAnnotations(ctx, &dc, taskId)
-
-			cassTask.Status.Active = 0
-			cassTask.Status.CompletionTime = &timeNow
-
-			// Requeue for deletion later
-			deletionTime := calculateDeletionTime()
-			nextRunTime := deletionTime.Sub(timeNow.Time)
-			res.RequeueAfter = nextRunTime
-			logger.V(1).Info("This task has completed, scheduling for deletion in " + nextRunTime.String())
-		}
-	} else {
-		// Starting the run, set the Active label so we can quickly fetch the active ones
-		cassTask.GetLabels()[taskStatusLabel] = activeTaskLabelValue
-
-		if err = r.Client.Patch(ctx, &cassTask, taskPatch); err != nil {
+	if res.RequeueAfter == 0 && !res.Requeue {
+		// Job has been completed
+		cassTask.GetLabels()[taskStatusLabel] = completedTaskLabelValue
+		if err = r.Client.Update(ctx, &cassTask); err != nil {
 			return res, err
 		}
 
-		cassTask.Status.StartTime = &timeNow
-		cassTask.Status.Active = 1 // We don't have concurrency inside a task at the moment
+		r.cleanupJobAnnotations(ctx, &dc, taskId)
+
+		cassTask.Status.Active = 0
+		cassTask.Status.CompletionTime = &timeNow
+
+		// Requeue for deletion later
+		deletionTime := calculateDeletionTime()
+		nextRunTime := deletionTime.Sub(timeNow.Time)
+		res.RequeueAfter = nextRunTime
+		logger.V(1).Info("This task has completed, scheduling for deletion in " + nextRunTime.String())
 	}
 
 	if cassTask.Status.Succeeded != completedCount {
@@ -252,7 +255,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// TODO Add conditions also
-	if err = r.Client.Status().Patch(ctx, &cassTask, taskPatch); err != nil {
+	if err = r.Client.Status().Update(ctx, &cassTask); err != nil {
 		return res, err
 	}
 
@@ -430,7 +433,8 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 			return ctrl.Result{}, err
 		}
 
-		podPatch := client.MergeFrom(pod.DeepCopy())
+		// podPatch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
+		// podPatch := client.MergeFrom(pod.DeepCopy())
 		if jobStatus.Id != "" {
 			if jobStatus.Status == podJobCompleted {
 				// Next pod, this is done
@@ -447,7 +451,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 				if details.Id == "" {
 					// This job was not found, pod most likely restarted. Let's retry..
 					delete(pod.Annotations, getJobAnnotationKey(taskId))
-					err = r.Client.Patch(ctx, &pod, podPatch)
+					err = r.Client.Update(ctx, &pod)
 					if err != nil {
 						return ctrl.Result{}, err
 					}
@@ -460,7 +464,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 						return ctrl.Result{}, err
 					}
 
-					if err = r.Client.Patch(ctx, &pod, podPatch); err != nil {
+					if err = r.Client.Update(ctx, &pod); err != nil {
 						return ctrl.Result{}, err
 					}
 					continue
@@ -472,7 +476,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 						return ctrl.Result{}, err
 					}
 
-					if err = r.Client.Patch(ctx, &pod, podPatch); err != nil {
+					if err = r.Client.Update(ctx, &pod); err != nil {
 						return ctrl.Result{}, err
 					}
 					continue
@@ -492,7 +496,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 					return ctrl.Result{}, err
 				}
 
-				if err = r.Client.Patch(ctx, &pod, podPatch); err != nil {
+				if err = r.Client.Update(ctx, &pod); err != nil {
 					return ctrl.Result{}, err
 				}
 
@@ -507,6 +511,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 				// We can retry this later, it will only restart the cleanup but won't otherwise hurt
 				return ctrl.Result{}, err
 			}
+			// podPatch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
 			jobStatus.Handler = jobHandlerMgmtApi
 			jobStatus.Id = jobId
 
@@ -514,7 +519,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 				return ctrl.Result{}, err
 			}
 
-			err = r.Client.Patch(ctx, &pod, podPatch)
+			err = r.Client.Update(ctx, &pod)
 			if err != nil {
 				logger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
 				return ctrl.Result{}, err
@@ -530,6 +535,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 			jobId := strconv.Itoa(idx)
 
 			// This pod should run next, mark it
+			// podPatch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
 			jobStatus.Handler = oplabels.ManagedByLabelValue
 			jobStatus.Id = jobId
 
@@ -537,7 +543,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 				return ctrl.Result{}, err
 			}
 
-			err = r.Client.Patch(ctx, &pod, podPatch)
+			err = r.Client.Update(ctx, &pod)
 			if err != nil {
 				logger.Error(err, "Failed to patch pod's status to indicate its running a local job", "Pod", pod)
 				return ctrl.Result{}, err
@@ -554,7 +560,8 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 					<-jobRunner
 				}()
 
-				podPatch := client.MergeFrom(targetPod.DeepCopy())
+				// podPatch := client.MergeFromWithOptions(targetPod.DeepCopy(), client.MergeFromWithOptimisticLock{})
+				// podPatch := client.MergeFrom(targetPod.DeepCopy())
 				if err = taskConfig.SyncFunc(nodeMgmtClient, targetPod, taskConfig.Arguments); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod
 					logger.Error(err, "executing the sync task failed", "Pod", targetPod)
@@ -567,7 +574,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 					logger.Error(err, "Failed to update local job's status", "Pod", targetPod)
 				}
 
-				err = r.Client.Patch(ctx, &pod, podPatch)
+				err = r.Client.Update(ctx, &pod)
 				if err != nil {
 					logger.Error(err, "Failed to update local job's status", "Pod", targetPod)
 				}

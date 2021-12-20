@@ -22,7 +22,7 @@ spec:
       name: Datacenter
       type: string
     - description: The job that is executed
-      jsonPath: .spec.jobs[0].Command
+      jsonPath: .spec.jobs[0].command
       name: Job
       type: string
     - description: When the execution of the task is allowed at earliest

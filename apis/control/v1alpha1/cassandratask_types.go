@@ -153,7 +153,7 @@ type JobCondition struct {
 //+kubebuilder:subresource:status
 
 // +kubebuilder:printcolumn:name="Datacenter",type=string,JSONPath=".spec.datacenter.name",description="Datacenter which the task targets"
-// +kubebuilder:printcolumn:name="Job",type=string,JSONPath=".spec.jobs[0].Command",description="The job that is executed"
+// +kubebuilder:printcolumn:name="Job",type=string,JSONPath=".spec.jobs[0].command",description="The job that is executed"
 // +kubebuilder:printcolumn:name="Scheduled",type="date",JSONPath=".spec.scheduledTime",description="When the execution of the task is allowed at earliest"
 // +kubebuilder:printcolumn:name="Started",type="date",JSONPath=".status.startTime",description="When the execution of the task started"
 // +kubebuilder:printcolumn:name="Completed",type="date",JSONPath=".status.completionTime",description="When the execution of the task finished"

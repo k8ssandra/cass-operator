@@ -19,6 +19,8 @@ var featuresReply = `{
 
 var jobDetailsCompleted = `{"submit_time":"1638545895255","end_time":"1638545895255","id":"%s","type":"Cleanup","status":"COMPLETED"}`
 
+var jobDetailsFailed = `{"submit_time":"1638545895255","end_time":"1638545895255","id":"%s","type":"Cleanup","status":"ERROR"}`
+
 var noJobDetails = `{}`
 
 func mgmtApiListener() (net.Listener, error) {
@@ -49,23 +51,12 @@ func (c *CallDetails) incr(url string) {
 }
 
 func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, error) {
-	// TODO Modify cass-operator to allow different ports
-	// The client in cass-operator has hardcoded port of 8080, so we need to run our mgtt-api listener in that port
-	mgmtApiListener, err := mgmtApiListener()
-	if err != nil {
-		return nil, err
-	}
-
 	jobId := 0
 
-	managementMockServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return FakeMgmtApiServer(callDetails, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query, err := url.ParseQuery(r.URL.RawQuery)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-		}
-
-		if callDetails != nil {
-			callDetails.incr(r.URL.Path)
 		}
 
 		if r.Method == http.MethodGet && r.RequestURI == "/api/v0/metadata/versions/features" {
@@ -85,29 +76,60 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 		}
 
 	}))
-	managementMockServer.Listener.Close()
-	managementMockServer.Listener = mgmtApiListener
+}
 
-	return managementMockServer, nil
+func FakeExecutorServerWithDetailsFails(callDetails *CallDetails) (*httptest.Server, error) {
+	jobId := 0
+
+	// TODO Repeated code from above.. refactor
+
+	return FakeMgmtApiServer(callDetails, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query, err := url.ParseQuery(r.URL.RawQuery)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+
+		if r.Method == http.MethodGet && r.RequestURI == "/api/v0/metadata/versions/features" {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(featuresReply))
+		} else if r.Method == http.MethodGet && r.URL.Path == "/api/v0/ops/executor/job" {
+			w.WriteHeader(http.StatusOK)
+			jobId := query.Get("job_id")
+			w.Write([]byte(fmt.Sprintf(jobDetailsFailed, jobId)))
+		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild") {
+			w.WriteHeader(http.StatusOK)
+			// Write jobId
+			jobId++
+			w.Write([]byte(strconv.Itoa(jobId)))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+
+	}))
 }
 
 func FakeServerWithoutFeaturesEndpoint(callDetails *CallDetails) (*httptest.Server, error) {
-	mgmtApiListener, err := mgmtApiListener()
-	if err != nil {
-		return nil, err
-	}
-
-	managementMockServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if callDetails != nil {
-			callDetails.incr(r.URL.Path)
-		}
-
+	return FakeMgmtApiServer(callDetails, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/api/v0/ops/keyspace/cleanup" {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
+}
+
+func FakeMgmtApiServer(callDetails *CallDetails, handlerFunc http.HandlerFunc) (*httptest.Server, error) {
+	mgmtApiListener, err := mgmtApiListener()
+	if err != nil {
+		return nil, err
+	}
+	callerFunc := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if callDetails != nil {
+			callDetails.incr(r.URL.Path)
+		}
+		handlerFunc(w, r)
+	})
+	managementMockServer := httptest.NewUnstartedServer(callerFunc)
 	managementMockServer.Listener.Close()
 	managementMockServer.Listener = mgmtApiListener
 

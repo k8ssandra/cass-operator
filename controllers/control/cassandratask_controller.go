@@ -202,7 +202,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	var res ctrl.Result
-	completedCount := int32(0)
+	// completedCount := int32(0)
 
 	// TODO We only support a single job at this stage (helps dev work)
 	if len(cassTask.Spec.Jobs) > 1 {
@@ -213,6 +213,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	taskId := string(cassTask.UID)
 
 	var err error
+	var failed, completed int
 	for _, job := range cassTask.Spec.Jobs {
 		taskConfigProto := &TaskConfiguration{
 			RestartPolicy: cassTask.Spec.RestartPolicy,
@@ -220,9 +221,9 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		switch job.Command {
 		case "rebuild":
-			res, err = r.reconcileEveryPodTask(ctx, &dc, rebuild(taskConfigProto, job.Arguments))
+			res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, rebuild(taskConfigProto, job.Arguments))
 		case "cleanup":
-			res, err = r.reconcileEveryPodTask(ctx, &dc, cleanup(taskConfigProto))
+			res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, cleanup(taskConfigProto))
 		case "decommission":
 			// res, err = r.reconcileEveryPodTask(ctx, taskId, &dc, decommission())
 		default:
@@ -239,7 +240,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			// This job isn't complete yet or there's an error, do not continue
 			break
 		}
-		completedCount++
+		// completedCount++
 	}
 
 	if res.RequeueAfter == 0 && !res.Requeue {
@@ -261,9 +262,8 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		logger.V(1).Info("This task has completed, scheduling for deletion in " + nextRunTime.String())
 	}
 
-	if cassTask.Status.Succeeded != completedCount {
-		cassTask.Status.Succeeded = completedCount
-	}
+	cassTask.Status.Succeeded = completed
+	cassTask.Status.Failed = failed
 
 	// TODO Add conditions also
 	if err = r.Client.Status().Update(ctx, &cassTask); err != nil {
@@ -322,6 +322,7 @@ type JobStatus struct {
 	Id      string `json:"id,omitempty"`
 	Status  string `json:"status,omitempty"`
 	Handler string `json:"handler,omitempty"`
+	Retries int    `json:"retries,omitempty"`
 }
 
 func getJobAnnotationKey(taskId string) string {
@@ -416,13 +417,13 @@ func (r *CassandraTaskReconciler) cleanupJobAnnotations(ctx context.Context, dc 
 	return nil
 }
 
-func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, error) {
+func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, int, int, error) {
 	logger := log.FromContext(ctx)
 
 	// We sort to ensure we process the dcPods in the same order
 	dcPods, err := r.getDatacenterPods(ctx, dc)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, 0, 0, err
 	}
 
 	sort.Slice(dcPods, func(i, j int) bool {
@@ -438,13 +439,14 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 
 	nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, 0, 0, err
 	}
 
+	failed, completed := 0, 0
 	for idx, pod := range dcPods {
 		features, err := nodeMgmtClient.FeatureSet(&pod)
 		if err != nil {
-			return ctrl.Result{}, err
+			return ctrl.Result{}, failed, completed, err
 		}
 
 		if pod.Annotations == nil {
@@ -453,22 +455,28 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 
 		jobStatus, err := GetJobStatusFromPodAnnotations(taskConfig.Id, pod.Annotations)
 		if err != nil {
-			return ctrl.Result{}, err
+			return ctrl.Result{}, failed, completed, err
 		}
 
 		// podPatch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
 		// podPatch := client.MergeFrom(pod.DeepCopy())
 		if jobStatus.Id != "" {
+			// Check the completed statuses
 			if jobStatus.Status == podJobCompleted {
-				// Next pod, this is done
+				completed++
+				continue
+			} else if jobStatus.Status == podJobError {
+				failed++
 				continue
 			}
+
+			// Only if we have "Running" status should we check the jobDetails
 			if features.Supports(taskConfig.AsyncFeature) {
 				// Pod is currently processing something, or has finished processing.. update the status
 				details, err := nodeMgmtClient.JobDetails(&pod, jobStatus.Id)
 				if err != nil {
 					logger.Error(err, "Could not get JobDetails for pod", "Pod", pod)
-					return ctrl.Result{}, err
+					return ctrl.Result{}, failed, completed, err
 				}
 
 				if details.Id == "" {
@@ -476,53 +484,66 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					delete(pod.Annotations, getJobAnnotationKey(taskConfig.Id))
 					err = r.Client.Update(ctx, &pod)
 					if err != nil {
-						return ctrl.Result{}, err
+						return ctrl.Result{}, failed, completed, err
 					}
-					return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+					return ctrl.Result{RequeueAfter: 1 * time.Second}, failed, completed, nil
 				} else if details.Status == podJobError {
 					// Log the error, move on
 					logger.Error(fmt.Errorf("task failed: %s", details.Error), "Job failed to successfully complete the task", "Pod", pod)
-					jobStatus.Status = podJobError
+					if taskConfig.RestartPolicy != corev1.RestartPolicyOnFailure || jobStatus.Retries >= 1 {
+						jobStatus.Status = podJobError
+					} else {
+						logger.V(1).Info("Restarting the pod due to the RestartPolicy", "Pod", pod)
+						jobStatus.Retries++
+						jobStatus.Status = podJobWaiting
+						jobStatus.Id = "" // Remove id, so next requeue restarts it
+					}
+
 					if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-						return ctrl.Result{}, err
+						return ctrl.Result{}, failed, completed, err
 					}
 
 					if err = r.Client.Update(ctx, &pod); err != nil {
-						return ctrl.Result{}, err
+						return ctrl.Result{}, failed, completed, err
 					}
-					continue
+
+					if jobStatus.Status == podJobError {
+						failed++
+						continue
+					}
 				} else if details.Status == podJobCompleted {
 					// Pod has finished, remove the job_id and let us move to the next pod
 					jobStatus.Status = podJobCompleted
 					// TODO Repeating code - refactor
 					if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-						return ctrl.Result{}, err
+						return ctrl.Result{}, failed, completed, err
 					}
 
 					if err = r.Client.Update(ctx, &pod); err != nil {
-						return ctrl.Result{}, err
+						return ctrl.Result{}, failed, completed, err
 					}
+					completed++
 					continue
 				} else if details.Status == podJobWaiting {
 					// Job is still running or waiting
-					return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
+					return ctrl.Result{RequeueAfter: jobRunningRequeue}, failed, completed, nil
 				}
 			} else {
 				if len(jobRunner) > 0 {
 					// Something is still holding the worker
-					return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
+					return ctrl.Result{RequeueAfter: jobRunningRequeue}, failed, completed, nil
 				}
 
 				// Nothing is holding the job, this pod has finished
 				jobStatus.Status = podJobCompleted
 				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-					return ctrl.Result{}, err
+					return ctrl.Result{}, failed, completed, err
 				}
 
 				if err = r.Client.Update(ctx, &pod); err != nil {
-					return ctrl.Result{}, err
+					return ctrl.Result{}, failed, completed, err
 				}
-
+				completed++
 				continue
 			}
 		}
@@ -532,27 +553,27 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 			jobId, err := taskConfig.AsyncFunc(nodeMgmtClient, &pod, taskConfig.Arguments)
 			if err != nil {
 				// We can retry this later, it will only restart the cleanup but won't otherwise hurt
-				return ctrl.Result{}, err
+				return ctrl.Result{}, failed, completed, err
 			}
 			// podPatch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
 			jobStatus.Handler = jobHandlerMgmtApi
 			jobStatus.Id = jobId
 
 			if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-				return ctrl.Result{}, err
+				return ctrl.Result{}, failed, completed, err
 			}
 
 			err = r.Client.Update(ctx, &pod)
 			if err != nil {
 				logger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
-				return ctrl.Result{}, err
+				return ctrl.Result{}, failed, completed, err
 			}
 		} else {
 			if taskConfig.SyncFunc == nil {
 				// This feature is not supported in sync mode, mark everything as done
 				err := fmt.Errorf("this job isn't supported by the target pod")
 				logger.Error(err, "unable to execute requested job against pod", "Pod", pod)
-				return ctrl.Result{}, err
+				return ctrl.Result{}, failed, completed, err
 			}
 
 			jobId := strconv.Itoa(idx)
@@ -563,13 +584,13 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 			jobStatus.Id = jobId
 
 			if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-				return ctrl.Result{}, err
+				return ctrl.Result{}, failed, completed, err
 			}
 
 			err = r.Client.Update(ctx, &pod)
 			if err != nil {
 				logger.Error(err, "Failed to patch pod's status to indicate its running a local job", "Pod", pod)
-				return ctrl.Result{}, err
+				return ctrl.Result{}, failed, completed, err
 			}
 
 			pod := pod
@@ -605,7 +626,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 		}
 
 		// We have a job going on, return back later to check the status
-		return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
+		return ctrl.Result{RequeueAfter: jobRunningRequeue}, failed, completed, nil
 	}
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, failed, completed, nil
 }

@@ -143,7 +143,6 @@ spec:
             properties:
               active:
                 description: The number of actively running pods.
-                format: int32
                 type: integer
               completionTime:
                 description: Represents time when the job was completed. It is not
@@ -192,7 +191,6 @@ spec:
                 x-kubernetes-list-type: atomic
               failed:
                 description: The number of pods which reached phase Failed.
-                format: int32
                 type: integer
               startTime:
                 description: Represents time when the job controller started processing
@@ -204,7 +202,6 @@ spec:
                 type: string
               succeeded:
                 description: The number of pods which reached phase Succeeded.
-                format: int32
                 type: integer
             type: object
         type: object

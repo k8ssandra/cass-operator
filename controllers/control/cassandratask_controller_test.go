@@ -106,7 +106,7 @@ func createDatacenter(dcName, namespace string) func() {
 	}
 }
 
-func createTask(command api.CassandraCommand, namespace string) (types.NamespacedName, *api.CassandraTask) {
+func buildTask(command api.CassandraCommand, namespace string) (types.NamespacedName, *api.CassandraTask) {
 	taskKey := types.NamespacedName{
 		Name:      fmt.Sprintf("test-%s-task-%d", command, rand.Int31()),
 		Namespace: namespace,
@@ -131,19 +131,26 @@ func createTask(command api.CassandraCommand, namespace string) (types.Namespace
 		Status: api.CassandraTaskStatus{},
 	}
 
-	Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
-
 	return taskKey, task
 }
 
-func waitForTaskCompletion(taskKey types.NamespacedName) {
+func createTask(command api.CassandraCommand, namespace string) types.NamespacedName {
+	taskKey, task := buildTask(command, namespace)
+	Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+	return taskKey
+}
+
+func waitForTaskCompletion(taskKey types.NamespacedName) *api.CassandraTask {
+	var emptyTask *api.CassandraTask
 	Eventually(func() bool {
-		emptyTask := &api.CassandraTask{}
+		emptyTask = &api.CassandraTask{}
 		err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
 		Expect(err).ToNot(HaveOccurred())
 
-		return emptyTask.Status.CompletionTime != nil && emptyTask.Status.Active == 0 && emptyTask.Status.Succeeded == 1
+		return emptyTask.Status.CompletionTime != nil
 	}, time.Duration(5*time.Second)).Should(BeTrue())
+	return emptyTask
 }
 
 func verifyPodsHaveAnnotations(testNamespaceName, taskId string) {
@@ -180,42 +187,94 @@ var _ = Describe("Execute jobs against all pods", func() {
 		When("Running rebuild in datacenter", func() {
 			It("Run a rebuild task against the datacenter pods", func() {
 				By("Create a task for rebuild")
-				taskKey, _ := createTask(api.CommandRebuild, testNamespaceName)
+				taskKey := createTask(api.CommandRebuild, testNamespaceName)
 
-				waitForTaskCompletion(taskKey)
+				completedTask := waitForTaskCompletion(taskKey)
 
 				Expect(callDetails.URLCounts["/api/v1/ops/node/rebuild"]).To(Equal(3))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
 				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
 			})
 		})
 		When("Running cleanup twice in the same datacenter", func() {
 			It("Run a cleanup task against the datacenter pods", func() {
 				By("Create a task for cleanup")
-				taskKey, _ := createTask(api.CommandCleanup, testNamespaceName)
+				taskKey := createTask(api.CommandCleanup, testNamespaceName)
 
-				waitForTaskCompletion(taskKey)
+				completedTask := waitForTaskCompletion(taskKey)
 
 				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
 				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
 
 				// This is hacky approach to run two jobs twice in the same test - resetting the callDetails
 				callDetails.URLCounts = make(map[string]int)
 				By("Create a task for second cleanup")
-				taskKey, _ = createTask("cleanup", testNamespaceName)
+				taskKey = createTask("cleanup", testNamespaceName)
 
-				waitForTaskCompletion(taskKey)
+				completedTask = waitForTaskCompletion(taskKey)
 
 				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
 				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
+		})
+	})
+	Context("Failing jobs", func() {
+		When("In a datacenter", func() {
+			It("Should fail once when no retryPolicy is set", func() {
+				By("Create fake mgmt-api server")
+				callDetails := httphelper.NewCallDetails()
+				mockServer, err := httphelper.FakeExecutorServerWithDetailsFails(callDetails)
+				testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())
+				Expect(err).ToNot(HaveOccurred())
+				mockServer.Start()
+				defer mockServer.Close()
+
+				By("create datacenter", createDatacenter("dc1", testFailedNamespaceName))
+				By("Create a task for cleanup")
+				taskKey := createTask(api.CommandCleanup, testFailedNamespaceName)
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
+
+				Expect(completedTask.Status.Failed).To(BeNumerically(">=", 3))
+			})
+			It("If retryPolicy is set, we should see a retry", func() {
+				By("Create fake mgmt-api server")
+				callDetails := httphelper.NewCallDetails()
+				mockServer, err := httphelper.FakeExecutorServerWithDetailsFails(callDetails)
+				testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())
+				Expect(err).ToNot(HaveOccurred())
+				mockServer.Start()
+				defer mockServer.Close()
+
+				By("create datacenter", createDatacenter("dc1", testFailedNamespaceName))
+				By("Create a task for cleanup")
+				taskKey, task := buildTask(api.CommandCleanup, testFailedNamespaceName)
+				task.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				// Due to retry, we have double the amount of calls
+				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(6))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 6))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 6))
+
+				Expect(completedTask.Status.Failed).To(BeNumerically(">=", 3))
 			})
 		})
 	})
@@ -238,15 +297,16 @@ var _ = Describe("Execute jobs against all pods", func() {
 
 		It("Run a cleanup task against the datacenter pods", func() {
 			By("Create a task for cleanup")
-			taskKey, _ := createTask(api.CommandCleanup, testNamespaceName)
+			taskKey := createTask(api.CommandCleanup, testNamespaceName)
 
-			waitForTaskCompletion(taskKey)
+			completedTask := waitForTaskCompletion(taskKey)
 
 			Expect(callDetails.URLCounts["/api/v0/ops/keyspace/cleanup"]).To(Equal(3))
 			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
 			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
 
 			// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+			Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
 		})
 	})
 })

@@ -182,7 +182,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		// Link this resource to the Datacenter and copy labels from it
-		if err := controllerutil.SetOwnerReference(&dc, &cassTask, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(&dc, &cassTask, r.Scheme); err != nil {
 			logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassTask.Spec.Datacenter, "CassandraTask", req.NamespacedName)
 			return ctrl.Result{}, err
 		}

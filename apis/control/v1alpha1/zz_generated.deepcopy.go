@@ -22,8 +22,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -123,19 +121,9 @@ func (in *CassandraTaskSpec) DeepCopyInto(out *CassandraTaskSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.RestartPolicy != nil {
-		in, out := &in.RestartPolicy, &out.RestartPolicy
-		*out = new(v1.RestartPolicy)
-		**out = **in
-	}
 	if in.TTLSecondsAfterFinished != nil {
 		in, out := &in.TTLSecondsAfterFinished, &out.TTLSecondsAfterFinished
 		*out = new(int32)
-		**out = **in
-	}
-	if in.ConcurrencyPolicy != nil {
-		in, out := &in.ConcurrencyPolicy, &out.ConcurrencyPolicy
-		*out = new(batchv1.ConcurrencyPolicy)
 		**out = **in
 	}
 }

@@ -109,12 +109,9 @@ spec:
                     args:
                       additionalProperties:
                         type: string
-                      description: Should command be typed to restrict allowed values
-                        in this version?
                       type: object
                     command:
-                      description: TODO Should this be typed to match what jobs this
-                        version of cass-operator can run?
+                      description: Command defines what is run against Cassandra pods
                       type: string
                     name:
                       type: string

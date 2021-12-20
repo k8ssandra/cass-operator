@@ -62,10 +62,12 @@ type SyncTaskExecutorFunc func(httphelper.NodeMgmtClient, *corev1.Pod, map[strin
 
 // TaskConfiguration sets the command's functions to execute
 type TaskConfiguration struct {
-	AsyncFunc    AsyncTaskExecutorFunc
-	SyncFunc     SyncTaskExecutorFunc
-	AsyncFeature httphelper.Feature
-	Arguments    map[string]string
+	Id            string
+	AsyncFunc     AsyncTaskExecutorFunc
+	SyncFunc      SyncTaskExecutorFunc
+	AsyncFeature  httphelper.Feature
+	RestartPolicy corev1.RestartPolicy
+	Arguments     map[string]string
 }
 
 //+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=cassandratasks,verbs=get;list;watch;create;update;patch;delete
@@ -87,6 +89,8 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
+	setDefaults(&cassTask)
+
 	timeNow := metav1.Now()
 
 	if cassTask.Spec.ScheduledTime != nil && timeNow.Before(cassTask.Spec.ScheduledTime) {
@@ -106,15 +110,16 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return deletionTime
 	}
 
-	if cassTask.GetLabels() == nil {
-		cassTask.Labels = make(map[string]string)
-	}
-
 	// If we're active, we can proceed - otherwise verify if we're allowed to run
 	status, found := cassTask.GetLabels()[taskStatusLabel]
 
+	if cassTask.Status.CompletionTime == nil && status == completedTaskLabelValue {
+		// This is out of sync
+		return ctrl.Result{Requeue: true}, nil
+	}
+
 	// Check if job is finished, and if and only if, check the TTL from last finished time.
-	if cassTask.Status.CompletionTime != nil || status == completedTaskLabelValue {
+	if cassTask.Status.CompletionTime != nil {
 		deletionTime := calculateDeletionTime()
 
 		// Nothing more to do here, other than delete it..
@@ -146,10 +151,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger = log.FromContext(ctx, "datacenterName", dc.Name, "clusterName", dc.Spec.ClusterName)
 	log.IntoContext(ctx, logger)
 
-	if cassTask.GetLabels() == nil {
-		cassTask.Labels = make(map[string]string)
-	}
-
 	// If we're active, we can proceed - otherwise verify if we're allowed to run
 	if !found {
 		// Does our concurrencypolicy allow the task to run? Are there any other active ones?
@@ -167,13 +168,13 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		if len(activeTasks) > 0 {
-			if cassTask.Spec.ConcurrencyPolicy == nil || *cassTask.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+			if cassTask.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 				// TODO Or should we push an event?
 				logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
 				return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
 			}
 			for _, task := range activeTasks {
-				if cassTask.Spec.ConcurrencyPolicy == nil || *task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
+				if task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 					logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
 					return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
 				}
@@ -213,11 +214,15 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	var err error
 	for _, job := range cassTask.Spec.Jobs {
+		taskConfigProto := &TaskConfiguration{
+			RestartPolicy: cassTask.Spec.RestartPolicy,
+			Id:            taskId,
+		}
 		switch job.Command {
 		case "rebuild":
-			res, err = r.reconcileEveryPodTask(ctx, taskId, &dc, rebuild(job.Arguments))
+			res, err = r.reconcileEveryPodTask(ctx, &dc, rebuild(taskConfigProto, job.Arguments))
 		case "cleanup":
-			res, err = r.reconcileEveryPodTask(ctx, taskId, &dc, cleanup())
+			res, err = r.reconcileEveryPodTask(ctx, &dc, cleanup(taskConfigProto))
 		case "decommission":
 			// res, err = r.reconcileEveryPodTask(ctx, taskId, &dc, decommission())
 		default:
@@ -225,6 +230,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, err
 		}
 
+		// TODO How would we detect what sort of error we've had here? For the correct reconcile action
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -273,6 +279,20 @@ func (r *CassandraTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.CassandraTask{}).
 		Complete(r)
+}
+
+func setDefaults(cassTask *api.CassandraTask) {
+	if cassTask.GetLabels() == nil {
+		cassTask.Labels = make(map[string]string)
+	}
+
+	if cassTask.Spec.RestartPolicy == "" {
+		cassTask.Spec.RestartPolicy = corev1.RestartPolicyNever
+	}
+
+	if cassTask.Spec.ConcurrencyPolicy == "" {
+		cassTask.Spec.ConcurrencyPolicy = batchv1.ForbidConcurrent
+	}
 }
 
 func (r *CassandraTaskReconciler) activeTasks(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]api.CassandraTask, error) {
@@ -346,24 +366,22 @@ func callCleanupSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, 
 	return nodeMgmtClient.CallKeyspaceCleanupEndpoint(pod, -1, "", nil)
 }
 
-func cleanup() TaskConfiguration {
-	return TaskConfiguration{
-		AsyncFeature: httphelper.AsyncSSTableTasks,
-		AsyncFunc:    callCleanup,
-		SyncFunc:     callCleanupSync,
-	}
+func cleanup(taskConfig *TaskConfiguration) *TaskConfiguration {
+	taskConfig.AsyncFeature = httphelper.AsyncSSTableTasks
+	taskConfig.AsyncFunc = callCleanup
+	taskConfig.SyncFunc = callCleanupSync
+	return taskConfig
 }
 
 func callRebuild(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, args map[string]string) (string, error) {
 	return nodeMgmtClient.CallDatacenterRebuild(pod, args["source_datacenter"])
 }
 
-func rebuild(args map[string]string) TaskConfiguration {
-	return TaskConfiguration{
-		AsyncFeature: httphelper.Rebuild,
-		AsyncFunc:    callRebuild,
-		Arguments:    args,
-	}
+func rebuild(taskConfig *TaskConfiguration, args map[string]string) *TaskConfiguration {
+	taskConfig.AsyncFeature = httphelper.Rebuild
+	taskConfig.AsyncFunc = callRebuild
+	taskConfig.Arguments = args
+	return taskConfig
 }
 
 func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]corev1.Pod, error) {
@@ -398,7 +416,7 @@ func (r *CassandraTaskReconciler) cleanupJobAnnotations(ctx context.Context, dc 
 	return nil
 }
 
-func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, taskId string, dc *cassapi.CassandraDatacenter, taskConfig TaskConfiguration) (ctrl.Result, error) {
+func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	// We sort to ensure we process the dcPods in the same order
@@ -433,7 +451,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 			pod.Annotations = make(map[string]string)
 		}
 
-		jobStatus, err := GetJobStatusFromPodAnnotations(taskId, pod.Annotations)
+		jobStatus, err := GetJobStatusFromPodAnnotations(taskConfig.Id, pod.Annotations)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -455,7 +473,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 
 				if details.Id == "" {
 					// This job was not found, pod most likely restarted. Let's retry..
-					delete(pod.Annotations, getJobAnnotationKey(taskId))
+					delete(pod.Annotations, getJobAnnotationKey(taskConfig.Id))
 					err = r.Client.Update(ctx, &pod)
 					if err != nil {
 						return ctrl.Result{}, err
@@ -465,7 +483,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 					// Log the error, move on
 					logger.Error(fmt.Errorf("task failed: %s", details.Error), "Job failed to successfully complete the task", "Pod", pod)
 					jobStatus.Status = podJobError
-					if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+					if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
 						return ctrl.Result{}, err
 					}
 
@@ -477,7 +495,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 					// Pod has finished, remove the job_id and let us move to the next pod
 					jobStatus.Status = podJobCompleted
 					// TODO Repeating code - refactor
-					if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+					if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
 						return ctrl.Result{}, err
 					}
 
@@ -497,7 +515,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 
 				// Nothing is holding the job, this pod has finished
 				jobStatus.Status = podJobCompleted
-				if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
 					return ctrl.Result{}, err
 				}
 
@@ -520,7 +538,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 			jobStatus.Handler = jobHandlerMgmtApi
 			jobStatus.Id = jobId
 
-			if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+			if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -544,7 +562,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 			jobStatus.Handler = oplabels.ManagedByLabelValue
 			jobStatus.Id = jobId
 
-			if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+			if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -575,7 +593,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, tas
 					jobStatus.Status = podJobCompleted
 				}
 
-				if err = JobStatusToPodAnnotations(taskId, pod.Annotations, jobStatus); err != nil {
+				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
 					logger.Error(err, "Failed to update local job's status", "Pod", targetPod)
 				}
 

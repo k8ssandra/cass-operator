@@ -106,7 +106,7 @@ func createDatacenter(dcName, namespace string) func() {
 	}
 }
 
-func createTask(command, namespace string) (types.NamespacedName, *api.CassandraTask) {
+func createTask(command api.CassandraCommand, namespace string) (types.NamespacedName, *api.CassandraTask) {
 	taskKey := types.NamespacedName{
 		Name:      fmt.Sprintf("test-%s-task-%d", command, rand.Int31()),
 		Namespace: namespace,
@@ -180,7 +180,7 @@ var _ = Describe("Execute jobs against all pods", func() {
 		When("Running rebuild in datacenter", func() {
 			It("Run a rebuild task against the datacenter pods", func() {
 				By("Create a task for rebuild")
-				taskKey, _ := createTask("rebuild", testNamespaceName)
+				taskKey, _ := createTask(api.CommandRebuild, testNamespaceName)
 
 				waitForTaskCompletion(taskKey)
 
@@ -194,7 +194,7 @@ var _ = Describe("Execute jobs against all pods", func() {
 		When("Running cleanup twice in the same datacenter", func() {
 			It("Run a cleanup task against the datacenter pods", func() {
 				By("Create a task for cleanup")
-				taskKey, _ := createTask("cleanup", testNamespaceName)
+				taskKey, _ := createTask(api.CommandCleanup, testNamespaceName)
 
 				waitForTaskCompletion(taskKey)
 
@@ -238,7 +238,7 @@ var _ = Describe("Execute jobs against all pods", func() {
 
 		It("Run a cleanup task against the datacenter pods", func() {
 			By("Create a task for cleanup")
-			taskKey, _ := createTask("cleanup", testNamespaceName)
+			taskKey, _ := createTask(api.CommandCleanup, testNamespaceName)
 
 			waitForTaskCompletion(taskKey)
 

@@ -2146,7 +2146,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	return result.RequeueSoon(10)
 }
 
-func (rc *ReconciliationContext) findActiveTask(command string) (*taskapi.CassandraTask, error) {
+func (rc *ReconciliationContext) findActiveTask(command taskapi.CassandraCommand) (*taskapi.CassandraTask, error) {
 	if len(rc.Datacenter.Status.TrackedTasks) > 0 {
 		for _, taskMeta := range rc.Datacenter.Status.TrackedTasks {
 			taskKey := types.NamespacedName{Name: taskMeta.Name, Namespace: taskMeta.Namespace}
@@ -2167,11 +2167,13 @@ func (rc *ReconciliationContext) findActiveTask(command string) (*taskapi.Cassan
 
 func (rc *ReconciliationContext) createTask(command string) error {
 	generatedName := fmt.Sprintf("%s-%d", command, time.Now().Unix())
+	dc := rc.Datacenter
 
 	task := &taskapi.CassandraTask{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      generatedName,
 			Namespace: rc.Datacenter.Namespace,
+			Labels:    dc.GetDatacenterLabels(),
 		},
 		Spec: taskapi.CassandraTaskSpec{
 			Datacenter: corev1.ObjectReference{
@@ -2181,18 +2183,19 @@ func (rc *ReconciliationContext) createTask(command string) error {
 			Jobs: []taskapi.CassandraJob{
 				{
 					Name:    fmt.Sprintf("%s-%s", command, rc.Datacenter.Name),
-					Command: command,
+					Command: taskapi.CommandCleanup,
 				},
 			},
 		},
 		Status: taskapi.CassandraTaskStatus{},
 	}
 
+	oplabels.AddOperatorLabels(task.GetLabels(), dc)
+
 	if err := rc.Client.Create(rc.Ctx, task); err != nil {
 		return err
 	}
 
-	dc := rc.Datacenter
 	dcPatch := client.MergeFrom(dc.DeepCopy())
 
 	rc.Datacenter.Status.AddTaskToTrack(task.ObjectMeta)

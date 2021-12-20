@@ -42,7 +42,7 @@ type CassandraTaskSpec struct {
 
 	// RestartPolicy indicates the behavior n case of failure. Default is Never.
 	// +optional
-	RestartPolicy *corev1.RestartPolicy `json:"restartPolicy,omitempty"`
+	RestartPolicy corev1.RestartPolicy `json:"restartPolicy,omitempty"`
 
 	// TTLSecondsAfterFinished defines how long the completed job will kept before being cleaned up. If not set,
 	// the task will not be cleaned up by the cass-operator.
@@ -54,16 +54,23 @@ type CassandraTaskSpec struct {
 	// - "Forbid" (default): only a single task is executed at once
 	// The "Allow" property is only valid if all the other active Tasks have "Allow" as well.
 	// +optional
-	ConcurrencyPolicy *batchv1.ConcurrencyPolicy `json:"concurrencyPolicy,omitempty"`
+	ConcurrencyPolicy batchv1.ConcurrencyPolicy `json:"concurrencyPolicy,omitempty"`
 }
+
+type CassandraCommand string
+
+const (
+	CommandCleanup CassandraCommand = "cleanup"
+	CommandRebuild CassandraCommand = "rebuild"
+)
 
 type CassandraJob struct {
 	Name string `json:"name"`
 
-	// TODO Should this be typed to match what jobs this version of cass-operator can run?
-	Command string `json:"command"`
+	// Command defines what is run against Cassandra pods
+	Command CassandraCommand `json:"command"`
 
-	// Should command be typed to restrict allowed values in this version?
+	// +optional
 	Arguments map[string]string `json:"args,omitempty"`
 }
 

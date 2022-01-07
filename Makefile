@@ -4,7 +4,7 @@
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 
-VERSION ?= 1.9.0
+VERSION ?= 1.10.0
 
 COMMIT := $(shell git rev-parse --short HEAD)
 DATE := $(shell date +%Y%m%d)
@@ -60,7 +60,9 @@ CRD_OPTIONS ?= "crd"
 ENVTEST_K8S_VERSION = 1.21
 
 # Logger image
-LOG_IMG ?= k8ssandra/system-logger:latest
+LOG_IMG_BASE ?= $(ORG)/system-logger
+LOG_IMG ?= $(LOG_IMG_BASE):$(VERSION)
+LOG_IMG_LATEST ?= $(LOG_IMG_BASE):latest
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -130,7 +132,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 docker-build: ## Build docker image with the manager.
-	docker buildx build -t ${IMG} -t ${IMG_LATEST} . --load
+	docker buildx build --build-arg VERSION=${VERSION} -t ${IMG} -t ${IMG_LATEST} . --load
 
 docker-kind: docker-build ## Build docker image and load to kind cluster
 	kind load docker-image ${IMG}
@@ -141,10 +143,15 @@ docker-push: ## Build and push docker image with the manager.
 	docker push ${IMG_LATEST}
 
 docker-logger-build: ## Build system-logger image.
-	docker buildx build -t ${LOG_IMG} -f logger.Dockerfile . --load
+	docker buildx build -t ${LOG_IMG} -t ${LOG_IMG_LATEST} --build-arg VERSION=${VERSION} -f logger.Dockerfile . --load
 
 docker-logger-push: ## Push system-logger-image
 	docker push ${LOG_IMG}
+	docker push ${LOG_IMG_LATEST}
+
+docker-logger-kind: docker-logger-build ## Build system-logger image and load to kind cluster
+	kind load docker-image ${LOG_IMG}
+	kind load docker-image ${LOG_IMG_LATEST}
 
 ##@ Deployment
 

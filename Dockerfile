@@ -19,12 +19,23 @@ COPY pkg/ pkg/
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager main.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
+# Build the UBI image
 FROM redhat/ubi8-micro:latest
-#FROM gcr.io/distroless/static:nonroot
+
+ARG VERSION
+
+LABEL maintainer="DataStax, Inc <info@datastax.com>"
+LABEL name="cass-operator"
+LABEL vendor="DataStax, Inc"
+LABEL release="${VERSION}"
+LABEL version="${VERSION}"
+LABEL summary="DataStax Kubernetes Operator for Apache Cassandra "
+LABEL description="The DataStax Kubernetes Operator for Apache Cassandra®. This operator handles the provisioning and day to day management of Apache Cassandra based clusters. Features include configuration deployment, node remediation, and automatic upgrades."
+
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/manager /manager
+COPY ./LICENSE.txt /licenses/
+
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

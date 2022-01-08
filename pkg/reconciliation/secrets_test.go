@@ -50,13 +50,12 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 		}
 
 		expectedSecretLabels := map[string]string{
-			oplabels.InstanceLabel: "cassandra-exampleCluster",
+			oplabels.InstanceLabel:  "cassandra-exampleCluster",
 			oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
-			oplabels.NameLabel: oplabels.NameLabelValue,
-			oplabels.VersionLabel: "",
-			"piclem": "add",
+			oplabels.NameLabel:      oplabels.NameLabelValue,
+			oplabels.VersionLabel:   "",
+			"piclem":                "add",
 		}
-
 
 		if !reflect.DeepEqual(expectedSecretLabels, secret.Labels) {
 			t.Errorf("labels = \n %v \n, want \n %v", secret.Labels, expectedSecretLabels)

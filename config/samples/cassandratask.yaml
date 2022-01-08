@@ -1,0 +1,11 @@
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: CassandraTask
+metadata:
+  name: example-cleanup
+spec:
+  datacenter:
+    name: dc2
+    namespace: cass-operator
+  jobs:
+    - name: cleanup-run
+      command: cleanup

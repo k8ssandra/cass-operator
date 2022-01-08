@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -50,13 +51,14 @@ type ReconciliationContext struct {
 
 // CreateReconciliationContext gathers all information needed for computeReconciliationActions into a struct.
 func CreateReconciliationContext(
+	ctx context.Context,
 	req *reconcile.Request,
 	cli runtimeClient.Client,
 	scheme *runtime.Scheme,
 	rec record.EventRecorder,
-	secretWatches dynamicwatch.DynamicWatches,
-	reqLogger logr.Logger) (*ReconciliationContext, error) {
+	secretWatches dynamicwatch.DynamicWatches) (*ReconciliationContext, error) {
 
+	reqLogger := log.FromContext(ctx)
 	rc := &ReconciliationContext{}
 	rc.Request = req
 	rc.Client = cli
@@ -64,7 +66,7 @@ func CreateReconciliationContext(
 	rc.Recorder = &events.LoggingEventRecorder{EventRecorder: rec, ReqLogger: reqLogger}
 	rc.SecretWatches = secretWatches
 	rc.ReqLogger = reqLogger
-	rc.Ctx = context.Background()
+	rc.Ctx = ctx
 
 	rc.ReqLogger = rc.ReqLogger.
 		WithValues("namespace", req.Namespace)
@@ -103,26 +105,17 @@ func CreateReconciliationContext(
 		rc.Datacenter.Status.LastRollingRestart = metav1.Unix(1, 0)
 	}
 
-	httpClient, err := httphelper.BuildManagementApiHttpClient(dc, cli, rc.Ctx)
-	if err != nil {
-		rc.ReqLogger.Error(err, "error in BuildManagementApiHttpClient")
-		return nil, err
-	}
-
 	rc.ReqLogger = rc.ReqLogger.
 		WithValues("datacenterName", dc.Name).
 		WithValues("clusterName", dc.Spec.ClusterName)
 
-	protocol, err := httphelper.GetManagementApiProtocol(dc)
-	if err != nil {
-		rc.ReqLogger.Error(err, "error in GetManagementApiProtocol")
-		return nil, err
-	}
+	log.IntoContext(ctx, rc.ReqLogger)
 
-	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-		Client:   httpClient,
-		Log:      rc.ReqLogger,
-		Protocol: protocol,
+	var err error
+	rc.NodeMgmtClient, err = httphelper.NewMgmtClient(rc.Ctx, cli, dc)
+	if err != nil {
+		rc.ReqLogger.Error(err, "failed to build NodeMgmtClient")
+		return nil, err
 	}
 
 	return rc, nil

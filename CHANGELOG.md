@@ -10,8 +10,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ```
 
 ## unreleased
+* [FEATURE] Task scheduler support to allow creating tasks that run for each pod in the cluster. The tasks have their own reconciliation process and lifecycle distinct from CassandraDatacenter as well as their own API package.
 * [ENHANCEMENT] [#235](https://github.com/k8ssandra/cass-operator/issues/235) Adding AdditionalLabels to add on all resources managed by the operator
-* [ENHANCEMENT] [#244](https://github.com/k8ssandra/cass-operator/issues/244) Add ability to skip Casandra user creation
+* [ENHANCEMENT] [#244](https://github.com/k8ssandra/cass-operator/issues/244) Add ability to skip Cassandra user creation
 
 ## v.1.9.0
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.

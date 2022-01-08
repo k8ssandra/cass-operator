@@ -290,7 +290,7 @@ var _ = Describe(testName, func() {
 			Eventually(func() error {
 				_, err := getAdditionalSeedEndpointResourceAddresses()
 				return err
-			}, "5s", "100ms").Should(Succeed())
+			}, "15s", "100ms").Should(Succeed())
 
 			checkSeedConstraints()
 

@@ -35,7 +35,9 @@ import (
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
+	controlv1alpha1 "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	controllers "github.com/k8ssandra/cass-operator/controllers/cassandra"
+	controlcontrollers "github.com/k8ssandra/cass-operator/controllers/control"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	//+kubebuilder:scaffold:imports
@@ -51,6 +53,7 @@ func init() {
 
 	utilruntime.Must(api.AddToScheme(scheme))
 	utilruntime.Must(configv1beta1.AddToScheme(scheme))
+	utilruntime.Must(controlv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -124,6 +127,13 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
 			os.Exit(1)
 		}
+	}
+	if err = (&controlcontrollers.CassandraTaskReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "CassandraTask")
+		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
 

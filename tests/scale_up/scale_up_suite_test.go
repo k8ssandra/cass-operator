@@ -69,6 +69,10 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReady(dcName)
 
+			// Ensure we have a single CassandraTask created which is a cleanup (and it succeeded)
+			ns.CheckForCompletedCassandraTasks(dcName, "cleanup", 1)
+			// ns.CheckForCompletedCassandraTask(dcName, "cleanup")
+
 			step = "scale up to 4 nodes"
 			json = "{\"spec\": {\"size\": 4}}"
 			k = kubectl.PatchMerge(dcResource, json)
@@ -77,6 +81,9 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
 
+			// Ensure we have two CassandraTasks created which are cleanup (and they succeeded)
+			ns.CheckForCompletedCassandraTasks(dcName, "cleanup", 2)
+
 			step = "scale up to 5 nodes"
 			json = "{\"spec\": {\"size\": 5}}"
 			k = kubectl.PatchMerge(dcResource, json)
@@ -84,6 +91,9 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
+
+			// Ensure we have three CassandraTasks created which are cleanup (and they succeeded)
+			ns.CheckForCompletedCassandraTasks(dcName, "cleanup", 3)
 
 			step = "check recorded host IDs"
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)

@@ -18,7 +18,10 @@ import (
 
 	"github.com/go-logr/logr"
 
+	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type NodeMgmtClient struct {
@@ -79,7 +82,7 @@ type JobDetails struct {
 	Id         string `json:"id"`
 	Type       string `json:"type"`
 	Status     string `json:"status"`
-	SubmitTime string `json:"submit_time"`
+	SubmitTime string `json:"submit_time,omitempty"`
 	EndTime    string `json:"end_time,omitempty"`
 	Error      string `json:"error,omitempty"`
 }
@@ -94,6 +97,7 @@ type FeatureSet struct {
 const (
 	AsyncSSTableTasks Feature = "async_sstable_tasks"
 	FullQuerySupport  Feature = "full_query_logging"
+	Rebuild           Feature = "rebuild"
 )
 
 func (f *FeatureSet) UnmarshalJSON(b []byte) error {
@@ -117,6 +121,28 @@ func (f *FeatureSet) UnmarshalJSON(b []byte) error {
 func (f *FeatureSet) Supports(feature Feature) bool {
 	_, found := f.Features[string(feature)]
 	return found
+}
+
+func NewMgmtClient(ctx context.Context, client client.Client, dc *cassdcapi.CassandraDatacenter) (NodeMgmtClient, error) {
+	logger := log.FromContext(ctx)
+
+	httpClient, err := BuildManagementApiHttpClient(dc, client, ctx)
+	if err != nil {
+		logger.Error(err, "error in BuildManagementApiHttpClient")
+		return NodeMgmtClient{}, err
+	}
+
+	protocol, err := GetManagementApiProtocol(dc)
+	if err != nil {
+		logger.Error(err, "error in GetManagementApiProtocol")
+		return NodeMgmtClient{}, err
+	}
+
+	return NodeMgmtClient{
+		Client:   httpClient,
+		Log:      logger,
+		Protocol: protocol,
+	}, nil
 }
 
 func BuildPodHostFromPod(pod *corev1.Pod) (string, error) {
@@ -318,6 +344,34 @@ func (client *NodeMgmtClient) CallKeyspaceCleanup(pod *corev1.Pod, jobs int, key
 	return string(jobId), nil
 }
 
+// CallDatacenterRebuild returns the job id of the rebuild job.
+func (client *NodeMgmtClient) CallDatacenterRebuild(pod *corev1.Pod, sourceDatacenter string) (string, error) {
+	client.Log.Info(
+		"calling Management API keyspace rebuild - POST /api/v1/ops/node/rebuild",
+		"pod", pod.Name,
+	)
+
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return "", err
+	}
+
+	queryUrl := fmt.Sprintf("/api/v1/ops/node/rebuild?src_dc=%s", sourceDatacenter)
+
+	req := nodeMgmtRequest{
+		endpoint: queryUrl,
+		host:     podHost,
+		method:   http.MethodPost,
+		timeout:  60 * time.Second,
+	}
+	jobId, err := callNodeMgmtEndpoint(client, req, "application/json")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jobId), nil
+}
+
 // CreateKeyspace calls management API to create a new Keyspace.
 func (client *NodeMgmtClient) CreateKeyspace(pod *corev1.Pod, keyspaceName string, replicationSettings []map[string]string) error {
 	return client.modifyKeyspace("create", pod, keyspaceName, replicationSettings)
@@ -332,7 +386,7 @@ func (client *NodeMgmtClient) modifyKeyspace(endpoint string, pod *corev1.Pod, k
 	postData := make(map[string]interface{})
 
 	if keyspaceName == "" || replicationSettings == nil {
-		return fmt.Errorf("Keyspacename and replication settings are required")
+		return fmt.Errorf("keyspacename and replication settings are required")
 	}
 
 	postData["keyspace_name"] = keyspaceName
@@ -616,6 +670,7 @@ func (client *NodeMgmtClient) CallReloadSeedsEndpoint(pod *corev1.Pod) error {
 	return err
 }
 
+// TODO Create async version of this also
 func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) error {
 	client.Log.Info(
 		"calling Management API decommission node - POST /api/v0/ops/node/decommission",
@@ -636,6 +691,34 @@ func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) erro
 
 	_, err = callNodeMgmtEndpoint(client, request, "")
 	return err
+}
+
+// CallDecommissionNode returns the job id of the decommission job.
+func (client *NodeMgmtClient) CallDecommissionNode(pod *corev1.Pod, force bool) (string, error) {
+	client.Log.Info(
+		"calling Management API keyspace rebuild - POST /api/v1/ops/node/decommission",
+		"pod", pod.Name,
+	)
+
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return "", err
+	}
+
+	queryUrl := fmt.Sprintf("/api/v1/ops/node/decommission?force=%t", force)
+
+	req := nodeMgmtRequest{
+		endpoint: queryUrl,
+		host:     podHost,
+		method:   http.MethodPost,
+		timeout:  60 * time.Second,
+	}
+	jobId, err := callNodeMgmtEndpoint(client, req, "application/json")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jobId), nil
 }
 
 // FeatureSet returns supported features on the target pod. If the target pod is too old, empty
@@ -690,7 +773,7 @@ func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDet
 	}
 
 	request := nodeMgmtRequest{
-		endpoint: "/api/v0/ops/executor/job",
+		endpoint: fmt.Sprintf("/api/v0/ops/executor/job?job_id=%s", jobId),
 		host:     podHost,
 		method:   http.MethodGet,
 	}

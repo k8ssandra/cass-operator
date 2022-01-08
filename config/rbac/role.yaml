@@ -73,6 +73,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - control.k8ssandra.io
+  resources:
+  - cassandratasks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - control.k8ssandra.io
+  resources:
+  - cassandratasks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - control.k8ssandra.io
+  resources:
+  - cassandratasks/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - ""
   resources:
   - configmaps
@@ -82,6 +108,19 @@ rules:
   - pods
   - secrets
   - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - pods
   verbs:
   - create
   - delete

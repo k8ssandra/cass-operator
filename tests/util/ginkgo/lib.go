@@ -267,7 +267,7 @@ func (ns *NsWrapper) WaitForDatacenterReadyPodCountWithTimeout(dcName string, co
 }
 
 func (ns *NsWrapper) WaitForDatacenterReady(dcName string) {
-	ns.WaitForDatacenterReadyWithTimeouts(dcName, 400, 30)
+	ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 30)
 }
 
 func (ns *NsWrapper) WaitForDatacenterReadyWithTimeouts(dcName string, podCountTimeout int, dcReadyTimeout int) {
@@ -520,4 +520,14 @@ func (ns NsWrapper) CqlExecute(podName string, stepDesc string, cql string, user
 		WithFlag("container", "cassandra")
 	ginkgo.By(stepDesc)
 	ns.ExecVPanic(k)
+}
+
+func (ns *NsWrapper) CheckForCompletedCassandraTasks(dcName, command string, count int) {
+	step := fmt.Sprintf("checking that cassandratask command %s has succeeded", command)
+	json := "jsonpath={.items[*].spec.jobs[0].command}"
+	k := kubectl.Get("cassandratask").
+		WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)).
+		WithLabel("control.k8ssandra.io/status=completed").
+		FormatOutput(json)
+	ns.WaitForOutputAndLog(step, k, duplicate(command, count), 60)
 }

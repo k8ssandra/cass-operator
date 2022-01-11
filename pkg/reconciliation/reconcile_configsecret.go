@@ -105,7 +105,7 @@ func (rc *ReconciliationContext) updateConfigHashAnnotation(secret *corev1.Secre
 	b64Hash := base64.StdEncoding.EncodeToString(hashBytes)
 
 	patch := client.MergeFrom(rc.Datacenter.DeepCopy())
-	rc.Datacenter.Annotations[api.ConfigHashAnnotation] = b64Hash
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.ConfigHashAnnotation, b64Hash)
 
 	return rc.Client.Patch(rc.Ctx, rc.Datacenter, patch)
 }

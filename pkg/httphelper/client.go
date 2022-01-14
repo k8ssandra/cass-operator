@@ -200,6 +200,39 @@ func (client *NodeMgmtClient) CallMetadataEndpointsEndpoint(pod *corev1.Pod) (Ca
 	}
 }
 
+// CallSchemaVersionsEndpoint returns a map of all schema versions. Map keys are the schema
+// UUIDs and the values are lists of nodes' IPs that are at that version. The JSON response
+// looks like this:
+//
+//    {"2207c2a9-f598-3971-986b-2926e09e239d": ["10.244.1.4", "10.244.2.3, 10.244.3.3"]}
+//
+// A map length of 1 indicates schema agreement.
+func (client *NodeMgmtClient) CallSchemaVersionsEndpoint(pod *corev1.Pod) (map[string][]string, error) {
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v1/ops/node/schema/versions",
+		host:     podHost,
+		method:   http.MethodGet,
+		timeout:  60 * time.Second,
+	}
+
+	bytes, err := callNodeMgmtEndpoint(client, request, "")
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string][]string)
+	if err = json.Unmarshal(bytes, &result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 // Create a new superuser with the given username and password
 func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username string, password string, superuser bool) error {
 	client.Log.Info(

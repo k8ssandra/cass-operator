@@ -14,8 +14,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#235](https://github.com/k8ssandra/cass-operator/issues/235) Adding AdditionalLabels to add on all resources managed by the operator
 * [ENHANCEMENT] [#244](https://github.com/k8ssandra/cass-operator/issues/244) Add ability to skip Cassandra user creation
 * [ENHANCEMENT] [#257](https://github.com/k8ssandra/cass-operator/issues/257) Add management-api client method to list schema versions
-* [ENHANCEMENT] [#125](https://github.com/k8ssandra/cass-operator/issues/125) On delete, decommission the datacenter if running in multi-datacenter cluster.
+* [ENHANCEMENT] [#125](https://github.com/k8ssandra/cass-operator/issues/125) On delete, allow decommission of the datacenter if running in multi-datacenter cluster.
 * [BUGFIX] [#254](https://github.com/k8ssandra/cass-operator/pull/254) Safely set annotation on datacenter in config secret
+* [BUGFIX] [#261](https://github.com/k8ssandra/cass-operator/issues/261) State of decommission can't be detected correctly if the RPC address is removed from endpoint state during decommission, but before it's finalized.
 
 ## v.1.9.0
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.

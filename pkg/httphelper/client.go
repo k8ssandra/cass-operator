@@ -60,6 +60,7 @@ type EndpointState struct {
 	SSTableVersion         string `json:"SSTABLE_VERSIONS,omitempty"`
 	HostID                 string `json:"HOST_ID,omitempty"`
 	IsAlive                string `json:"IS_ALIVE,omitempty"`
+	EndpointIP             string `json:"ENDPOINT_IP,omitempty"`
 	NativeTransportAddress string `json:"NATIVE_TRANSPORT_ADDRESS,omitempty"`
 	RpcAddress             string `json:"RPC_ADDRESS,omitempty"`
 	Status                 string `json:"STATUS,omitempty"`

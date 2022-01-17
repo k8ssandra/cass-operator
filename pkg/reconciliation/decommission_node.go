@@ -62,7 +62,6 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 	}
 
 	if currentSize <= targetSize {
-		logger.Info(fmt.Sprintf("reconcile_racks::DecommissionNodes::reached-target: %d <= %d", currentSize, dc.Spec.Size))
 		return result.Continue()
 	}
 
@@ -79,9 +78,9 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 		maxReplicas := *statefulSet.Spec.Replicas
 		lastPodSuffix := stsLastPodSuffix(maxReplicas)
 
-		logger.Info(fmt.Sprintf("reconcile_racks::DecommissionNodes::maxReplicas::%d > %d", maxReplicas, desiredNodeCount))
-
 		if maxReplicas > desiredNodeCount {
+			logger.V(1).Info(fmt.Sprintf("reconcile_racks::DecommissionNodes::maxReplicas::%d > %d", maxReplicas, desiredNodeCount), "Rack", rackInfo.RackName)
+
 			dcPatch := client.MergeFrom(dc.DeepCopy())
 			updated := false
 
@@ -120,8 +119,6 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 		}
 	}
 
-	logger.Info(fmt.Sprintf("reconcile_racks::DecommissionNodes::continue-after-decommrack: %d <= %d", currentSize, dc.Spec.Size))
-
 	return result.Continue()
 }
 
@@ -142,7 +139,7 @@ func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData 
 				return err
 			}
 
-			rc.ReqLogger.Info("Marking node as decommissioning")
+			rc.ReqLogger.V(1).Info("Marking node as decommissioning")
 			patch := client.MergeFrom(pod.DeepCopy())
 			metav1.SetMetaDataLabel(&pod.ObjectMeta, api.CassNodeState, stateDecommissioning)
 			if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
@@ -161,24 +158,24 @@ func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData 
 }
 
 func (rc *ReconciliationContext) callDecommission(pod *corev1.Pod) error {
-	// features, err := rc.NodeMgmtClient.FeatureSet(pod)
-	// if err != nil {
-	// 	return err
-	// } else if features.Supports(httphelper.AsyncSSTableTasks) {
-	// 	if jobId, err := rc.NodeMgmtClient.CallDecommissionNode(pod, true); err != nil {
-	// 		return err
-	// 	} else {
-	// 		rc.ReqLogger.Info(fmt.Sprintf("Decommission requested, returned jobId: %s", jobId))
-	// 	}
-	// } else {
-	// 	// Fallback to older code
-	// 	pod := pod
-	// 	go func(pod *corev1.Pod) {
-	if err := rc.NodeMgmtClient.CallDecommissionNodeEndpoint(pod); err != nil {
-		rc.ReqLogger.Info(fmt.Sprintf("Error from decommission attempt. This is only an attempt and can fail. Error: %v", err))
+	features, err := rc.NodeMgmtClient.FeatureSet(pod)
+	if err != nil {
+		return err
+	} else if features.Supports(httphelper.AsyncSSTableTasks) {
+		if jobId, err := rc.NodeMgmtClient.CallDecommissionNode(pod, true); err != nil {
+			return err
+		} else {
+			rc.ReqLogger.V(1).Info(fmt.Sprintf("Decommission requested, returned jobId: %s", jobId))
+		}
+	} else {
+		// Fallback to older code
+		pod := pod
+		go func(pod *corev1.Pod) {
+			if err := rc.NodeMgmtClient.CallDecommissionNodeEndpoint(pod); err != nil {
+				rc.ReqLogger.V(1).Info(fmt.Sprintf("Error from decommission attempt. This is only an attempt and can fail. Error: %v", err))
+			}
+		}(pod)
 	}
-	// 	}(pod)
-	// }
 
 	return nil
 }
@@ -189,18 +186,20 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 		return result.Continue()
 	}
 
+	nodeStatuses := rc.Datacenter.Status.NodeStatuses
+
 	for _, pod := range rc.dcPods {
 		if pod.Labels[api.CassNodeState] == stateDecommissioning {
-			if !IsDoneDecommissioning(pod, epData, rc.ReqLogger) {
-				if !HasStartedDecommissioning(pod, epData) {
-					rc.ReqLogger.Info("Decommission has not started trying again")
+			if !IsDoneDecommissioning(pod, epData, nodeStatuses, rc.ReqLogger) {
+				if !HasStartedDecommissioning(pod, epData, nodeStatuses) {
+					rc.ReqLogger.V(1).Info("Decommission has not started trying again", "Pod", pod.Name)
 					err := rc.callDecommission(pod)
 					if err != nil {
 						return result.Error(err)
 					}
 				}
 			} else {
-				rc.ReqLogger.Info("Node finished decommissioning")
+				rc.ReqLogger.V(1).Info("Node finished decommissioning", "Pod", pod.Name)
 				if res := rc.cleanUpAfterDecommissionedPod(pod); res != nil {
 					return res
 				}
@@ -209,8 +208,6 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 			return result.RequeueSoon(5)
 		}
 	}
-
-	rc.ReqLogger.Info("Nothing to decommission")
 
 	dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
 	updated := false
@@ -226,7 +223,6 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 			return result.Error(err)
 		}
 		// Requeue after updating to ensure we verify previous steps with the new size
-		rc.ReqLogger.Info("Requeing after updating DatacenterScalingDown to False")
 		return result.RequeueSoon(0)
 	}
 
@@ -257,25 +253,45 @@ func (rc *ReconciliationContext) cleanUpAfterDecommissionedPod(pod *corev1.Pod) 
 	return nil
 }
 
-func HasStartedDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints) bool {
+func HasStartedDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap) bool {
 	for idx := range epData.Entity {
 		ep := &epData.Entity[idx]
-		if ep.GetRpcAddress() == pod.Status.PodIP {
+		if ep.GetRpcAddress() == pod.Status.PodIP || ep.EndpointIP == pod.Status.PodIP {
 			return ep.HasStatus(httphelper.StatusLeaving)
 		}
 	}
+
+	// Lets try with HostID next
+	if nodeStatus, found := nodeStatuses[pod.Name]; found {
+		for idx := range epData.Entity {
+			ep := &epData.Entity[idx]
+			if ep.HostID == nodeStatus.HostID {
+				return ep.HasStatus(httphelper.StatusLeaving)
+			}
+		}
+	}
+
 	return false
 }
 
-func IsDoneDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, logger logr.Logger) bool {
+func IsDoneDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap, logger logr.Logger) bool {
 	for idx := range epData.Entity {
 		ep := &epData.Entity[idx]
-		if ep.GetRpcAddress() == pod.Status.PodIP {
+		if ep.GetRpcAddress() == pod.Status.PodIP || ep.EndpointIP == pod.Status.PodIP {
 			return ep.HasStatus(httphelper.StatusLeft)
 		}
 	}
 
-	logger.Info(fmt.Sprintf("It seems the pod is gone from the ring, considering it as done:\nPod Status IP: %v\nEntity Ring: %v", pod.Status.PodIP, epData.Entity))
+	// Lets try with HostID next
+	if nodeStatus, found := nodeStatuses[pod.Name]; found {
+		for idx := range epData.Entity {
+			ep := &epData.Entity[idx]
+			if ep.HostID == nodeStatus.HostID {
+				return ep.HasStatus(httphelper.StatusLeft)
+			}
+		}
+	}
+
 	// Gone from the ring completely?
 	return true
 }

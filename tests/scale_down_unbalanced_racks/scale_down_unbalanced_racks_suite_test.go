@@ -61,15 +61,6 @@ var _ = Describe(testName, func() {
 			k = kubectl.PatchMerge("sts/cluster1-dc1-r2-sts", json)
 			ns.ExecAndLog(step, k)
 
-			// because we scale up the rack before scaling down the dc,
-			// the operator will wait to scale down until the extra rack
-			// nodes are  ready, so we can safetly update the dc size
-			// at this point
-			step = "scale down dc to 2 nodes"
-			json = "{\"spec\": {\"size\": 2}}"
-			k = kubectl.PatchMerge(dcResource, json)
-			ns.ExecAndLog(step, k)
-
 			extraPod := "cluster1-dc1-r2-sts-2"
 
 			step = "check that the extra pod is ready"
@@ -78,6 +69,11 @@ var _ = Describe(testName, func() {
 				WithFlag("field-selector", fmt.Sprintf("metadata.name=%s", extraPod)).
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "true", 600)
+
+			step = "scale down dc to 2 nodes"
+			json = "{\"spec\": {\"size\": 2}}"
+			k = kubectl.PatchMerge(dcResource, json)
+			ns.ExecAndLog(step, k)
 
 			// The rack with an extra node should get a decommission request
 			// first, despite being the last rack and the first rack also needing

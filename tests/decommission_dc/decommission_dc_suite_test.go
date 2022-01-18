@@ -58,7 +58,6 @@ func findDatacenters(nodeName string) []string {
 	re := regexp.MustCompile(`Datacenter:.*`)
 	k := kubectl.ExecOnPod(nodeName, "-c", "cassandra", "--", "nodetool", "status")
 	output := ns.OutputPanic(k)
-	fmt.Printf("OUTPUT: %s\n", output)
 	dcLines := re.FindAllString(output, -1)
 	dcs := make([]string, 0, len(dcLines))
 	for _, dcLine := range dcLines {
@@ -141,11 +140,6 @@ var _ = Describe(testName, func() {
 			podNames = ns.GetDatacenterReadyPodNames(dc1Name)
 			Expect(len(podNames)).To(Equal(2))
 			dcs = findDatacenters(podNames[0])
-			if len(dcs) > 1 {
-				fmt.Printf("There are these DCs: %v\n", dcs)
-				By(fmt.Sprintf("There are these DCs: %v\n", dcs))
-			}
-
 			Expect(len(dcs)).To(Equal(1))
 
 			// Delete the remaining DC and expect it to finish correctly (it should not be decommissioned - that will hang the process and fail)

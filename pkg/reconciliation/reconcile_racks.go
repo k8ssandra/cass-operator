@@ -2341,7 +2341,6 @@ func (rc *ReconciliationContext) fixMissingPVC() (bool, error) {
 // ReconcileAllRacks determines if a rack needs to be reconciled.
 func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	rc.ReqLogger.Info("reconciliationContext::reconcileAllRacks")
-	rc.ReqLogger.Info(fmt.Sprintf("reconciliationContext::reconcileAllRacks:target size: %d", rc.Datacenter.Spec.Size))
 
 	if recResult := rc.CheckForInvalidState(); recResult.Completed() {
 		return recResult.Output()
@@ -2369,9 +2368,15 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return recResult.Output()
 	}
 
-	rc.ReqLogger.Info(fmt.Sprintf("Going to CheckDecommissionNodes with target size: %d", rc.Datacenter.Spec.Size))
+	if recResult := rc.CheckConfigSecret(); recResult.Completed() {
+		return recResult.Output()
+	}
 
 	if recResult := rc.CheckRackCreation(); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.CheckRackLabels(); recResult.Completed() {
 		return recResult.Output()
 	}
 
@@ -2388,14 +2393,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	}
 
 	if recResult := rc.CheckInternodeCredentialCreation(); recResult.Completed() {
-		return recResult.Output()
-	}
-
-	if recResult := rc.CheckConfigSecret(); recResult.Completed() {
-		return recResult.Output()
-	}
-
-	if recResult := rc.CheckRackLabels(); recResult.Completed() {
 		return recResult.Output()
 	}
 

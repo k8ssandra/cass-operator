@@ -544,7 +544,7 @@ func (rc *ReconciliationContext) checkSeedLabels() (int, error) {
 func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMetadataEndpoints) result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckPodsReady")
 
-	if rc.Datacenter.Spec.Stopped || rc.Datacenter.GetDeletionTimestamp() != nil {
+	if rc.Datacenter.Spec.Stopped {
 		return result.Continue()
 	}
 
@@ -1902,20 +1902,10 @@ func (rc *ReconciliationContext) countReadyAndStarted() (int, int) {
 	for _, pod := range rc.dcPods {
 		if isServerReady(pod) {
 			ready++
-			rc.ReqLogger.Info(
-				"found a ready pod",
-				"podName", pod.Name,
-				"runningCountReady", ready,
-			)
 		}
 
 		if isServerStarted(pod) {
 			started++
-			rc.ReqLogger.Info(
-				"found a pod we labeled Started",
-				"podName", pod.Name,
-				"runningCountStarted", started,
-			)
 		}
 	}
 	return ready, started
@@ -2384,10 +2374,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return recResult.Output()
 	}
 
-	if recResult := rc.DecommissionNodes(endpointData); recResult.Completed() {
-		return recResult.Output()
-	}
-
 	if recResult := rc.CheckSuperuserSecretCreation(); recResult.Completed() {
 		return recResult.Output()
 	}
@@ -2414,7 +2400,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		// }
 	}
 
-	// TODO CheckRackScale is updating our StatefulSet at the wrong time
 	if recResult := rc.CheckRackScale(); recResult.Completed() {
 		return recResult.Output()
 	}
@@ -2424,6 +2409,10 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	}
 
 	if recResult := rc.CheckCassandraNodeStatuses(); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.DecommissionNodes(endpointData); recResult.Completed() {
 		return recResult.Output()
 	}
 

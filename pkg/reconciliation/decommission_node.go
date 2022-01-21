@@ -158,6 +158,12 @@ func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData 
 }
 
 func (rc *ReconciliationContext) callDecommission(pod *corev1.Pod) error {
+	if !isPodUp(pod) {
+		// The pod must be started before it can be decommissioned
+		rc.ReqLogger.V(1).Info("Error while trying to decommission, pod isn't running.", "Pod", pod)
+		return nil
+	}
+
 	features, err := rc.NodeMgmtClient.FeatureSet(pod)
 	if err != nil {
 		return err

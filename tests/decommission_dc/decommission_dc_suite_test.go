@@ -124,6 +124,10 @@ var _ = Describe(testName, func() {
 			dcs := findDatacenters(podNames[0])
 			Expect(len(dcs)).To(Equal(2))
 
+			step = "annotate dc2 to do decommission on delete"
+			k = kubectl.Annotate("cassdc", dc2Name, "cassandra.datastax.com/decommission-on-delete", "true")
+			ns.ExecAndLog(step, k)
+
 			// Time to remove the dc2 and verify it has been correctly cleaned up
 			step = "deleting the dc2"
 			k = kubectl.DeleteFromFiles(dc2Yaml)

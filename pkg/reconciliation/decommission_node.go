@@ -79,7 +79,7 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 		lastPodSuffix := stsLastPodSuffix(maxReplicas)
 
 		if maxReplicas > desiredNodeCount {
-			logger.V(1).Info(fmt.Sprintf("reconcile_racks::DecommissionNodes::maxReplicas::%d > %d", maxReplicas, desiredNodeCount), "Rack", rackInfo.RackName)
+			logger.V(1).Info("reconcile_racks::DecommissionNodes::scaleDownRack", "Rack", rackInfo.RackName, "maxReplicas", maxReplicas, "desiredNodeCount", desiredNodeCount)
 
 			dcPatch := client.MergeFrom(dc.DeepCopy())
 			updated := false

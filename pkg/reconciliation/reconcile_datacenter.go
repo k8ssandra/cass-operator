@@ -4,8 +4,6 @@
 package reconciliation
 
 import (
-	"fmt"
-
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	corev1 "k8s.io/api/core/v1"
@@ -42,14 +40,7 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 		return result.Continue()
 	}
 
-	rc.ReqLogger.Info(fmt.Sprintf("Datacenter is not scaling down anymore, decommissioning still?: %v", rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission)))
-	// TODO We should copy the original size somewhere so it can be set before finalizer is removed (and we can keep the validation inplace)
-
-	// If there are still pods up, check the cluster datacenter count..
-	// TODO This if/else really needs some help
-	// if rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) != corev1.ConditionTrue {
-	// TODO Modify to opt-in instead of opt-out
-	if _, found := rc.Datacenter.Annotations[api.SkipDecommissionAnnotation]; !found {
+	if _, found := rc.Datacenter.Annotations[api.DecommissionOnDeleteAnnotation]; found {
 		podList, err := rc.listPods(rc.Datacenter.GetDatacenterLabels())
 		if err != nil {
 			rc.ReqLogger.Error(err, "Failed to list pods, unable to proceed with deletion")
@@ -81,7 +72,6 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 			}
 		}
 	}
-	// }
 
 	// Clean up annotation litter on the user Secrets
 	err := rc.SecretWatches.RemoveWatcher(types.NamespacedName{
@@ -104,8 +94,8 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 
 	// Update finalizer to allow delete of CassandraDatacenter
 	rc.Datacenter.SetFinalizers(nil)
+	rc.Datacenter.Spec.Size = origSize // Has to be set to original size, since 0 isn't allowed for the Update to succeed
 
-	rc.Datacenter.Spec.Size = origSize
 	// Update CassandraDatacenter
 	if err := rc.Client.Update(rc.Ctx, rc.Datacenter); err != nil {
 		rc.ReqLogger.Error(err, "Failed to update CassandraDatacenter with removed finalizers")

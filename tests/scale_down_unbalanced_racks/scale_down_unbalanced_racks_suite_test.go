@@ -61,15 +61,6 @@ var _ = Describe(testName, func() {
 			k = kubectl.PatchMerge("sts/cluster1-dc1-r2-sts", json)
 			ns.ExecAndLog(step, k)
 
-			// because we scale up the rack before scaling down the dc,
-			// the operator will wait to scale down until the extra rack
-			// nodes are  ready, so we can safetly update the dc size
-			// at this point
-			step = "scale down dc to 2 nodes"
-			json = "{\"spec\": {\"size\": 2}}"
-			k = kubectl.PatchMerge(dcResource, json)
-			ns.ExecAndLog(step, k)
-
 			extraPod := "cluster1-dc1-r2-sts-2"
 
 			step = "check that the extra pod is ready"
@@ -79,16 +70,31 @@ var _ = Describe(testName, func() {
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "true", 600)
 
-			// The rack with an extra node should get a decommission request
-			// first, despite being the last rack and the first rack also needing
-			// to eventually decommission nodes
-			expectedRemainingPods := []string{
-				"cluster1-dc1-r1-sts-0", "cluster1-dc1-r1-sts-1",
-				"cluster1-dc1-r2-sts-0", "cluster1-dc1-r2-sts-1",
-			}
-			ensurePodGetsDecommissionedNext(extraPod, expectedRemainingPods)
+			// Kill all the pods in rack1
 
-			expectedRemainingPods = []string{
+			step = "kill pod cluster1-dc1-r1-sts-0"
+			k = kubectl.Delete("pod", "cluster1-dc1-r1-sts-0")
+			ns.ExecAndLog(step, k)
+
+			step = "kill pod cluster1-dc1-r1-sts-1"
+			k = kubectl.Delete("pod", "cluster1-dc1-r1-sts-1")
+			ns.ExecAndLog(step, k)
+
+			// Scale down while we have pods down - expect this setup to recover
+
+			step = "scale down dc to 2 nodes"
+			json = "{\"spec\": {\"size\": 2}}"
+			k = kubectl.PatchMerge(dcResource, json)
+			ns.ExecAndLog(step, k)
+
+			step = "wait for cluster1-dc1-r1-sts-0 to be ready again"
+			json = "jsonpath={.items[*].status.containerStatuses[0].ready}"
+			k = kubectl.Get("pod").
+				WithFlag("field-selector", fmt.Sprintf("metadata.name=%s", "cluster1-dc1-r1-sts-0")).
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "true", 600)
+
+			expectedRemainingPods := []string{
 				"cluster1-dc1-r1-sts-0", "cluster1-dc1-r1-sts-1",
 				"cluster1-dc1-r2-sts-0",
 			}

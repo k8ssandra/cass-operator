@@ -9,10 +9,11 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
-	"github.com/pavel-v-chernykh/keystore-go"
-	corev1 "k8s.io/api/core/v1"
 	"math/big"
 	"time"
+
+	"github.com/pavel-v-chernykh/keystore-go"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func setupKey() (*big.Int, time.Time, *rsa.PrivateKey, string, time.Time, error) {
@@ -108,7 +109,6 @@ func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err
 	if derBytes, err = x509.CreateCertificate(rand.Reader, &newCert, ca_certificate, &priv.PublicKey, ca_key); err == nil {
 		asn1_bytes, err := rsa2pkcs8(priv)
 		buffer := bytes.NewBufferString("")
-		fmt.Printf("Creating keystore")
 		store := keystore.KeyStore{
 			fmt.Sprintf("%s.%s.cassdc", podname, ca.ObjectMeta.Namespace): &keystore.PrivateKeyEntry{
 				Entry:   keystore.Entry{CreationDate: time.Now()},

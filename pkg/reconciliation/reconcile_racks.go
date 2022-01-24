@@ -57,8 +57,7 @@ func (rc *ReconciliationContext) CalculateRackInformation() error {
 	nodeCount := int(rc.Datacenter.Spec.Size)
 	racks := rc.Datacenter.GetRacks()
 	rackCount := len(racks)
-
-	if nodeCount < rackCount {
+	if nodeCount < rackCount && rc.Datacenter.GetDeletionTimestamp() == nil {
 		return fmt.Errorf("the number of nodes cannot be smaller than the number of racks")
 	}
 
@@ -898,7 +897,7 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 		return result.Continue()
 	}
 
-	if dc.Spec.Stopped {
+	if dc.Spec.Stopped || rc.Datacenter.GetDeletionTimestamp() != nil {
 		rc.ReqLogger.Info("cluster is stopped, skipping CreateUser")
 		return result.Continue()
 	}
@@ -912,6 +911,9 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 
 	// make sure the default superuser secret exists
 	_, err = rc.retrieveSuperuserSecretOrCreateDefault()
+	if err != nil {
+		rc.ReqLogger.Error(err, "Failed to verify superuser secret status")
+	}
 
 	users := rc.GetUsers()
 
@@ -981,6 +983,12 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 		nodeStatus, ok := dc.Status.NodeStatuses[pod.Name]
 		if !ok {
 			nodeStatus = api.CassandraNodeStatus{}
+		}
+
+		if metav1.HasLabel(pod.ObjectMeta, api.CassNodeState) {
+			if pod.Labels[api.CassNodeState] == stateDecommissioning {
+				continue
+			}
 		}
 
 		if pod.Status.PodIP != "" && isMgmtApiRunning(pod) {
@@ -1109,7 +1117,6 @@ func (rc *ReconciliationContext) UpdateStatusForUserActions() error {
 
 func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 	dc := rc.Datacenter
-	status := rc.Datacenter.Status.DeepCopy()
 	oldDc := rc.Datacenter.DeepCopy()
 
 	err := rc.UpdateCassandraNodeStatus(false)
@@ -1122,7 +1129,7 @@ func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 		return result.Error(err)
 	}
 
-	status = &api.CassandraDatacenterStatus{}
+	status := &api.CassandraDatacenterStatus{}
 	dc.Status.DeepCopyInto(status)
 	oldDc.Status.DeepCopyInto(&dc.Status)
 
@@ -1895,20 +1902,10 @@ func (rc *ReconciliationContext) countReadyAndStarted() (int, int) {
 	for _, pod := range rc.dcPods {
 		if isServerReady(pod) {
 			ready++
-			rc.ReqLogger.Info(
-				"found a ready pod",
-				"podName", pod.Name,
-				"runningCountReady", ready,
-			)
 		}
 
 		if isServerStarted(pod) {
 			started++
-			rc.ReqLogger.Info(
-				"found a pod we labeled Started",
-				"podName", pod.Name,
-				"runningCountStarted", started,
-			)
 		}
 	}
 	return ready, started
@@ -1974,8 +1971,8 @@ func isServerReady(pod *corev1.Pod) bool {
 
 func (rc *ReconciliationContext) refreshSeeds() error {
 	rc.ReqLogger.Info("reconcile_racks::refreshSeeds")
-	if rc.Datacenter.Spec.Stopped {
-		rc.ReqLogger.Info("cluster is stopped, skipping refreshSeeds")
+	if rc.Datacenter.Spec.Stopped || rc.Datacenter.GetDeletionTimestamp() != nil {
+		rc.ReqLogger.Info("cluster is stopped/deleted, skipping refreshSeeds")
 		return nil
 	}
 
@@ -2333,6 +2330,8 @@ func (rc *ReconciliationContext) fixMissingPVC() (bool, error) {
 
 // ReconcileAllRacks determines if a rack needs to be reconciled.
 func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
+	rc.ReqLogger.Info("reconciliationContext::reconcileAllRacks")
+
 	if recResult := rc.CheckForInvalidState(); recResult.Completed() {
 		return recResult.Output()
 	}
@@ -2359,14 +2358,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return recResult.Output()
 	}
 
-	if recResult := rc.CheckSuperuserSecretCreation(); recResult.Completed() {
-		return recResult.Output()
-	}
-
-	if recResult := rc.CheckInternodeCredentialCreation(); recResult.Completed() {
-		return recResult.Output()
-	}
-
 	if recResult := rc.CheckConfigSecret(); recResult.Completed() {
 		return recResult.Output()
 	}
@@ -2380,6 +2371,14 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	}
 
 	if recResult := rc.CheckDecommissioningNodes(endpointData); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.CheckSuperuserSecretCreation(); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.CheckInternodeCredentialCreation(); recResult.Completed() {
 		return recResult.Output()
 	}
 
@@ -2413,15 +2412,15 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return recResult.Output()
 	}
 
+	if recResult := rc.DecommissionNodes(endpointData); recResult.Completed() {
+		return recResult.Output()
+	}
+
 	if recResult := rc.CheckRollingRestart(); recResult.Completed() {
 		return recResult.Output()
 	}
 
 	if recResult := rc.CheckDcPodDisruptionBudget(); recResult.Completed() {
-		return recResult.Output()
-	}
-
-	if recResult := rc.DecommissionNodes(endpointData); recResult.Completed() {
 		return recResult.Output()
 	}
 

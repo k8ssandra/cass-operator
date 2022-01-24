@@ -47,6 +47,19 @@ func TestRetryDecommissionNode(t *testing.T) {
 		Return(res, nil).
 		Once()
 
+	resFeatureSet := &http.Response{
+		StatusCode: http.StatusNotFound,
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+	}
+
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/api/v0/metadata/versions/features"
+			})).
+		Return(resFeatureSet, nil).
+		Once()
+
 	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
 		Client:   mockHttpClient,
 		Log:      rc.ReqLogger,

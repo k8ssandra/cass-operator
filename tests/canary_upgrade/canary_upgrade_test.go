@@ -32,10 +32,17 @@ var (
 func TestLifecycle(t *testing.T) {
 	AfterSuite(func() {
 		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		kubectl.DumpAllLogs(logPath).ExecV()
+		err := kubectl.DumpAllLogs(logPath).ExecV()
+		if err != nil {
+			t.Logf("Failed to dump all the logs: %v", err)
+		}
+
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.Undeploy(namespace)
+		err = kustomize.Undeploy(namespace)
+		if err != nil {
+			t.Logf("Failed to undeploy cass-operator: %v", err)
+		}
 	})
 
 	RegisterFailHandler(Fail)
@@ -58,6 +65,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForSuperUserUpserted(dcName, 600)
 
 			step = "check recorded host IDs"
+			ns.Log(step)
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
 			Expect(len(nodeStatusesHostIds), 3)
 

@@ -21,12 +21,10 @@ var (
 	opNamespace = "test-psp-emm"
 	dc1Name     = "dc1"
 	// This scenario requires RF greater than 2
-	dc1Yaml      = "../testdata/psp-emm-dc.yaml"
-	dc1Resource  = fmt.Sprintf("CassandraDatacenter/%s", dc1Name)
-	pod1Name     = "cluster1-dc1-r1-sts-0"
-	pod1Resource = fmt.Sprintf("pod/%s", pod1Name)
-	nodeCount    = 3
-	ns           = ginkgo_util.NewWrapper(testName, opNamespace)
+	dc1Yaml   = "../testdata/psp-emm-dc.yaml"
+	pod1Name  = "cluster1-dc1-r1-sts-0"
+	nodeCount = 3
+	ns        = ginkgo_util.NewWrapper(testName, opNamespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -35,11 +33,15 @@ func TestLifecycle(t *testing.T) {
 		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
 		err := kubectl.DumpAllLogs(logPath).ExecV()
 		if err != nil {
-			fmt.Printf("\n\tError during dumping logs: %s\n\n", err.Error())
+			t.Logf("Failed to dump all the logs: %v", err)
 		}
+
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.Undeploy(opNamespace)
+		err = kustomize.Undeploy(opNamespace)
+		if err != nil {
+			t.Logf("Failed to undeploy cass-operator: %v", err)
+		}
 	})
 
 	RegisterFailHandler(Fail)

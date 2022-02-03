@@ -23,7 +23,6 @@ var (
 	namespace               = "test-node-port-service"
 	dcName                  = "dc1"
 	dcYaml                  = "../testdata/nodeport-service-dc.yaml"
-	operatorYaml            = "../testdata/operator.yaml"
 	nodePortServiceResource = "services/cluster1-dc1-node-port-service"
 	ns                      = ginkgo_util.NewWrapper(testName, namespace)
 )
@@ -31,11 +30,17 @@ var (
 func TestLifecycle(t *testing.T) {
 	AfterSuite(func() {
 		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		kubectl.DumpAllLogs(logPath).ExecV()
+		err := kubectl.DumpAllLogs(logPath).ExecV()
+		if err != nil {
+			t.Logf("Failed to dump all the logs: %v", err)
+		}
 
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.Undeploy(namespace)
+		err = kustomize.Undeploy(namespace)
+		if err != nil {
+			t.Logf("Failed to undeploy cass-operator: %v", err)
+		}
 	})
 
 	RegisterFailHandler(Fail)
@@ -52,6 +57,7 @@ func checkNodePortService() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = json.Unmarshal([]byte(output), &data)
+	Expect(err).ToNot(HaveOccurred())
 
 	spec := data["spec"].(map[string]interface{})
 	policy := spec["externalTrafficPolicy"].(string)

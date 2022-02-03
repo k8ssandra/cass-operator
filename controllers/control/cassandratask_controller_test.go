@@ -154,16 +154,6 @@ func waitForTaskCompletion(taskKey types.NamespacedName) *api.CassandraTask {
 	return emptyTask
 }
 
-func verifyPodsHaveAnnotations(testNamespaceName, taskId string) {
-	podList := corev1.PodList{}
-	Expect(k8sClient.List(context.TODO(), &podList, client.InNamespace(testNamespaceName))).To(Succeed())
-
-	jobAnnotationKey := getJobAnnotationKey(taskId)
-	for _, pod := range podList.Items {
-		Expect(pod.GetAnnotations()).To(HaveKey(jobAnnotationKey))
-	}
-}
-
 var _ = Describe("Execute jobs against all pods", func() {
 	jobRunningRequeue = time.Duration(1 * time.Millisecond)
 	Context("Async jobs", func() {

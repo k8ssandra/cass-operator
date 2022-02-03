@@ -98,7 +98,7 @@ func CreateMockReconciliationContext(
 	s := scheme.Scheme
 	s.AddKnownTypes(api.GroupVersion, cassandraDatacenter)
 
-	fakeClient := fake.NewFakeClient(trackObjects...)
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	request := &reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -148,7 +148,7 @@ func fakeClientWithService(cassandraDatacenter *api.CassandraDatacenter) (*clien
 		service,
 	}
 
-	fakeClient := fake.NewFakeClient(trackObjects...)
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	return &fakeClient, service
 }

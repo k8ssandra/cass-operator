@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func test_RangeInt(t *testing.T) {
+func Test_RangeInt(t *testing.T) {
 	assert.Equal(t, []int{0, 2, 4, 6, 8}, RangeInt(0, 10, 2))
 	assert.Equal(t, []int{0, 1, 2, 3, 4}, RangeInt(0, 5, 1))
 	assert.Equal(t, []int{5, 8}, RangeInt(5, 10, 3))
@@ -21,9 +21,21 @@ type foo struct {
 	b int
 }
 
+// This is done to please structcheck
+func (f foo) getAB() (int, int) {
+	return f.a, f.b
+}
+
+// This is done to please structcheck
+func TestFooStruct(t *testing.T) {
+	a, b := foo{1, 2}.getAB()
+	assert.Equal(t, 1, a)
+	assert.Equal(t, 2, b)
+}
+
 func Test_ElementsMatch(t *testing.T) {
-	var aNil []int = nil
-	var bNil []int = nil
+	var aNil []foo = nil
+	var bNil []foo = nil
 
 	assert.True(t, ElementsMatch(
 		[]foo{{1, 2}, {3, 4}, {5, 6}},

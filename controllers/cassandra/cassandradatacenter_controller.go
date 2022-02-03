@@ -123,9 +123,9 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	}
 
 	// TODO fold this into the quiet period
-	twentySecs := time.Second * 20
+	cooldownPeriod := time.Second * 20
 	lastNodeStart := rc.Datacenter.Status.LastServerNodeStarted
-	cooldownTime := time.Until(lastNodeStart.Add(twentySecs))
+	cooldownTime := time.Until(lastNodeStart.Add(cooldownPeriod))
 
 	if cooldownTime > 0 {
 		logger.Info("Ending reconciliation early because a server node was recently started")
@@ -135,7 +135,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 	if rc.Datacenter.Status.QuietPeriod.After(time.Now()) {
 		logger.Info("Ending reconciliation early because the datacenter is in a quiet period")
-		cooldownTime = rc.Datacenter.Status.QuietPeriod.Sub(time.Now())
+		cooldownTime = time.Until(rc.Datacenter.Status.QuietPeriod.Time)
 		secs := time.Duration(1 + int(cooldownTime.Seconds()))
 		return ctrl.Result{RequeueAfter: secs * time.Second}, nil
 	}

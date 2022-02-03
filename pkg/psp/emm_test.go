@@ -514,7 +514,7 @@ func evacuateDataNode(name string) *corev1.Node {
 	node := &corev1.Node{}
 	node.Name = name
 	node.Spec.Taints = []corev1.Taint{
-		corev1.Taint{
+		{
 			Key:    "node.vmware.com/drain",
 			Value:  "drain",
 			Effect: corev1.TaintEffectNoSchedule,
@@ -525,9 +525,8 @@ func evacuateDataNode(name string) *corev1.Node {
 
 func Test_removeAllNotReadyPodsOnEMMNodes(t *testing.T) {
 	var service *EMMServiceImpl
-	var testObj *MockEMMSPI
 
-	testObj = &MockEMMSPI{}
+	testObj := &MockEMMSPI{}
 	service = &EMMServiceImpl{
 		EMMSPI: testObj,
 	}

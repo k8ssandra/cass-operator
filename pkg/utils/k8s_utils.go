@@ -28,7 +28,7 @@ func UnionStringSet(a, b StringSet) StringSet {
 
 func SubtractStringSet(a, b StringSet) StringSet {
 	result := StringSet{}
-	for k, _ := range a {
+	for k := range a {
 		if !b[k] {
 			result[k] = true
 		}

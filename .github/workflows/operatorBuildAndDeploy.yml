@@ -43,7 +43,7 @@ jobs:
         with:
           version: latest
           # Temporary, do not fail this job even if we have issues (until we've fixed them)
-          args: --issues-exit-code=0 --timeout=10m
+          # args: --issues-exit-code=0 --timeout=10m
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           # only-new-issues: true
           skip-go-installation: true

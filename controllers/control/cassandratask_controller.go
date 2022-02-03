@@ -244,7 +244,11 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return res, err
 		}
 
-		r.cleanupJobAnnotations(ctx, &dc, taskId)
+		err = r.cleanupJobAnnotations(ctx, &dc, taskId)
+		if err != nil {
+			// Not the end of the world
+			logger.Error(err, "Failed to cleanup job annotations from pods")
+		}
 
 		cassTask.Status.Active = 0
 		cassTask.Status.CompletionTime = &timeNow

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 
 	mageutil "github.com/k8ssandra/cass-operator/tests/util"
 	shutil "github.com/k8ssandra/cass-operator/tests/util/sh"
@@ -34,7 +34,8 @@ func GetKubeconfig(createDefault bool) string {
 		defaultDir := fmt.Sprintf("%s/.kube/", usr.HomeDir)
 		kubeconfig = fmt.Sprintf("%s/config", defaultDir)
 		if _, err := os.Stat(kubeconfig); createDefault && os.IsNotExist(err) {
-			os.MkdirAll(defaultDir, 0755)
+			err := os.MkdirAll(defaultDir, 0755)
+			mageutil.PanicOnError(err)
 			file, err := os.Create(kubeconfig)
 			mageutil.PanicOnError(err)
 			file.Close()
@@ -168,7 +169,7 @@ func Label(nodes string, key string, value string) KCmd {
 }
 
 func Taint(node string, key string, value string, effect string) KCmd {
-	var args []string = nil
+	var args []string
 	if value != "" {
 		args = []string{"nodes", node, fmt.Sprintf("%s=%s:%s", key, value, effect)}
 	} else {
@@ -275,7 +276,7 @@ func waitForOutputPattern(k KCmd, pattern string, seconds int) error {
 	defer close(cquit)
 
 	counter := 0
-	outputIsTerminal := terminal.IsTerminal(int(os.Stdout.Fd()))
+	outputIsTerminal := term.IsTerminal(int(os.Stdout.Fd()))
 	var actual string
 	var err error
 

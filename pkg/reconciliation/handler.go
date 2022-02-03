@@ -126,6 +126,7 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 		if err := rc.updateDcMaps(); err != nil {
 			// We will not skip reconciliation if the map update failed
 			// return result.Error(err).Output()
+			rc.ReqLogger.V(1).Info("Failed to update dc map")
 		}
 	}
 

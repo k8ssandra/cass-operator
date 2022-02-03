@@ -105,18 +105,24 @@ func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err
 	}
 	var derBytes []byte
 	ca_cert_bytes, ca_certificate, ca_key, err := prepare_ca(ca)
+	if err != nil {
+		return nil, err
+	}
 
 	if derBytes, err = x509.CreateCertificate(rand.Reader, &newCert, ca_certificate, &priv.PublicKey, ca_key); err == nil {
 		asn1_bytes, err := rsa2pkcs8(priv)
+		if err != nil {
+			return nil, err
+		}
 		buffer := bytes.NewBufferString("")
 		store := keystore.KeyStore{
 			fmt.Sprintf("%s.%s.cassdc", podname, ca.ObjectMeta.Namespace): &keystore.PrivateKeyEntry{
 				Entry:   keystore.Entry{CreationDate: time.Now()},
 				PrivKey: asn1_bytes,
-				CertChain: []keystore.Certificate{keystore.Certificate{
+				CertChain: []keystore.Certificate{{
 					Type:    "X509",
 					Content: derBytes,
-				}, keystore.Certificate{
+				}, {
 					Type:    "X509",
 					Content: ca_cert_bytes,
 				}},

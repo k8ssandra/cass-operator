@@ -84,10 +84,10 @@ func SearchMap(mapToSearch map[string]interface{}, key string) map[string]interf
 	}
 
 	for _, v := range mapToSearch {
-		switch v.(type) {
+		switch v := v.(type) {
 		case map[string]interface{}:
 
-			if foundMap := SearchMap(v.(map[string]interface{}), key); len(foundMap) != 0 {
+			if foundMap := SearchMap(v, key); len(foundMap) != 0 {
 				return foundMap
 			}
 		}

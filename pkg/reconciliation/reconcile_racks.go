@@ -746,23 +746,6 @@ func hasStatefulSetControllerCaughtUp(statefulSets []*appsv1.StatefulSet, dcPods
 	return true
 }
 
-func allPodsBelongToSameNodeOrHaveNoNode(pods []*corev1.Pod) (string, bool) {
-	nodeName := ""
-	for _, pod := range pods {
-		name := pod.Spec.NodeName
-		if name != "" {
-			if nodeName == "" {
-				nodeName = name
-			}
-			if nodeName != name {
-				return nodeName, false
-			}
-		}
-	}
-
-	return nodeName, true
-}
-
 // CheckRackScale loops over each statefulset and makes sure that it has the right
 // amount of desired replicas. At this time we can only increase the amount of replicas.
 func (rc *ReconciliationContext) CheckRackScale() result.ReconcileResult {
@@ -843,11 +826,6 @@ func (rc *ReconciliationContext) CheckRackPodLabels() result.ReconcileResult {
 	}
 
 	return result.Continue()
-}
-
-func shouldUpsertUsers(dc api.CassandraDatacenter) bool {
-	lastCreated := dc.Status.UsersUpserted
-	return time.Now().After(lastCreated.Add(time.Minute * 4))
 }
 
 func (rc *ReconciliationContext) upsertUser(user api.CassandraUser) error {
@@ -1076,7 +1054,9 @@ func (rc *ReconciliationContext) updateCurrentReplacePodsProgress() error {
 							"Finished replacing pod %s", pod.Name)
 
 						dc.Status.NodeReplacements = utils.RemoveValueFromStringArray(dc.Status.NodeReplacements, pod.Name)
-						rc.UpdateCassandraNodeStatus(true)
+						if err := rc.UpdateCassandraNodeStatus(true); err != nil {
+							return err
+						}
 					}
 				}
 			}
@@ -1180,16 +1160,6 @@ func hasBeenXMinutesSinceReady(x int, pod *corev1.Pod) bool {
 	for _, c := range pod.Status.Conditions {
 		if c.Type == "Ready" && c.Status == "False" {
 			return hasBeenXMinutes(x, c.LastTransitionTime.Time)
-		}
-	}
-	return false
-}
-
-func hasBeenXMinutesSinceStarted(x int, pod *corev1.Pod) bool {
-	if status := getCassContainerStatus(pod); status != nil {
-		running := status.State.Running
-		if running != nil {
-			return hasBeenXMinutes(x, running.StartedAt.Time)
 		}
 	}
 	return false
@@ -1661,14 +1631,6 @@ func shouldUpdateLabelsForRackResource(resourceLabels map[string]string, dc *api
 	return mergeInLabelsIfDifferent(resourceLabels, desired)
 }
 
-// shouldUpdateLabelsForDatacenterResource will compare the labels passed in with what the labels should be for a datacenter level
-// resource. It will return the updated map and a boolean denoting whether the resource needs to be updated with the new labels.
-func shouldUpdateLabelsForDatacenterResource(resourceLabels map[string]string, dc *api.CassandraDatacenter) (bool, map[string]string) {
-	desired := dc.GetDatacenterLabels()
-	oplabels.AddOperatorLabels(desired, dc)
-	return mergeInLabelsIfDifferent(resourceLabels, desired)
-}
-
 func (rc *ReconciliationContext) labelServerPodStarting(pod *corev1.Pod) error {
 	ctx := rc.Ctx
 	dc := rc.Datacenter
@@ -1940,10 +1902,6 @@ func isMgmtApiRunning(pod *corev1.Pod) bool {
 		}
 	}
 	return false
-}
-
-func isNodeDecommissioning(pod *corev1.Pod) bool {
-	return pod.Labels[api.CassNodeState] == stateDecommissioning
 }
 
 func isServerStarting(pod *corev1.Pod) bool {

@@ -43,7 +43,7 @@ func (rc *ReconciliationContext) getPodsPVCs(pods []*corev1.Pod) ([]*corev1.Pers
 
 func (rc *ReconciliationContext) getNodesForNameSet(nodeNameSet utils.StringSet) ([]*corev1.Node, error) {
 	nodes := []*corev1.Node{}
-	for nodeName, _ := range nodeNameSet {
+	for nodeName := range nodeNameSet {
 		if nodeName != "" {
 			node, err := rc.getNode(nodeName)
 			if err != nil {

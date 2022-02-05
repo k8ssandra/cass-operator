@@ -8,7 +8,7 @@ spec:
   serverVersion: "4.0.1"
   managementApiAuth:
     insecure: {}
-  size: 1
+  size: 3
   storageConfig:
       cassandraDataVolumeClaimSpec:
         storageClassName: server-storage
@@ -16,20 +16,25 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 10Gi
   dockerImageRunsAsCassandra: false
+  resources:
+    requests:
+      memory: 2Gi
+      cpu: 1000m
   podTemplateSpec:
     securityContext: {}
     containers:
       - name: cassandra
         securityContext: {}
   racks:
-    - name: r1
+    - name: rack1
   config:
     jvm-server-options:
-      initial_heap_size: "512m"
-      max_heap_size: "512m"
+      initial_heap_size: "1G"
+      max_heap_size: "1G"
     cassandra-yaml:
+      num_tokens: 16
       authenticator: PasswordAuthenticator
       authorizer: CassandraAuthorizer
       role_manager: CassandraRoleManager

@@ -18,7 +18,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] [#254](https://github.com/k8ssandra/cass-operator/pull/254) Safely set annotation on datacenter in config secret
 * [BUGFIX] [#261](https://github.com/k8ssandra/cass-operator/issues/261) State of decommission can't be detected correctly if the RPC address is removed from endpoint state during decommission, but before it's finalized.
 
-## v.1.9.0
+## v1.9.0
 * [CHANGE] #202 Support fetching FeatureSet from management-api if available. Return RequestError with StatusCode when endpoint has bad status.
 * [CHANGE] #213 Integration tests in Github Actions are now reusable across different workflows
 * [CHANGE] Prevent instant requeues, every requeue must wait at least 500ms.

@@ -18,13 +18,13 @@ Default installation is simple, the kubectl will create a namespace ``cass-opera
 Default install requires cert-manager to be installed, since webhooks require TLS certificates to be injected. See below how to install cert-manager if your environment does not have it installed previously.
 
 ```console
-kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/default
+kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.9.0
 ```
 
 If you wish to install it with cluster wide rights to monitor all the namespaces for ``CassandraDatacenter`` objects, use the following command:
 
 ```console
-kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/cluster
+kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/cluster?ref=v1.9.0
 ```
 
 Alternatively, if you checkout the code, you can use ``make deploy`` to run [Kustomize](https://kustomize.io/) and deploy the files.
@@ -39,7 +39,7 @@ cass-operator-555577b9f8-zgx6j   1/1     Running   0          25h
 
 ### Upgrade instructions:
 
-Updates are supported from previous versions of ``k8ssandra/cass-operator``. If upgrading from versions older than 1.7.0 (released under ``datastax/cass-operator`` name), please upgrade first to version 1.7.1. The following instructions apply when upgrading from 1.7.1 to 1.8.0 or to 1.9.0.
+Updates are supported from previous versions of ``k8ssandra/cass-operator``. If upgrading from versions older than 1.7.0 (released under ``datastax/cass-operator`` name), please upgrade first to version 1.7.1. The following instructions apply when upgrading from 1.7.1 to 1.8.0 or newer.
 
 Due to the modifications to cass-operator’s underlying controller-runtime and updated Kubernetes versions, there is a need to do couple of manual steps before updating to a newest version of cass-operator. Newer Kubernetes versions require stricter validation and as such we need to remove ``preserveUnknownFields`` global property from the CRD to allow us to update to a newer CRD. The newer controller-runtime on the other hand modifies the liveness, readiness and configuration options, which require us to delete the older deployment. These commands do not delete your running Cassandra instances.
 
@@ -58,7 +58,7 @@ You can now install new version of cass-operator as instructed previously.
 If you have Prometheus installed in your cluster, you can apply the following command to install the Prometheus support:
 
 ```console
-kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus
+kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus?ref=v1.9.0
 ```
 
 ### Install cert-manager
@@ -83,7 +83,7 @@ resources:
   - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.9.0
 
 components:
-  - github.com/k8ssandra/cass-operator/config/components/cluster
+  - github.com/k8ssandra/cass-operator/config/components/cluster?ref=v1.9.0
 
 images:
 - name: k8ssandra/cass-operator
@@ -133,7 +133,7 @@ kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.9.
 
 ### Creating a CassandraDatacenter
 
-The following resource defines a Cassandra 3.11.11 datacenter with 3 nodes on one rack, which you can also find at [config/samples/cassandra-3.11.x/example-cassdc-minimal.yaml](config/samples/cassandra-3.11.x/example-cassdc-minimal.yaml):
+The following resource defines a Cassandra 4.0.1 datacenter with 3 nodes on one rack, which you can also find at [config/samples/example-cassdc-three-nodes-single-rack.yaml](config/samples/example-cassdc-three-nodes-single-rack.yaml):
 
 ```yaml
 apiVersion: cassandra.datastax.com/v1beta1
@@ -141,34 +141,48 @@ kind: CassandraDatacenter
 metadata:
   name: dc1
 spec:
-  clusterName: cluster1
+  clusterName: development
   serverType: cassandra
-  serverVersion: 3.11.11
+  serverVersion: "4.0.1"
   managementApiAuth:
     insecure: {}
   size: 3
   storageConfig:
-    cassandraDataVolumeClaimSpec:
-      storageClassName: server-storage
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 5Gi
+      cassandraDataVolumeClaimSpec:
+        storageClassName: server-storage
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  dockerImageRunsAsCassandra: false
+  resources:
+    requests:
+      memory: 2Gi
+      cpu: 1000m
+  podTemplateSpec:
+    securityContext: {}
+    containers:
+      - name: cassandra
+        securityContext: {}
+  racks:
+    - name: rack1
   config:
+    jvm-server-options:
+      initial_heap_size: "1G"
+      max_heap_size: "1G"
     cassandra-yaml:
-      authenticator: org.apache.cassandra.auth.PasswordAuthenticator
-      authorizer: org.apache.cassandra.auth.CassandraAuthorizer
-      role_manager: org.apache.cassandra.auth.CassandraRoleManager
-    jvm-options:
-      initial_heap_size: 800M
-      max_heap_size: 800M
+      num_tokens: 16
+      authenticator: PasswordAuthenticator
+      authorizer: CassandraAuthorizer
+      role_manager: CassandraRoleManager
+
 ```
 
 Apply the above as follows:
 
 ```console
-kubectl -n cass-operator apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/master/operator/example-cassdc-yaml/cassandra-3.11.x/example-cassdc-minimal.yaml
+kubectl -n cass-operator apply -f https://github.com/k8ssandra/cass-operator/blob/master/config/samples/example-cassdc-three-nodes-single-rack.yaml
 ```
 
 You can check the status of pods in the Cassandra cluster as follows:
@@ -330,12 +344,12 @@ For other means of contacting, check [k8ssandra community](https://k8ssandra.io/
 
 ### Developer setup
 
-Almost every build, test, or development task requires the following
-pre-requisites...
+Almost every build, test, or development task requires the following pre-requisites...
 
-* Golang 1.15 or newer
+* Golang 1.17 or newer
 * Docker, either the docker.io packages on Ubuntu, Docker Desktop for Mac,
   or your preferred docker distribution. Other container engines such as podman should work also.
+* Kind or similar Kubernetes distribution for testing (Docker Desktop / Minikube will work if correct StorageClass is added)
 
 ### Building
 
@@ -373,7 +387,7 @@ Tests are separated to unit-tests (including [envtests](https://book.kubebuilder
 make test
 ```
 
-test target will spawn a envtest environment, which will require the ports to be available.  
+test target will spawn a envtest environment, which will require the ports to be available. To test the unit test workflow, one can use the [act](https://github.com/nektos/act) to run the tests with simply running `act -j testing`. While integration tests will work with `act` also, we do not recommend that, since it runs them serially and that takes a long time.
 
 #### End-to-end Automated Testing
 
@@ -401,7 +415,7 @@ Delete your CassandraDatacenters first, otherwise Kubernetes will block deletion
 kubectl delete cassdcs --all-namespaces --all
 ```
 
-If you used the ``make deploy`` to deploy the operator, replace it with ``make undeploy`` to uninstall.
+If you used the ``make deploy`` to deploy the operator, replace it with ``make undeploy`` to uninstall. With the `kubectl apply -k` option, replace it with `kubectl delete -k`.
 
 ## Contacts
 

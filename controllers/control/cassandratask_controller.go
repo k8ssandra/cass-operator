@@ -99,17 +99,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{RequeueAfter: nextRunTime}, nil
 	}
 
-	calculateDeletionTime := func() time.Time {
-		var deletionTime time.Time
-		if cassTask.Spec.TTLSecondsAfterFinished != nil {
-			deletionTime = cassTask.Status.CompletionTime.Add(time.Duration(*cassTask.Spec.TTLSecondsAfterFinished) * time.Second)
-		} else {
-			deletionTime = cassTask.Status.CompletionTime.Add(defaultTTL)
-		}
-
-		return deletionTime
-	}
-
 	// If we're active, we can proceed - otherwise verify if we're allowed to run
 	status, found := cassTask.GetLabels()[taskStatusLabel]
 
@@ -120,7 +109,12 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Check if job is finished, and if and only if, check the TTL from last finished time.
 	if cassTask.Status.CompletionTime != nil {
-		deletionTime := calculateDeletionTime()
+		deletionTime := calculateDeletionTime(&cassTask)
+
+		if deletionTime.IsZero() {
+			// This task does not have a TTL, we end the processing here
+			return ctrl.Result{}, nil
+		}
 
 		// Nothing more to do here, other than delete it..
 		if deletionTime.Before(timeNow.Time) {
@@ -256,7 +250,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		cassTask.Status.CompletionTime = &timeNow
 
 		// Requeue for deletion later
-		deletionTime := calculateDeletionTime()
+		deletionTime := calculateDeletionTime(&cassTask)
 		nextRunTime := deletionTime.Sub(timeNow.Time)
 		res.RequeueAfter = nextRunTime
 		logger.V(1).Info("This task has completed, scheduling for deletion in " + nextRunTime.String())
@@ -293,6 +287,16 @@ func setDefaults(cassTask *api.CassandraTask) {
 	if cassTask.Spec.ConcurrencyPolicy == "" {
 		cassTask.Spec.ConcurrencyPolicy = batchv1.ForbidConcurrent
 	}
+}
+
+func calculateDeletionTime(cassTask *api.CassandraTask) time.Time {
+	if cassTask.Spec.TTLSecondsAfterFinished != nil {
+		if *cassTask.Spec.TTLSecondsAfterFinished == 0 {
+			return time.Time{}
+		}
+		return cassTask.Status.CompletionTime.Add(time.Duration(*cassTask.Spec.TTLSecondsAfterFinished) * time.Second)
+	}
+	return cassTask.Status.CompletionTime.Add(defaultTTL)
 }
 
 func (r *CassandraTaskReconciler) activeTasks(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]api.CassandraTask, error) {

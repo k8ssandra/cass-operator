@@ -14,6 +14,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -182,8 +183,6 @@ var _ = Describe("Execute jobs against all pods", func() {
 			mockServer.Close()
 		})
 
-		// TODO Cleanup shouldn't happen when cluster is created
-		// TODO The additional seeds logging in the cass-pod'
 		When("Running rebuild in datacenter", func() {
 			It("Run a rebuild task against the datacenter pods", func() {
 				By("Create a task for rebuild")
@@ -307,6 +306,54 @@ var _ = Describe("Execute jobs against all pods", func() {
 
 			// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 			Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+		})
+	})
+	Context("Task TTL", func() {
+		var testNamespaceName string
+		BeforeEach(func() {
+			testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
+			testNamespace := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: testNamespaceName,
+				},
+			}
+			Expect(k8sClient.Create(context.Background(), testNamespace)).Should(Succeed())
+		})
+		It("Ensure task is deleted after TTL has expired", func() {
+			taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
+			metav1.SetMetaDataLabel(&task.ObjectMeta, taskStatusLabel, completedTaskLabelValue)
+			ttlTime := new(int32)
+			*ttlTime = 1
+			task.Spec.TTLSecondsAfterFinished = ttlTime
+			Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+			timeNow := metav1.Now()
+			task.Status.CompletionTime = &timeNow
+			Expect(k8sClient.Status().Update(context.TODO(), task)).Should(Succeed())
+
+			Eventually(func() bool {
+				deletedTask := api.CassandraTask{}
+				err := k8sClient.Get(context.TODO(), taskKey, &deletedTask)
+				return err != nil && errors.IsNotFound(err)
+			}).Should(BeTrue())
+		})
+		It("Ensure task is not deleted if TTL is set to 0", func() {
+			taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
+			metav1.SetMetaDataLabel(&task.ObjectMeta, taskStatusLabel, completedTaskLabelValue)
+			ttlTime := new(int32)
+			*ttlTime = 0
+			task.Spec.TTLSecondsAfterFinished = ttlTime
+			Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+			timeNow := metav1.Now()
+			task.Status.CompletionTime = &timeNow
+
+			Expect(k8sClient.Status().Update(context.TODO(), task)).Should(Succeed())
+			Consistently(func() bool {
+				deletedTask := api.CassandraTask{}
+				err := k8sClient.Get(context.TODO(), taskKey, &deletedTask)
+				return err == nil
+			}).Should(BeTrue())
 		})
 	})
 })

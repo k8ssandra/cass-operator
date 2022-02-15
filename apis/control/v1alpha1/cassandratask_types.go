@@ -44,8 +44,8 @@ type CassandraTaskSpec struct {
 	// +optional
 	RestartPolicy corev1.RestartPolicy `json:"restartPolicy,omitempty"`
 
-	// TTLSecondsAfterFinished defines how long the completed job will kept before being cleaned up. If not set,
-	// the task will not be cleaned up by the cass-operator.
+	// TTLSecondsAfterFinished defines how long the completed job will kept before being cleaned up. If set to 0
+	// the task will not be cleaned up by the cass-operator. If unset, the default time (86400s) is used.
 	// +optional
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 

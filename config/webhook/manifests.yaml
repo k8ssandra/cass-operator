@@ -14,7 +14,7 @@ webhooks:
       name: webhook-service
       namespace: system
       path: /validate-cassandra-datastax-com-v1beta1-cassandradatacenter
-  failurePolicy: Ignore
+  failurePolicy: Fail
   name: vcassandradatacenter.kb.io
   rules:
   - apiGroups:

@@ -15,8 +15,6 @@
   * Proceed only after you've received OK from them
 * Create bundle with the new SHA256 image: (make VERSION=1.9.0 IMG=registry.connect.redhat.com/datastax/cass-operator@sha256:f14b6b217ecf4f6b3dc1b43210ed51d6be56d70e5bbc5444861df73934631d3c bundle)
 * Modify bundle's imageConfig to use the SHA256 image of system-logger
-#* Modify bundle's name to cass-operator-bundle (or cass-operator-bundle-marketplace depending on the one you're creating)
-#* Rename bundle files to cass-operator-bundle-<file>
 * Verify CSV's metadata.name to be cass-operator.v<version>
 * Ensure yamllint passes
   * Line changes are not validated by RH, and also some indentation mistakes are fine (array indentation starts from same pos is fine)
@@ -41,7 +39,8 @@ This process starts in the github actions workflow dispatch. It calls the pre, r
 #### scripts/pre-release-process.sh
 * Modify CHANGELOG automatically to match the tag (for unreleased)
 * Modify README to include proper installation refs (keep them also?)
-* Modify kustomize tags for server-system-logger and cass-operator
+* Modify config/manager/kustomization.yaml to have proper newTag for cass-operator
+* Modify config/manager/image_config.yaml to have proper version for server-system-logger
 
 #### GHA
 * Commit changes
@@ -54,7 +53,13 @@ This process starts in the github actions workflow dispatch. It calls the pre, r
 ### post-release
 
 #### scripts/post-release-process.sh
-* Add also new ## unreleased after the tagging (post-release-process.sh)
+* Return config/manager/kustomization.yaml to :latest
+* Return config/manager/image_config.yaml to :latest
 
 #### GHA
 * Commit changes
+
+#### Manual work (for now)
+* Add also new ## unreleased after the tagging (post-release-process.sh)
+* Modify Makefile for the next VERSION in line
+

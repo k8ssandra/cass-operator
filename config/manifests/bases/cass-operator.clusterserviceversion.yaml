@@ -22,6 +22,11 @@ spec:
       kind: CassandraDatacenter
       name: cassandradatacenters.cassandra.datastax.com
       version: v1beta1
+    - description: CassandraTask is the Schema for the cassandrajobs API
+      displayName: Cassandra Task
+      kind: CassandraTask
+      name: cassandratasks.control.k8ssandra.io
+      version: v1alpha1
   description: ../../docs/developer/csv-description.md
   displayName: DataStax Kubernetes Operator for Apache Cassandra
   icon:

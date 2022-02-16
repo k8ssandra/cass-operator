@@ -208,7 +208,7 @@ ifeq (,$(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPSDK)) ;\
-	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.16.0/operator-sdk_${OS}_${ARCH} ;\
+	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.17.0/operator-sdk_${OS}_${ARCH} ;\
 	chmod +x $(OPSDK) ;\
 	}
 else

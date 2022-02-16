@@ -23,22 +23,6 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
-  domain: k8ssandra.io
-  group: config
-  kind: ImageConfig
-  path: github.com/k8ssandra/cass-operator/apis/config/v1beta1
-  version: v1
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: k8ssandra.io
-  group: config
-  kind: OperatorConfig
-  path: github.com/k8ssandra/cass-operator/apis/config/v1beta1
-  version: v1beta1
-- api:
-    crdVersion: v1
-    namespaced: true
   controller: true
   domain: k8ssandra.io
   group: control

@@ -1,11 +1,36 @@
 # How to make a release
 
-* Make a `release` branch (such as 1.8.x)
-* Run all int tests
-* Update `CHANGELOG.md`
-* Update `README.md` links/references to the right version in URLs like `https://.../k8ssandra/cass-operator/v1.8.0/...`
-* Update Kustomize newTag(s) to future tag value and set correct values to image_config.yaml
-* Create a tag and watch that release process completes in the github actions
+Run the following sequence, doing the small manual steps when required (until automated). There is no need to make a release branch as we want to maintain documentation in the master also.
+Ensure the post-release and pre-release scripts are correct if you've made any changes to the structure of the project since the last release.
+
+### pre-release
+
+#### scripts/pre-release-process.sh
+* Modify CHANGELOG automatically to match the tag (for unreleased)
+* Modify README to include proper installation refs (keep them also?)
+* Modify config/manager/kustomization.yaml to have proper newTag for cass-operator
+* Modify config/manager/image_config.yaml to have proper version for server-system-logger
+
+#### GHA / manual
+* Commit changes
+
+### release-github-action
+
+* Copy the unreleased notes to Github releases
+* Add Github packages upload for docker images
+
+### post-release
+
+#### scripts/post-release-process.sh
+* Return config/manager/kustomization.yaml to :latest
+* Return config/manager/image_config.yaml to :latest
+
+#### GHA / manual
+* Commit changes
+
+#### Manual work (for now)
+* Add also new ## unreleased after the tagging (post-release-process.sh)
+* Modify Makefile for the next VERSION in line
 
 # How to release Red Hat certified bundles
 
@@ -28,38 +53,3 @@ spec:
     - name: system-logger
       image: registry.connect.redhat.com/datastax/system-logger@sha256:33e75d0c78a277cdc37be24f2b116cade0d9b7dc7249610cdf9bf0705c8a040e
 ```
-* Ensure the post-release and pre-release scripts are correct if you've made any changes to the structure of the project
-
-## To improve release processing
-
-This process starts in the github actions workflow dispatch. It calls the pre, release, post parts
-
-### pre-release
-
-#### scripts/pre-release-process.sh
-* Modify CHANGELOG automatically to match the tag (for unreleased)
-* Modify README to include proper installation refs (keep them also?)
-* Modify config/manager/kustomization.yaml to have proper newTag for cass-operator
-* Modify config/manager/image_config.yaml to have proper version for server-system-logger
-
-#### GHA
-* Commit changes
-
-### release-github-action
-
-* Copy the unreleased notes to Github releases
-* Add Github packages upload for docker images
-
-### post-release
-
-#### scripts/post-release-process.sh
-* Return config/manager/kustomization.yaml to :latest
-* Return config/manager/image_config.yaml to :latest
-
-#### GHA
-* Commit changes
-
-#### Manual work (for now)
-* Add also new ## unreleased after the tagging (post-release-process.sh)
-* Modify Makefile for the next VERSION in line
-

@@ -1516,3 +1516,35 @@ func TestCleanupAfterScaling(t *testing.T) {
 	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
 	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
 }
+
+func TestStripPassword(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	password := "secretPassword"
+
+	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req != nil
+			})).
+		Return(nil, fmt.Errorf(password)).
+		Once()
+
+	client := httphelper.NodeMgmtClient{
+		Client:   mockHttpClient,
+		Log:      rc.ReqLogger,
+		Protocol: "http",
+	}
+
+	pod := makeReloadTestPod()
+	pod.Status.PodIP = "1.2.3.4"
+
+	err := client.CallCreateRoleEndpoint(pod, "userNameA", password, true)
+	if err == nil {
+		assert.Fail(t, "Should have returned error")
+	}
+
+	assert.False(t, strings.Contains(err.Error(), password))
+}

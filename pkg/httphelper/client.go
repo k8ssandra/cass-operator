@@ -868,7 +868,6 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 
 	req, err := http.NewRequest(request.method, url, reqBody)
 	if err != nil {
-		client.Log.Error(err, "unable to create request for Node Management Endpoint")
 		return nil, err
 	}
 	req.Close = true
@@ -885,7 +884,6 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 
 	res, err := client.Client.Do(req)
 	if err != nil {
-		client.Log.Error(err, "unable to perform request to Node Management Endpoint")
 		return nil, err
 	}
 

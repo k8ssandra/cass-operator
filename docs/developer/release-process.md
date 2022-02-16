@@ -1,7 +1,28 @@
 # How to make a release
 
+After ensuring the release is done and integration tests work:
+
 Run the following sequence, doing the small manual steps when required (until automated). There is no need to make a release branch as we want to maintain documentation in the master also.
 Ensure the post-release and pre-release scripts are correct if you've made any changes to the structure of the project since the last release.
+
+The steps required (assuming releasing v1.10.0 and previous one was v1.9.0), doing from master (replace git commands with correct target remote names):
+
+```
+scripts/pre-release-process.sh v1.10.0 v1.9.0
+git commit -m 'Release v1.10.0'
+git tag v1.10.0
+git push upstream master
+git push upstream v1.10.0
+```
+
+```
+scripts/post-release-process.sh
+# Do post-release manual work
+git commit -m 'Post-release v1.10.0'
+git push upstream master
+```
+
+The github action will create docker images and bundles.
 
 ### pre-release
 
@@ -31,6 +52,16 @@ Ensure the post-release and pre-release scripts are correct if you've made any c
 #### Manual work (for now)
 * Add also new ## unreleased after the tagging (post-release-process.sh)
 * Modify Makefile for the next VERSION in line
+
+# How to release OperatorHub bundle
+
+Follow the process in: https://operatorhub.io/contribute
+
+The output of ``make bundle bundle-build`` should be valid if the development process was correct. Create the bundle which will be submitted in the PR with a correct version, for example for v1.10.0:
+
+``make IMG=k8ssandra/cass-operator:v1.10.0 bundle bundle-build``
+
+Add the bundle directory as the input for the PR one submits for operatorhub.io
 
 # How to release Red Hat certified bundles
 

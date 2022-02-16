@@ -39,11 +39,6 @@ jobs:
           echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
           echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
           echo "TARGET_VERSION=$(echo ${GITHUB_REF#refs/tags/} | awk '{print substr($0,2)}')" >> $GITHUB_ENV
-      - name: Update imageConfig to match release version for system-logger
-        id: imageConfig
-        shell: bash
-        run: |
-          yq eval -i '.images.system-logger = "k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}"' config/manager/image_config.yaml
       - name: Build and push
         id: docker_build_system-logger
         uses: docker/build-push-action@v2

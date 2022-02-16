@@ -280,8 +280,12 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 		method:   http.MethodPost,
 		timeout:  60 * time.Second,
 	}
-	_, err = callNodeMgmtEndpoint(client, request, "")
-	return err
+	if _, err = callNodeMgmtEndpoint(client, request, ""); err != nil {
+		// The error could include a password, strip it
+		strippedErrMsg := strings.ReplaceAll(err.Error(), password, "******")
+		return fmt.Errorf(strippedErrMsg)
+	}
+	return nil
 }
 
 func (client *NodeMgmtClient) CallProbeClusterEndpoint(pod *corev1.Pod, consistencyLevel string, rfPerDc int) error {
@@ -864,7 +868,6 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 
 	req, err := http.NewRequest(request.method, url, reqBody)
 	if err != nil {
-		client.Log.Error(err, "unable to create request for Node Management Endpoint")
 		return nil, err
 	}
 	req.Close = true
@@ -881,7 +884,6 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 
 	res, err := client.Client.Do(req)
 	if err != nil {
-		client.Log.Error(err, "unable to perform request to Node Management Endpoint")
 		return nil, err
 	}
 

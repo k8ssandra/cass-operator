@@ -280,8 +280,12 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 		method:   http.MethodPost,
 		timeout:  60 * time.Second,
 	}
-	_, err = callNodeMgmtEndpoint(client, request, "")
-	return err
+	if _, err = callNodeMgmtEndpoint(client, request, ""); err != nil {
+		// The error could include a password, strip it
+		strippedErrMsg := strings.ReplaceAll(err.Error(), password, "******")
+		return fmt.Errorf(strippedErrMsg)
+	}
+	return nil
 }
 
 func (client *NodeMgmtClient) CallProbeClusterEndpoint(pod *corev1.Pod, consistencyLevel string, rfPerDc int) error {

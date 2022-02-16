@@ -1,5 +1,6 @@
 #!/bin/sh
 IMG=k8ssandra/cass-operator:latest
+KUSTOMIZE=$(pwd)/bin/kustomize
 
 # Add new ## unreleased after the tagging (post-release-process.sh)
 # Modify Makefile for the next VERSION in line

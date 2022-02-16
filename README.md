@@ -63,10 +63,10 @@ kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus?ref=v1.9.0
 
 ### Install cert-manager
 
-We have tested the cass-operator to work with cert-manager versions 1.3.1 and 1.5.3. Other versions might work also. To install 1.5.3 to your cluster, run the following command:
+We have tested the cass-operator to work with cert-manager versions 1.3.1, 1.5.3 and 1.7.1. Other versions might work also. To install 1.7.1 to your cluster, run the following command:
 
 ```console
-kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.5.3/cert-manager.yaml
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.7.1/cert-manager.yaml
 ```
 
 #### Modifying the Kustomize template
@@ -84,10 +84,6 @@ resources:
 
 components:
   - github.com/k8ssandra/cass-operator/config/components/cluster?ref=v1.9.0
-
-images:
-- name: k8ssandra/cass-operator
-  newTag: v1.9.0
 ```
 
 We provide both components to modify the installation as well as some additional resources for custom features. At the moment, you can modify the behavior of the installation in the following ways, or remove a component to

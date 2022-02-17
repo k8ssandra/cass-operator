@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.10.0
 * [CHANGE] [#271](https://github.com/k8ssandra/cass-operator/pull/271) Admission webhook's FailPolicy is set to Fail instead of Ignored
 * [FEATURE] [#243](https://github.com/k8ssandra/cass-operator/pull/243) Task scheduler support to allow creating tasks that run for each pod in the cluster. The tasks have their own reconciliation process and lifecycle distinct from CassandraDatacenter as well as their own API package.

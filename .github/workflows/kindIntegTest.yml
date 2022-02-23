@@ -53,115 +53,222 @@ jobs:
         with:
           name: system-logger
           path: /tmp/k8ssandra-system-logger.tar
-  kind_integration_tests:
+  # kind_integration_tests:
+  #   needs: build_docker_images
+  #   strategy:
+  #     matrix:
+  #       integration_test:
+  #       # Single worker tests:
+  #       - additional_serviceoptions
+  #       - additional_volumes
+  #       - delete_node_terminated_container
+  #       - podspec_simple
+  #       # - smoke_test_oss # See next job
+  #       - smoke_test_dse
+  #       # - terminate # Completes too fast, the test doesn't catch it
+  #       - timeout_prestop_termination
+  #       - upgrade_operator
+  #       - webhook_validation
+  #       # Three worker tests:
+  #       - canary_upgrade
+  #       - config_change_condition
+  #       # - delete_node_lost_readiness # DSE specific behavior
+  #       - host_network
+  #       - internode-encryption-generated
+  #       #- no_infinite_reconcile # smoke_test_* should take care of this
+  #       - node_replace
+  #       - nodeport_service
+  #       - rolling_restart
+  #       - stop_resume
+  #       - superuser-secret-generated
+  #       - superuser-secret-provided
+  #       - test_bad_config_and_fix
+  #       - test_mtls_mgmt_api
+  #       # More than 3 workers tests:
+  #       - add_racks
+  #       - additional_seeds
+  #       - cluster_wide_install
+  #       - config_change
+  #       - config_secret
+  #       - multi_cluster_management
+  #       - oss_test_all_the_things
+  #       - scale_down
+  #       # - scale_down_not_enough_space # Not enough stable test
+  #       - scale_down_unbalanced_racks
+  #       - scale_up
+  #       - scale_up_stop_resume
+  #       - seed_selection
+  #       - config_fql
+  #       - decommission_dc
+  #       # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
+  #     # let other tests continue to run
+  #     # even if one fails
+  #     fail-fast: false
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     # GOPATH: /home/runner/go
+  #     # GOROOT: /usr/local/go1.16
+  #     CGO_ENABLED: 0
+  #     M_INTEG_DIR: ${{ matrix.integration_test }}
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #       if: github.event_name == 'pull_request'
+  #       with:
+  #         ref: ${{ github.event.pull_request.head.sha }}
+  #     - uses: actions/checkout@v2
+  #       if: github.event_name != 'pull_request'
+  #     - uses: ./.github/actions/run-integ-test
+  #       with:
+  #         integration_test: ${{ matrix.integration_test }}
+  #     - name: Archive k8s logs
+  #       if: ${{ failure() }}
+  #       uses: actions/upload-artifact@v2
+  #       with:
+  #         name: k8s-logs-${{ matrix.integration_test }}
+  #         path: ./build/kubectl_dump
+  # kind_smoke_tests:
+  #   needs: build_docker_images
+  #   strategy:
+  #     matrix:
+  #       version:
+  #       - "3.11.7"
+  #       - "3.11.11"
+  #       - "4.0.0"
+  #       - "4.0.3"
+  #       include:
+  #         - version: 3.11.7
+  #           serverImage: k8ssandra/cass-management-api:3.11.7-v0.1.24 # k8ssandra 1.1
+  #         - version: 4.0.0
+  #           serverImage: k8ssandra/cass-management-api:4.0.0-v0.1.28 # k8ssandra 1.3
+  #     fail-fast: true
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     # GOPATH: /home/runner/go
+  #     # GOROOT: /usr/local/go1.16
+  #     CGO_ENABLED: 0
+  #     M_INTEG_DIR: smoke_test_oss
+  #     M_SERVER_VERSION: ${{ matrix.version }}
+  #     M_SERVER_IMAGE: ${{ matrix.serverImage }}
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #       if: github.event_name == 'pull_request'
+  #       with:
+  #         ref: ${{ github.event.pull_request.head.sha }}
+  #     - uses: actions/checkout@v2
+  #       if: github.event_name != 'pull_request'
+  #     - uses: ./.github/actions/run-integ-test
+  #       with:
+  #         integration_test: smoke_test_oss
+  #     - name: Archive k8s logs
+  #       if: ${{ failure() }}
+  #       uses: actions/upload-artifact@v2
+  #       with:
+  #         name: k8s-logs-smoke_test_oss-${{ matrix.version }}-${{ matrix.serverImage }}
+  #         path: ./build/kubectl_dump
+  olm_smoke_test:
     needs: build_docker_images
-    strategy:
-      matrix:
-        integration_test:
-        # Single worker tests:
-        - additional_serviceoptions
-        - additional_volumes
-        - delete_node_terminated_container
-        - podspec_simple
-        # - smoke_test_oss # See next job
-        - smoke_test_dse
-        # - terminate # Completes too fast, the test doesn't catch it
-        - timeout_prestop_termination
-        - upgrade_operator
-        - webhook_validation
-        # Three worker tests:
-        - canary_upgrade
-        - config_change_condition
-        # - delete_node_lost_readiness # DSE specific behavior
-        - host_network
-        - internode-encryption-generated
-        #- no_infinite_reconcile # smoke_test_* should take care of this
-        - node_replace
-        - nodeport_service
-        - rolling_restart
-        - stop_resume
-        - superuser-secret-generated
-        - superuser-secret-provided
-        - test_bad_config_and_fix
-        - test_mtls_mgmt_api
-        # More than 3 workers tests:
-        - add_racks
-        - additional_seeds
-        - cluster_wide_install
-        - config_change
-        - config_secret
-        - multi_cluster_management
-        - oss_test_all_the_things
-        - scale_down
-        # - scale_down_not_enough_space # Not enough stable test
-        - scale_down_unbalanced_racks
-        - scale_up
-        - scale_up_stop_resume
-        - seed_selection
-        - config_fql
-        - decommission_dc
-        # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
-      # let other tests continue to run
-      # even if one fails
-      fail-fast: false
     runs-on: ubuntu-latest
     env:
-      # GOPATH: /home/runner/go
-      # GOROOT: /usr/local/go1.16
       CGO_ENABLED: 0
-      M_INTEG_DIR: ${{ matrix.integration_test }}
     steps:
-      - uses: actions/checkout@v2
-        if: github.event_name == 'pull_request'
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v2
-        if: github.event_name != 'pull_request'
-      - uses: ./.github/actions/run-integ-test
-        with:
-          integration_test: ${{ matrix.integration_test }}
-      - name: Archive k8s logs
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v2
-        with:
-          name: k8s-logs-${{ matrix.integration_test }}
-          path: ./build/kubectl_dump
-  kind_smoke_tests:
-    needs: build_docker_images
-    strategy:
-      matrix:
-        version:
-        - "3.11.7"
-        - "3.11.11"
-        - "4.0.0"
-        - "4.0.1"
-        include:
-          - version: 3.11.7
-            serverImage: k8ssandra/cass-management-api:3.11.7-v0.1.24 # k8ssandra 1.1
-          - version: 4.0.0
-            serverImage: k8ssandra/cass-management-api:4.0.0-v0.1.28 # k8ssandra 1.3
-      fail-fast: true
-    runs-on: ubuntu-latest
-    env:
-      # GOPATH: /home/runner/go
-      # GOROOT: /usr/local/go1.16
-      CGO_ENABLED: 0
-      M_INTEG_DIR: smoke_test_oss
-      M_SERVER_VERSION: ${{ matrix.version }}
-      M_SERVER_IMAGE: ${{ matrix.serverImage }}
-    steps:
-      - uses: actions/checkout@v2
-        if: github.event_name == 'pull_request'
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v2
-        if: github.event_name != 'pull_request'
-      - uses: ./.github/actions/run-integ-test
-        with:
-          integration_test: smoke_test_oss
-      - name: Archive k8s logs
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v2
-        with:
-          name: k8s-logs-smoke_test_oss-${{ matrix.version }}-${{ matrix.serverImage }}
-          path: ./build/kubectl_dump
+    - name: Free diskspace by removing unused packages
+      shell: bash
+      run: |
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /usr/share/dotnet
+    - uses: actions/checkout@v2
+      if: github.event_name == 'pull_request'
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+    - uses: actions/checkout@v2
+      if: github.event_name != 'pull_request'
+    - name: Set up Go 1.16
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.16
+    - uses: actions/cache@v2
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    - name: Cache Docker layers
+      uses: actions/cache@v2
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-integ-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-integ-
+    # - name: Create Kind Cluster
+    #   shell: bash
+    #   run: |
+    #     .github/scripts/cluster.sh
+      # uses: helm/kind-action@v1.1.0
+      # with:
+      #   version: v0.11.1
+      #   node_image: kindest/node:v1.21.2
+      #   cluster_name: kind
+      #   config: tests/testdata/kind/kind_config_6_workers.yaml
+    # - name: Download cass-operator image
+    #   uses: actions/download-artifact@v2
+    #   with:
+    #     name: cass-operator
+    #     path: /tmp
+    # - name: Download system-logger image
+    #   uses: actions/download-artifact@v2
+    #   with:
+    #     name: system-logger
+    #     path: /tmp
+    # - name: Load Docker images
+    #   shell: bash
+    #   run: |
+    #     docker load --input /tmp/k8ssandra-cass-operator.tar
+    #     docker load --input /tmp/k8ssandra-system-logger.tar
+    # - name: Load image on the nodes of the cluster
+    #   shell: bash
+    #   run: |
+    #     kind load docker-image --name=kind k8ssandra/cass-operator:latest
+    #     kind load docker-image --name=kind k8ssandra/system-logger:latest
+    - name: Install operator-sdk
+      shell: bash
+      run: |
+        make operator-sdk kustomize
+        bin/operator-sdk version
+    # - name: Install OLM to the cluster
+    #   shell: bash
+    #   run: |
+    #     bin/operator-sdk olm install
+    # - name: Install operator-bundle v1.10.0 from local registry
+    #   shell: bash
+    #   run: |
+    #     bin/operator-sdk run bundle --timeout 10m docker.io/k8ssandra/cass-operator-bundle:v1.10.0
+    # - name: Set git parsed values
+    #   id: vars
+    #   run: |
+    #     echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
+    # - name: Login to GitHub Container Registry
+    #   uses: docker/login-action@v1
+    #   with:
+    #     registry: ghcr.io
+    #     username: ${{ github.actor }}
+    #     password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build the bundle
+      shell: bash
+      run: |
+        make VERSION=1.10.1 bundle bundle-build
+    # - name: Upgrade operator on the cluster to the latest bundle
+    #   shell: bash
+    #   run: |
+    #     bin/operator-sdk run bundle-upgrade --timeout 10m ghcr.io/${{ github.repository_owner }}/cass-operator-bundle:${{ steps.vars.outputs.sha_short }}
+    # - name: Ensure cleanup works
+    #   shell: bash
+    #   run: |
+    #     bin/operator-sdk cleanup cass-operator
+    - name: Run community-operators kiwi tests
+      uses:  operator-framework/community-operators@v1
+      with:
+        test-type: 'kiwi'
+        stream: 'upstream-community-operators'
+        name: 'cass-operator-community'
+        version: '1.10.1'
+        operator-version-path: bundle

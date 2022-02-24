@@ -35,7 +35,7 @@ type ImageConfig struct {
 
 	DefaultImages *DefaultImages `json:"defaults,omitempty"`
 
-	ImageRegistry string `json:"imageRegistryOverride,omitempty"`
+	ImageRegistry string `json:"imageRegistry,omitempty"`
 
 	ImagePullSecret corev1.LocalObjectReference `json:"imagePullSecret,omitempty"`
 

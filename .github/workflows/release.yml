@@ -41,14 +41,14 @@ jobs:
           echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
           echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
           echo "TARGET_VERSION=$(echo ${GITHUB_REF#refs/tags/} | awk '{print substr($0,2)}')" >> $GITHUB_ENV
-      - name: Set git parsed values for act
-        if: ${{ env.ACT }}
-        id: vars
-        shell: bash
-        run: |
-          echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
-          echo ::set-output name=tag_name::$(git describe --abbrev=0 --tags)
-          echo "TARGET_VERSION=$(echo $(git describe --abbrev=0 --tags) | awk '{print substr($0,2)}')" >> $GITHUB_ENV
+      # - name: Set git parsed values for act
+      #   if: ${{ env.ACT }}
+      #   id: vars
+      #   shell: bash
+      #   run: |
+      #     echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
+      #     echo ::set-output name=tag_name::$(git describe --abbrev=0 --tags)
+      #     echo "TARGET_VERSION=$(echo $(git describe --abbrev=0 --tags) | awk '{print substr($0,2)}')" >> $GITHUB_ENV
       - name: Build and push
         id: docker_build_system-logger
         uses: docker/build-push-action@v2

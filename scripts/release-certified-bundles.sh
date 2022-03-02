@@ -14,7 +14,7 @@ TARGET_DIRS=(certified-operators)
 SYSTEM_LOGGER_SHA=sha256:33e75d0c78a277cdc37be24f2b116cade0d9b7dc7249610cdf9bf0705c8a040e
 
 # Checkout tag
-# git checkout v$VERSION
+git checkout v$VERSION
 
 yq -i '.images.system-logger = "registry.connect.redhat.com/datastax/system-logger@"' config/manager/image_config.yaml
 SYSTEM_LOGGER_SHA=$SYSTEM_LOGGER_SHA yq -i '.images.system-logger += env(SYSTEM_LOGGER_SHA)' config/manager/image_config.yaml

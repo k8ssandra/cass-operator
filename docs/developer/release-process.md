@@ -91,3 +91,5 @@ Copy the SHA256 of the published image and run the following script:
 ```
 scripts/release-certified-bundles.sh 1.10.1 sha256:ae709b680dde2aa43c92d6b331af0554c9af92aa9fad673454892ca2b40bd3f7
 ```
+
+When sending the PR, the PR must have title structured: ``operator cass-operator (v$VERSION)``, such as ``operator cass-operator (v1.10.1)``

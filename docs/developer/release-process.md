@@ -55,32 +55,39 @@ The github action will create docker images and bundles.
 
 # How to release OperatorHub bundle
 
-Follow the process in: https://operatorhub.io/contribute
+OperatorHub has been split to two different community parts, one appearing for Kubernetes OLM installations and one for Openshift's integrated OperatorHub instance. We need to publish to both.
+It happens by creating a PR to two different repositories:
 
-The output of ``make bundle bundle-build`` should be valid if the development process was correct. Create the bundle which will be submitted in the PR with a correct version, for example for v1.10.0:
+https://github.com/redhat-openshift-ecosystem/community-operators-prod
+https://github.com/k8s-operatorhub/community-operators
 
-``make IMG=k8ssandra/cass-operator:v1.10.0 bundle bundle-build``
+A script has been created which will create the necessary packages, branch and a commit. The prerequisite is that those two must be checked out to same level directory as cass-operator so that they
+can be accessed with ``../community-operators/`` and ``../community-operators-prod``. Only users in the ``cass-operator-community/ci.yaml`` in those repository can submit updates. The commits
+must be signed, thus ensure your git properties are correctly set.
 
-Add the bundle directory as the input for the PR one submits for operatorhub.io
+The script is run by first checking out the correct tag in the ``cass-operator`` repository and then running:
+
+``scripts/release-community-olm.sh version`` 
+
+where ``version`` is without ``v``-prefix, for example ``1.11.0``. You need to manually push the created branch ``cass-operator-$VERSION`` and make a PR, the script will not do that part.
 
 # How to release Red Hat certified bundles
 
-* Upload images to the Red Hat using the connect.redhat.com
-  * If the images are built using ubi8-micro, you need to make a support ticket to ask them for a waiver since their validation process is broken
-  * Include oisp, project_id, sha256 of the image etc.
-  * Proceed only after you've received OK from them
-* Create bundle with the new SHA256 image: (make VERSION=1.9.0 IMG=registry.connect.redhat.com/datastax/cass-operator@sha256:f14b6b217ecf4f6b3dc1b43210ed51d6be56d70e5bbc5444861df73934631d3c bundle)
-* Modify bundle's imageConfig to use the SHA256 image of system-logger
-* Verify CSV's metadata.name to be cass-operator.v<version>
-* Ensure yamllint passes
-  * Line changes are not validated by RH, and also some indentation mistakes are fine (array indentation starts from same pos is fine)
-* Verify version is set correctly (and not v1.9.0-dev.ac96a72-20220209 etc)
-* Add spec/relatedImages to CSV
+* Upload images to the Red Hat using the connect.redhat.com portal
+* Select container images and "push manually" for instructions. Upload cass-operator and system-logger if you wish to update that one also (if there are no changes, then no need to)
+* If the images are built using ubi8-micro, you need to make a support ticket to ask them for a waiver since their validation process is broken. This happens after the upload is done and the
+  only failure is rpm_list
+* Include oisp, project_id, sha256 of the image to the ticket
+* Proceed only after you've received OK from them (the state on the portal changes to "Passed")
+* Publish the container image from the portal
+* If the system-logger image was updated, modify ``scripts/release-certified-bundles.sh`` with the new SHA256  
+
+Checkout certified-operators (and if required, certified-operators-marketplace) to a directory at the same level as cass-operator. 
+
+Copy the SHA256 of the published image and run the following script:
+
+``scripts/release-certified-bundles.sh version sha256:<sha256>``, version without ``v`` prefix and sha256 with the ``sha256:`` prefix (the copy button on the portal puts it automatically). For example:
+
 ```
-spec:
-  relatedImages:
-    - name: cass-operator
-      image: registry.connect.redhat.com/datastax/cass-operator@sha256:f14b6b217ecf4f6b3dc1b43210ed51d6be56d70e5bbc5444861df73934631d3c
-    - name: system-logger
-      image: registry.connect.redhat.com/datastax/system-logger@sha256:33e75d0c78a277cdc37be24f2b116cade0d9b7dc7249610cdf9bf0705c8a040e
+scripts/release-certified-bundles.sh 1.10.1 sha256:ae709b680dde2aa43c92d6b331af0554c9af92aa9fad673454892ca2b40bd3f7
 ```

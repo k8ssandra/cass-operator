@@ -31,13 +31,13 @@ SYSTEM_LOGGER_SHA=$SYSTEM_LOGGER_SHA yq -i '.spec.relatedImages[1].image += env(
 
 for dir in "${TARGET_DIRS[@]}"
 do
-    TARGET_DIR=../$dir/operators/cass-operator/$VERSION
+    TARGET_DIR=../$dir/operators/cass-operator/v$VERSION
     mkdir $TARGET_DIR
     cp -R bundle/* $TARGET_DIR
 
     cd $TARGET_DIR
     git checkout -b cass-operator-$VERSION main
     git add .
-    git commit -s -am "cass-operator v${VERSION}"
+    git commit -s -am "operator cass-operator (v${VERSION})"
     cd -
 done

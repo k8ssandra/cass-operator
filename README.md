@@ -18,13 +18,13 @@ Default installation is simple, the kubectl will create a namespace ``cass-opera
 Default install requires cert-manager to be installed, since webhooks require TLS certificates to be injected. See below how to install cert-manager if your environment does not have it installed previously.
 
 ```console
-kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.10.0
+kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.10.1
 ```
 
 If you wish to install it with cluster wide rights to monitor all the namespaces for ``CassandraDatacenter`` objects, use the following command:
 
 ```console
-kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/cluster?ref=v1.10.0
+kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/cluster?ref=v1.10.1
 ```
 
 Alternatively, if you checkout the code, you can use ``make deploy`` to run [Kustomize](https://kustomize.io/) and deploy the files.
@@ -58,7 +58,7 @@ You can now install new version of cass-operator as instructed previously.
 If you have Prometheus installed in your cluster, you can apply the following command to install the Prometheus support:
 
 ```console
-kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus?ref=v1.10.0
+kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus?ref=v1.10.1
 ```
 
 ### Install cert-manager
@@ -80,10 +80,10 @@ kind: Kustomization
 namespace: cass-operator
 
 resources:
-  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.10.0
+  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.10.1
 
 components:
-  - github.com/k8ssandra/cass-operator/config/components/cluster?ref=v1.10.0
+  - github.com/k8ssandra/cass-operator/config/components/cluster?ref=v1.10.1
 ```
 
 We provide both components to modify the installation as well as some additional resources for custom features. At the moment, you can modify the behavior of the installation in the following ways, or remove a component to
@@ -124,7 +124,7 @@ reclaimPolicy: Delete
 Paste the above to a file and apply:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.10.0/operator/k8s-flavors/gke/storage.yaml
+kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.10.1/operator/k8s-flavors/gke/storage.yaml
 ```
 
 ### Creating a CassandraDatacenter

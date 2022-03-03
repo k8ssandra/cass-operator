@@ -12,6 +12,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#264](https://github.com/k8ssandra/cass-operator/issues/264) Generate PodTemplateSpec in CassandraDatacenter with metadata
+
+## v1.10.1
+
 * [BUGFIX] [#278](https://github.com/k8ssandra/cass-operator/issues/278) ImageRegistry json key was incorrect in the definition type. Fixed from "imageRegistryOverride" to "imageRegistry"
 
 ## v1.10.0

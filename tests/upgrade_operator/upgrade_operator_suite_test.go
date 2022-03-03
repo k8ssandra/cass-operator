@@ -108,6 +108,11 @@ var _ = Describe(testName, func() {
 
 			ns.ExpectDoneReconciling(dcName)
 
+			// Verify PodDisruptionBudget is available (1.11 updates from v1beta1 -> v1)
+			json = "jsonpath={.items[].metadata.name}"
+			k = kubectl.Get("poddisruptionbudgets").WithLabel("cassandra.datastax.com/datacenter").FormatOutput(json)
+			ns.WaitForOutputContains(k, "dc1-pdb", 20)
+
 			// Update Cassandra version to ensure we can still do changes
 			step = "perform cassandra upgrade"
 			json = "{\"spec\": {\"serverVersion\": \"3.11.11\"}}"

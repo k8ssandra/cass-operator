@@ -10,26 +10,26 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Create a PodDisruptionBudget object for the Datacenter
-func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1beta1.PodDisruptionBudget {
+func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(int(dc.Spec.Size - 1))
 	labels := dc.GetDatacenterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
 	selectorLabels := dc.GetDatacenterLabels()
-	pdb := &policyv1beta1.PodDisruptionBudget{
+	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        dc.Name + "-pdb",
 			Namespace:   dc.Namespace,
 			Labels:      labels,
 			Annotations: map[string]string{},
 		},
-		Spec: policyv1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: selectorLabels,
 			},

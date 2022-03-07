@@ -56,7 +56,7 @@ IMG_LATEST ?= $(IMAGE_TAG_BASE):latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:generateEmbeddedObjectMeta=true"
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.22
+ENVTEST_K8S_VERSION = 1.23
 
 # Logger image
 LOG_IMG_BASE ?= $(ORG)/system-logger
@@ -188,7 +188,7 @@ cert-manager: ## Install cert-manager to the cluster
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0)
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
@@ -208,7 +208,7 @@ ifeq (,$(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPSDK)) ;\
-	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.17.0/operator-sdk_${OS}_${ARCH} ;\
+	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.18.0/operator-sdk_${OS}_${ARCH} ;\
 	chmod +x $(OPSDK) ;\
 	}
 else
@@ -236,7 +236,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/manifests | $(OPSDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	scripts/postprocess-bundle.sh
-	$(OPSDK) bundle validate ./bundle
+	$(OPSDK) bundle validate ./bundle --select-optional suite=operatorframework
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.

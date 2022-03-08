@@ -155,14 +155,14 @@ docker-logger-kind: docker-logger-build ## Build system-logger image and load to
 ##@ Deployment
 
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply --server-side -f -
+	$(KUSTOMIZE) build config/crd | kubectl apply --force-conflicts --server-side -f -
 
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/deployments/default | kubectl apply --server-side -f -
+	$(KUSTOMIZE) build config/deployments/default | kubectl apply --force-conflicts --server-side -f -
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/deployments/default | kubectl delete -f -
@@ -171,7 +171,7 @@ deploy-test:
 ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
-	$(KUSTOMIZE) build tests/$(TEST_DIR) | kubectl apply --server-side -f -
+	$(KUSTOMIZE) build tests/$(TEST_DIR) | kubectl apply --force-conflicts --server-side -f -
 
 undeploy-test:
 ifneq ($(strip $(NAMESPACE)),)

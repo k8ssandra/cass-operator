@@ -11,7 +11,7 @@ VERSION=$1
 TARGET_DIRS=(community-operators community-operators-prod)
 
 # Checkout tag
-# git checkout v$VERSION
+git checkout v$VERSION
 
 # Create bundle
 make VERSION=$VERSION bundle

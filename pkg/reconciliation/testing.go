@@ -9,7 +9,7 @@ package reconciliation
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -118,7 +118,7 @@ func CreateMockReconciliationContext(
 
 	res := &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(strings.NewReader("OK")),
+		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
 
 	mockHttpClient := &mocks.HttpClient{}

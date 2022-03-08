@@ -5,7 +5,7 @@ package images
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
 
@@ -35,7 +35,7 @@ func init() {
 
 func ParseImageConfig(imageConfigFile string) error {
 	// Mostly from controller-runtime, modified here to avoid needing ControllerManagerConfigurationSpec in the ImageConfig
-	content, err := ioutil.ReadFile(imageConfigFile)
+	content, err := os.ReadFile(imageConfigFile)
 	if err != nil {
 		return fmt.Errorf("could not read file at %s", imageConfigFile)
 	}

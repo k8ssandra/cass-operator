@@ -5,7 +5,6 @@ package smoke_test_oss
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,7 +36,7 @@ func TestLifecycle(t *testing.T) {
 func createTestFile(cassandraVersion, serverImage string) (string, error) {
 	var data map[interface{}]interface{}
 
-	d, err := ioutil.ReadFile(dcYaml)
+	d, err := os.ReadFile(dcYaml)
 	if err != nil {
 		return "", err
 	}
@@ -70,7 +69,7 @@ func createTestFile(cassandraVersion, serverImage string) (string, error) {
 		return "", err
 	}
 
-	if err = ioutil.WriteFile(testFilename, updated, os.ModePerm); err != nil {
+	if err = os.WriteFile(testFilename, updated, os.ModePerm); err != nil {
 		return "", err
 	}
 

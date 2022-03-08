@@ -5,7 +5,7 @@ package reconciliation
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -36,7 +36,7 @@ func TestRetryDecommissionNode(t *testing.T) {
 	})
 	res := &http.Response{
 		StatusCode: http.StatusBadRequest,
-		Body:       ioutil.NopCloser(strings.NewReader("OK")),
+		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
 	mockHttpClient := &mocks.HttpClient{}
 	mockHttpClient.On("Do",
@@ -49,7 +49,7 @@ func TestRetryDecommissionNode(t *testing.T) {
 
 	resFeatureSet := &http.Response{
 		StatusCode: http.StatusNotFound,
-		Body:       ioutil.NopCloser(strings.NewReader("")),
+		Body:       io.NopCloser(strings.NewReader("")),
 	}
 
 	mockHttpClient.On("Do",

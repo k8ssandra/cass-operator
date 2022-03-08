@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -894,7 +893,7 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 		}
 	}()
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		client.Log.Error(err, "Unable to read response from Node Management Endpoint")
 		return nil, err

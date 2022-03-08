@@ -6,7 +6,7 @@ package reconciliation
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -1389,7 +1389,7 @@ func Test_callPodEndpoint(t *testing.T) {
 
 	res := &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(strings.NewReader("OK")),
+		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
 
 	mockHttpClient := &mocks.HttpClient{}
@@ -1421,7 +1421,7 @@ func Test_callPodEndpoint_BadStatus(t *testing.T) {
 
 	res := &http.Response{
 		StatusCode: http.StatusBadRequest,
-		Body:       ioutil.NopCloser(strings.NewReader("OK")),
+		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
 
 	mockHttpClient := &mocks.HttpClient{}
@@ -1452,7 +1452,7 @@ func Test_callPodEndpoint_RequestFail(t *testing.T) {
 
 	res := &http.Response{
 		StatusCode: http.StatusInternalServerError,
-		Body:       ioutil.NopCloser(strings.NewReader("OK")),
+		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
 
 	mockHttpClient := &mocks.HttpClient{}

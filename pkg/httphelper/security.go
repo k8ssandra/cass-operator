@@ -299,23 +299,23 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 	// Update Liveness probe to account for mutual auth (can't just use HTTP probe now)
 	if container.LivenessProbe == nil {
 		container.LivenessProbe = &corev1.Probe{
-			Handler: corev1.Handler{},
+			ProbeHandler: corev1.ProbeHandler{},
 		}
 	}
-	container.LivenessProbe.Handler.HTTPGet = nil
-	container.LivenessProbe.Handler.TCPSocket = nil
-	container.LivenessProbe.Handler.Exec = provider.BuildMgmtApiWgetAction(livenessEndpoint)
+	container.LivenessProbe.ProbeHandler.HTTPGet = nil
+	container.LivenessProbe.ProbeHandler.TCPSocket = nil
+	container.LivenessProbe.ProbeHandler.Exec = provider.BuildMgmtApiWgetAction(livenessEndpoint)
 
 	// Update Readiness probe to account for mutual auth (can't just use HTTP probe now)
 	// TODO: Get endpoint from configured HTTPGet probe
 	if container.ReadinessProbe == nil {
 		container.ReadinessProbe = &corev1.Probe{
-			Handler: corev1.Handler{},
+			ProbeHandler: corev1.ProbeHandler{},
 		}
 	}
-	container.ReadinessProbe.Handler.HTTPGet = nil
-	container.ReadinessProbe.Handler.TCPSocket = nil
-	container.ReadinessProbe.Handler.Exec = provider.BuildMgmtApiWgetAction(readinessEndpoint)
+	container.ReadinessProbe.ProbeHandler.HTTPGet = nil
+	container.ReadinessProbe.ProbeHandler.TCPSocket = nil
+	container.ReadinessProbe.ProbeHandler.Exec = provider.BuildMgmtApiWgetAction(readinessEndpoint)
 
 	return nil
 }

@@ -7,7 +7,7 @@ and managing Cassandra or DSE in a Kubernetes cluster.
 
 ## Prerequisites
 
-1. A Kubernetes cluster. We support versions above 1.17
+1. A Kubernetes cluster. We support versions 1.21 and newer
 2. The ability to download images from Docker Hub from within the Kubernetes
    cluster. If that isn't possible, a private registry must be configured.
 

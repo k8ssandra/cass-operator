@@ -330,7 +330,7 @@ spec:
 
 ## Requirements
 
-- Kubernetes cluster, 1.17 or newer.
+- Kubernetes cluster, 1.21 or newer. For Openshift, version 4.8 or newer.
 
 ## Contributing
 

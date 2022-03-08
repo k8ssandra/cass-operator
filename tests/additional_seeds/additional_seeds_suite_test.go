@@ -214,9 +214,12 @@ func getAdditionalSeedEndpointResourceAddresses() ([]interface{}, error) {
 	// Should be addresses and then go through them in the later check
 	jsonpath := "jsonpath={.subsets[0].addresses}"
 	k := kubectl.Get(additionalSeedEndpointResource).FormatOutput(jsonpath)
-	output := ns.OutputPanic(k)
+	output, err := ns.Output(k)
+	if err != nil {
+		return nil, err
+	}
 	ips := []interface{}{}
-	err := json.Unmarshal([]byte(output), &ips)
+	err = json.Unmarshal([]byte(output), &ips)
 	return ips, err
 }
 

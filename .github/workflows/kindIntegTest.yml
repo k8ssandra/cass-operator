@@ -61,7 +61,7 @@ jobs:
         # Single worker tests:
         - additional_serviceoptions
         - additional_volumes
-        - delete_node_terminated_container
+        # - delete_node_terminated_container # This does not test any operator behavior
         - podspec_simple
         # - smoke_test_oss # See next job
         - smoke_test_dse

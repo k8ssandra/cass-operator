@@ -66,7 +66,7 @@ The following table lists the supported keys that can appear under `jvm-options`
 | `cassandra_disable_auth_caches_remote_configuration` | `-Dcassandra.disable_auth_caches_remote_configuration` | boolean | Disabled by default |
 | `survivor_ratio` | `-XX:SurvivorRatio` | integer | Defaults to `8`. Can only be used when CMS garbage collector is used. |
 | `g1r_set_updating_pause_time_percent` | `-XX:G1RSetUpdatingPauseTimePercent` | integer | Defaults to `5`. Can only be used when G1 garbage collector is used. |
-| `java_net_prefer_ipv4_stack` | `-Djava.net.preferIPv4Stack=true` | boolean | Enabeled by default |
+| `java_net_prefer_ipv4_stack` | `-Djava.net.preferIPv4Stack=true` | boolean | Enabled by default |
 | `cassandra_load_ring_state` | `-Dcassandra.load_ring_state` | boolean | Enabled by default |
 | `per_thread_stack_size` | `-Xss` | string | Defaults to `256k` |
 | `use_biased_locking` | `-XX:-UseBiasedLocking` | boolean | Disabled by default |
@@ -88,7 +88,6 @@ The following table lists the supported keys that can appear under `jvm-options`
 | `cassandra_metrics_reporter_config_file` | `-Dcassandra.metricsReporterConfigFile` | string | Disabled by default |
 | `max_tenuring_threshold` | `-XX:MaxTenuringThreshold` | integer | Defaults to `1`. Can only be used when the CMS garbage collector is used. |
 | `number_of_gc_log_files` | `-XX:NumberOfGCLogFiles` | integer | Disabled by default. Can only be used when the G1 garbage collector is used. |
-|
 | `print_gc_details` | `-XX:+PrintGCDetails` | boolean | Disabled by default |
 | `enable_assertions` | `-ea` | boolean | Enabled by default |
 | `use_thread_priorities` | `-XX:+UseThreadPriorities` | boolean | Enabled by default |
@@ -162,7 +161,7 @@ The following table lists the supported keys that can appear under `jvm-server-o
 | `resize_tlb` | `-XX:+ResizeTLAB` | boolean | Enabled by default |
 | `use_numa` | `-XX:+UseNUMA` | boolean | Enabled by default |
 | `perf_disable_shared_mem` | `-XX:+PerfDisableSharedMem` | boolean | Enabled by default |
-| `java_net_prefer_ipv4_stack` | `-Djava.net.preferIPv4Stack=true` | boolean | Enabeled by default |
+| `java_net_prefer_ipv4_stack` | `-Djava.net.preferIPv4Stack=true` | boolean | Enabled by default |
 | `page-align-direct-memory` | `-Dsun.nio.PageAlignDirectMemory=true` | boolean | Enabled by default |
 | `restrict-contended` | `-XX:-RestrictContended` | boolean | Enabled by default |
 | `guaranteed-safepoint-interval` | `-XX:GuaranteedSafepointInterval` | string | Defaults to `300000` |

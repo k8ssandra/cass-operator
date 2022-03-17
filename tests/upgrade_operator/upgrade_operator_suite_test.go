@@ -118,7 +118,8 @@ var _ = Describe(testName, func() {
 			// Verify PodDisruptionBudget is available (1.11 updates from v1beta1 -> v1)
 			json = "jsonpath={.items[].metadata.name}"
 			k = kubectl.Get("poddisruptionbudgets").WithLabel("cassandra.datastax.com/datacenter").FormatOutput(json)
-			ns.WaitForOutputContains(k, "dc1-pdb", 20)
+			err = ns.WaitForOutputContains(k, "dc1-pdb", 20)
+			Expect(err).ToNot(HaveOccurred())
 
 			// Update Cassandra version to ensure we can still do changes
 			step = "perform cassandra upgrade"

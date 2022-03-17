@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -85,5 +84,5 @@ func Test_GetJKS(t *testing.T) {
 		_ = os.Remove("test-jks")
 	}()
 
-	ioutil.WriteFile("test-jks", jks, 0644)
+	os.WriteFile("test-jks", jks, 0644)
 }

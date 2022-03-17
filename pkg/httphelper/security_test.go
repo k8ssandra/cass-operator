@@ -6,7 +6,7 @@ package httphelper
 import (
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -15,7 +15,7 @@ import (
 
 func helperLoadBytes(t *testing.T, name string) []byte {
 	path := filepath.Join("testdata", name)
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}

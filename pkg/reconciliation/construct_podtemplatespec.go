@@ -105,7 +105,7 @@ func selectorFromFieldPath(fieldPath string) *corev1.EnvVarSource {
 
 func probe(port int, path string, initDelay int, period int) *corev1.Probe {
 	return &corev1.Probe{
-		Handler: corev1.Handler{
+		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Port: intstr.FromInt(port),
 				Path: path,
@@ -439,7 +439,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		if err != nil {
 			return err
 		}
-		cassContainer.Lifecycle.PreStop = &corev1.Handler{
+		cassContainer.Lifecycle.PreStop = &corev1.LifecycleHandler{
 			Exec: action,
 		}
 	}

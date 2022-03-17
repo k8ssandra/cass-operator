@@ -17,14 +17,13 @@ import (
 )
 
 var (
-	testName        = "Upgrade Operator"
-	namespace       = "test-upgrade-operator"
-	oldOperatorYaml = "../testdata/cass-operator-1.7.1-manifests.yaml"
-	dcName          = "dc1"
-	dcYaml          = "../testdata/operator-1.7.1-oss-dc.yaml"
-	dcResource      = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel         = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns              = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "Upgrade Operator"
+	namespace  = "test-upgrade-operator"
+	dcName     = "dc1"
+	dcYaml     = "../testdata/operator-1.7.1-oss-dc.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -41,32 +40,20 @@ func TestLifecycle(t *testing.T) {
 
 // InstallOldOperator installs the oldest supported upgrade path (this is the first k8ssandra/cass-operator release)
 func InstallOldOperator() {
-	step := "install cass-operator 1.7.1"
+	step := "install cass-operator 1.8.0"
 	By(step)
 
 	// kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.1/docs/user/cass-operator-manifests.yaml
-	k := kubectl.ApplyFiles(oldOperatorYaml)
-	ns.ExecAndLog(step, k)
+	// kubectl apply -k "github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.8.0"
+	err := kustomize.DeployDir(namespace, "upgrade_operator")
+	Expect(err).ToNot(HaveOccurred())
 }
 
 func UpgradeOperator() {
 	step := "upgrade Cass Operator"
 	By(step)
 
-	// Update steps needed for 1.7.1
-	// kubectl -n cass-operator delete deployment.apps/cass-operator
-	// kubectl -n cass-operator delete service/cassandradatacenter-webhook-service
-	// kubectl patch crd/cassandradatacenters.cassandra.datastax.com -p '{"spec":{"preserveUnknownFields":false}}'
-	k := kubectl.Delete("deployment.apps/cass-operator")
-	ns.ExecAndLog(step, k)
-
-	k = kubectl.Delete("service/cassandradatacenter-webhook-service")
-	ns.ExecAndLog(step, k)
-
-	k = kubectl.Patch("crd/cassandradatacenters.cassandra.datastax.com", `{"spec":{"preserveUnknownFields":false}}`)
-	ns.ExecAndLog(step, k)
-
-	// Then install as usual.
+	// Install as usual.
 	err := kustomize.Deploy(namespace)
 	Expect(err).ToNot(HaveOccurred())
 }
@@ -88,14 +75,14 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReady(dcName)
 
-			step = "get name of 1.7.1 operator pod"
+			step = "get name of 1.8.0 operator pod"
 			json := "jsonpath={.items[].metadata.name}"
 			k = kubectl.Get("pods").WithFlag("selector", "name=cass-operator").FormatOutput(json)
 			oldOperatorName := ns.OutputAndLog(step, k)
 
 			UpgradeOperator()
 
-			step = "wait for 1.7.1 operator pod to be removed"
+			step = "wait for 1.8.0 operator pod to be removed"
 			k = kubectl.Get("pods").WithFlag("field-selector", fmt.Sprintf("metadata.name=%s", oldOperatorName))
 			ns.WaitForOutputAndLog(step, k, "", 60)
 
@@ -115,7 +102,7 @@ var _ = Describe(testName, func() {
 
 			// Update Cassandra version to ensure we can still do changes
 			step = "perform cassandra upgrade"
-			json = "{\"spec\": {\"serverVersion\": \"3.11.11\"}}"
+			json = "{\"spec\": {\"serverVersion\": \"3.11.12\"}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 

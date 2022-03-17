@@ -2,7 +2,7 @@ package reconciliation
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -64,7 +64,7 @@ func setupPodList(rc *ReconciliationContext) {
 func mockFeaturesEnabled(mockHttpClient *mocks.HttpClient) {
 	resFeatureSet := &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(strings.NewReader(fullQueryIsSupported)),
+		Body:       io.NopCloser(strings.NewReader(fullQueryIsSupported)),
 	}
 
 	mockHttpClient.On("Do",
@@ -79,7 +79,7 @@ func mockFeaturesEnabled(mockHttpClient *mocks.HttpClient) {
 func mockFeaturesNotAvailable(mockHttpClient *mocks.HttpClient) {
 	resFeatureSet := &http.Response{
 		StatusCode: http.StatusNotFound,
-		Body:       ioutil.NopCloser(strings.NewReader("")),
+		Body:       io.NopCloser(strings.NewReader("")),
 	}
 
 	mockHttpClient.On("Do",
@@ -94,7 +94,7 @@ func mockFeaturesNotAvailable(mockHttpClient *mocks.HttpClient) {
 func mockFullQueryLoggingRequestToTrue(mockHttpClient *mocks.HttpClient) {
 	resFullQueryStatus := &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(strings.NewReader(httpResponseFullQueryEnabled)),
+		Body:       io.NopCloser(strings.NewReader(httpResponseFullQueryEnabled)),
 	}
 	mockHttpClient.On("Do",
 		mock.MatchedBy(
@@ -108,7 +108,7 @@ func mockFullQueryLoggingRequestToTrue(mockHttpClient *mocks.HttpClient) {
 func mockFullQueryLoggingRequestToFalse(mockHttpClient *mocks.HttpClient) {
 	resFullQueryStatus := &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(strings.NewReader(httpResponseFullQueryDisabled)),
+		Body:       io.NopCloser(strings.NewReader(httpResponseFullQueryDisabled)),
 	}
 	mockHttpClient.On("Do",
 		mock.MatchedBy(

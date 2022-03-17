@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/go-logr/logr"
-	logrtesting "github.com/go-logr/logr/testing"
 
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
@@ -133,7 +132,7 @@ func (m *MockEMMService) getPodNameSetWithVolumeHealthInaccessiblePVC(rackName s
 }
 
 func (m *MockEMMService) getLogger() logr.Logger {
-	return logrtesting.NullLogger{}
+	return logr.Discard()
 }
 
 func Test_checkNodeEMM(t *testing.T) {
@@ -500,7 +499,7 @@ func (m *MockEMMSPI) IsInitialized() bool {
 }
 
 func (m *MockEMMSPI) GetLogger() logr.Logger {
-	return logrtesting.NullLogger{}
+	return logr.Discard()
 }
 
 func pod(name string, nodeName string) *corev1.Pod {

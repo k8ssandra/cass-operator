@@ -84,7 +84,7 @@ func DeleteIgnoreFinalizersAndLog(description string, resourceName string) {
 	// In the case of PVCs at least, finalizers removed before deletion can be
 	// automatically added back. Consequently, we delete the resource first,
 	// then remove any finalizers while it is terminating.
-	k := kubectl.PatchMerge(resourceName, `{"metadata":{"finalizers": [null]}}`)
+	k := kubectl.PatchMerge(resourceName, `{"metadata":{"finalizers": null}}`)
 
 	// Ignore errors as this may fail due to the resource already having been
 	// deleted (which is what we want).

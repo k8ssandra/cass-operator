@@ -39,7 +39,7 @@ cass-operator-555577b9f8-zgx6j   1/1     Running   0          25h
 
 ### Upgrade instructions:
 
-Updates are supported from previous versions of ``k8ssandra/cass-operator``. If upgrading from versions older than 1.7.0 (released under ``datastax/cass-operator`` name), please upgrade first to version 1.7.1. The following instructions apply when upgrading from 1.7.1 to 1.8.0 or newer.
+Updates are supported from previous versions of ``k8ssandra/cass-operator``. If upgrading from versions older than 1.7.0 (released under ``datastax/cass-operator`` name), please upgrade first to version 1.7.1. The following instructions apply when upgrading from 1.7.1 to 1.8.0 or newer up to 1.10.1. Upgrading to 1.11.0 if using Kubernetes 1.23 requires updating at least to 1.8.0 first, since 1.7.1 can not be used in Kubernetes 1.23 or newer.
 
 Due to the modifications to cass-operator’s underlying controller-runtime and updated Kubernetes versions, there is a need to do couple of manual steps before updating to a newest version of cass-operator. Newer Kubernetes versions require stricter validation and as such we need to remove ``preserveUnknownFields`` global property from the CRD to allow us to update to a newer CRD. The newer controller-runtime on the other hand modifies the liveness, readiness and configuration options, which require us to delete the older deployment. These commands do not delete your running Cassandra instances.
 

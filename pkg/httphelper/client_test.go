@@ -7,12 +7,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
-	"github.com/stretchr/testify/mock"
 	"io"
 	"net/http"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"testing"
+
+	"github.com/go-logr/logr"
+	"github.com/k8ssandra/cass-operator/pkg/mocks"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/assert"
 
@@ -389,7 +390,7 @@ func TestNodeMgmtClient_CreateTable(t *testing.T) {
 func newMockMgmtClient(httpClient *mocks.HttpClient) *NodeMgmtClient {
 	return &NodeMgmtClient{
 		Client:   httpClient,
-		Log:      log.NullLogger{},
+		Log:      logr.Discard(),
 		Protocol: "http",
 	}
 }

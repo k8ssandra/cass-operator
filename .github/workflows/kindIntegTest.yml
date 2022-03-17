@@ -61,7 +61,7 @@ jobs:
         # Single worker tests:
         - additional_serviceoptions
         - additional_volumes
-        - delete_node_terminated_container
+        # - delete_node_terminated_container # This does not test any operator behavior
         - podspec_simple
         # - smoke_test_oss # See next job
         - smoke_test_dse
@@ -106,8 +106,6 @@ jobs:
       fail-fast: false
     runs-on: ubuntu-latest
     env:
-      # GOPATH: /home/runner/go
-      # GOROOT: /usr/local/go1.16
       CGO_ENABLED: 0
       M_INTEG_DIR: ${{ matrix.integration_test }}
     steps:
@@ -143,8 +141,6 @@ jobs:
       fail-fast: true
     runs-on: ubuntu-latest
     env:
-      # GOPATH: /home/runner/go
-      # GOROOT: /usr/local/go1.16
       CGO_ENABLED: 0
       M_INTEG_DIR: smoke_test_oss
       M_SERVER_VERSION: ${{ matrix.version }}

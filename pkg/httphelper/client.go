@@ -61,8 +61,8 @@ type EndpointState struct {
 	HostID                 string `json:"HOST_ID,omitempty"`
 	IsAlive                string `json:"IS_ALIVE,omitempty"`
 	EndpointIP             string `json:"ENDPOINT_IP,omitempty"`
-	NativeTransportAddress string `json:"NATIVE_TRANSPORT_ADDRESS,omitempty"`
 	NativeAddressAndPort   string `json:"NATIVE_ADDRESS_AND_PORT,omitempty"`
+	NativeTransportAddress string `json:"NATIVE_TRANSPORT_ADDRESS,omitempty"`
 	RpcAddress             string `json:"RPC_ADDRESS,omitempty"`
 	Status                 string `json:"STATUS,omitempty"`
 	StatusWithPort         string `json:"STATUS_WITH_PORT,omitempty"`

@@ -14,6 +14,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#183](https://github.com/k8ssandra/cass-operator/issues/183) Move from PodDisruptionBudget v1beta1 to v1 (min. Kubernetes version 1.21)
 * [CHANGE] [#264](https://github.com/k8ssandra/cass-operator/issues/264) Generate PodTemplateSpec in CassandraDatacenter with metadata
 * [ENHANCEMENT] []() Update to Go 1.17 with updates to dependencies: Kube 1.23.4 and controller-runtime 0.11.1 
+* [ENHANCEMENT] []() Add documentation for jvm11-server.options and jvm8-server.options keys
 
 ## v1.10.1
 

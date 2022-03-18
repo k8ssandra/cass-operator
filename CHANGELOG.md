@@ -15,6 +15,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#312](https://github.com/k8ssandra/cass-operator/issues/312) Integration tests now output CassandraDatacenter and CassandraTask CRD outputs to build directory
 * [BUGFIX] [#304](https://github.com/k8ssandra/cass-operator/issues/304) Hostname lookups on Cassandra pods fail
 * [BUGFIX] [#311](https://github.com/k8ssandra/cass-operator/issues/311) Fix cleanup retry reconcile bug
+* [BUGFIX] [#298](https://github.com/k8ssandra/cass-operator/issues/298) EndpointState has incorrect json key 
 
 ## v1.10.2
 

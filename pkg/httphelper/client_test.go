@@ -111,6 +111,62 @@ func Test_parseMetadataEndpointsResponseBody(t *testing.T) {
 	assert.Equal(t, "95c157dc-2811-446a-a541-9faaab2e6930", endpoints.Entity[0].HostID)
 }
 
+func Test_parseMetadataEndpointsResponseBody_Cassandra4(t *testing.T) {
+	endpoints, err := parseMetadataEndpointsResponseBody([]byte(`{
+  "entity": [
+    {
+      "DC": "dc1",
+      "ENDPOINT_IP": "10.244.1.4",
+      "HOST_ID": "72a83db5-1e9d-4ec1-ac3a-bb179df4865d",
+      "INTERNAL_ADDRESS_AND_PORT": "10.244.1.4:7000",
+      "INTERNAL_IP": "10.244.1.4",
+      "IS_ALIVE": "true",
+      "LOAD": "70691.0",
+      "NATIVE_ADDRESS_AND_PORT": "10.244.1.4:9042",
+      "NET_VERSION": "12",
+      "RACK": "default",
+      "RELEASE_VERSION": "4.0.3",
+      "RPC_ADDRESS": "10.244.1.4",
+      "RPC_READY": "true",
+      "SCHEMA": "1f9c10f4-9964-3a41-bef6-66720dc90429",
+      "SSTABLE_VERSIONS": "big-nb",
+      "STATUS": "NORMAL,-2378755110699573255",
+      "STATUS_WITH_PORT": "NORMAL,-2378755110699573255",
+      "TOKENS": "\u0000\u0000\u0000\bÞüöÔ{\u001B_ù\u0000\u0000\u0000\bÑiä¹/8a^\u0000\u0000\u0000\bºñ÷\u0005©2\u0000\u0000\u0000\b¤á\"åÈEYo\u0000\u0000\u0000\bt^>k)\u0000$\u0000\u0000\u0000\b2c\u0019z\u000B¾\u0000\u0000\u0000\b\u0016\u0006î^°o\u0005\u0000\u0000\u0000\b!¾Â¡±\bý¢\u0000\u0000\u0000\b5»±¨Ãh\u0000\u0000\u0000\bD[\u0016ß8\u0010\u0000\u0000\u0000\b\u0006áÝ«x@â\u0000\u0000\u0000\bRº}\u0006\u0012\u001C\u0000\u0000\u0000\b^\u0013qÖó0¥g\u0000\u0000\u0000\bm\u0001L\u001D0­z\u0000\u0000\u0000\bw7ËX©Ã\u0000\u0000\u0000\u0000"
+    }
+  ],
+  "variant": {
+    "language": null,
+    "mediaType": {
+      "type": "application",
+      "subtype": "json",
+      "parameters": {},
+      "wildcardType": false,
+      "wildcardSubtype": false
+    },
+    "encoding": null,
+    "languageString": null
+  },
+  "annotations": [],
+  "mediaType": {
+    "type": "application",
+    "subtype": "json",
+    "parameters": {},
+    "wildcardType": false,
+    "wildcardSubtype": false
+  },
+  "language": null,
+  "encoding": null
+}
+`))
+
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(endpoints.Entity))
+	assert.Equal(t, "10.244.1.4:9042", endpoints.Entity[0].NativeAddressAndPort)
+	assert.Equal(t, "10.244.1.4", endpoints.Entity[0].RpcAddress)
+	assert.Equal(t, "10.244.1.4", endpoints.Entity[0].GetRpcAddress())
+}
+
 func Test_parseListKeyspacesEndpointsResponseBody(t *testing.T) {
 	keyspaces, err := parseListKeyspacesEndpointsResponseBody([]byte(`["keyspace1", "keyspace2"]`))
 

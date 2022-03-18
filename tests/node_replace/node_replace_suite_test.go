@@ -26,7 +26,7 @@ var (
 	dcName           = "dc1"
 	podNames         = []string{"cluster1-dc1-r1-sts-0", "cluster1-dc1-r2-sts-0", "cluster1-dc1-r3-sts-0"}
 	podNameToReplace = podNames[2]
-	dcYaml           = "../testdata/default-three-rack-three-node-dc.yaml"
+	dcYaml           = "../testdata/default-three-rack-three-node-dc-4x.yaml"
 	dcResource       = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	ns               = ginkgo_util.NewWrapper(testName, namespace)
 )

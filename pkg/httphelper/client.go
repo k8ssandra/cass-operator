@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -61,6 +62,7 @@ type EndpointState struct {
 	HostID                 string `json:"HOST_ID,omitempty"`
 	IsAlive                string `json:"IS_ALIVE,omitempty"`
 	EndpointIP             string `json:"ENDPOINT_IP,omitempty"`
+	NativeAddressAndPort   string `json:"NATIVE_ADDRESS_AND_PORT,omitempty"`
 	NativeTransportAddress string `json:"NATIVE_TRANSPORT_ADDRESS,omitempty"`
 	RpcAddress             string `json:"RPC_ADDRESS,omitempty"`
 	Status                 string `json:"STATUS,omitempty"`
@@ -84,9 +86,18 @@ func (e *EndpointState) HasStatus(status EndpointStateStatus) bool {
 }
 
 func (x *EndpointState) GetRpcAddress() string {
-	if x.NativeTransportAddress != "" {
+	if x.NativeAddressAndPort != "" {
+		// Cassandra 4.0+
+		ip, _, err := net.SplitHostPort(x.NativeAddressAndPort)
+		if err != nil {
+			return ""
+		}
+		return ip
+	} else if x.NativeTransportAddress != "" {
+		// DSE 6.8+
 		return x.NativeTransportAddress
 	} else {
+		// Cassandra 3.11
 		return x.RpcAddress
 	}
 }

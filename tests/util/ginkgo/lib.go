@@ -475,7 +475,7 @@ func (ns NsWrapper) RetrieveStatusFromNodetool(podName string) []NodetoolNodeInf
 	nodeTexts := regexp.MustCompile(`(?m)^.*(([0-9a-fA-F]+-){4}([0-9a-fA-F]+)).*$`).FindAllString(output, -1)
 	nodeInfo := []NodetoolNodeInfo{}
 	for _, nodeText := range nodeTexts {
-		comps := regexp.MustCompile(`[[:space:]]+`).Split(nodeText, -1)
+		comps := regexp.MustCompile(`[[:space:]]+`).Split(strings.TrimSpace(nodeText), -1)
 		nodeInfo = append(nodeInfo,
 			NodetoolNodeInfo{
 				Status:  getFullName(string(comps[0][0])),

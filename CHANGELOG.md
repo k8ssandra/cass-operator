@@ -9,6 +9,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [BUGFIX] [#304](https://github.com/k8ssandra/cass-operator/issues/304) Hostname lookups on Cassandra pods fail
+
 ## v1.10.1
 
 * [BUGFIX] [#278](https://github.com/k8ssandra/cass-operator/issues/278) ImageRegistry json key was incorrect in the definition type. Fixed from "imageRegistryOverride" to "imageRegistry"

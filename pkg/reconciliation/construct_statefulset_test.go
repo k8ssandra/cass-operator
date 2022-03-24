@@ -6,6 +6,8 @@ package reconciliation
 import (
 	"fmt"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"testing"
@@ -150,6 +152,25 @@ func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing
 	}
 
 	assert.Equal(t, expected, nodeAffinityLabels)
+}
+
+func Test_newStatefulSetForCassandraDatacenter_ServiceName(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "test",
+			ServerType:    "cassandra",
+			ServerVersion: "4.0.3",
+			Size:          1,
+			StorageConfig: api.StorageConfig{
+				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+			},
+		},
+	}
+
+	sts, err := newStatefulSetForCassandraDatacenter(&appsv1.StatefulSet{}, "default", dc, 1, false)
+
+	require.NoError(t, err)
+	assert.Equal(t, dc.GetAllPodsServiceName(), sts.Spec.ServiceName)
 }
 
 func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T) {

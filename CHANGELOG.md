@@ -15,6 +15,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#264](https://github.com/k8ssandra/cass-operator/issues/264) Generate PodTemplateSpec in CassandraDatacenter with metadata
 * [ENHANCEMENT] []() Update to Go 1.17 with updates to dependencies: Kube 1.23.4 and controller-runtime 0.11.1 
 * [BUGFIX] [#298](https://github.com/k8ssandra/cass-operator/issues/298) EndpointState has incorrect json key 
+* [BUGFIX] [#304](https://github.com/k8ssandra/cass-operator/issues/304) Hostname lookups on Cassandra pods fail
 
 ## v1.10.1
 

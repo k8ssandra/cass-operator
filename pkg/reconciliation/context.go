@@ -89,7 +89,6 @@ func CreateReconciliationContext(
 	// Fetch the datacenter resource
 	dc := &api.CassandraDatacenter{}
 	if err := retrieveDatacenter(rc, req, dc); err != nil {
-		rc.ReqLogger.Error(err, "error in retrieveDatacenter")
 		return nil, err
 	}
 	rc.Datacenter = dc

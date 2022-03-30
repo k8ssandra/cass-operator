@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -126,12 +127,11 @@ func (rc *ReconciliationContext) CheckInternodeCredentialCreation() result.Recon
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
-	rc.ReqLogger.Info("reconcile_racks::CheckRackCreation")
+func (rc *ReconciliationContext) FetchRackStatus() result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::FetchRackStatus")
+
 	for idx := range rc.desiredRackInformation {
 		rackInfo := rc.desiredRackInformation[idx]
-
-		// Does this rack have a statefulset?
 
 		statefulSet, statefulSetFound, err := rc.GetStatefulSetForRack(rackInfo)
 		if err != nil {
@@ -141,21 +141,45 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 				"Rack", rackInfo.RackName)
 			return result.Error(err)
 		}
+		if statefulSetFound {
+			rc.statefulSets[idx] = statefulSet
+		}
+	}
 
-		if !statefulSetFound {
-			rc.ReqLogger.Info(
-				"Need to create new StatefulSet for",
-				"Rack", rackInfo.RackName)
-			err := rc.ReconcileNextRack(statefulSet)
+	return result.Continue()
+}
+
+func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::CheckRackCreation")
+	for idx := range rc.desiredRackInformation {
+		rackInfo := rc.desiredRackInformation[idx]
+
+		// Does this rack have a statefulset?
+		if rc.statefulSets[idx] == nil {
+			statefulSet, statefulSetFound, err := rc.GetStatefulSetForRack(rackInfo)
 			if err != nil {
 				rc.ReqLogger.Error(
 					err,
-					"error creating new StatefulSet",
+					"Could not locate statefulSet for",
 					"Rack", rackInfo.RackName)
 				return result.Error(err)
 			}
+
+			if !statefulSetFound {
+				rc.ReqLogger.Info(
+					"Need to create new StatefulSet for",
+					"Rack", rackInfo.RackName)
+				err := rc.ReconcileNextRack(statefulSet)
+				if err != nil {
+					rc.ReqLogger.Error(
+						err,
+						"error creating new StatefulSet",
+						"Rack", rackInfo.RackName)
+					return result.Error(err)
+				}
+			}
+			rc.statefulSets[idx] = statefulSet
 		}
-		rc.statefulSets[idx] = statefulSet
 	}
 
 	return result.Continue()
@@ -166,6 +190,7 @@ func (rc *ReconciliationContext) desiredStatefulSetForExistingStatefulSet(sts *a
 
 	// have to use zero here, because each statefulset is created with no replicas
 	// in GetStatefulSetForRack()
+	// TODO Remove this, we need the correct replicaSize
 	replicas := 0
 
 	// when Cass Operator was released, we accidentally used the incorrect managed-by
@@ -273,13 +298,23 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			)
 
 			statefulSet.SetResourceVersion(resVersion)
-			err = rc.Client.Update(rc.Ctx, statefulSet)
-			if err != nil {
-				logger.Error(
-					err,
-					"Unable to perform update on statefulset for config",
-					"statefulSet", statefulSet)
-				return result.Error(err)
+			if err = rc.Client.Update(rc.Ctx, statefulSet); err != nil {
+				if errors.IsInvalid(err) {
+					logger.Info("Deleting statefulSet and setting new owner references")
+					// TODO IsInvalid or IsForbidden? Any underlying error messages?
+					// I assume Forbidden for now: https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/apps/validation/validation.go#L186
+					// TODO This StatefulSet requires recreate instead of update
+					/*
+						There are multiple scenarios, some require simple recreate such as change of ServiceName
+						Some require more work, such as change of PVC sizes
+					*/
+					if err = rc.deleteStatefulSet(statefulSet); err != nil {
+						logger.Error(err, "Failed to delete the StatefulSet", "Invalid", errors.IsInvalid(err), "Forbidden", errors.IsForbidden(err))
+						return result.Error(err)
+					}
+				} else {
+					return result.Error(err)
+				}
 			}
 
 			if err := rc.enableQuietPeriod(20); err != nil {
@@ -386,11 +421,22 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 			)
 
 			if err := rc.Client.Update(rc.Ctx, statefulSet); err != nil {
-				logger.Error(
-					err,
-					"Unable to perform update on statefulset for force update config",
-					"statefulSet", statefulSet)
-				return result.Error(err)
+				logger.Error(err, "Failed to update the StatefulSet", "Invalid", errors.IsInvalid(err), "Forbidden", errors.IsForbidden(err))
+				if errors.IsInvalid(err) {
+					// TODO IsInvalid or IsForbidden? Any underlying error messages?
+					// I assume Forbidden for now: https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/apps/validation/validation.go#L186
+					// TODO This StatefulSet requires recreate instead of update
+					/*
+						There are multiple scenarios, some require simple recreate such as change of ServiceName
+						Some require more work, such as change of PVC sizes
+					*/
+					if err = rc.deleteStatefulSet(statefulSet); err != nil {
+						logger.Error(err, "Failed to delete the StatefulSet", "Invalid", errors.IsInvalid(err), "Forbidden", errors.IsForbidden(err))
+						return result.Error(err)
+					}
+				} else {
+					return result.Error(err)
+				}
 			}
 
 		}
@@ -406,6 +452,60 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 	logger.Info("done CheckRackForceUpgrade()")
 	return result.Done()
+}
+
+func (rc *ReconciliationContext) deleteStatefulSet(statefulSet *appsv1.StatefulSet) error {
+	// Remove reference to the StatefulSet from pods
+	for _, pod := range rc.dcPods {
+		controller := metav1.GetControllerOf(&pod.ObjectMeta)
+		if controller.Kind == statefulSet.Kind &&
+			controller.Name == statefulSet.Name &&
+			string(controller.UID) == string(statefulSet.UID) {
+			// Replace this reference with a ref to CassandraDatacenter (prevents deletion of pods)
+			// We can't use SetControllerReference as it will notify that the pod is already controlled
+			pod.SetOwnerReferences([]metav1.OwnerReference{})
+			controllerutil.SetOwnerReference(rc.Datacenter, pod, rc.Scheme)
+			if err := rc.Client.Update(rc.Ctx, pod); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Delete StatefulSet
+	policy := metav1.DeletePropagationOrphan
+	cascadePolicy := client.DeleteOptions{
+		PropagationPolicy: &policy,
+	}
+
+	if err := rc.Client.Delete(rc.Ctx, statefulSet, &cascadePolicy); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (rc *ReconciliationContext) removeCassDcOwnerReferences(statefulSet *appsv1.StatefulSet) error {
+	// for _, pod := range rc.dcPods {
+	// 	if len(pod.GetOwnerReferences()) > 1 {
+
+	// 	}
+	// 	controller := metav1.GetControllerOf(&pod.ObjectMeta)
+	// 	if controller.Kind == statefulSet.Kind &&
+	// 		controller.Name == statefulSet.Name &&
+	// 		string(controller.UID) == string(statefulSet.UID) {
+	// 		// Replace this reference with a ref to CassandraDatacenter (prevents deletion of pods)
+	// 		// We can't use SetControllerReference as it will notify that the pod is already controlled
+	// 		pod.SetOwnerReferences([]metav1.OwnerReference{})
+	// 		controllerutil.SetOwnerReference(rc.Datacenter, pod, rc.Scheme)
+	// 		if err := rc.Client.Update(rc.Ctx, pod); err != nil {
+	// 			return err
+	// 		}
+	// 	}
+	// }
+
+	// TODO Readd the StatefulSet controller reference here also
+
+	return nil
 }
 
 func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
@@ -428,11 +528,9 @@ func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
 				"desired", updatedLabels)
 			statefulSet.SetLabels(updatedLabels)
 
-			if err := rc.Client.Patch(rc.Ctx, statefulSet, patch); err != nil {
+			if err := rc.Client.Patch(rc.Ctx, statefulSet, patch); err != nil && !errors.IsNotFound(err) {
 				rc.ReqLogger.Info("Unable to update statefulSet with labels",
 					"statefulSet", statefulSet)
-
-				// FIXME we had not been passing this error up - why?
 				return result.Error(err)
 			}
 
@@ -445,6 +543,7 @@ func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
 }
 
 func (rc *ReconciliationContext) CheckRackStoppedState() result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::CheckRackStoppedState")
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
 
@@ -453,6 +552,11 @@ func (rc *ReconciliationContext) CheckRackStoppedState() result.ReconcileResult 
 	for idx := range rc.desiredRackInformation {
 		rackInfo := rc.desiredRackInformation[idx]
 		statefulSet := rc.statefulSets[idx]
+
+		if statefulSet == nil {
+			// Cluster isn't created yet, can't stop
+			return result.Continue()
+		}
 
 		stopped := rc.Datacenter.Spec.Stopped
 		currentPodCount := *statefulSet.Spec.Replicas
@@ -1388,7 +1492,7 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 		currentStatefulSet,
 		nextRack.RackName,
 		rc.Datacenter,
-		0,
+		nextRack.NodeCount,
 		false)
 	if err != nil {
 		return nil, false, err
@@ -2362,14 +2466,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return recResult.Output()
 	}
 
-	if recResult := rc.CheckRackCreation(); recResult.Completed() {
-		return recResult.Output()
-	}
-
-	if recResult := rc.CheckRackLabels(); recResult.Completed() {
-		return recResult.Output()
-	}
-
 	if recResult := rc.CheckDecommissioningNodes(endpointData); recResult.Completed() {
 		return recResult.Output()
 	}
@@ -2382,11 +2478,27 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return recResult.Output()
 	}
 
+	if recResult := rc.FetchRackStatus(); recResult.Completed() {
+		return recResult.Output()
+	}
+
 	if recResult := rc.CheckRackStoppedState(); recResult.Completed() {
 		return recResult.Output()
 	}
 
+	if recResult := rc.CheckRackCreation(); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.CheckRackLabels(); recResult.Completed() {
+		return recResult.Output()
+	}
+
 	if recResult := rc.CheckRackForceUpgrade(); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.CheckRackScale(); recResult.Completed() {
 		return recResult.Output()
 	}
 
@@ -2398,10 +2510,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		// if recResult := psp.CheckPVCHealth(rc); recResult.Completed() {
 		// 	return recResult.Output()
 		// }
-	}
-
-	if recResult := rc.CheckRackScale(); recResult.Completed() {
-		return recResult.Output()
 	}
 
 	if recResult := rc.CheckPodsReady(endpointData); recResult.Completed() {

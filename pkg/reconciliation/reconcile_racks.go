@@ -164,17 +164,13 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 func (rc *ReconciliationContext) desiredStatefulSetForExistingStatefulSet(sts *appsv1.StatefulSet, rackName string) (desiredSts *appsv1.StatefulSet, err error) {
 	dc := rc.Datacenter
 
-	// have to use zero here, because each statefulset is created with no replicas
-	// in GetStatefulSetForRack()
-	replicas := 0
-
 	// when Cass Operator was released, we accidentally used the incorrect managed-by
 	// label of "cassandra-operator" we have since fixed this to be "cass-operator",
 	// but unfortunately, we cannot modify the labels in the volumeClaimTemplates of a
 	// StatefulSet. Consequently, we must preserve the old labels in this case.
 	usesDefunct := usesDefunctPvcManagedByLabel(sts)
 
-	return newStatefulSetForCassandraDatacenter(sts, rackName, dc, replicas, usesDefunct)
+	return newStatefulSetForCassandraDatacenter(sts, rackName, dc, int(*sts.Spec.Replicas), usesDefunct)
 }
 
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
@@ -275,11 +271,14 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			statefulSet.SetResourceVersion(resVersion)
 			err = rc.Client.Update(rc.Ctx, statefulSet)
 			if err != nil {
-				logger.Error(
-					err,
-					"Unable to perform update on statefulset for config",
-					"statefulSet", statefulSet)
-				return result.Error(err)
+				if errors.IsInvalid(err) {
+					if err = rc.deleteStatefulSet(statefulSet); err != nil {
+						// logger.Error(err, "Failed to delete the StatefulSet", "Invalid", errors.IsInvalid(err), "Forbidden", errors.IsForbidden(err))
+						return result.Error(err)
+					}
+				} else {
+					return result.Error(err)
+				}
 			}
 
 			if err := rc.enableQuietPeriod(20); err != nil {
@@ -334,7 +333,7 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 		return result.Continue()
 	}
 
-	for idx := range rc.desiredRackInformation {
+	for idx, nextRack := range rc.desiredRackInformation {
 		rackName := rc.desiredRackInformation[idx].RackName
 		if slice.ContainsString(forceRacks, rackName, nil) {
 
@@ -342,7 +341,7 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 			// have to use zero here, because each statefulset is created with no replicas
 			// in GetStatefulSetForRack()
-			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, 0, false)
+			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, nextRack.NodeCount, false)
 			if err != nil {
 				logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
 				return result.Error(err)
@@ -386,13 +385,15 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 			)
 
 			if err := rc.Client.Update(rc.Ctx, statefulSet); err != nil {
-				logger.Error(
-					err,
-					"Unable to perform update on statefulset for force update config",
-					"statefulSet", statefulSet)
-				return result.Error(err)
+				if errors.IsInvalid(err) {
+					if err = rc.deleteStatefulSet(statefulSet); err != nil {
+						// logger.Error(err, "Failed to delete the StatefulSet", "Invalid", errors.IsInvalid(err), "Forbidden", errors.IsForbidden(err))
+						return result.Error(err)
+					}
+				} else {
+					return result.Error(err)
+				}
 			}
-
 		}
 	}
 
@@ -406,6 +407,37 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 	logger.Info("done CheckRackForceUpgrade()")
 	return result.Done()
+}
+
+func (rc *ReconciliationContext) deleteStatefulSet(statefulSet *appsv1.StatefulSet) error {
+	// Remove reference to the StatefulSet from pods
+	/*
+		for _, pod := range rc.dcPods {
+			controller := metav1.GetControllerOf(&pod.ObjectMeta)
+			if controller.Kind == statefulSet.Kind &&
+				controller.Name == statefulSet.Name &&
+				string(controller.UID) == string(statefulSet.UID) {
+				// Replace this reference with a ref to CassandraDatacenter (prevents deletion of pods)
+				// We can't use SetControllerReference as it will notify that the pod is already controlled
+				pod.SetOwnerReferences([]metav1.OwnerReference{})
+				controllerutil.SetOwnerReference(rc.Datacenter, pod, rc.Scheme)
+				if err := rc.Client.Update(rc.Ctx, pod); err != nil {
+					return err
+				}
+			}
+		}
+	*/
+	// Delete StatefulSet
+	policy := metav1.DeletePropagationOrphan
+	cascadePolicy := client.DeleteOptions{
+		PropagationPolicy: &policy,
+	}
+
+	if err := rc.Client.Delete(rc.Ctx, statefulSet, &cascadePolicy); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
@@ -1388,7 +1420,7 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 		currentStatefulSet,
 		nextRack.RackName,
 		rc.Datacenter,
-		0,
+		nextRack.NodeCount,
 		false)
 	if err != nil {
 		return nil, false, err

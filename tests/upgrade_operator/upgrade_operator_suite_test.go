@@ -75,6 +75,11 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReady(dcName)
 
+			// Get UID of the cluster pod
+			step = "get Cassandra pods UID"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
+			createdPodUID := ns.OutputAndLog(step, k)
+
 			step = "get name of 1.8.0 operator pod"
 			json := "jsonpath={.items[].metadata.name}"
 			k = kubectl.Get("pods").WithFlag("selector", "name=cass-operator").FormatOutput(json)
@@ -94,6 +99,13 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 800, 60)
 
 			ns.ExpectDoneReconciling(dcName)
+
+			// Verify Pod hasn't restarted
+			step = "get Cassandra pods UID"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
+			postUpgradeCassPodUID := ns.OutputAndLog(step, k)
+
+			Expect(createdPodUID).To(Equal(postUpgradeCassPodUID))
 
 			// Verify PodDisruptionBudget is available (1.11 updates from v1beta1 -> v1)
 			json = "jsonpath={.items[].metadata.name}"

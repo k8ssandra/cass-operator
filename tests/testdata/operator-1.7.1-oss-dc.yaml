@@ -8,7 +8,7 @@ spec:
   serverVersion: "3.11.7"
   managementApiAuth:
     insecure: {}
-  size: 1
+  size: 3
   storageConfig:
     cassandraDataVolumeClaimSpec:
       storageClassName: standard
@@ -19,6 +19,8 @@ spec:
           storage: 1Gi
   racks:
     - name: r1
+    - name: r2
+    - name: r3
   config:
     jvm-options:
       initial_heap_size: "512m"

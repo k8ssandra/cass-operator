@@ -267,7 +267,7 @@ func (ns *NsWrapper) WaitForDatacenterReadyPodCountWithTimeout(dcName string, co
 }
 
 func (ns *NsWrapper) WaitForDatacenterReady(dcName string) {
-	ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 30)
+	ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 60)
 }
 
 func (ns *NsWrapper) WaitForDatacenterReadyWithTimeouts(dcName string, podCountTimeout int, dcReadyTimeout int) {
@@ -383,7 +383,7 @@ func (ns *NsWrapper) WaitForOperatorReady() {
 		WithLabel("name=cass-operator").
 		WithFlag("field-selector", "status.phase=Running").
 		FormatOutput(json)
-	ns.WaitForOutputAndLog(step, k, "true", 240)
+	ns.WaitForOutputAndLog(step, k, "true", 300)
 }
 
 // kubectl create secret docker-registry github-docker-registry --docker-username=USER --docker-password=PASS --docker-server docker.pkg.github.com
@@ -529,5 +529,5 @@ func (ns *NsWrapper) CheckForCompletedCassandraTasks(dcName, command string, cou
 		WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)).
 		WithLabel("control.k8ssandra.io/status=completed").
 		FormatOutput(json)
-	ns.WaitForOutputAndLog(step, k, duplicate(command, count), 60)
+	ns.WaitForOutputAndLog(step, k, duplicate(command, count), 120)
 }

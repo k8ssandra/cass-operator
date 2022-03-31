@@ -1492,7 +1492,7 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 		currentStatefulSet,
 		nextRack.RackName,
 		rc.Datacenter,
-		nextRack.NodeCount,
+		0,
 		false)
 	if err != nil {
 		return nil, false, err

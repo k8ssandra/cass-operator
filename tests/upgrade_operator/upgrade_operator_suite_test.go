@@ -77,7 +77,7 @@ var _ = Describe(testName, func() {
 
 			// Get UID of the cluster pod
 			step = "get Cassandra pods UID"
-			k = kubectl.Get("pod/cluster2-dc2-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
 			createdPodUID := ns.OutputAndLog(step, k)
 
 			step = "get name of 1.8.0 operator pod"
@@ -107,7 +107,7 @@ var _ = Describe(testName, func() {
 
 			// Verify Pod hasn't restarted
 			step = "get Cassandra pods UID"
-			k = kubectl.Get("pod/cluster2-dc2-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
 			postUpgradeCassPodUID := ns.OutputAndLog(step, k)
 
 			Expect(createdPodUID).To(Equal(postUpgradeCassPodUID))

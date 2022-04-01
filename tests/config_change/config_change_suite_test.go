@@ -19,7 +19,7 @@ var (
 	testName   = "Config change rollout"
 	namespace  = "test-config-change-rollout"
 	dcName     = "dc1"
-	dcYaml     = "../testdata/default-three-rack-three-node-dc.yaml"
+	dcYaml     = "../testdata/default-two-rack-two-node-dc.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns         = ginkgo_util.NewWrapper(testName, namespace)
@@ -56,8 +56,8 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReady(dcName)
 
-			step = "scale up to 6 nodes"
-			json := `{"spec": {"size": 6}}`
+			step = "scale up to 4 nodes"
+			json := `{"spec": {"size": 4}}`
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 

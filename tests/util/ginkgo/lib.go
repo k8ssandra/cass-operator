@@ -267,7 +267,7 @@ func (ns *NsWrapper) WaitForDatacenterReadyPodCountWithTimeout(dcName string, co
 }
 
 func (ns *NsWrapper) WaitForDatacenterReady(dcName string) {
-	ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 60)
+	ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 60)
 }
 
 func (ns *NsWrapper) WaitForDatacenterReadyWithTimeouts(dcName string, podCountTimeout int, dcReadyTimeout int) {

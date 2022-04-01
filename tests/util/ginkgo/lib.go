@@ -153,14 +153,14 @@ func (ns *NsWrapper) genTestLogDir(description string) string {
 
 func (ns *NsWrapper) ExecAndLog(description string, kcmd kubectl.KCmd) {
 	ginkgo.By(description)
-	defer kubectl.DumpLogs(ns.genTestLogDir(description), ns.Namespace).ExecVPanic()
+	defer kubectl.DumpClusterInfo(ns.genTestLogDir(description), ns.Namespace)
 	execErr := ns.ExecV(kcmd)
 	Expect(execErr).ToNot(HaveOccurred())
 }
 
 func (ns *NsWrapper) ExecAndLogAndExpectErrorString(description string, kcmd kubectl.KCmd, expectedError string) {
 	ginkgo.By(description)
-	defer kubectl.DumpLogs(ns.genTestLogDir(description), ns.Namespace).ExecVPanic()
+	defer kubectl.DumpClusterInfo(ns.genTestLogDir(description), ns.Namespace)
 	_, captureErr, execErr := ns.ExecVCapture(kcmd)
 	Expect(execErr).To(HaveOccurred())
 	Expect(captureErr).Should(ContainSubstring(expectedError))
@@ -168,7 +168,7 @@ func (ns *NsWrapper) ExecAndLogAndExpectErrorString(description string, kcmd kub
 
 func (ns *NsWrapper) OutputAndLog(description string, kcmd kubectl.KCmd) string {
 	ginkgo.By(description)
-	defer kubectl.DumpLogs(ns.genTestLogDir(description), ns.Namespace).ExecVPanic()
+	defer kubectl.DumpClusterInfo(ns.genTestLogDir(description), ns.Namespace)
 	output, execErr := ns.Output(kcmd)
 	Expect(execErr).ToNot(HaveOccurred())
 	return output
@@ -176,21 +176,21 @@ func (ns *NsWrapper) OutputAndLog(description string, kcmd kubectl.KCmd) string 
 
 func (ns *NsWrapper) WaitForOutputAndLog(description string, kcmd kubectl.KCmd, expected string, seconds int) {
 	ginkgo.By(description)
-	defer kubectl.DumpLogs(ns.genTestLogDir(description), ns.Namespace).ExecVPanic()
+	defer kubectl.DumpClusterInfo(ns.genTestLogDir(description), ns.Namespace)
 	execErr := ns.WaitForOutput(kcmd, expected, seconds)
 	Expect(execErr).ToNot(HaveOccurred())
 }
 
 func (ns *NsWrapper) WaitForOutputPatternAndLog(description string, kcmd kubectl.KCmd, expected string, seconds int) {
 	ginkgo.By(description)
-	defer kubectl.DumpLogs(ns.genTestLogDir(description), ns.Namespace).ExecVPanic()
+	defer kubectl.DumpClusterInfo(ns.genTestLogDir(description), ns.Namespace)
 	execErr := ns.WaitForOutputPattern(kcmd, expected, seconds)
 	Expect(execErr).ToNot(HaveOccurred())
 }
 
 func (ns *NsWrapper) WaitForOutputContainsAndLog(description string, kcmd kubectl.KCmd, expected string, seconds int) {
 	ginkgo.By(description)
-	defer kubectl.DumpLogs(ns.genTestLogDir(description), ns.Namespace).ExecVPanic()
+	defer kubectl.DumpClusterInfo(ns.genTestLogDir(description), ns.Namespace)
 	execErr := ns.WaitForOutputContains(kcmd, expected, seconds)
 	Expect(execErr).ToNot(HaveOccurred())
 }

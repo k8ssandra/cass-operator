@@ -2254,7 +2254,7 @@ func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileRe
 	// Explicitly handle scaling up here because we want to run a cleanup afterwards
 	if dc.GetConditionStatus(api.DatacenterScalingUp) == corev1.ConditionTrue {
 		// Call the first node with cleanup, wait until it has finished and then move on to the next pod..
-		if res := rc.cleanupAfterScaling(); !res.Completed() {
+		if res := rc.cleanupAfterScaling(); res.Completed() {
 			return res
 		}
 

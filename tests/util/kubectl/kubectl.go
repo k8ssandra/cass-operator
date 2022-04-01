@@ -366,7 +366,7 @@ func DumpClusterInfo(path string, namespace string) error {
 	// Dump all objects that we need to investigate failures as a flat list and as yaml manifests
 	for _, objectType := range []string{"CassandraDatacenter", "CassandraTask"} {
 		// Get the list of objects
-		output := Get(objectType, "-o", "out").OutputPanic()
+		output := Get(objectType, "-o", "wide").OutputPanic()
 		storeOutput(path, objectType, "out", output)
 
 		// Get the yamls for each object

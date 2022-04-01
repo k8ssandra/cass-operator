@@ -273,7 +273,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			if err != nil {
 				if errors.IsInvalid(err) {
 					if err = rc.deleteStatefulSet(statefulSet); err != nil {
-						// logger.Error(err, "Failed to delete the StatefulSet", "Invalid", errors.IsInvalid(err), "Forbidden", errors.IsForbidden(err))
 						return result.Error(err)
 					}
 				} else {
@@ -410,24 +409,6 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 }
 
 func (rc *ReconciliationContext) deleteStatefulSet(statefulSet *appsv1.StatefulSet) error {
-	// Remove reference to the StatefulSet from pods
-	/*
-		for _, pod := range rc.dcPods {
-			controller := metav1.GetControllerOf(&pod.ObjectMeta)
-			if controller.Kind == statefulSet.Kind &&
-				controller.Name == statefulSet.Name &&
-				string(controller.UID) == string(statefulSet.UID) {
-				// Replace this reference with a ref to CassandraDatacenter (prevents deletion of pods)
-				// We can't use SetControllerReference as it will notify that the pod is already controlled
-				pod.SetOwnerReferences([]metav1.OwnerReference{})
-				controllerutil.SetOwnerReference(rc.Datacenter, pod, rc.Scheme)
-				if err := rc.Client.Update(rc.Ctx, pod); err != nil {
-					return err
-				}
-			}
-		}
-	*/
-	// Delete StatefulSet
 	policy := metav1.DeletePropagationOrphan
 	cascadePolicy := client.DeleteOptions{
 		PropagationPolicy: &policy,

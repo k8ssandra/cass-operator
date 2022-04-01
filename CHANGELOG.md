@@ -13,9 +13,12 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#183](https://github.com/k8ssandra/cass-operator/issues/183) Move from PodDisruptionBudget v1beta1 to v1 (min. Kubernetes version 1.21)
 * [CHANGE] [#264](https://github.com/k8ssandra/cass-operator/issues/264) Generate PodTemplateSpec in CassandraDatacenter with metadata
-* [ENHANCEMENT] []() Update to Go 1.17 with updates to dependencies: Kube 1.23.4 and controller-runtime 0.11.1 
+* [FEATURE] [#309](https://github.com/k8ssandra/cass-operator/pull/309) If StatefulSets are modified in a way that they can't be updated directly, recreate them with new specs
+* [ENHANCEMENT] [#292](https://github.com/k8ssandra/cass-operator/issues/292) Update to Go 1.17 with updates to dependencies: Kube 1.23.4 and controller-runtime 0.11.1 
+* [ENHANCEMENT] [#312](https://github.com/k8ssandra/cass-operator/issues/312) Integration tests now output CassandraDatacenter and CassandraTask CRD outputs to build directory
 * [BUGFIX] [#298](https://github.com/k8ssandra/cass-operator/issues/298) EndpointState has incorrect json key 
 * [BUGFIX] [#304](https://github.com/k8ssandra/cass-operator/issues/304) Hostname lookups on Cassandra pods fail
+* [BUGFIX] [#311](https://github.com/k8ssandra/cass-operator/issues/311) Fix cleanup retry reconcile bug
 
 ## v1.10.1
 

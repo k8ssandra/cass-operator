@@ -24,7 +24,7 @@ var (
 
 const (
 	ValidDseVersionRegexp      = "6\\.8\\.\\d+"
-	ValidOssVersionRegexp      = "(3\\.11\\.\\d+)|(4\\.0\\.\\d+)"
+	ValidOssVersionRegexp      = "(3\\.11\\.\\d+)|(4\\.\\d+\\.\\d+)"
 	DefaultCassandraRepository = "k8ssandra/cass-management-api"
 	DefaultDSERepository       = "datastax/dse-server"
 )

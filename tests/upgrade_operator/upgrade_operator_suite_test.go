@@ -32,6 +32,7 @@ func TestLifecycle(t *testing.T) {
 		kubectl.DumpAllLogs(logPath).ExecV()
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
+		kustomize.Undeploy(namespace)
 	})
 
 	RegisterFailHandler(Fail)
@@ -96,7 +97,7 @@ var _ = Describe(testName, func() {
 			// give the operator a minute to reconcile and update the datacenter
 			time.Sleep(1 * time.Minute)
 
-			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 60)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 1200)
 
 			ns.ExpectDoneReconciling(dcName)
 
@@ -119,7 +120,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
-			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 60)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 1200)
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)
 
 			ns.ExpectDoneReconciling(dcName)

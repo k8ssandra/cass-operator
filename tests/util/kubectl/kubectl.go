@@ -360,17 +360,17 @@ func DumpClusterInfo(path string, namespace string) error {
 	dumpCmd.ExecVPanic()
 
 	// Store the list of pods in an easy to read format.
-	podWide := Get("pods", "-o", "wide").OutputPanic()
+	podWide := Get("pods", "-o", "wide", "-n", namespace).OutputPanic()
 	storeOutput(path, "pods", "out", podWide)
 
 	// Dump all objects that we need to investigate failures as a flat list and as yaml manifests
 	for _, objectType := range []string{"CassandraDatacenter", "CassandraTask"} {
 		// Get the list of objects
-		output, _ := Get(objectType, "-o", "wide").Output()
+		output, _ := Get(objectType, "-o", "wide", "-n", namespace).Output()
 		storeOutput(path, objectType, "out", output)
 
 		// Get the yamls for each object
-		output, _ = Get(objectType, "-o", "yaml").Output()
+		output, _ = Get(objectType, "-o", "yaml", "-n", namespace).Output()
 		storeOutput(path, objectType, "yaml", output)
 	}
 

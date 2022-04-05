@@ -16,13 +16,14 @@ import (
 )
 
 var (
-	testName   = "Config change rollout"
-	namespace  = "test-config-change-rollout"
-	dcName     = "dc1"
-	dcYaml     = "../testdata/default-single-rack-single-node-dc.yaml"
-	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns         = ginkgo_util.NewWrapper(testName, namespace)
+	testName    = "Config change rollout"
+	namespace   = "test-config-change-rollout"
+	dcName      = "dc2"
+	clusterName = "cluster2"
+	dcYaml      = "../testdata/default-single-rack-single-node-dc.yaml"
+	dcResource  = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel     = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns          = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -74,13 +75,13 @@ var _ = Describe(testName, func() {
 
 			step = "checking that the init container got the updated config roles_validity_in_ms=256000"
 			json = "jsonpath={.spec.initContainers[0].env[7].value}"
-			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").
+			k = kubectl.Get(fmt.Sprintf("pod/%s-%s-r1-sts-0", clusterName, dcName)).
 				FormatOutput(json)
 			ns.WaitForOutputContainsAndLog(step, k, "\"roles_validity_in_ms\":256000", 30)
 
 			step = "checking that statefulsets have the right owner reference"
 			json = "jsonpath={.metadata.ownerReferences[0].name}"
-			k = kubectl.Get("sts/cluster1-dc1-r1-sts").
+			k = kubectl.Get(fmt.Sprintf("sts/%s-%s-r1-sts", clusterName, dcName)).
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "dc1", 30)
 

@@ -83,7 +83,7 @@ var _ = Describe(testName, func() {
 			json = "jsonpath={.metadata.ownerReferences[0].name}"
 			k = kubectl.Get(fmt.Sprintf("sts/%s-%s-r1-sts", clusterName, dcName)).
 				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "dc1", 30)
+			ns.WaitForOutputAndLog(step, k, dcName, 30)
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(dcYaml)

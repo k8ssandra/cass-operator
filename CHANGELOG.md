@@ -11,7 +11,14 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [FEATURE] [#309](https://github.com/k8ssandra/cass-operator/pull/309) If StatefulSets are modified in a way that they can't be updated directly, recreate them with new specs
+* [ENHANCEMENT] [#312](https://github.com/k8ssandra/cass-operator/issues/312) Integration tests now output CassandraDatacenter and CassandraTask CRD outputs to build directory
 * [BUGFIX] [#304](https://github.com/k8ssandra/cass-operator/issues/304) Hostname lookups on Cassandra pods fail
+* [BUGFIX] [#311](https://github.com/k8ssandra/cass-operator/issues/311) Fix cleanup retry reconcile bug
+
+## v1.10.2
+
+Bundle tag only, no changes.
 
 ## v1.10.1
 

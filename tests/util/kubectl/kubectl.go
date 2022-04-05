@@ -351,6 +351,43 @@ func DumpLogs(path string, namespace string) KCmd {
 	return KCmd{Command: "cluster-info", Args: args, Flags: flags}
 }
 
+// DumpClusterInfo Executes `kubectl cluster-info dump -o yaml` on each cluster. The output
+// is stored under <project-root>/build/test.
+func DumpClusterInfo(path string, namespace string) error {
+	_ = os.MkdirAll(path, os.ModePerm)
+
+	dumpCmd := DumpLogs(path, namespace)
+	dumpCmd.ExecVPanic()
+
+	// Store the list of pods in an easy to read format.
+	podWide := Get("pods", "-o", "wide", "-n", namespace).OutputPanic()
+	storeOutput(path, "pods", "out", podWide)
+
+	// Dump all objects that we need to investigate failures as a flat list and as yaml manifests
+	for _, objectType := range []string{"CassandraDatacenter", "CassandraTask"} {
+		// Get the list of objects
+		output, _ := Get(objectType, "-o", "wide", "-n", namespace).Output()
+		storeOutput(path, objectType, "out", output)
+
+		// Get the yamls for each object
+		output, _ = Get(objectType, "-o", "yaml", "-n", namespace).Output()
+		storeOutput(path, objectType, "yaml", output)
+	}
+
+	return nil
+}
+
+func storeOutput(path, objectType, ext, output string) {
+	filePath := fmt.Sprintf("%s/%s.%s", path, objectType, ext)
+	outputFile, err := os.Create(filePath)
+	if err != nil {
+		panic("Failed to create log file")
+	}
+	defer outputFile.Close()
+	outputFile.WriteString(output)
+	outputFile.Sync()
+}
+
 func ExecOnPod(podName string, args ...string) KCmd {
 	execArgs := []string{podName}
 	execArgs = append(execArgs, args...)

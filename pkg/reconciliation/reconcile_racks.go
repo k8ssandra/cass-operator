@@ -164,17 +164,13 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 func (rc *ReconciliationContext) desiredStatefulSetForExistingStatefulSet(sts *appsv1.StatefulSet, rackName string) (desiredSts *appsv1.StatefulSet, err error) {
 	dc := rc.Datacenter
 
-	// have to use zero here, because each statefulset is created with no replicas
-	// in GetStatefulSetForRack()
-	replicas := 0
-
 	// when Cass Operator was released, we accidentally used the incorrect managed-by
 	// label of "cassandra-operator" we have since fixed this to be "cass-operator",
 	// but unfortunately, we cannot modify the labels in the volumeClaimTemplates of a
 	// StatefulSet. Consequently, we must preserve the old labels in this case.
 	usesDefunct := usesDefunctPvcManagedByLabel(sts)
 
-	return newStatefulSetForCassandraDatacenter(sts, rackName, dc, replicas, usesDefunct)
+	return newStatefulSetForCassandraDatacenter(sts, rackName, dc, int(*sts.Spec.Replicas), usesDefunct)
 }
 
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
@@ -275,11 +271,13 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			statefulSet.SetResourceVersion(resVersion)
 			err = rc.Client.Update(rc.Ctx, statefulSet)
 			if err != nil {
-				logger.Error(
-					err,
-					"Unable to perform update on statefulset for config",
-					"statefulSet", statefulSet)
-				return result.Error(err)
+				if errors.IsInvalid(err) {
+					if err = rc.deleteStatefulSet(statefulSet); err != nil {
+						return result.Error(err)
+					}
+				} else {
+					return result.Error(err)
+				}
 			}
 
 			if err := rc.enableQuietPeriod(20); err != nil {
@@ -334,7 +332,7 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 		return result.Continue()
 	}
 
-	for idx := range rc.desiredRackInformation {
+	for idx, nextRack := range rc.desiredRackInformation {
 		rackName := rc.desiredRackInformation[idx].RackName
 		if slice.ContainsString(forceRacks, rackName, nil) {
 
@@ -342,7 +340,7 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 			// have to use zero here, because each statefulset is created with no replicas
 			// in GetStatefulSetForRack()
-			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, 0, false)
+			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, nextRack.NodeCount, false)
 			if err != nil {
 				logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
 				return result.Error(err)
@@ -386,13 +384,15 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 			)
 
 			if err := rc.Client.Update(rc.Ctx, statefulSet); err != nil {
-				logger.Error(
-					err,
-					"Unable to perform update on statefulset for force update config",
-					"statefulSet", statefulSet)
-				return result.Error(err)
+				if errors.IsInvalid(err) {
+					if err = rc.deleteStatefulSet(statefulSet); err != nil {
+						// logger.Error(err, "Failed to delete the StatefulSet", "Invalid", errors.IsInvalid(err), "Forbidden", errors.IsForbidden(err))
+						return result.Error(err)
+					}
+				} else {
+					return result.Error(err)
+				}
 			}
-
 		}
 	}
 
@@ -406,6 +406,19 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 	logger.Info("done CheckRackForceUpgrade()")
 	return result.Done()
+}
+
+func (rc *ReconciliationContext) deleteStatefulSet(statefulSet *appsv1.StatefulSet) error {
+	policy := metav1.DeletePropagationOrphan
+	cascadePolicy := client.DeleteOptions{
+		PropagationPolicy: &policy,
+	}
+
+	if err := rc.Client.Delete(rc.Ctx, statefulSet, &cascadePolicy); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
@@ -1388,7 +1401,7 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 		currentStatefulSet,
 		nextRack.RackName,
 		rc.Datacenter,
-		0,
+		nextRack.NodeCount,
 		false)
 	if err != nil {
 		return nil, false, err
@@ -2222,7 +2235,7 @@ func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileRe
 	// Explicitly handle scaling up here because we want to run a cleanup afterwards
 	if dc.GetConditionStatus(api.DatacenterScalingUp) == corev1.ConditionTrue {
 		// Call the first node with cleanup, wait until it has finished and then move on to the next pod..
-		if res := rc.cleanupAfterScaling(); !res.Completed() {
+		if res := rc.cleanupAfterScaling(); res.Completed() {
 			return res
 		}
 

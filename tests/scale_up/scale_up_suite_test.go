@@ -71,15 +71,16 @@ var _ = Describe(testName, func() {
 
 			// Ensure we have a single CassandraTask created which is a cleanup (and it succeeded)
 			ns.CheckForCompletedCassandraTasks(dcName, "cleanup", 1)
-			// ns.CheckForCompletedCassandraTask(dcName, "cleanup")
 
 			step = "scale up to 4 nodes"
 			json = "{\"spec\": {\"size\": 4}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
+			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
 
 			// Ensure we have two CassandraTasks created which are cleanup (and they succeeded)
 			ns.CheckForCompletedCassandraTasks(dcName, "cleanup", 2)
@@ -89,8 +90,10 @@ var _ = Describe(testName, func() {
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
+			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
 
 			// Ensure we have three CassandraTasks created which are cleanup (and they succeeded)
 			ns.CheckForCompletedCassandraTasks(dcName, "cleanup", 3)

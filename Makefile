@@ -171,7 +171,8 @@ deploy-test:
 ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
-	$(KUSTOMIZE) build tests/$(TEST_DIR) | kubectl apply -f -
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build tests/$(TEST_DIR) | kubectl apply --force-conflicts --server-side -f -
 
 undeploy-test:
 ifneq ($(strip $(NAMESPACE)),)

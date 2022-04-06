@@ -68,4 +68,4 @@ runs:
     - name: Run integration test ( ${{ inputs.integration_test }} )
       shell: bash
       run: |
-        make integ-test
+        IMG=k8ssandra/cass-operator:latest make integ-test

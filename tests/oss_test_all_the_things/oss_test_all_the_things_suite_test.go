@@ -69,7 +69,7 @@ var _ = Describe(testName, func() {
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
 
 			step = "scale up to 5 nodes"
@@ -77,7 +77,7 @@ var _ = Describe(testName, func() {
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
 
 			step = "stopping the dc"

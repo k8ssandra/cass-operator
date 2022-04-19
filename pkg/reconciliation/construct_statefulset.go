@@ -179,7 +179,7 @@ func newStatefulSetForCassandraDatacenter(
 	}
 	result.Annotations = map[string]string{}
 
-	if sts != nil && sts.Spec.ServiceName != result.Spec.ServiceName {
+	if sts != nil && sts.Spec.ServiceName != "" && sts.Spec.ServiceName != result.Spec.ServiceName {
 		result.Spec.ServiceName = sts.Spec.ServiceName
 	}
 

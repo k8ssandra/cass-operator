@@ -65,6 +65,8 @@ func findDatacenters(nodeName string) []string {
 		dcs = append(dcs, strings.TrimSpace(dcParts[1]))
 	}
 
+	fmt.Printf("Nodetool status output:\n\n%s\n", output)
+
 	return dcs
 }
 

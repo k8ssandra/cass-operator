@@ -70,6 +70,8 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 				// Exiting to let other parts of the process take care of the decommission
 				return result.Continue()
 			}
+			// How could we have pods if we've decommissioned everything?
+			return result.RequeueSoon(5)
 		}
 	}
 

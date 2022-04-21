@@ -74,14 +74,27 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 			errString: "",
 		},
 		{
-			name: "Cassandra valid",
+			name: "Cassandra 4.0.x must be valid",
 			dc: &CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
 				Spec: CassandraDatacenterSpec{
 					ServerType:    "cassandra",
-					ServerVersion: "4.0.0",
+					ServerVersion: "4.0.3",
+				},
+			},
+			errString: "",
+		},
+		{
+			name: "Cassandra 4.1 must be valid",
+			dc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: CassandraDatacenterSpec{
+					ServerType:    "cassandra",
+					ServerVersion: "4.1.0",
 				},
 			},
 			errString: "",
@@ -244,7 +257,9 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 					t.Errorf("ValidateSingleDatacenter() err = %v, want %v", err, tt.errString)
 				}
 			} else {
-				if !strings.HasSuffix(err.Error(), tt.errString) {
+				if tt.errString == "" {
+					t.Errorf("ValidateSingleDatacenter() err = %v, should be valid", err)
+				} else if !strings.HasSuffix(err.Error(), tt.errString) {
 					t.Errorf("ValidateSingleDatacenter() err = %v, want suffix %v", err, tt.errString)
 				}
 			}
@@ -752,7 +767,9 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					t.Errorf("ValidateDatacenterFieldChanges() err = %v, want %v", err, tt.errString)
 				}
 			} else {
-				if !strings.HasSuffix(err.Error(), tt.errString) {
+				if tt.errString == "" {
+					t.Errorf("ValidateDatacenterFieldChanges() err = %v, should be valid", err)
+				} else if !strings.HasSuffix(err.Error(), tt.errString) {
 					t.Errorf("ValidateDatacenterFieldChanges() err = %v, want suffix %v", err, tt.errString)
 				}
 			}

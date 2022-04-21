@@ -9,6 +9,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [BUGFIX] [#313](https://github.com/k8ssandra/cass-operator/issues/313) Remove Cassandra 4.0.x regexp restriction, allow 4.x.x
+
 ## v1.10.3
 
 * [FEATURE] [#309](https://github.com/k8ssandra/cass-operator/pull/309) If StatefulSets are modified in a way that they can't be updated directly, recreate them with new specs

@@ -15,6 +15,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#183](https://github.com/k8ssandra/cass-operator/issues/183) Move from PodDisruptionBudget v1beta1 to v1 (min. Kubernetes version 1.21)
 * [ENHANCEMENT] [#313](https://github.com/k8ssandra/cass-operator/issues/313) Add support for Cassandra 4.x.x versions instead of only 4.0.x
 * [ENHANCEMENT] [#292](https://github.com/k8ssandra/cass-operator/issues/292) Update to Go 1.17 with updates to dependencies: Kube 1.23.4 and controller-runtime 0.11.1 
+* [BUGFIX] [#322](https://github.com/k8ssandra/cass-operator/pull/322) Add missing requeue if decommissioned pods haven't been removed y et
 
 ## v1.10.3
 

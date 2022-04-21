@@ -2132,27 +2132,32 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	}
 
 	if task != nil {
-		if task.Status.CompletionTime != nil {
-			// Job was completed, remove it from followed task
-			dc := rc.Datacenter
-			dcPatch := client.MergeFrom(dc.DeepCopy())
-
-			rc.Datacenter.Status.RemoveTrackedTask(task.ObjectMeta)
-
-			if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
-				return result.Error(err)
-			}
-
-			return result.Continue()
-		}
-	} else {
-		// Create the cleanup task
-		err := rc.createTask("cleanup")
-		if err != nil {
-			return result.Error(err)
-		}
+		return rc.activeTaskCompleted(task)
 	}
 
+	// Create the cleanup task
+	err = rc.createTask("cleanup")
+	if err != nil {
+		return result.Error(err)
+	}
+
+	return result.RequeueSoon(10)
+}
+
+func (rc *ReconciliationContext) activeTaskCompleted(task *taskapi.CassandraTask) result.ReconcileResult {
+	if task.Status.CompletionTime != nil {
+		// Job was completed, remove it from followed task
+		dc := rc.Datacenter
+		dcPatch := client.MergeFrom(dc.DeepCopy())
+
+		rc.Datacenter.Status.RemoveTrackedTask(task.ObjectMeta)
+
+		if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
+			return result.Error(err)
+		}
+
+		return result.Continue()
+	}
 	return result.RequeueSoon(10)
 }
 

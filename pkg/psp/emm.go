@@ -44,7 +44,7 @@ type EMMTaintValue string
 
 const (
 	EvacuateAllData EMMTaintValue = "drain"
-	PlannedDowntime               = "planned-downtime"
+	PlannedDowntime EMMTaintValue = "planned-downtime"
 )
 
 type VolumeHealth string
@@ -351,13 +351,10 @@ func (impl *EMMServiceImpl) removeNextPodFromEvacuateDataNode() (bool, error) {
 		return false, err
 	}
 
-	for name, _ := range nodeNameSet {
+	for name := range nodeNameSet {
 		for _, pod := range impl.getPodsForNodeName(name) {
 			err := impl.RemovePod(pod)
-			if err != nil {
-				return false, err
-			}
-			return true, nil
+			return err == nil, err
 		}
 	}
 
@@ -366,7 +363,7 @@ func (impl *EMMServiceImpl) removeNextPodFromEvacuateDataNode() (bool, error) {
 
 func (impl *EMMServiceImpl) removeAllPodsFromOnePlannedDowntimeNode() (bool, error) {
 	nodeNameSet, err := impl.getPlannedDownTimeNodeNameSet()
-	for nodeName, _ := range nodeNameSet {
+	for nodeName := range nodeNameSet {
 		pods := impl.getPodsForNodeName(nodeName)
 		if len(pods) > 0 {
 			for _, pod := range pods {
@@ -421,7 +418,7 @@ func (impl *EMMServiceImpl) getRacksWithNotReadyPodsBootstrapped() []string {
 	pods := impl.GetNotReadyPodsBootstrappedInDC()
 	rackNameSet := getPodsRackNameSet(pods)
 	rackNames := []string{}
-	for rackName, _ := range rackNameSet {
+	for rackName := range rackNameSet {
 		rackNames = append(rackNames, rackName)
 	}
 	return rackNames
@@ -564,7 +561,7 @@ func checkNodeEMM(provider EMMService) result.ReconcileResult {
 	// as we are unlikely to be able to carry them out successfully.
 	if provider.IsStopped() {
 		didUpdate := false
-		for nodeName, _ := range evacuateDataNodeNameSet {
+		for nodeName := range evacuateDataNodeNameSet {
 			podsUpdated, err := provider.failEMM(nodeName, GenericFailure)
 			if err != nil {
 				return result.Error(err)
@@ -595,7 +592,7 @@ func checkNodeEMM(provider EMMService) result.ReconcileResult {
 	if len(racksWithDownPods) > 1 {
 		allTaintedNameSet := utils.UnionStringSet(plannedDownNodeNameSet, evacuateDataNodeNameSet)
 		didUpdate := false
-		for nodeName, _ := range allTaintedNameSet {
+		for nodeName := range allTaintedNameSet {
 			didUpdatePods, err := provider.failEMM(nodeName, TooManyExistingFailures)
 			if err != nil {
 				return result.Error(err)
@@ -629,7 +626,7 @@ func checkNodeEMM(provider EMMService) result.ReconcileResult {
 
 		if len(nodeNameSetForNoPodsInRack) > 0 {
 			didUpdate := false
-			for nodeName, _ := range nodeNameSetForNoPodsInRack {
+			for nodeName := range nodeNameSetForNoPodsInRack {
 				podsUpdated, err := provider.failEMM(nodeName, TooManyExistingFailures)
 				if err != nil {
 					return result.Error(err)
@@ -781,7 +778,7 @@ func checkPVCHealth(provider EMMService) result.ReconcileResult {
 		return result.Continue()
 	}
 
-	for podName, _ := range podNameSetWithInaccessible {
+	for podName := range podNameSetWithInaccessible {
 		err := provider.startNodeReplace(podName)
 		if err != nil {
 			logger.Error(err, "Failed to start node replacement for pod with inaccessible PVC", "pod", podName)

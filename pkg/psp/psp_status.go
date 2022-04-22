@@ -144,15 +144,15 @@ func instanceHealthSchema() map[string]interface{} {
 	return map[string]interface{}{
 		"name": "instanceHealth",
 		"fields": []map[string]interface{}{
-			map[string]interface{}{
+			{
 				"name": "instance",
 				"type": "string",
 			},
-			map[string]interface{}{
+			{
 				"name": "namespace",
 				"type": "string",
 			},
-			map[string]interface{}{
+			{
 				"name": "health",
 				"type": "string",
 			},
@@ -210,7 +210,7 @@ func updateHealth(health *Health, dc api.CassandraDatacenter) {
 	health.Spec = buildSchema()
 	instanceHealths := health.Status.InstanceHealth
 	index := -1
-	for i, _ := range instanceHealths {
+	for i := range instanceHealths {
 		if instanceHealths[i].Instance == dc.Name && instanceHealths[i].Namespace == dc.Namespace {
 			index = i
 			break
@@ -239,7 +239,11 @@ func loadHealthFromConfigMap(configMap *corev1.ConfigMap) (*Health, error) {
 
 func createHealthCheckConfigMap(health *Health, healthCheckNamespacedName types.NamespacedName) *corev1.ConfigMap {
 	configMap := newConfigMap(healthCheckNamespacedName)
-	saveHealthCheckToConfigMap(health, configMap)
+	err := saveHealthCheckToConfigMap(health, configMap)
+	if err != nil {
+		// No point continuing, we need to redo this
+		return configMap
+	}
 	utils.AddHashAnnotation(configMap)
 	configMap.SetLabels(
 		utils.MergeMap(

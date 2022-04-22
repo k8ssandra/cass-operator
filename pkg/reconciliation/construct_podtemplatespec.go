@@ -119,13 +119,13 @@ func probe(port int, path string, initDelay int, period int) *corev1.Probe {
 func getJvmExtraOpts(dc *api.CassandraDatacenter) string {
 	flags := ""
 
-	if dc.Spec.DseWorkloads.AnalyticsEnabled == true {
+	if dc.Spec.DseWorkloads.AnalyticsEnabled {
 		flags += "-Dspark-trackers=true "
 	}
-	if dc.Spec.DseWorkloads.GraphEnabled == true {
+	if dc.Spec.DseWorkloads.GraphEnabled {
 		flags += "-Dgraph-enabled=true "
 	}
-	if dc.Spec.DseWorkloads.SearchEnabled == true {
+	if dc.Spec.DseWorkloads.SearchEnabled {
 		flags += "-Dsearch-service=true"
 	}
 	return flags
@@ -317,9 +317,7 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		{Name: "DSE_VERSION", Value: serverVersion},
 	}
 
-	for _, envVar := range configEnvVar {
-		envDefaults = append(envDefaults, envVar)
-	}
+	envDefaults = append(envDefaults, configEnvVar...)
 
 	serverCfg.Env = combineEnvSlices(envDefaults, serverCfg.Env)
 

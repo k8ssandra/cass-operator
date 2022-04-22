@@ -9,18 +9,10 @@ import (
 	"os"
 )
 
-// Creates and sets permissions on a directory. Idempotent.
-func EnsureDir(dir string) {
-	os.Mkdir(dir, os.ModePerm)
-	//For some reason, this step is necessary to actually
-	//get the expected permissions
-	os.Chmod(dir, os.ModePerm)
-}
-
 func RequireEnv(key string) string {
 	val := os.Getenv(key)
 	if val == "" {
-		msg := fmt.Errorf("%s is a required environment variable\n", key)
+		msg := fmt.Errorf("%s is a required environment variable", key)
 		panic(msg)
 	}
 	return val

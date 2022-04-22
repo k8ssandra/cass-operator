@@ -5,9 +5,10 @@ package reconciliation
 
 import (
 	"fmt"
-	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"reflect"
 	"testing"
+
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +32,7 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 		}
 		secret, err := buildDefaultSuperuserSecret(dc)
 		if err != nil {
-			t.Errorf("should not have returned an error %w", err)
+			t.Errorf("should not have returned an error %v", err)
 			return
 		}
 
@@ -46,7 +47,7 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 
 		errors := validateCassandraUserSecretContent(dc, secret)
 		if len(errors) > 0 {
-			t.Errorf("expected default secret to be valid, but was not: %w", errors[0])
+			t.Errorf("expected default secret to be valid, but was not: %v", errors[0])
 		}
 
 		expectedSecretLabels := map[string]string{
@@ -77,7 +78,7 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 
 		secret, err := buildDefaultSuperuserSecret(dc)
 		if err != nil {
-			t.Errorf("should not have returned an error %w", err)
+			t.Errorf("should not have returned an error %v", err)
 			return
 		}
 

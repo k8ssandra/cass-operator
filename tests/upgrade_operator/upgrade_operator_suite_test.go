@@ -29,10 +29,17 @@ var (
 func TestLifecycle(t *testing.T) {
 	AfterSuite(func() {
 		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		kubectl.DumpAllLogs(logPath).ExecV()
+		err := kubectl.DumpAllLogs(logPath).ExecV()
+		if err != nil {
+			t.Logf("Failed to dump all the logs: %v", err)
+		}
+
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.Undeploy(namespace)
+		err = kustomize.Undeploy(namespace)
+		if err != nil {
+			t.Logf("Failed to undeploy cass-operator: %v", err)
+		}
 	})
 
 	RegisterFailHandler(Fail)
@@ -111,7 +118,8 @@ var _ = Describe(testName, func() {
 			// Verify PodDisruptionBudget is available (1.11 updates from v1beta1 -> v1)
 			json = "jsonpath={.items[].metadata.name}"
 			k = kubectl.Get("poddisruptionbudgets").WithLabel("cassandra.datastax.com/datacenter").FormatOutput(json)
-			ns.WaitForOutputContains(k, "dc1-pdb", 20)
+			err = ns.WaitForOutputContains(k, "dc1-pdb", 20)
+			Expect(err).ToNot(HaveOccurred())
 
 			// Update Cassandra version to ensure we can still do changes
 			step = "perform cassandra upgrade"

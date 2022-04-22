@@ -16,13 +16,11 @@ import (
 )
 
 var (
-	testName   = "Bring Up Solr"
-	namespace  = "test-bring-up-solr"
-	dcName     = "dc1"
-	dcYaml     = "../testdata/solr-dc.yaml"
-	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns         = ginkgo_util.NewWrapper(testName, namespace)
+	testName  = "Bring Up Solr"
+	namespace = "test-bring-up-solr"
+	dcName    = "dc1"
+	dcYaml    = "../testdata/solr-dc.yaml"
+	ns        = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -30,11 +28,15 @@ func TestLifecycle(t *testing.T) {
 		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
 		err := kubectl.DumpAllLogs(logPath).ExecV()
 		if err != nil {
-			fmt.Printf("\n\tError during dumping logs: %s\n\n", err.Error())
+			t.Logf("Failed to dump all the logs: %v", err)
 		}
+
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.Undeploy(namespace)
+		err = kustomize.Undeploy(namespace)
+		if err != nil {
+			t.Logf("Failed to undeploy cass-operator: %v", err)
+		}
 	})
 
 	RegisterFailHandler(Fail)

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"sort"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -35,11 +34,17 @@ var (
 func TestLifecycle(t *testing.T) {
 	AfterSuite(func() {
 		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		kubectl.DumpAllLogs(logPath).ExecV()
+		err := kubectl.DumpAllLogs(logPath).ExecV()
+		if err != nil {
+			t.Logf("Failed to dump all the logs: %v", err)
+		}
 
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.Undeploy(namespace)
+		err = kustomize.Undeploy(namespace)
+		if err != nil {
+			t.Logf("Failed to undeploy cass-operator: %v", err)
+		}
 	})
 
 	RegisterFailHandler(Fail)
@@ -71,7 +76,7 @@ func retrieveNodes() []Node {
 	err := json.Unmarshal([]byte(output), &data)
 	Expect(err).ToNot(HaveOccurred())
 	result := []Node{}
-	for idx, _ := range data.Items {
+	for idx := range data.Items {
 		pod := &data.Items[idx]
 		node := Node{}
 		node.Name = pod.Name
@@ -158,31 +163,6 @@ func checkDesignatedSeedNodesAreStartedAndReady(info DatacenterInfo) {
 		if node.Seed {
 			Expect(node.Started).To(BeTrue(), "Expected %s to be labeled as started but was not.", node.Name)
 			Expect(node.Ready).To(BeTrue(), "Expected %s to be ready but was not.", node.Name)
-		}
-	}
-}
-
-func checkCassandraSeedListsAlignWithSeedLabels(info DatacenterInfo) {
-	expectedSeeds := []string{}
-	for _, node := range info.Nodes {
-		if node.Seed {
-			expectedSeeds = append(expectedSeeds, node.IP)
-		}
-	}
-	sort.Strings(expectedSeeds)
-
-	re := regexp.MustCompile(`[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+`)
-	for _, node := range info.Nodes {
-		if node.Ready && node.Started {
-			k := kubectl.ExecOnPod(node.Name, "--", "nodetool", "getseeds")
-			output := ns.OutputPanic(k)
-			seeds := re.FindAllString(output, -1)
-			if node.Seed {
-				seeds = append(seeds, node.IP)
-			}
-			sort.Strings(seeds)
-
-			Expect(seeds).To(Equal(expectedSeeds), "Expected pod %s to have seeds %v but had %v", node.Name, expectedSeeds, seeds)
 		}
 	}
 }

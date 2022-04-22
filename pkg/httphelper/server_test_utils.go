@@ -21,8 +21,6 @@ var jobDetailsCompleted = `{"submit_time":"1638545895255","end_time":"1638545895
 
 var jobDetailsFailed = `{"submit_time":"1638545895255","end_time":"1638545895255","id":"%s","type":"Cleanup","status":"ERROR"}`
 
-var noJobDetails = `{}`
-
 func mgmtApiListener() (net.Listener, error) {
 	mgmtApiListener, err := net.Listen("tcp", "127.0.0.1:8080")
 	if err != nil {
@@ -61,18 +59,22 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 
 		if r.Method == http.MethodGet && r.RequestURI == "/api/v0/metadata/versions/features" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(featuresReply))
+			_, err = w.Write([]byte(featuresReply))
 		} else if r.Method == http.MethodGet && r.URL.Path == "/api/v0/ops/executor/job" {
 			w.WriteHeader(http.StatusOK)
 			jobId := query.Get("job_id")
-			w.Write([]byte(fmt.Sprintf(jobDetailsCompleted, jobId)))
+			_, err = w.Write([]byte(fmt.Sprintf(jobDetailsCompleted, jobId)))
 		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild") {
 			w.WriteHeader(http.StatusOK)
 			// Write jobId
 			jobId++
-			w.Write([]byte(strconv.Itoa(jobId)))
+			_, err = w.Write([]byte(strconv.Itoa(jobId)))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
+		}
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 
 	}))
@@ -91,18 +93,21 @@ func FakeExecutorServerWithDetailsFails(callDetails *CallDetails) (*httptest.Ser
 
 		if r.Method == http.MethodGet && r.RequestURI == "/api/v0/metadata/versions/features" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(featuresReply))
+			_, err = w.Write([]byte(featuresReply))
 		} else if r.Method == http.MethodGet && r.URL.Path == "/api/v0/ops/executor/job" {
 			w.WriteHeader(http.StatusOK)
 			jobId := query.Get("job_id")
-			w.Write([]byte(fmt.Sprintf(jobDetailsFailed, jobId)))
+			_, err = w.Write([]byte(fmt.Sprintf(jobDetailsFailed, jobId)))
 		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild") {
 			w.WriteHeader(http.StatusOK)
 			// Write jobId
 			jobId++
-			w.Write([]byte(strconv.Itoa(jobId)))
+			_, err = w.Write([]byte(strconv.Itoa(jobId)))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
+		}
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 
 	}))

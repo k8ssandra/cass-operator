@@ -135,11 +135,17 @@ var _ = Describe(testName, func() {
 	AfterEach(func() {
 		if GinkgoT().Failed() {
 			logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-			kubectl.DumpAllLogs(logPath).ExecV()
 			fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
+			err := kubectl.DumpAllLogs(logPath).ExecV()
+			if err != nil {
+				GinkgoT().Logf("Failed to dump all the logs: %v", err)
+			}
 		}
 		ns.Terminate()
-		kustomize.Undeploy(namespace)
+		err := kustomize.Undeploy(namespace)
+		if err != nil {
+			GinkgoT().Logf("Failed to undeploy cass-operator: %v", err)
+		}
 	})
 
 	type ServerDetails struct {

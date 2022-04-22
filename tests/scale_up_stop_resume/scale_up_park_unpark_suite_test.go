@@ -16,23 +16,29 @@ import (
 )
 
 var (
-	testName     = "Scale Up Stop Resume"
-	namespace    = "test-scale-up-stop-resume"
-	dcName       = "dc1"
-	dcYaml       = "../testdata/default-three-rack-three-node-dc.yaml"
-	operatorYaml = "../testdata/operator.yaml"
-	dcResource   = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel      = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns           = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "Scale Up Stop Resume"
+	namespace  = "test-scale-up-stop-resume"
+	dcName     = "dc1"
+	dcYaml     = "../testdata/default-three-rack-three-node-dc.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
 	AfterSuite(func() {
 		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		kubectl.DumpAllLogs(logPath).ExecV()
+		err := kubectl.DumpAllLogs(logPath).ExecV()
+		if err != nil {
+			t.Logf("Failed to dump all the logs: %v", err)
+		}
+
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.Undeploy(namespace)
+		err = kustomize.Undeploy(namespace)
+		if err != nil {
+			t.Logf("Failed to undeploy cass-operator: %v", err)
+		}
 	})
 
 	RegisterFailHandler(Fail)
@@ -107,6 +113,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "true true true true true", 1200)
 
 			step = "check recorded host IDs"
+			ns.Log(step)
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
 			Expect(len(nodeStatusesHostIds), 5)
 

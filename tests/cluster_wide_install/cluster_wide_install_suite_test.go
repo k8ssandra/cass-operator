@@ -43,7 +43,11 @@ func TestLifecycle(t *testing.T) {
 		}
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.UndeployDir(opNamespace, "cluster_wide_install")
+		err = kustomize.UndeployDir(opNamespace, "cluster_wide_install")
+		if err != nil {
+			t.Logf("Failed to undeploy cass-operator: %v", err)
+		}
+
 	})
 
 	RegisterFailHandler(Fail)

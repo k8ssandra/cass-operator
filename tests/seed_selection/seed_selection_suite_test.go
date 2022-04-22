@@ -6,8 +6,6 @@ package seed_selection
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
-	"sort"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -21,24 +19,29 @@ import (
 )
 
 var (
-	testName     = "Seed Selection"
-	namespace    = "test-seed-selection"
-	dcName       = "dc1"
-	dcYaml       = "../testdata/default-three-rack-three-node-dc.yaml"
-	operatorYaml = "../testdata/operator.yaml"
-	dcResource   = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel      = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns           = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "Seed Selection"
+	namespace  = "test-seed-selection"
+	dcName     = "dc1"
+	dcYaml     = "../testdata/default-three-rack-three-node-dc.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
 	AfterSuite(func() {
 		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		kubectl.DumpAllLogs(logPath).ExecV()
+		err := kubectl.DumpAllLogs(logPath).ExecV()
+		if err != nil {
+			t.Logf("Failed to dump all the logs: %v", err)
+		}
 
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.Undeploy(namespace)
+		err = kustomize.Undeploy(namespace)
+		if err != nil {
+			t.Logf("Failed to undeploy cass-operator: %v", err)
+		}
 	})
 
 	RegisterFailHandler(Fail)
@@ -70,7 +73,7 @@ func retrieveNodes() []Node {
 	err := json.Unmarshal([]byte(output), &data)
 	Expect(err).ToNot(HaveOccurred())
 	result := []Node{}
-	for idx, _ := range data.Items {
+	for idx := range data.Items {
 		pod := &data.Items[idx]
 		node := Node{}
 		node.Name = pod.Name
@@ -99,6 +102,7 @@ func retrieveDatacenterInfo() DatacenterInfo {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = json.Unmarshal([]byte(output), &data)
+	Expect(err).ToNot(HaveOccurred())
 
 	spec := data["spec"].(map[string]interface{})
 	rackNames := []string{}
@@ -177,31 +181,6 @@ func checkDesignatedSeedNodesAreStartedAndReady(info DatacenterInfo) {
 	}
 }
 
-func checkCassandraSeedListsAlignWithSeedLabels(info DatacenterInfo) {
-	expectedSeeds := []string{}
-	for _, node := range info.Nodes {
-		if node.Seed {
-			expectedSeeds = append(expectedSeeds, node.IP)
-		}
-	}
-	sort.Strings(expectedSeeds)
-
-	re := regexp.MustCompile(`[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+`)
-	for _, node := range info.Nodes {
-		if node.Ready && node.Started {
-			k := kubectl.ExecOnPod(node.Name, "--", "nodetool", "getseeds")
-			output := ns.OutputPanic(k)
-			seeds := re.FindAllString(output, -1)
-			if node.Seed {
-				seeds = append(seeds, node.IP)
-			}
-			sort.Strings(seeds)
-
-			Expect(seeds).To(Equal(expectedSeeds), "Expected pod %s to have seeds %v but had %v", node.Name, expectedSeeds, seeds)
-		}
-	}
-}
-
 func checkSeedConstraints() {
 	info := retrieveDatacenterInfo()
 	// There should be 3 seed nodes for every datacenter
@@ -222,34 +201,6 @@ func checkSeedConstraints() {
 	// likely end up with slight out-of-date seed lists. KO-375
 	//
 	// checkCassandraSeedListsAlignWithSeedLabels(info)
-}
-
-func disableGossipWaitNotReady(podName string) {
-	disableGossip(podName)
-	ns.WaitForPodNotStarted(podName)
-}
-
-func enableGossipWaitReady(podName string) {
-	enableGossip(podName)
-	ns.WaitForPodStarted(podName)
-}
-
-func disableGossip(podName string) {
-	execArgs := []string{"-c", "cassandra",
-		"--", "bash", "-c",
-		"nodetool disablegossip",
-	}
-	k := kubectl.ExecOnPod(podName, execArgs...)
-	ns.ExecVPanic(k)
-}
-
-func enableGossip(podName string) {
-	execArgs := []string{"-c", "cassandra",
-		"--", "bash", "-c",
-		"nodetool enablegossip",
-	}
-	k := kubectl.ExecOnPod(podName, execArgs...)
-	ns.ExecVPanic(k)
 }
 
 var _ = Describe(testName, func() {

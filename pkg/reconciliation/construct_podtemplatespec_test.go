@@ -334,9 +334,7 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 		configEnVars, err := getConfigDataEnVars(dc)
 		assert.NoError(t, err, "failed to get config env vars")
 
-		for _, v := range configEnVars {
-			tt.want = append(tt.want, v)
-		}
+		tt.want = append(tt.want, configEnVars...)
 
 		if err := buildInitContainers(dc, rack, templateSpec); err == nil {
 			assert.Equal(t, 1, len(templateSpec.Spec.InitContainers), fmt.Sprintf("%s: expected to find 1 init container", tt.name))

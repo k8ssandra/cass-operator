@@ -270,6 +270,10 @@ func (ns *NsWrapper) WaitForDatacenterReady(dcName string) {
 	ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 1200)
 }
 
+func (ns *NsWrapper) Log(step string) {
+	ginkgo.By(step)
+}
+
 func (ns *NsWrapper) WaitForDatacenterReadyWithTimeouts(dcName string, podCountTimeout int, dcReadyTimeout int) {
 	json := "jsonpath={.spec.size}"
 	k := kubectl.Get("CassandraDatacenter", dcName).FormatOutput(json)
@@ -384,18 +388,6 @@ func (ns *NsWrapper) WaitForOperatorReady() {
 		WithFlag("field-selector", "status.phase=Running").
 		FormatOutput(json)
 	ns.WaitForOutputAndLog(step, k, "true", 300)
-}
-
-// kubectl create secret docker-registry github-docker-registry --docker-username=USER --docker-password=PASS --docker-server docker.pkg.github.com
-func CreateDockerRegistrySecret(name string, namespace string) {
-	args := []string{"secret", "docker-registry", name}
-	flags := map[string]string{
-		"docker-username": os.Getenv(kubectl.EnvDockerUsername),
-		"docker-password": os.Getenv(kubectl.EnvDockerPassword),
-		"docker-server":   os.Getenv(kubectl.EnvDockerServer),
-	}
-	k := kubectl.KCmd{Command: "create", Args: args, Flags: flags}
-	k.InNamespace(namespace).ExecVCapture()
 }
 
 // Note that the actual value will be cast to a string before the comparison with the expectedValue

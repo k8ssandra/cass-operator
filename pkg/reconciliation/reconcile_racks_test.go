@@ -193,7 +193,7 @@ func TestReconcileRacks_ReconcilePods(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewFakeClient(trackObjects...)
+	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = "default"
@@ -416,7 +416,7 @@ func TestReconcilePods_WithVolumes(t *testing.T) {
 		pvc,
 	}
 
-	rc.Client = fake.NewFakeClient(trackObjects...)
+	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 	err = rc.ReconcilePods(statefulSet)
 	assert.NoErrorf(t, err, "Should not have returned an error")
 }
@@ -551,7 +551,7 @@ func TestReconcileRacks(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewFakeClient(trackObjects...)
+	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -624,7 +624,7 @@ func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewFakeClient(trackObjects...)
+	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -661,7 +661,7 @@ func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
 		preExistingStatefulSet,
 	}
 
-	rc.Client = fake.NewFakeClient(trackObjects...)
+	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -703,7 +703,7 @@ func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewFakeClient(trackObjects...)
+	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -740,7 +740,7 @@ func TestReconcileRacks_NeedToPark(t *testing.T) {
 		rc.Datacenter,
 	}
 
-	rc.Client = fake.NewFakeClient(trackObjects...)
+	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -791,7 +791,7 @@ func TestReconcileRacks_AlreadyReconciled(t *testing.T) {
 		desiredPdb,
 	}
 
-	rc.Client = fake.NewFakeClient(trackObjects...)
+	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -868,7 +868,7 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 		rc.Datacenter,
 	}
 
-	rc.Client = fake.NewFakeClient(trackObjects...)
+	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -938,7 +938,7 @@ func TestReconcileRacks_UpdateRackNodeCount(t *testing.T) {
 				rc.Datacenter,
 			}
 
-			rc.Client = fake.NewFakeClient(trackObjects...)
+			rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 			if err := rc.UpdateRackNodeCount(tt.args.statefulSet, tt.args.newNodeCount); (err != nil) != tt.wantErr {
 				t.Errorf("updateRackNodeCount() error = %v, wantErr %v", err, tt.wantErr)
@@ -980,7 +980,7 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewFakeClient(trackObjects...)
+	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 

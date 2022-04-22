@@ -15,6 +15,9 @@ import (
 func Test_newCA(t *testing.T) {
 	var verify_key *rsa.PrivateKey
 	pem_key, cert, err := GetNewCAandKey("cassandradatacenter-webhook-service", "somenamespace")
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
 	certpool := x509.NewCertPool()
 	key, _ := pem.Decode([]byte(pem_key))
 	if block, _ := pem.Decode([]byte(cert)); block != nil {
@@ -84,5 +87,8 @@ func Test_GetJKS(t *testing.T) {
 		_ = os.Remove("test-jks")
 	}()
 
-	os.WriteFile("test-jks", jks, 0644)
+	err = os.WriteFile("test-jks", jks, 0644)
+	if err != nil {
+		t.Errorf("WriteFile error: %e", err)
+	}
 }

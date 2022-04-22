@@ -16,12 +16,11 @@ import (
 )
 
 var (
-	testName     = "Multi-cluster Management"
-	namespace    = "test-multi-cluster-management"
-	dcNames      = [2]string{"dc1", "dc2"}
-	dcYamls      = [2]string{"../testdata/default-three-rack-three-node-dc.yaml", "../testdata/default-single-rack-single-node-dc.yaml"}
-	operatorYaml = "../testdata/operator.yaml"
-	ns           = ginkgo_util.NewWrapper(testName, namespace)
+	testName  = "Multi-cluster Management"
+	namespace = "test-multi-cluster-management"
+	dcNames   = [2]string{"dc1", "dc2"}
+	dcYamls   = [2]string{"../testdata/default-three-rack-three-node-dc.yaml", "../testdata/default-single-rack-single-node-dc.yaml"}
+	ns        = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func dcResourceForName(dcName string) string {
@@ -35,10 +34,17 @@ func dcLabelForName(dcName string) string {
 func TestLifecycle(t *testing.T) {
 	AfterSuite(func() {
 		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		kubectl.DumpAllLogs(logPath).ExecV()
+		err := kubectl.DumpAllLogs(logPath).ExecV()
+		if err != nil {
+			t.Logf("Failed to dump all the logs: %v", err)
+		}
+
 		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
 		ns.Terminate()
-		kustomize.Undeploy(namespace)
+		err = kustomize.Undeploy(namespace)
+		if err != nil {
+			t.Logf("Failed to undeploy cass-operator: %v", err)
+		}
 	})
 
 	RegisterFailHandler(Fail)

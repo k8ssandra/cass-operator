@@ -18,13 +18,13 @@ Default installation is simple, the kubectl will create a namespace ``cass-opera
 Default install requires cert-manager to be installed, since webhooks require TLS certificates to be injected. See below how to install cert-manager if your environment does not have it installed previously.
 
 ```console
-kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.10.3
+kubectl apply --force-conflicts --server-side -k github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.10.3
 ```
 
 If you wish to install it with cluster wide rights to monitor all the namespaces for ``CassandraDatacenter`` objects, use the following command:
 
 ```console
-kubectl apply -k github.com/k8ssandra/cass-operator/config/deployments/cluster?ref=v1.10.3
+kubectl apply --force-conflicts --server-side -k github.com/k8ssandra/cass-operator/config/deployments/cluster?ref=v1.10.3
 ```
 
 Alternatively, if you checkout the code, you can use ``make deploy`` to run [Kustomize](https://kustomize.io/) and deploy the files.

@@ -12,10 +12,11 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#264](https://github.com/k8ssandra/cass-operator/issues/264) Generate PodTemplateSpec in CassandraDatacenter with metadata
-* [CHANGE] [#183](https://github.com/k8ssandra/cass-operator/issues/183) Move from PodDisruptionBudget v1beta1 to v1 (min. Kubernetes version 1.21)
+* [CHANGE] [#183](https://github.com/k8ssandra/cass-operator/issues/183) Move from PodDisruptionBudget v1beta1 to v1 (changes min. required Kubernetes version to 1.21)
+* [ENHANCEMENT] [#325](https://github.com/k8ssandra/cass-operator/issues/325) Enable static checking (golangci-lint) in the repository and fix all the found issues.
 * [ENHANCEMENT] [#313](https://github.com/k8ssandra/cass-operator/issues/313) Add support for Cassandra 4.x.x versions instead of only 4.0.x
 * [ENHANCEMENT] [#292](https://github.com/k8ssandra/cass-operator/issues/292) Update to Go 1.17 with updates to dependencies: Kube 1.23.4 and controller-runtime 0.11.1 
-* [BUGFIX] [#322](https://github.com/k8ssandra/cass-operator/pull/322) Add missing requeue if decommissioned pods haven't been removed y et
+* [BUGFIX] [#322](https://github.com/k8ssandra/cass-operator/pull/322) Add missing requeue if decommissioned pods haven't been removed yet
 
 ## v1.10.3
 

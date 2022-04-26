@@ -1070,19 +1070,29 @@ func (rc *ReconciliationContext) startReplacePodsIfReplacePodsSpecified() error 
 	dc := rc.Datacenter
 
 	if len(dc.Spec.ReplaceNodes) > 0 {
-		rc.ReqLogger.Info("Replacing pods", "pods", dc.Spec.ReplaceNodes)
+		rc.ReqLogger.Info("Requested replacing pods", "pods", dc.Spec.ReplaceNodes)
 
-		podNamesString := strings.Join(dc.Spec.ReplaceNodes, ", ")
+		for _, podName := range dc.Spec.ReplaceNodes {
+			// Each podName has to be in the dcPods
+			for _, dcPod := range rc.dcPods {
+				if podName == dcPod.Name {
+					dc.Status.NodeReplacements = utils.AppendValuesToStringArrayIfNotPresent(
+						dc.Status.NodeReplacements, podName)
+					break
+				}
+			}
+			rc.ReqLogger.Error(fmt.Errorf("invalid pod name in ReplaceNodes"), "Rejected ReplaceNode entry, pod does not exist in the Datacenter", "PodName", podName)
+		}
 
-		_ = rc.setCondition(
-			api.NewDatacenterCondition(api.DatacenterReplacingNodes, corev1.ConditionTrue))
+		if len(dc.Status.NodeReplacements) > 0 {
+			podNamesString := strings.Join(dc.Spec.ReplaceNodes, ", ")
 
-		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.ReplacingNode,
-			"Replacing Cassandra nodes for pods %s", podNamesString)
+			_ = rc.setCondition(
+				api.NewDatacenterCondition(api.DatacenterReplacingNodes, corev1.ConditionTrue))
 
-		dc.Status.NodeReplacements = utils.AppendValuesToStringArrayIfNotPresent(
-			dc.Status.NodeReplacements,
-			dc.Spec.ReplaceNodes...)
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.ReplacingNode,
+				"Replacing Cassandra nodes for pods %s", podNamesString)
+		}
 
 		// Now that we've recorded these nodes in the status, we can blank
 		// out this field on the spec

@@ -1549,3 +1549,55 @@ func TestStripPassword(t *testing.T) {
 
 	assert.False(t, strings.Contains(err.Error(), password))
 }
+
+func TestNodereplacements(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	pod := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1-default-sts-0",
+		},
+	}
+
+	pod2 := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1-default-sts-1",
+		},
+	}
+
+	rc.dcPods = []*corev1.Pod{
+		pod, pod2,
+	}
+
+	err := rc.startReplacePodsIfReplacePodsSpecified()
+	assert.NoError(err)
+	assert.Equal(0, len(rc.Datacenter.Status.NodeReplacements))
+
+	rc.Datacenter.Spec.ReplaceNodes = []string{""}
+	err = rc.startReplacePodsIfReplacePodsSpecified()
+	assert.NoError(err)
+	assert.Equal(0, len(rc.Datacenter.Status.NodeReplacements))
+	assert.Equal(0, len(rc.Datacenter.Spec.ReplaceNodes))
+
+	rc.Datacenter.Spec.ReplaceNodes = []string{"dc1-default-sts-3"} // Does not exists
+	err = rc.startReplacePodsIfReplacePodsSpecified()
+	assert.NoError(err)
+	assert.Equal(0, len(rc.Datacenter.Status.NodeReplacements))
+	assert.Equal(0, len(rc.Datacenter.Spec.ReplaceNodes))
+
+	rc.Datacenter.Spec.ReplaceNodes = []string{"dc1-default-sts-0"}
+	err = rc.startReplacePodsIfReplacePodsSpecified()
+	assert.NoError(err)
+	assert.Equal(1, len(rc.Datacenter.Status.NodeReplacements))
+	assert.Equal(0, len(rc.Datacenter.Spec.ReplaceNodes))
+}

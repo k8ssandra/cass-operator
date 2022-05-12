@@ -100,3 +100,22 @@ jobs:
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
+      - name: Create bundle
+        run: |
+          make IMG=k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}} VERSION=${{ env.TARGET_VERSION }} bundle
+      - name: Build and push cass-operator-bundle
+        id: docker_build_cass-operator_bundle
+        uses: docker/build-push-action@v2
+        with:
+          file: bundle.Dockerfile
+          build-args: |
+            VERSION=${{ env.TARGET_VERSION }}
+          context: .
+          push: ${{ !env.ACT }}
+          tags: k8ssandra/cass-operator-bundle:${{ steps.vars.outputs.tag_name}}
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+      - name: Build and update cass-operator-catalog
+        run: |
+          make VERSION=${{ env.TARGET_VERSION }} CHANNEL=dev catalog-build catalog-push

@@ -76,6 +76,7 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+.PHONY: all
 all: build
 
 ##@ General
@@ -91,20 +92,25 @@ all: build
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
+.PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
 
+.PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
+.PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+.PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
 
+.PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
 
@@ -112,12 +118,14 @@ vet: ## Run go vet against code.
 lint: ## Run golangci-lint against code.
 	golangci-lint run ./...
 
+.PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	# Old unit tests first - these use mocked client / fakeclient
 	go test ./pkg/... -coverprofile cover-pkg.out
 	# Then the envtest ones
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v ./apis/... ./controllers/... -coverprofile cover.out
 
+.PHONY: integ-test
 integ-test: kustomize cert-manager ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
 ifeq ($(M_INTEG_DIR), all)
 	# Run all the tests (exclude kustomize & testdata directories)
@@ -128,49 +136,62 @@ endif
 
 ##@ Build
 
+.PHONY: build
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
 
+.PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
+.PHONY: docker-build
 docker-build: ## Build docker image with the manager.
 	docker buildx build --build-arg VERSION=${VERSION} -t ${IMG} -t ${IMG_LATEST} . --load
 
+.PHONY: docker-kind
 docker-kind: docker-build ## Build docker image and load to kind cluster
 	kind load docker-image ${IMG}
 	kind load docker-image ${IMG_LATEST}
 
+.PHONY: docker-push
 docker-push: ## Build and push docker image with the manager.
 	docker push ${IMG}
 	docker push ${IMG_LATEST}
 
+.PHONY: docker-logger-build
 docker-logger-build: ## Build system-logger image.
 	docker buildx build -t ${LOG_IMG} -t ${LOG_IMG_LATEST} --build-arg VERSION=${VERSION} -f logger.Dockerfile . --load
 
+.PHONY: docker-logger-push
 docker-logger-push: ## Push system-logger-image
 	docker push ${LOG_IMG}
 	docker push ${LOG_IMG_LATEST}
 
+.PHONY: docker-logger-kind
 docker-logger-kind: docker-logger-build ## Build system-logger image and load to kind cluster
 	kind load docker-image ${LOG_IMG}
 	kind load docker-image ${LOG_IMG_LATEST}
 
 ##@ Deployment
 
+.PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl apply --force-conflicts --server-side -f -
 
+.PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
+.PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/deployments/default | kubectl apply --force-conflicts --server-side -f -
 
+.PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/deployments/default | kubectl delete -f -
 
+.PHONY: deploy-test
 deploy-test:
 ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
@@ -178,6 +199,7 @@ endif
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build tests/$(TEST_DIR) | kubectl apply --force-conflicts --server-side -f -
 
+.PHONY: undeploy-test
 undeploy-test:
 ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
@@ -186,20 +208,24 @@ endif
 
 ##@ Tools
 
+.PHONY: cert-manager
 cert-manager: ## Install cert-manager to the cluster
 	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.7.1/cert-manager.yaml
 	kubectl wait --for=condition=Established crd certificates.cert-manager.io
 	kubectl rollout status deployment cert-manager-webhook -n cert-manager
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
+.PHONY: controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
+.PHONY: kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.4.1)
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
+.PHONY: envtest
 envtest: ## Download envtest-setup locally if necessary.
 	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
 
@@ -213,7 +239,7 @@ ifeq (,$(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPSDK)) ;\
-	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.18.0/operator-sdk_${OS}_${ARCH} ;\
+	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.19.1/operator-sdk_${OS}_${ARCH} ;\
 	chmod +x $(OPSDK) ;\
 	}
 else

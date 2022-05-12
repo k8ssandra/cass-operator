@@ -5,7 +5,7 @@ metadata:
 spec:
   clusterName: development
   serverType: cassandra
-  serverVersion: "4.0.1"
+  serverVersion: "4.0.3"
   managementApiAuth:
     insecure: {}
   size: 3
@@ -22,13 +22,10 @@ spec:
     requests:
       memory: 2Gi
       cpu: 1000m
-  podTemplateSpec:
-    securityContext: {}
-    containers:
-      - name: cassandra
-        securityContext: {}
   racks:
     - name: rack1
+    - name: rack2
+    - name: rack3
   config:
     jvm-server-options:
       initial_heap_size: "1G"

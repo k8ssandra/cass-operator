@@ -1,4 +1,5 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
 - example-cassdc-three-nodes-single-rack.yaml
+- cassandratask-cleanup.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

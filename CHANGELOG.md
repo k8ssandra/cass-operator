@@ -14,6 +14,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#264](https://github.com/k8ssandra/cass-operator/issues/264) Generate PodTemplateSpec in CassandraDatacenter with metadata
 * [BUGFIX] [#313](https://github.com/k8ssandra/cass-operator/issues/313) Remove Cassandra 4.0.x regexp restriction, allow 4.x.x
 * [BUGFIX] [#322](https://github.com/k8ssandra/cass-operator/pull/322) Add missing requeue if decommissioned pods haven't been removed yet
+* [BUGFIX] [#315](https://github.com/k8ssandra/cass-operator/pull/315) Validate podnames in the ReplaceNodes before moving them to NodeReplacements
 
 ## v1.10.3
 

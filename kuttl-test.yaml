@@ -1,0 +1,10 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestSuite
+testDirs:
+- ./tests/kuttl
+startKIND: true
+kindNodeCache: true
+kindConfig: tests/kuttl/config/kind/w3k1.21.yaml 
+timeout: 1400
+kindContainers:
+- k8ssandra/cass-operator:latest

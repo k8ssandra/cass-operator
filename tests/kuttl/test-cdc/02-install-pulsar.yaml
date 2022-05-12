@@ -1,0 +1,30 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands: 
+- script: |
+    ../../../bin/helm 
+    helm repo add datastax-pulsar https://datastax.github.io/pulsar-helm-chart
+    helm repo update
+    curl -LOs https://datastax.github.io/pulsar-helm-chart/examples/dev-values.yaml
+    helm install pulsar --create-namespace -f dev-values.yaml datastax-pulsar/pulsar
+- script: |
+    PULSAR_POD=$(kubectl --kubeconfig kubeconfig get pods -l=app=pulsar -l=component=broker -o=jsonpath='{.items[0].metadata.name}')
+    kubectl exec $PULSAR_POD --container pulsar-broker -- /pulsar/bin/pulsar-admin \
+    --name cassandra-source-1 \
+    --archive /pulsar/connectors/pulsar-cassandra-source-1.0.3.nar \
+    --tenant public \
+    --namespace default \
+    --destination-topic-name public/default/data-ks1.table1 \
+    --parallelism 1 \
+    --source-config '{
+        "events.topic": "persistent://public/default/events-cdc-ks1.table1",
+        "keyspace": "ks1",
+        "table": "table1",
+        "contactPoints": "localhost",
+        "port": 9042,
+        "loadBalancing.localDc": "DC1",
+        "auth.provider": "PLAIN",
+        "auth.username": "testuser",
+        "auth.password": "testpass"
+    }'
+  ignoreFailure: false

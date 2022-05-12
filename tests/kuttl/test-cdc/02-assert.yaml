@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulsar-broker
+  namespace: default
+status:
+  conditions:
+  - status: "True"
+    type: Available
+  - status: "True"
+    type: Progressing

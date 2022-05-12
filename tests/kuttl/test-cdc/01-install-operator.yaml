@@ -1,0 +1,8 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands: 
+- script: |
+    kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.7.1/cert-manager.yaml
+    kubectl wait --for=condition=Established crd certificates.cert-manager.io
+    until ../../../bin/kustomize build ../../../config/deployments/default | kubectl apply --server-side --force-conflicts -f -; do sleep 5; done
+  ignoreFailure: false

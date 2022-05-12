@@ -231,6 +231,29 @@ envtest: ## Download envtest-setup locally if necessary.
 
 OS=$(shell go env GOOS)
 ARCH=$(shell go env GOARCH)
+
+HELM = $(shell pwd)/bin/helm
+HELMFILENAME = helm-v3.8.2-${OS}-${ARCH}.tar.gz
+bin/helm: ## Download helm locally if necessary.
+	curl -LO https://get.helm.sh/${HELMFILENAME} ;\
+	tar zxvf ${HELMFILENAME} ;\
+	mv darwin-amd64/helm ./bin/ ;\
+	rm -r darwin-amd64 ${HELMFILENAME}
+
+# E2E tests from kuttl
+kuttl-test: bin/kubectl-kuttl bin/helm docker-build
+	./bin/kubectl-kuttl test --test test-cdc
+
+ # Install kuttl for e2e tests.
+bin/kubectl-kuttl: 
+	mkdir -p ./bin ; \
+	cd ./bin ; \
+	OS="$$(uname | tr '[:upper:]' '[:lower:]')" ; \
+  	ARCH="$$(uname -m | sed -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$$/arm64/')" ; \
+	curl -LO https://github.com/kudobuilder/kuttl/releases/download/v0.11.1/kuttl_0.11.1_$${OS}_$${ARCH}.tar.gz ; \
+	tar -zxvf kuttl_0.11.1_$${OS}_$${ARCH}.tar.gz ; 
+
+
 .PHONY: operator-sdk
 OPSDK = ./bin/operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary

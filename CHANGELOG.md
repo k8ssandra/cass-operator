@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.10.4
 
 * [CHANGE] [#264](https://github.com/k8ssandra/cass-operator/issues/264) Generate PodTemplateSpec in CassandraDatacenter with metadata
 * [BUGFIX] [#313](https://github.com/k8ssandra/cass-operator/issues/313) Remove Cassandra 4.0.x regexp restriction, allow 4.x.x

@@ -1085,7 +1085,7 @@ func (rc *ReconciliationContext) startReplacePodsIfReplacePodsSpecified() error 
 		}
 
 		if len(dc.Status.NodeReplacements) > 0 {
-			podNamesString := strings.Join(dc.Spec.ReplaceNodes, ", ")
+			podNamesString := strings.Join(dc.Status.NodeReplacements, ", ")
 
 			_ = rc.setCondition(
 				api.NewDatacenterCondition(api.DatacenterReplacingNodes, corev1.ConditionTrue))

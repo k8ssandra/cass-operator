@@ -1589,7 +1589,7 @@ func TestNodereplacements(t *testing.T) {
 	assert.Equal(0, len(rc.Datacenter.Status.NodeReplacements))
 	assert.Equal(0, len(rc.Datacenter.Spec.ReplaceNodes))
 
-	rc.Datacenter.Spec.ReplaceNodes = []string{"dc1-default-sts-3"} // Does not exists
+	rc.Datacenter.Spec.ReplaceNodes = []string{"dc1-default-sts-3"} // Does not exist
 	err = rc.startReplacePodsIfReplacePodsSpecified()
 	assert.NoError(err)
 	assert.Equal(0, len(rc.Datacenter.Status.NodeReplacements))

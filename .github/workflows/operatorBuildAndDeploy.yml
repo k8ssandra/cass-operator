@@ -45,8 +45,7 @@ jobs:
           # GHA requires longer timeout
           args: --timeout=10m
           # Optional: show only new issues if it's a pull request. The default value is `false`.
-          only-new-issues: true
-          skip-go-installation: true
+          only-new-issues: ${{ github.event_name == 'pull_request' }}
           skip-pkg-cache: true
           skip-build-cache: true
       - name: Unit Tests

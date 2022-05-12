@@ -79,7 +79,7 @@ jobs:
         run: |
           make IMG=k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}} VERSION=${{ env.TARGET_VERSION }} bundle
       - name: Build and push cass-operator-bundle
-        id: docker_build_cass-operator
+        id: docker_build_cass-operator_bundle
         uses: docker/build-push-action@v2
         with:
           file: bundle.Dockerfile

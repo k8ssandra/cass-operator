@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.11.0
 
 * [CHANGE] [#183](https://github.com/k8ssandra/cass-operator/issues/183) Move from PodDisruptionBudget v1beta1 to v1 (changes min. required Kubernetes version to 1.21)
 * [ENHANCEMENT] [#325](https://github.com/k8ssandra/cass-operator/issues/325) Enable static checking (golangci-lint) in the repository and fix all the found issues.

@@ -5,9 +5,9 @@ The DataStax Kubernetes Operator for Apache Cassandra&reg;. This repository repl
 
 ## Getting Started
 
-To create a full featured cluster, the recommend approach is to use the Helm charts from k8ssandra. Check the [Getting started](https://k8ssandra.io/docs/getting-started/) documentation at (k8ssandra.io)[https://k8ssandra.io/docs].
+To create a full featured cluster, the recommend approach is to use the Helm charts from k8ssandra. Check the [Getting started](https://k8ssandra.io/docs/getting-started/) documentation at (k8ssandra.io)[https://k8ssandra.io/docs]. We also provide the ability to install and upgrade the operator with Operator Lifecycle Manager (OLM).
 
-A more custom approach is to use Kustomize as described in the following sections if you wish to use cass-operator only. If updating from previous version, please see ``Upgrade instructions`` section first.
+If you wish to use cass-operator only we provide Kustomize templates that can be used to install with kubectl only. This approach is also recommended if you wish to modify the installation beyond our provided examples. If updating from previous versions, please see ``Upgrade instructions`` section first.
 
 ### Installing the operator with Kustomize
 
@@ -18,13 +18,13 @@ Default installation is simple, the kubectl will create a namespace ``cass-opera
 Default install requires cert-manager to be installed, since webhooks require TLS certificates to be injected. See below how to install cert-manager if your environment does not have it installed previously.
 
 ```console
-kubectl apply --force-conflicts --server-side -k github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.10.4
+kubectl apply --force-conflicts --server-side -k github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.11.0
 ```
 
 If you wish to install it with cluster wide rights to monitor all the namespaces for ``CassandraDatacenter`` objects, use the following command:
 
 ```console
-kubectl apply --force-conflicts --server-side -k github.com/k8ssandra/cass-operator/config/deployments/cluster?ref=v1.10.4
+kubectl apply --force-conflicts --server-side -k github.com/k8ssandra/cass-operator/config/deployments/cluster?ref=v1.11.0
 ```
 
 Alternatively, if you checkout the code, you can use ``make deploy`` to run [Kustomize](https://kustomize.io/) and deploy the files.
@@ -41,7 +41,7 @@ cass-operator-555577b9f8-zgx6j   1/1     Running   0          25h
 
 Updates are supported from previous versions of ``k8ssandra/cass-operator``. If upgrading from versions older than 1.7.0 (released under ``datastax/cass-operator`` name), please upgrade first to version 1.7.1. The following instructions apply when upgrading from 1.7.1 to 1.8.0 or newer up to 1.10.1. Upgrading to 1.11.0 if using Kubernetes 1.23 requires updating at least to 1.8.0 first, since 1.7.1 can not be used in Kubernetes 1.23 or newer.
 
-Due to the modifications to cass-operator’s underlying controller-runtime and updated Kubernetes versions, there is a need to do couple of manual steps before updating to a newest version of cass-operator. Newer Kubernetes versions require stricter validation and as such we need to remove ``preserveUnknownFields`` global property from the CRD to allow us to update to a newer CRD. The newer controller-runtime on the other hand modifies the liveness, readiness and configuration options, which require us to delete the older deployment. These commands do not delete your running Cassandra instances.
+If you're upgrading from 1.7.1, there is an additional step to take due to the modifications to cass-operator’s underlying controller-runtime and updated Kubernetes versions. These steps need to be done manually before updating to the newest version of cass-operator. Newer Kubernetes versions require stricter validation and as such we need to remove ``preserveUnknownFields`` global property from the CRD to allow us to update to a newer CRD. The newer controller-runtime on the other hand modifies the liveness, readiness and configuration options, which require us to delete the older deployment. These commands do not delete your running Cassandra instances.
 
  Run the following commands assuming cass-operator is installed to ``cass-operator`` namespace (change -n parameter if it is installed to some other namespace):
 
@@ -58,7 +58,7 @@ You can now install new version of cass-operator as instructed previously.
 If you have Prometheus installed in your cluster, you can apply the following command to install the Prometheus support:
 
 ```console
-kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus?ref=v1.10.4
+kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus?ref=v1.11.0
 ```
 
 ### Install cert-manager
@@ -80,10 +80,10 @@ kind: Kustomization
 namespace: cass-operator
 
 resources:
-  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.10.4
+  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.11.0
 
 components:
-  - github.com/k8ssandra/cass-operator/config/components/cluster?ref=v1.10.4
+  - github.com/k8ssandra/cass-operator/config/components/cluster?ref=v1.11.0
 ```
 
 We provide both components to modify the installation as well as some additional resources for custom features. At the moment, you can modify the behavior of the installation in the following ways, or remove a component to
@@ -124,7 +124,7 @@ reclaimPolicy: Delete
 Paste the above to a file and apply:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.10.4/operator/k8s-flavors/gke/storage.yaml
+kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.11.0/operator/k8s-flavors/gke/storage.yaml
 ```
 
 ### Creating a CassandraDatacenter
@@ -249,6 +249,10 @@ helm repo add k8ssandra https://helm.k8ssandra.io/stable
 helm install cass-operator k8ssandra/cass-operator -n cass-operator --create-namespace
 ```
 
+## Installing from OperatorHub / OLM
+
+cass-operator is available in the OperatorHub community under the name of [cass-operator-community](https://operatorhub.io/operator/cass-operator-community), but also in the Openshift's certified catalog.
+
 ## Features
 
 - Proper token ring initialization, with only one node bootstrapping at a time
@@ -330,7 +334,7 @@ spec:
 
 ## Requirements
 
-- Kubernetes cluster, 1.21 or newer. For Openshift, version 4.8 or newer.
+- Kubernetes cluster, 1.21 or newer. For Openshift, version 4.9 or newer. If you're using older versions, please install from [1.10.x branch](https://github.com/k8ssandra/cass-operator/tree/1.10.x), which supports Openshift 4.7 and Kubernetes 1.19. 
 
 ## Contributing
 

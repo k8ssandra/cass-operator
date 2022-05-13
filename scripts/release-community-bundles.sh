@@ -12,6 +12,7 @@ TARGET_DIRS=(community-operators community-operators-prod)
 
 # Checkout tag
 git checkout v$VERSION
+go mod vendor
 
 # Create bundle
 make VERSION=$VERSION bundle

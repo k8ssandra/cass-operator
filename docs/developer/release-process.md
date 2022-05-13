@@ -9,6 +9,7 @@ The steps required (assuming releasing v1.10.0 and previous one was v1.9.0), doi
 
 ```
 scripts/pre-release-process.sh v1.10.0 v1.9.0
+git add .
 git commit -m 'Release v1.10.0'
 git tag v1.10.0
 git push upstream master
@@ -67,7 +68,7 @@ must be signed, thus ensure your git properties are correctly set.
 
 The script is run by first checking out the correct tag in the ``cass-operator`` repository and then running:
 
-``scripts/release-community-olm.sh version`` 
+``scripts/release-community-bundles.sh version`` 
 
 where ``version`` is without ``v``-prefix, for example ``1.11.0``. You need to manually push the created branch ``cass-operator-$VERSION`` and make a PR, the script will not do that part.
 

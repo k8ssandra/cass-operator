@@ -10,7 +10,7 @@ import (
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
 
-// UpdateConfig updates the json formatted Cassandra config which incorporates the JVM options (under key additional-jvm-options) passed into the launch scripts
+// UpdateConfig updates the json formatted Cassandra config which incorporates the JVM options (under key additional-jvm-opts) passed into the launch scripts
 // for Cassandra via the config builder.
 func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) (json.RawMessage, error) {
 	// Unmarshall everything into structs.
@@ -19,10 +19,10 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	if err != nil {
 		return nil, err
 	}
-	// If JvmOptions.AddtnlJVMOptions exists, populate a string slice with it.
+	// If CassEnvSh.AddtnlJVMOptions exists, populate a string slice with it.
 	var additional []string
-	if c.JvmOptions != nil && c.JvmOptions.AddtnlJVMOptions != nil {
-		additional = *c.JvmOptions.AddtnlJVMOptions
+	if c.CassEnvSh != nil && c.CassEnvSh.AddtnlJVMOptions != nil {
+		additional = *c.CassEnvSh.AddtnlJVMOptions
 	}
 	// Deal with the possibility that cassdcapi.CDCConfiguration is nil.
 	CDCConfig := cassdcapi.CDCConfiguration{}
@@ -32,30 +32,30 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 		CDCConfig = *cassDC.Spec.CDC
 	}
 	updateCassandraYaml(&c, CDCConfig) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
-	// Figure out what to do and reconcile config.JvmOptions.AddtnlJVMOptions back to desired state per CDCConfig.
+	// Figure out what to do and reconcile config.CassEnvSh.AddtnlJVMOptions back to desired state per CDCConfig.
 	if CDCConfig.Enabled {
 		agentPath := getAgentPath(cassDC) // get path for agent based on whether we have a DSE or Cassandra server.
-		if c.JvmOptions != nil {
+		if c.CassEnvSh != nil {
 			newValue, err := updateAdditionalJVMOpts(additional, CDCConfig, agentPath)
 			if err != nil {
 				return nil, err
 			}
-			c.JvmOptions.AddtnlJVMOptions = &newValue
+			c.CassEnvSh.AddtnlJVMOptions = &newValue
 		} else {
 			newValue, err := updateAdditionalJVMOpts(additional, CDCConfig, agentPath)
 			if err != nil {
 				return nil, err
 			}
-			c.JvmOptions = &jvmOptions{
+			c.CassEnvSh = &cassEnvSh{
 				AddtnlJVMOptions: &newValue,
 			}
 		}
 	} else {
 		newValue := disableCDCInAdditionalJVMOpts(additional)
-		if c.JvmOptions != nil {
-			c.JvmOptions.AddtnlJVMOptions = &newValue
+		if c.CassEnvSh != nil {
+			c.CassEnvSh.AddtnlJVMOptions = &newValue
 		} else if len(newValue) > 0 {
-			c.JvmOptions = &jvmOptions{
+			c.CassEnvSh = &cassEnvSh{
 				AddtnlJVMOptions: &newValue,
 			}
 		}

@@ -5,7 +5,7 @@ package cdc
 import "encoding/json"
 
 type configData struct {
-	JvmOptions    *jvmOptions `json:"jvm-options,omitempty"`
+	CassEnvSh     *cassEnvSh `json:"cassandra-env-sh,omitempty"`
 	CassandraYaml map[string]interface{}
 	UnknownFields map[string]interface{}
 }
@@ -15,18 +15,18 @@ func (c *configData) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal([]byte(data), &intermediate); err != nil {
 		return err
 	}
-	// If jvm-options key exists, parse, add to c.JvmOptions field, delete from intermediate map.
-	if jvmOptsUnparsed, exists := intermediate["jvm-options"]; exists {
-		parsedjvmOpts := jvmOptions{} // First parse the known field "jvm-options" into the known struct jvmOptions{}
+	// If jvm-options key exists, parse, add to c.CassEnvSh field, delete from intermediate map.
+	if jvmOptsUnparsed, exists := intermediate["cassandra-env-sh"]; exists {
+		parsedjvmOpts := cassEnvSh{} // First parse the known field "jvm-options" into the known struct cassEnvSh{}
 		if err := json.Unmarshal(jvmOptsUnparsed, &parsedjvmOpts); err != nil {
 			return err
 		}
-		c.JvmOptions = &parsedjvmOpts
-		delete(intermediate, "jvm-options")
+		c.CassEnvSh = &parsedjvmOpts
+		delete(intermediate, "cassandra-env-sh")
 	}
-	// If cassandra-yaml key exists, parse, add to c.JvmOptions field, delete from intermediate map.
+	// If cassandra-yaml key exists, parse, add to c.CassEnvSh field, delete from intermediate map.
 	if cassYamlUnparsed, exists := intermediate["cassandra-yaml"]; exists {
-		parsedCassYaml := make(map[string]interface{}) // First parse the known field "jvm-options" into the known struct jvmOptions{}
+		parsedCassYaml := make(map[string]interface{}) // First parse the known field "jvm-options" into the known struct cassEnvSh{}
 		if err := json.Unmarshal(cassYamlUnparsed, &parsedCassYaml); err != nil {
 			return err
 		}
@@ -51,8 +51,8 @@ func (c configData) MarshalJSON() ([]byte, error) {
 	for k, v := range c.UnknownFields {
 		intermediate[k] = v
 	}
-	if c.JvmOptions != nil {
-		intermediate["jvm-options"] = c.JvmOptions
+	if c.CassEnvSh != nil {
+		intermediate["cassandra-env-sh"] = c.CassEnvSh
 	}
 	if c.CassandraYaml != nil {
 		intermediate["cassandra-yaml"] = c.CassandraYaml
@@ -60,12 +60,12 @@ func (c configData) MarshalJSON() ([]byte, error) {
 	return json.Marshal(intermediate)
 }
 
-type jvmOptions struct {
+type cassEnvSh struct {
 	AddtnlJVMOptions *[]string `json:"additional-jvm-opts,omitempty"`
 	UnknownFields    map[string]interface{}
 }
 
-func (j *jvmOptions) UnmarshalJSON(data []byte) error {
+func (j *cassEnvSh) UnmarshalJSON(data []byte) error {
 	var intermediate = make(map[string]json.RawMessage)
 	err := json.Unmarshal([]byte(data), &intermediate)
 	if err != nil {
@@ -95,7 +95,7 @@ func (j *jvmOptions) UnmarshalJSON(data []byte) error {
 }
 
 // We just need this for flattening everything back down.
-func (c jvmOptions) MarshalJSON() ([]byte, error) {
+func (c cassEnvSh) MarshalJSON() ([]byte, error) {
 	intermediate := make(map[string]interface{})
 	for k, v := range c.UnknownFields {
 		intermediate[k] = v

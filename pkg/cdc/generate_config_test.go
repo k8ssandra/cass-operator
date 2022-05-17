@@ -48,7 +48,7 @@ type testCase struct {
 	Actual         map[string]interface{}
 }
 
-// run runs the testCase and populates the actual
+// run runs the testCase and populates the actual and ParsedExpected maps.
 func (c *testCase) run(t *testing.T) {
 	newConfig, err := UpdateConfig(json.RawMessage(c.InitialConfig), c.DC)
 	assert.NoError(t, err, err)
@@ -102,13 +102,13 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 	test.run(t)
 	assert.Equal(t, test.ParsedExpected, test.Actual, "modified config was not what we expected")
 
-	// Make sure that this also works on jvm-options.
+	// Make sure that this also works on cassandra-env-sh.
 
 	test = testCase{
-		Description: "When CDC not requested and a config json with jvm-options exists, UpdateConfig() is adds cdc_enabled: false to cassandra-yaml and preserves all fields in jvm-options.",
+		Description: "When CDC not requested and a config json with cassandra-env-sh exists, UpdateConfig() is adds cdc_enabled: false to cassandra-yaml and preserves all fields in cassandra-env-sh.",
 		InitialConfig: `
 		{
-			"jvm-options": {
+			"cassandra-env-sh": {
 				"test-option1": "100M"
 			}
 		}
@@ -116,7 +116,7 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 		DC: dc,
 		Expected: `
 		{
-			"jvm-options": {
+			"cassandra-env-sh": {
 				"test-option1": "100M"
 			},
 			"cassandra-yaml": {
@@ -129,12 +129,12 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 	test.run(t)
 	assert.Equal(t, test.ParsedExpected, test.Actual, "modified config and initial config did not match, we expected them to")
 
-	// Make sure that this also works on jvm-options.
+	// Make sure that this also works on cassandra-env-sh.
 	test = testCase{
-		Description: "When CDC not requested and a config json with additional-jvm-opts.jvm-options exists, UpdateConfig() is a no-op and preserves all non-CDC related parts of additional-jvm-opts.",
+		Description: "When CDC not requested and a config json with cassandra-env-sh.additional-jvm-opts exists, UpdateConfig() is a no-op and preserves all non-CDC related parts of additional-jvm-opts.",
 		InitialConfig: `
 		{
-			"jvm-options": {
+			"cassandra-env-sh": {
 				"test-option1": "100M",
 				"additional-jvm-opts": [
 					"additional-option1",
@@ -148,7 +148,7 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 			"cassandra-yaml": {
 				"cdc_enabled": false
 			},
-			"jvm-options": {
+			"cassandra-env-sh": {
 				"test-option1": "100M",
 				"additional-jvm-opts": [
 					"additional-option1",
@@ -178,7 +178,7 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	}
 	test.run(t)
 	assert.Contains(t,
-		test.Actual["jvm-options"].(map[string]interface{})["additional-jvm-opts"],
+		test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"],
 		fmt.Sprintf("-javaagent:%s=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-", getAgentPath(dc)),
 	)
 }
@@ -192,7 +192,7 @@ func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 	}
 	jvmAddtnlOptionsJson := fmt.Sprintf(`
 	{
-		"jvm-options": {
+		"cassandra-env-sh": {
 			"test-option1": "100M",
 			"additional-jvm-opts": [
 				"-javaagent:%s=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-",
@@ -207,6 +207,6 @@ func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 		Expected:      jvmAddtnlOptionsJson,
 	}
 	test.run(t)
-	assert.NotContains(t, test.Actual["jvm-options"].(map[string]interface{})["additional-jvm-opts"], fmt.Sprintf("-javaagent:%s=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-", getAgentPath(dc)))
-	assert.Contains(t, test.Actual["jvm-options"].(map[string]interface{})["additional-jvm-opts"], "additional-option2")
+	assert.NotContains(t, test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"], fmt.Sprintf("-javaagent:%s=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-", getAgentPath(dc)))
+	assert.Contains(t, test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"], "additional-option2")
 }

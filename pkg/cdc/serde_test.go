@@ -9,7 +9,7 @@ import (
 
 var serdeTestConfig = `
 {
-	"jvm-options":{
+	"cassandra-env-sh":{
 		"initial_heap_size": "800M",
 		"additional-jvm-opts":[
 			"-Ddse.system_distributed_replication_dc_names=dc1"
@@ -31,16 +31,16 @@ func Test_UnmarshallConfig(t *testing.T) {
 	assert.NoError(t, err, err)
 	assert.NotNil(t, c.CassandraYaml)
 	assert.Contains(t, c.CassandraYaml, "authenticator")
-	assert.NotNil(t, c.JvmOptions)
-	assert.NotNil(t, c.JvmOptions.AddtnlJVMOptions)
-	assert.Contains(t, *c.JvmOptions.AddtnlJVMOptions, "-Ddse.system_distributed_replication_dc_names=dc1")
+	assert.NotNil(t, c.CassEnvSh)
+	assert.NotNil(t, c.CassEnvSh.AddtnlJVMOptions)
+	assert.Contains(t, *c.CassEnvSh.AddtnlJVMOptions, "-Ddse.system_distributed_replication_dc_names=dc1")
 	assert.Contains(t, c.UnknownFields["unknownfields"], "unknown1")
 }
 
 // Tests that Marshalling works as expected.
 func Test_MarshallConfig(t *testing.T) {
 	c := configData{
-		JvmOptions: &jvmOptions{
+		CassEnvSh: &cassEnvSh{
 			AddtnlJVMOptions: &[]string{"-Ddse.system_distributed_replication_dc_names=dc1"},
 			UnknownFields: map[string]interface{}{
 				"initial_heap_size": "800M",

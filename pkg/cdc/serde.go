@@ -62,24 +62,33 @@ func (c configData) MarshalJSON() ([]byte, error) {
 
 type cassEnvSh struct {
 	AddtnlJVMOptions *[]string `json:"additional-jvm-opts,omitempty"`
+	AddtnlEnvOptions *[]string `json:"additional-env-opts,omitempty"`
 	UnknownFields    map[string]interface{}
 }
 
 func (j *cassEnvSh) UnmarshalJSON(data []byte) error {
 	var intermediate = make(map[string]json.RawMessage)
-	err := json.Unmarshal([]byte(data), &intermediate)
-	if err != nil {
+	if err := json.Unmarshal(data, &intermediate); err != nil {
 		return err
 	}
 	//
-	if addtnlOptsUnparsed, exists := intermediate["additional-jvm-opts"]; exists {
-		parsedAddtnlOpts := []string{} // Handle known additional opts string slice.
-		err := json.Unmarshal(addtnlOptsUnparsed, &parsedAddtnlOpts)
+	if addtnlJVMOptsUnparsed, exists := intermediate["additional-jvm-opts"]; exists {
+		parsedAddtnlJVMOpts := []string{} // Handle known additional opts string slice.
+		err := json.Unmarshal(addtnlJVMOptsUnparsed, &parsedAddtnlJVMOpts)
 		if err != nil {
 			return err
 		}
-		j.AddtnlJVMOptions = &parsedAddtnlOpts
+		j.AddtnlJVMOptions = &parsedAddtnlJVMOpts
 		delete(intermediate, "additional-jvm-opts")
+	}
+	if addtnlEnvOptsUnparsed, exists := intermediate["additional-env-opts"]; exists {
+		addtnlEnvOptsParsed := []string{} // Handle known additional opts string slice.
+		err := json.Unmarshal(addtnlEnvOptsUnparsed, &addtnlEnvOptsParsed)
+		if err != nil {
+			return err
+		}
+		j.AddtnlEnvOptions = &addtnlEnvOptsParsed
+		delete(intermediate, "additional-env-opts")
 	}
 	// Now parse the remaining fields as a map[string]interface{}.
 	var unknownFields = make(map[string]interface{})
@@ -102,6 +111,9 @@ func (c cassEnvSh) MarshalJSON() ([]byte, error) {
 	}
 	if c.AddtnlJVMOptions != nil && len(*c.AddtnlJVMOptions) > 0 {
 		intermediate["additional-jvm-opts"] = c.AddtnlJVMOptions
+	}
+	if c.AddtnlEnvOptions != nil && len(*c.AddtnlEnvOptions) > 0 {
+		intermediate["additional-env-opts"] = c.AddtnlEnvOptions
 	}
 	return json.Marshal(intermediate)
 }

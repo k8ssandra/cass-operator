@@ -105,11 +105,17 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 	// Make sure that this also works on cassandra-env-sh.
 
 	test = testCase{
-		Description: "When CDC not requested and a config json with cassandra-env-sh exists, UpdateConfig() is adds cdc_enabled: false to cassandra-yaml and preserves all fields in cassandra-env-sh.",
+		Description: "When CDC not requested and a config json with cassandra-env-sh exists, UpdateConfig() adds cdc_enabled: false to cassandra-yaml and preserves all fields in cassandra-env-sh.",
 		InitialConfig: `
 		{
 			"cassandra-env-sh": {
-				"test-option1": "100M"
+				"additional-jvm-opts": [
+					"jvmopt"
+				],
+				"additional-env-opts": [
+					"envopt"
+				],
+				"unknownfield": true	
 			}
 		}
 		`,
@@ -117,49 +123,22 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 		Expected: `
 		{
 			"cassandra-env-sh": {
-				"test-option1": "100M"
+				"additional-jvm-opts": [
+					"jvmopt"
+				],
+				"additional-env-opts": [
+					"envopt"
+				],
+				"unknownfield": true
 			},
 			"cassandra-yaml": {
 				"cdc_enabled": false
 			}
-
 		}
 		`,
 	}
 	test.run(t)
 	assert.Equal(t, test.ParsedExpected, test.Actual, "modified config and initial config did not match, we expected them to")
-
-	// Make sure that this also works on cassandra-env-sh.
-	test = testCase{
-		Description: "When CDC not requested and a config json with cassandra-env-sh.additional-jvm-opts exists, UpdateConfig() is a no-op and preserves all non-CDC related parts of additional-jvm-opts.",
-		InitialConfig: `
-		{
-			"cassandra-env-sh": {
-				"test-option1": "100M",
-				"additional-jvm-opts": [
-					"additional-option1",
-					"additional-option2"
-				]
-			}
-		}`,
-		DC: dc,
-		Expected: `
-		{
-			"cassandra-yaml": {
-				"cdc_enabled": false
-			},
-			"cassandra-env-sh": {
-				"test-option1": "100M",
-				"additional-jvm-opts": [
-					"additional-option1",
-					"additional-option2"
-				]
-			}
-		}`,
-	}
-	test.run(t)
-	assert.Equal(t, test.ParsedExpected, test.Actual, "modified config and initial config did not match, we expected them to")
-
 }
 
 // TestUpdateConfig_ExistingConfig_WithCDC tests for when there is an existing config, and we are adding the CDC parms. The main purpose
@@ -180,6 +159,10 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	assert.Contains(t,
 		test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"],
 		fmt.Sprintf("-javaagent:%s=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-", getAgentPath(dc)),
+	)
+	assert.Contains(t,
+		test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-env-opts"],
+		fmt.Sprintf("CLASSPATH=$CLASSPATH:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar"),
 	)
 }
 

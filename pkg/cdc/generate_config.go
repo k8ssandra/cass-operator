@@ -15,14 +15,19 @@ import (
 func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) (json.RawMessage, error) {
 	// Unmarshall everything into structs.
 	c := configData{}
-	err := json.Unmarshal([]byte(config), &c)
+	err := json.Unmarshal(config, &c)
 	if err != nil {
 		return nil, err
 	}
 	// If CassEnvSh.AddtnlJVMOptions exists, populate a string slice with it.
-	var additional []string
+	var additionalJVMOpts []string
 	if c.CassEnvSh != nil && c.CassEnvSh.AddtnlJVMOptions != nil {
-		additional = *c.CassEnvSh.AddtnlJVMOptions
+		additionalJVMOpts = *c.CassEnvSh.AddtnlJVMOptions
+	}
+	// If CassEnvSh.AddtnlEnvOptions exists, populate a string slice with it.
+	var additionalEnvOpts []string
+	if c.CassEnvSh != nil && c.CassEnvSh.AddtnlEnvOptions != nil {
+		additionalEnvOpts = *c.CassEnvSh.AddtnlEnvOptions
 	}
 	// Deal with the possibility that cassdcapi.CDCConfiguration is nil.
 	CDCConfig := cassdcapi.CDCConfiguration{}
@@ -33,31 +38,19 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	}
 	updateCassandraYaml(&c, CDCConfig) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
 	// Figure out what to do and reconcile config.CassEnvSh.AddtnlJVMOptions back to desired state per CDCConfig.
-	if CDCConfig.Enabled {
-		agentPath := getAgentPath(cassDC) // get path for agent based on whether we have a DSE or Cassandra server.
-		if c.CassEnvSh != nil {
-			newValue, err := updateAdditionalJVMOpts(additional, CDCConfig, agentPath)
-			if err != nil {
-				return nil, err
-			}
-			c.CassEnvSh.AddtnlJVMOptions = &newValue
-		} else {
-			newValue, err := updateAdditionalJVMOpts(additional, CDCConfig, agentPath)
-			if err != nil {
-				return nil, err
-			}
-			c.CassEnvSh = &cassEnvSh{
-				AddtnlJVMOptions: &newValue,
-			}
-		}
+	agentPath := getAgentPath(cassDC) // get path for agent based on whether we have a DSE or Cassandra server.
+	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, CDCConfig, agentPath)
+	if err != nil {
+		return nil, err
+	}
+	newEnvOpts := updateAdditionalEnvOpts(additionalEnvOpts, CDCConfig)
+	if c.CassEnvSh != nil {
+		c.CassEnvSh.AddtnlJVMOptions = &newJVMOpts
+		c.CassEnvSh.AddtnlEnvOptions = &newEnvOpts
 	} else {
-		newValue := disableCDCInAdditionalJVMOpts(additional)
-		if c.CassEnvSh != nil {
-			c.CassEnvSh.AddtnlJVMOptions = &newValue
-		} else if len(newValue) > 0 {
-			c.CassEnvSh = &cassEnvSh{
-				AddtnlJVMOptions: &newValue,
-			}
+		c.CassEnvSh = &cassEnvSh{
+			AddtnlJVMOptions: &newJVMOpts,
+			AddtnlEnvOptions: &newEnvOpts,
 		}
 	}
 	// Marshall everything back to json and mutate the input.
@@ -65,12 +58,12 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	if err != nil {
 		return nil, err
 	}
-	return json.RawMessage(marshalled), nil
+	return marshalled, nil
 }
 
 // updateAdditionalJVMOpts adds CDC related entries to additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
 func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration, agentPath string) ([]string, error) {
-	out := disableCDCInAdditionalJVMOpts(optsSlice)
+	out := removeEntryFromSlice(optsSlice, "pulsarServiceUrl")
 	//Next, create an additional options entry that instantiates the settings we want.
 	if CDCConfig.Enabled {
 		reflectedCDCConfig := reflect.ValueOf(CDCConfig)
@@ -120,6 +113,16 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfigur
 	return out, nil
 }
 
+func getAgentPath(dc cassdcapi.CassandraDatacenter) string {
+	if dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "3") {
+		return fmt.Sprintf("/opt/cdc_agent/agent-c3-pulsar-%s-all.jar", CDCAgentVer)
+	} else if dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "4") {
+		return fmt.Sprintf("/opt/cdc_agent/agent-c4-pulsar-%s-all.jar", CDCAgentVer)
+	} else {
+		return fmt.Sprintf("/opt/cdc_agent/agent-dse4-pulsar-%s-all.jar", CDCAgentVer)
+	}
+}
+
 func updateCassandraYaml(cassConfig *configData, cdcConfig cassdcapi.CDCConfiguration) {
 	if cassConfig.CassandraYaml == nil {
 		cassConfig.CassandraYaml = make(map[string]interface{})
@@ -132,28 +135,24 @@ func updateCassandraYaml(cassConfig *configData, cdcConfig cassdcapi.CDCConfigur
 	}
 }
 
-// disableCDCInAdditionalJVMOpts removes all CDC related entries from additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
-func disableCDCInAdditionalJVMOpts(optsSlice []string) []string {
-	found := false
+func updateAdditionalEnvOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration) []string {
 	out := []string{}
-	for i, optionEntry := range optsSlice {
-		if strings.Contains(optionEntry, "pulsarServiceUrl") {
-			out = append(optsSlice[:i], optsSlice[i+1:]...)
-			found = true
-		}
-	}
-	if !found {
-		return optsSlice
+	if CDCConfig.Enabled {
+		out = removeEntryFromSlice(optsSlice, "CLASSPATH=$CLASSPATH:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar") // We want this to be idempotent.
+		out = append(out, "CLASSPATH=$CLASSPATH:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
+	} else {
+		out = removeEntryFromSlice(optsSlice, "CLASSPATH=$CLASSPATH:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
 	}
 	return out
 }
 
-func getAgentPath(dc cassdcapi.CassandraDatacenter) string {
-	if dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "3") {
-		return fmt.Sprintf("/opt/cdc_agent/agent-c3-%s-all", CDCAgentVer)
-	} else if dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "4") {
-		return fmt.Sprintf("/opt/cdc_agent/agent-c4-%s-all", CDCAgentVer)
-	} else {
-		return fmt.Sprintf("/opt/cdc_agent/agent-dse4-%s-all", CDCAgentVer)
+// removeEntryFromSlice removes all an entry from a slice if it contains a substring.
+func removeEntryFromSlice(optsSlice []string, substring string) []string {
+	out := []string{}
+	for _, optionEntry := range optsSlice {
+		if !strings.Contains(optionEntry, substring) {
+			out = append(out, optionEntry)
+		}
 	}
+	return out
 }

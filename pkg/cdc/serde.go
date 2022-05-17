@@ -6,6 +6,7 @@ import "encoding/json"
 
 type configData struct {
 	JvmOptions    *jvmOptions `json:"jvm-options,omitempty"`
+	CassandraYaml map[string]interface{}
 	UnknownFields map[string]interface{}
 }
 
@@ -22,6 +23,15 @@ func (c *configData) UnmarshalJSON(data []byte) error {
 		}
 		c.JvmOptions = &parsedjvmOpts
 		delete(intermediate, "jvm-options")
+	}
+	// If cassandra-yaml key exists, parse, add to c.JvmOptions field, delete from intermediate map.
+	if cassYamlUnparsed, exists := intermediate["cassandra-yaml"]; exists {
+		parsedCassYaml := make(map[string]interface{}) // First parse the known field "jvm-options" into the known struct jvmOptions{}
+		if err := json.Unmarshal(cassYamlUnparsed, &parsedCassYaml); err != nil {
+			return err
+		}
+		c.CassandraYaml = parsedCassYaml
+		delete(intermediate, "cassandra-yaml")
 	}
 	// Now parse the remaining fields as a map[string]interface{}.
 	var unknownFields = make(map[string]interface{})
@@ -43,6 +53,9 @@ func (c configData) MarshalJSON() ([]byte, error) {
 	}
 	if c.JvmOptions != nil {
 		intermediate["jvm-options"] = c.JvmOptions
+	}
+	if c.CassandraYaml != nil {
+		intermediate["cassandra-yaml"] = c.CassandraYaml
 	}
 	return json.Marshal(intermediate)
 }

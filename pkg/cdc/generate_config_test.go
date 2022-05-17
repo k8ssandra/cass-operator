@@ -68,47 +68,94 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 	dc := testutils.GetCassandraDatacenter("test-dc", "test-ns")
 	dc.Spec.CDC = &cassdcapi.CDCConfiguration{Enabled: false}
 	test := testCase{
-		Description:   "When CDC not requested and a config json exists, UpdateConfig() is a no-op.",
+		Description:   "When CDC not requested and a config json exists, UpdateConfig() just adds cdc_enabled: false to the cassandra-yaml key.",
 		InitialConfig: existingConfig,
 		DC:            dc,
-		Expected:      existingConfig,
+		Expected: `{
+			"cassandra-env-sh": {
+			  "additional-jvm-opts": [
+				"-Dcassandra.system_distributed_replication=test-dc:1",
+				"-Dcom.sun.management.jmxremote.authenticate=true"
+			  ]
+			},
+			"cassandra-yaml": {
+			  "authenticator": "PasswordAuthenticator",
+			  "authorizer": "CassandraAuthorizer",
+			  "num_tokens": 256,
+			  "role_manager": "CassandraRoleManager",
+			  "start_rpc": false,
+              "cdc_enabled": false
+			},
+			"cluster-info": {
+			  "name": "test",
+			  "seeds": "test-seed-service,test-dc-additional-seed-service"
+			},
+			"datacenter-info": {
+			  "graph-enabled": 0,
+			  "name": "dc1",
+			  "solr-enabled": 0,
+			  "spark-enabled": 0
+			}
+		}
+		`,
+	}
+	test.run(t)
+	assert.Equal(t, test.ParsedExpected, test.Actual, "modified config was not what we expected")
+
+	// Make sure that this also works on jvm-options.
+
+	test = testCase{
+		Description: "When CDC not requested and a config json with jvm-options exists, UpdateConfig() is adds cdc_enabled: false to cassandra-yaml and preserves all fields in jvm-options.",
+		InitialConfig: `
+		{
+			"jvm-options": {
+				"test-option1": "100M"
+			}
+		}
+		`,
+		DC: dc,
+		Expected: `
+		{
+			"jvm-options": {
+				"test-option1": "100M"
+			},
+			"cassandra-yaml": {
+				"cdc_enabled": false
+			}
+
+		}
+		`,
 	}
 	test.run(t)
 	assert.Equal(t, test.ParsedExpected, test.Actual, "modified config and initial config did not match, we expected them to")
 
 	// Make sure that this also works on jvm-options.
-	jvmOptionsJson := `
-	{
-		"jvm-options": {
-			"test-option1": "100M"
-		}
-	}
-	`
 	test = testCase{
-		Description:   "When CDC not requested and a config json with jvm-options exists, UpdateConfig() is a no-op and preserves all fields in jvm-options.",
-		InitialConfig: jvmOptionsJson,
-		DC:            dc,
-		Expected:      jvmOptionsJson,
-	}
-	test.run(t)
-	assert.Equal(t, test.ParsedExpected, test.Actual, "modified config and initial config did not match, we expected them to")
-
-	// Make sure that this also works on jvm-options.
-	jvmAddtnlOptionsJson := `
-	{
-		"jvm-options": {
-			"test-option1": "100M",
-			"additional-jvm-opts": [
-				"additional-option1",
-				"additional-option2"
-			]
-		}
-	}`
-	test = testCase{
-		Description:   "When CDC not requested and a config json with additional-jvm-opts.jvm-options exists, UpdateConfig() is a no-op and preserves all non-CDC related parts of additional-jvm-opts.",
-		InitialConfig: jvmAddtnlOptionsJson,
-		DC:            dc,
-		Expected:      jvmAddtnlOptionsJson,
+		Description: "When CDC not requested and a config json with additional-jvm-opts.jvm-options exists, UpdateConfig() is a no-op and preserves all non-CDC related parts of additional-jvm-opts.",
+		InitialConfig: `
+		{
+			"jvm-options": {
+				"test-option1": "100M",
+				"additional-jvm-opts": [
+					"additional-option1",
+					"additional-option2"
+				]
+			}
+		}`,
+		DC: dc,
+		Expected: `
+		{
+			"cassandra-yaml": {
+				"cdc_enabled": false
+			},
+			"jvm-options": {
+				"test-option1": "100M",
+				"additional-jvm-opts": [
+					"additional-option1",
+					"additional-option2"
+				]
+			}
+		}`,
 	}
 	test.run(t)
 	assert.Equal(t, test.ParsedExpected, test.Actual, "modified config and initial config did not match, we expected them to")

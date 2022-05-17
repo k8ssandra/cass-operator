@@ -17,6 +17,9 @@ var serdeTestConfig = `
 	},
 	"cassandra-yaml": {
 	  "authenticator": "PasswordAuthenticator"
+	},
+	"unknownfields": {
+		"unknown1": true
 	}
 }
 `
@@ -26,10 +29,12 @@ func Test_UnmarshallConfig(t *testing.T) {
 	c := configData{}
 	err := json.Unmarshal([]byte(serdeTestConfig), &c)
 	assert.NoError(t, err, err)
-	assert.Contains(t, c.UnknownFields, "cassandra-yaml")
+	assert.NotNil(t, c.CassandraYaml)
+	assert.Contains(t, c.CassandraYaml, "authenticator")
 	assert.NotNil(t, c.JvmOptions)
 	assert.NotNil(t, c.JvmOptions.AddtnlJVMOptions)
 	assert.Contains(t, *c.JvmOptions.AddtnlJVMOptions, "-Ddse.system_distributed_replication_dc_names=dc1")
+	assert.Contains(t, c.UnknownFields["unknownfields"], "unknown1")
 }
 
 // Tests that Marshalling works as expected.
@@ -41,9 +46,12 @@ func Test_MarshallConfig(t *testing.T) {
 				"initial_heap_size": "800M",
 			},
 		},
+		CassandraYaml: map[string]interface{}{
+			"authenticator": "PasswordAuthenticator",
+		},
 		UnknownFields: map[string]interface{}{
-			"cassandra-yaml": map[string]interface{}{
-				"authenticator": "PasswordAuthenticator",
+			"unknownfields": map[string]interface{}{
+				"unknown1": true,
 			},
 		},
 	}

@@ -31,17 +31,18 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	} else {
 		CDCConfig = *cassDC.Spec.CDC
 	}
+	updateCassandraYaml(&c, CDCConfig) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
 	// Figure out what to do and reconcile config.JvmOptions.AddtnlJVMOptions back to desired state per CDCConfig.
 	if CDCConfig.Enabled {
 		agentPath := getAgentPath(cassDC) // get path for agent based on whether we have a DSE or Cassandra server.
 		if c.JvmOptions != nil {
-			newValue, err := updateCDC(additional, CDCConfig, agentPath)
+			newValue, err := updateAdditionalJVMOpts(additional, CDCConfig, agentPath)
 			if err != nil {
 				return nil, err
 			}
 			c.JvmOptions.AddtnlJVMOptions = &newValue
 		} else {
-			newValue, err := updateCDC(additional, CDCConfig, agentPath)
+			newValue, err := updateAdditionalJVMOpts(additional, CDCConfig, agentPath)
 			if err != nil {
 				return nil, err
 			}
@@ -50,7 +51,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 			}
 		}
 	} else {
-		newValue := disableCDC(additional)
+		newValue := disableCDCInAdditionalJVMOpts(additional)
 		if c.JvmOptions != nil {
 			c.JvmOptions.AddtnlJVMOptions = &newValue
 		} else if len(newValue) > 0 {
@@ -67,15 +68,14 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	return json.RawMessage(marshalled), nil
 }
 
-// disableCDC adds CDC related entries to additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
-func updateCDC(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration, agentPath string) ([]string, error) {
-	out := disableCDC(optsSlice)
+// updateAdditionalJVMOpts adds CDC related entries to additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
+func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration, agentPath string) ([]string, error) {
+	out := disableCDCInAdditionalJVMOpts(optsSlice)
 	//Next, create an additional options entry that instantiates the settings we want.
 	if CDCConfig.Enabled {
 		reflectedCDCConfig := reflect.ValueOf(CDCConfig)
 		t := reflectedCDCConfig.Type()
 		optsSlice := []string{}
-
 	FieldLoop:
 		for i := 0; i < reflectedCDCConfig.NumField(); i++ {
 			// This logic depends on the json tags from the CR mapping to the CDC agent's parameter names.
@@ -120,8 +120,20 @@ func updateCDC(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration, agentPa
 	return out, nil
 }
 
-// disableCDC removes all CDC related entries from additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
-func disableCDC(optsSlice []string) []string {
+func updateCassandraYaml(cassConfig *configData, cdcConfig cassdcapi.CDCConfiguration) {
+	if cassConfig.CassandraYaml == nil {
+		cassConfig.CassandraYaml = make(map[string]interface{})
+	}
+	switch {
+	case cdcConfig.Enabled:
+		cassConfig.CassandraYaml["cdc_enabled"] = true
+	case !cdcConfig.Enabled:
+		cassConfig.CassandraYaml["cdc_enabled"] = false
+	}
+}
+
+// disableCDCInAdditionalJVMOpts removes all CDC related entries from additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
+func disableCDCInAdditionalJVMOpts(optsSlice []string) []string {
 	found := false
 	out := []string{}
 	for i, optionEntry := range optsSlice {

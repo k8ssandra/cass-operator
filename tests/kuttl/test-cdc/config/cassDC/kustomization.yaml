@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ../../config/fixtures/k8ssandra-base/
+  - ../../../config/fixtures/k8ssandra-base/
 patches:
   - |-
     apiVersion: cassandra.datastax.com/v1beta1
@@ -14,3 +14,6 @@ patches:
       cdc:
         enabled: true
         pulsarServiceUrl: pulsar://pulsar-proxy.default.svc.cluster.local:6650
+        topicPrefix: persistent://public/default/events-cdc-
+        cdcWorkingDir: /var/lib/cassandra/cdc
+        

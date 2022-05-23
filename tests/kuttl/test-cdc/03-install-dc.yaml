@@ -2,5 +2,5 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands: 
 - script: |
-    kustomize build config | kubectl apply --server-side --force-conflicts -f -
+    kustomize build config/cassDC | kubectl apply --server-side --force-conflicts -f -
   ignoreFailure: false

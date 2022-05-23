@@ -7,6 +7,8 @@ spec:
   clusterName: test-cluster
   # The number of server nodes.
   size: 3
+  serverImage: mgmtapi-4_0:miles
+  configBuilderImage: cass-config-builder:miles
   storageConfig:
     cassandraDataVolumeClaimSpec:
       storageClassName: standard

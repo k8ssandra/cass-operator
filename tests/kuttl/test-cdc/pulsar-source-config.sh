@@ -16,18 +16,16 @@ create_source() {
 --source-type cassandra-source \
 --tenant public \
 --namespace default \
---destination-topic-name public/default/data-ks1.table1 \
+--destination-topic-name public/default/data-ks1.testtable \
 --parallelism 1 \
 --source-config '{
-    "events.topic": "persistent://public/default/events-cdc-ks1.table1",
+    "events.topic": "persistent://public/default/events-cdc-ks1.testtable",
     "keyspace": "ks1",
-    "table": "table1",
-    "contactPoints": "localhost",
-    "port": 9042,
-    "loadBalancing.localDc": "DC1",
-    "auth.provider": "PLAIN",
-    "auth.username": "testuser",
-    "auth.password": "testpass"
+    "table": "testtable",
+    "datastax-java-driver.basic.contact-points": "test-cluster-dc1-all-pods-service.cass-operator.svc.cluster.local:9042",
+    "loadBalancing.localDc": "dc1",
+    "auth.provider": "None",
+    "batch.size": 1
     }';
     return $?
 }

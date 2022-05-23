@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands: 
+- script: |
+    POD_NAME="test-cluster-dc1-default-sts-0"
+    cmd=$(
+    cat <<EOF 
+    "INSERT INTO ks1.testtable (id, col1, col2, time) 
+      VALUES (uuid(), 'a value!', 1, toTimestamp(now()))"
+    EOF
+    )
+    i=0
+    while [[ i -le 30 ]]; do kubectl exec -n cass-operator $POD_NAME -- bash -c "cqlsh test-cluster-dc1-all-pods-service.cass-operator.svc.cluster.local 9042  -e $cmd  " ; i=$(( $i + 1 )); done
+  ignoreFailure: false
+  # We need to manually flush the memtables to trigger off CDC agent sending data to Pulsar.
+- script: |
+    POD_NAME="test-cluster-dc1-default-sts-0"
+    kubectl exec -n cass-operator $POD_NAME -- bash -c "nodetool flush ks1 testtable"
+  ignoreFailure: false

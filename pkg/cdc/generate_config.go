@@ -108,6 +108,10 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfigur
 			}
 		}
 		CDCOpt := fmt.Sprintf("-javaagent:%s=%s", agentPath, strings.Join(optsSlice, ","))
+		out = append(out, // We need to add these two elements to the slice first, because the management agent must start before the CDC agent.
+			"-javaagent:/opt/metrics-collector/lib/datastax-mcac-agent.jar",
+			"-javaagent:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar",
+		)
 		return append(out, CDCOpt), nil
 	}
 	return out, nil
@@ -138,10 +142,10 @@ func updateCassandraYaml(cassConfig *configData, cdcConfig cassdcapi.CDCConfigur
 func updateAdditionalEnvOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration) []string {
 	out := []string{}
 	if CDCConfig.Enabled {
-		out = removeEntryFromSlice(optsSlice, "CLASSPATH=$CLASSPATH:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar") // We want this to be idempotent.
-		out = append(out, "CLASSPATH=$CLASSPATH:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
+		out = removeEntryFromSlice(optsSlice, "CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar") // We want this to be idempotent.
+		out = append(out, "CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
 	} else {
-		out = removeEntryFromSlice(optsSlice, "CLASSPATH=$CLASSPATH:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
+		out = removeEntryFromSlice(optsSlice, "CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
 	}
 	return out
 }

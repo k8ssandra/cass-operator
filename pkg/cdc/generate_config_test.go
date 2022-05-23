@@ -162,7 +162,7 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	)
 	assert.Contains(t,
 		test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-env-opts"],
-		fmt.Sprintf("CLASSPATH=$CLASSPATH:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar"),
+		fmt.Sprintf("CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar"),
 	)
 }
 

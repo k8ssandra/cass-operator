@@ -54,6 +54,7 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 			oplabels.InstanceLabel:  "cassandra-exampleCluster",
 			oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 			oplabels.NameLabel:      oplabels.NameLabelValue,
+			oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 			oplabels.VersionLabel:   "",
 			"piclem":                "add",
 		}

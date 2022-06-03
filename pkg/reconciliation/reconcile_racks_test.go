@@ -63,10 +63,37 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				api.ClusterLabel:        "exampleCluster",
 				oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 				oplabels.NameLabel:      oplabels.NameLabelValue,
+				oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
 				oplabels.VersionLabel:   "4.0.1",
 			},
 		}, {
+			name: "Cluster name with spaces",
+			args: args{
+				resourceLabels: make(map[string]string),
+				rc: &ReconciliationContext{
+					Datacenter: &api.CassandraDatacenter{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "exampleDC",
+						},
+						Spec: api.CassandraDatacenterSpec{
+							ClusterName:   "Example Cluster",
+							ServerVersion: "4.0.1",
+						},
+					},
+				},
+			},
+			want: true,
+			wantLabels: map[string]string{
+				oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
+				api.ClusterLabel:        "ExampleCluster",
+				oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+				oplabels.NameLabel:      oplabels.NameLabelValue,
+				oplabels.InstanceLabel:  fmt.Sprintf("%s-ExampleCluster", oplabels.NameLabelValue),
+				oplabels.VersionLabel:   "4.0.1",
+			},
+		},
+		{
 			name: "Nil labels",
 			args: args{
 				resourceLabels: nil,
@@ -87,6 +114,7 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				api.ClusterLabel:        "exampleCluster",
 				oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 				oplabels.NameLabel:      oplabels.NameLabelValue,
+				oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
 				oplabels.VersionLabel:   "4.0.1",
 			},
@@ -98,6 +126,7 @@ func Test_validateLabelsForCluster(t *testing.T) {
 					api.ClusterLabel:        "exampleCluster",
 					oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 					oplabels.NameLabel:      oplabels.NameLabelValue,
+					oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 					oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
 					oplabels.VersionLabel:   "4.0.1",
 				},
@@ -118,6 +147,7 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				api.ClusterLabel:        "exampleCluster",
 				oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 				oplabels.NameLabel:      oplabels.NameLabelValue,
+				oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
 				oplabels.VersionLabel:   "4.0.1",
 			},
@@ -145,6 +175,7 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				api.ClusterLabel:        "exampleCluster",
 				oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 				oplabels.NameLabel:      oplabels.NameLabelValue,
+				oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
 				oplabels.VersionLabel:   "6.8.13",
 			},
@@ -1235,6 +1266,7 @@ func Test_shouldUpdateLabelsForRackResource(t *testing.T) {
 		api.RackLabel:           rackName,
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, clusterName),
 		oplabels.VersionLabel:   "4.0.1",
 	}
@@ -1319,6 +1351,7 @@ func Test_shouldUpdateLabelsForRackResource(t *testing.T) {
 					api.RackLabel:           rackName,
 					oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 					oplabels.NameLabel:      oplabels.NameLabelValue,
+					oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 					oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, clusterName),
 					oplabels.VersionLabel:   "4.0.1",
 				},
@@ -1336,6 +1369,7 @@ func Test_shouldUpdateLabelsForRackResource(t *testing.T) {
 					api.RackLabel:           rackName,
 					oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 					oplabels.NameLabel:      oplabels.NameLabelValue,
+					oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 					oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, clusterName),
 					oplabels.VersionLabel:   "4.0.1",
 					"foo":                   "bar",

@@ -3,7 +3,7 @@ kind: CassandraDatacenter
 metadata:
   name: dc2
 spec:
-  clusterName: cluster2
+  clusterName: cluster 2
   serverType: cassandra
   serverVersion: "4.0.0"
   managementApiAuth:

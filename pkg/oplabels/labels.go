@@ -43,3 +43,17 @@ func HasManagedByCassandraOperatorLabel(m map[string]string) bool {
 	v, ok := m[ManagedByLabel]
 	return ok && v == ManagedByLabelValue
 }
+
+
+func GetReservedOperatorLables() [5]string {
+	return [5]string{ManagedByLabel, NameLabel, InstanceLabel, VersionLabel, CreatedByLabel}
+}
+
+func IsReservedLabel(label string) bool {
+    for _, v := range GetReservedOperatorLables() {
+		if label == v {
+			return true
+		}
+	}
+	return false
+}

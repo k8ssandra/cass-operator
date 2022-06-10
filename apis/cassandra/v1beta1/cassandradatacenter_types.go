@@ -837,29 +837,3 @@ func SplitRacks(nodeCount, rackCount int) []int {
 
 	return topology
 }
-
-func GetReservedLabels() [6]string {
-	return [6]string{ClusterLabel, DatacenterLabel, SeedNodeLabel, RackLabel, CassOperatorProgressLabel, PromMetricsLabel}
-}
-
-func IsReservedLabel(label string) bool {
-	for _, v := range GetReservedLabels() {
-		if label == v {
-			return true
-		}
-	}
-	return false
-}
-
-func GetReservedAnnotations() [4]string {
-	return [4]string{DatacenterAnnotation, ConfigHashAnnotation, SkipUserCreationAnnotation, DecommissionOnDeleteAnnotation}
-}
-
-func IsReservedAnnotation(annotation string) bool {
-	for _, v := range GetReservedAnnotations() {
-		if annotation == v {
-			return true
-		}
-	}
-	return false
-}

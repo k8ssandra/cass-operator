@@ -31,6 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
+const (
+	datastaxPrefix string = "cassandra.datastax.com"
+	k8ssandraPrefix string = "k8ssandra.io"
+)
+
 var log = logf.Log.WithName("api")
 
 func (r *CassandraDatacenter) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -112,6 +117,11 @@ func ValidateSingleDatacenter(dc CassandraDatacenter) error {
 
 			return attemptedTo("use multiple nodes per worker without cpu and memory requests and limits")
 		}
+	}
+
+	err := validateServiceLabelsAndAnnotations(dc)
+	if err != nil {
+		return err
 	}
 
 	return ValidateFQLConfig(dc)
@@ -242,4 +252,52 @@ func ValidateFQLConfig(dc CassandraDatacenter) error {
 	}
 
 	return nil
+}
+
+func validateServiceLabelsAndAnnotations(dc CassandraDatacenter) error {
+	// check each service
+	addSeedSvc  := dc.Spec.AdditionalServiceConfig.AdditionalSeedService
+	allPodsSvc  := dc.Spec.AdditionalServiceConfig.AllPodsService
+	dcSvc       := dc.Spec.AdditionalServiceConfig.DatacenterService
+	nodePortSvc := dc.Spec.AdditionalServiceConfig.NodePortService
+	seedSvc     := dc.Spec.AdditionalServiceConfig.SeedService
+
+	services := map[string]ServiceConfigAdditions{
+		"AdditionalSeedService" : addSeedSvc,
+	    "AllPOdsService" : allPodsSvc,
+		"DatacenterService" : dcSvc,
+		"NodePOrtService" : nodePortSvc,
+		"SeedService" : seedSvc,
+	}
+
+	var msg string
+
+	for svcName, config := range services {
+		if containsReservedAnnotations(config) || containsReservedLabels(config) {
+			msg = string(append([]byte(msg), fmt.Sprintf("configure %s with reserved annotations and/or labels (prefixes %s and/or %s)", svcName, datastaxPrefix, k8ssandraPrefix)...))
+		}
+	}
+	msg = strings.Trim(msg, " ")
+	if msg != "" {
+		return attemptedTo(msg)
+	}
+	return nil
+}
+
+func containsReservedAnnotations(config ServiceConfigAdditions) bool {
+	return containsReservedPrefixes(config.Annotations)
+}
+
+func containsReservedLabels(config ServiceConfigAdditions) bool {
+	return containsReservedPrefixes(config.Labels)
+}
+
+func containsReservedPrefixes(config map[string]string) bool {
+	for k := range config {
+		if strings.HasPrefix(k, datastaxPrefix) || strings.HasPrefix(k, k8ssandraPrefix) {
+			// reserved prefix found
+			return true
+		}
+	}
+	return false
 }

@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"testing"
 
-	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
@@ -56,7 +55,7 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 			// store svc annotations
 			svcAnnotationMap[arg.GetName()] = arg.GetAnnotations()
 		}).
-    	Times(4)
+		Times(4)
 
 	// Check the service should populate labels and annotations
 	recResult := rc.CheckHeadlessServices()
@@ -79,8 +78,8 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 	dcSvcAnnotations := svcAnnotationMap[dcSvcName]
 	dcSvcAnnotations["AddAnnotation1"] = "AddValue1"
 	dcSvcAnnotations["AddAnnotation2"] = "AddValue2"
-	// In DC Additional Labels, add a label, change a label value, delete a label and try to add a reserved label
-	rc.Datacenter.Spec.AdditionalServiceConfig.DatacenterService.Labels = map[string]string{"AddKey1" : "ChangeValue1", "AddKey3" : "Value3", api.DatacenterLabel : "userOverride"}
+	// In DC Additional Labels, add a label, change a label value and delete a label
+	rc.Datacenter.Spec.AdditionalServiceConfig.DatacenterService.Labels = map[string]string{"AddKey1" : "ChangeValue1", "AddKey3" : "Value3"}
 	updatedDcSvcLabels := make(map[string]string)
 	// copy current labels into updated labels
 	for k, v := range dcSvcLabels {
@@ -89,8 +88,8 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 	delete(updatedDcSvcLabels, "AddKey2")
 	updatedDcSvcLabels["AddKey1"] = "ChangeValue1"
 	updatedDcSvcLabels["AddKey3"] = "Value3"
-	// In DC Additional Annotations, add an annotation, change an annotation value, delete an annotation and try to add a reserved annotation
-	rc.Datacenter.Spec.AdditionalServiceConfig.DatacenterService.Annotations = map[string]string{"AddAnnotation1": "ChangeAnnotation1", "AddAnnotation3" : "AddValue3", api.DatacenterAnnotation : "userOverride"}
+	// In DC Additional Annotations, add an annotation, change an annotation value and delete an annotation
+	rc.Datacenter.Spec.AdditionalServiceConfig.DatacenterService.Annotations = map[string]string{"AddAnnotation1": "ChangeAnnotation1", "AddAnnotation3" : "AddValue3"}
 	updatedDcSvcAnnotations := make(map[string]string)
 	// copy current annotations into updated annotations
 	for k, v := range dcSvcAnnotations {
@@ -130,8 +129,8 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 				assert.Truef(t, reflect.DeepEqual(arg.GetAnnotations(), updatedDcSvcAnnotations), "Datacenter Service Annotations do not match. Expected:\n%v\nObserved:\n%v\n", updatedDcSvcAnnotations, observedAnnotations)
 			}
 		}).
-    	Times(4)
-	
+		Times(4)
+
 	// re-populate labels and annotations
 	recResult = rc.CheckHeadlessServices()
 

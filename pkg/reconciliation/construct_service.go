@@ -8,7 +8,6 @@ import (
 	"net"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
@@ -79,13 +78,7 @@ func addAdditionalOptions(service *corev1.Service, serviceConfig *api.ServiceCon
 			service.Labels = make(map[string]string, len(serviceConfig.Labels))
 		}
 		for k, v := range serviceConfig.Labels {
-			// make sure user specified labels don't override reserved labels
-			if oplabels.IsReservedLabel(k) || api.IsReservedLabel(k) {
-				// don't allow reserved labels as AdditionalLabels
-				log.Log.Info("Skipping reserved label from AdditionalLabels", "reserved label", k)
-			} else {
-				service.Labels[k] = v
-			}
+			service.Labels[k] = v
 		}
 	}
 
@@ -94,13 +87,7 @@ func addAdditionalOptions(service *corev1.Service, serviceConfig *api.ServiceCon
 			service.Annotations = make(map[string]string, len(serviceConfig.Annotations))
 		}
 		for k, v := range serviceConfig.Annotations {
-			// make sure user specified annotations don't override reserved annotations
-			if api.IsReservedAnnotation(k) {
-				// don't allow reserved annotations as AdditionalAnnotations
-				log.Log.Info("Skipping reserved annotation from AdditionalAnnotations", "reserved annotation", k)
-			} else {
-			    service.Annotations[k] = v
-			}
+			service.Annotations[k] = v
 		}
 	}
 }

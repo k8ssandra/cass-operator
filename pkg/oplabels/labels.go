@@ -5,6 +5,7 @@ package oplabels
 
 import (
 	"fmt"
+	"strings"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
@@ -25,7 +26,7 @@ func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
 	m[NameLabel] = NameLabelValue
 	m[VersionLabel] = dc.Spec.ServerVersion
 
-	instanceName := fmt.Sprintf("cassandra-%s", dc.Spec.ClusterName)
+	instanceName := fmt.Sprintf("cassandra-%s", strings.ReplaceAll(dc.Spec.ClusterName, " ", ""))
 	m[InstanceLabel] = instanceName
 
 	if len(dc.Spec.AdditionalLabels) != 0 {

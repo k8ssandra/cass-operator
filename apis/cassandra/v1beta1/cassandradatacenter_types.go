@@ -540,7 +540,7 @@ func (dc *CassandraDatacenter) GetDatacenterLabels() map[string]string {
 // GetClusterLabels returns a new map with the cluster label key and cluster name value
 func (dc *CassandraDatacenter) GetClusterLabels() map[string]string {
 	return map[string]string{
-		ClusterLabel: dc.Spec.ClusterName,
+		ClusterLabel: strings.ReplaceAll(dc.Spec.ClusterName, " ", ""),
 	}
 }
 

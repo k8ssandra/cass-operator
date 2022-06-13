@@ -545,7 +545,7 @@ const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 
 var whitelistRegex = regexp.MustCompile(`(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?`)
 
-// CleanLabelValue CleanLabelName a valid label must be an empty string or consist of alphanumeric characters,
+// CleanLabelValue a valid label must be an empty string or consist of alphanumeric characters,
 // '-', '_' or '.', and must start and end with an alphanumeric.
 // Note: we apply a prefix of "cassandra-" to the cluster name value used as label name.
 // As such, empty string isn't a valid case.

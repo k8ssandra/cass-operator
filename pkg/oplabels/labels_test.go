@@ -12,7 +12,7 @@ import (
 A valid label must be an empty string or consist of alphanumeric characters,
 '-', '_' or '.', and must start and end with an alphanumeric.
 */
-func TestLabelNameClean(t *testing.T) {
+func TestLabelValueClean(t *testing.T) {
 
 	var cleaned = CleanLabelValue("TestCluster")
 	require.EqualValues(t, "TestCluster", cleaned,

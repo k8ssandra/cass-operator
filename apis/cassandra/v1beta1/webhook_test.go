@@ -254,12 +254,12 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 					Name: "exampleDC",
 				},
 				Spec: CassandraDatacenterSpec{
-					ServerType:                  "cassandra",
-					ServerVersion:               "4.0.4",
-					AdditionalServiceConfig:     ServiceConfig{
-						DatacenterService:     ServiceConfigAdditions{
-							Labels:      map[string]string{"k8ssandra.io/key1" : "val1", "cassandra.datastax.com/key2" : "val2"},
-							Annotations: map[string]string{"k8ssandra.io/key3" : "val3", "cassandra.datastax.com/key4" : "val4"},
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.4",
+					AdditionalServiceConfig: ServiceConfig{
+						DatacenterService: ServiceConfigAdditions{
+							Labels:      map[string]string{"k8ssandra.io/key1": "val1", "cassandra.datastax.com/key2": "val2"},
+							Annotations: map[string]string{"k8ssandra.io/key3": "val3", "cassandra.datastax.com/key4": "val4"},
 						},
 					},
 				},

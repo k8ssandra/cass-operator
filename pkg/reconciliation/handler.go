@@ -204,6 +204,9 @@ func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
 	// Validate FQL config
 	errs = append(errs, api.ValidateFQLConfig(*dc))
 
+	// Validate Service labels and annotations
+	errs = append(errs, api.ValidateServiceLabelsAndAnnotations(*dc))
+
 	// Validate Management API config
 	errs = append(errs, httphelper.ValidateManagementApiConfig(dc, rc.Client, rc.Ctx)...)
 	if len(errs) > 0 {

@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	datastaxPrefix string = "cassandra.datastax.com"
+	datastaxPrefix  string = "cassandra.datastax.com"
 	k8ssandraPrefix string = "k8ssandra.io"
 )
 
@@ -119,7 +119,7 @@ func ValidateSingleDatacenter(dc CassandraDatacenter) error {
 		}
 	}
 
-	err := validateServiceLabelsAndAnnotations(dc)
+	err := ValidateServiceLabelsAndAnnotations(dc)
 	if err != nil {
 		return err
 	}
@@ -254,20 +254,20 @@ func ValidateFQLConfig(dc CassandraDatacenter) error {
 	return nil
 }
 
-func validateServiceLabelsAndAnnotations(dc CassandraDatacenter) error {
+func ValidateServiceLabelsAndAnnotations(dc CassandraDatacenter) error {
 	// check each service
-	addSeedSvc  := dc.Spec.AdditionalServiceConfig.AdditionalSeedService
-	allPodsSvc  := dc.Spec.AdditionalServiceConfig.AllPodsService
-	dcSvc       := dc.Spec.AdditionalServiceConfig.DatacenterService
+	addSeedSvc := dc.Spec.AdditionalServiceConfig.AdditionalSeedService
+	allPodsSvc := dc.Spec.AdditionalServiceConfig.AllPodsService
+	dcSvc := dc.Spec.AdditionalServiceConfig.DatacenterService
 	nodePortSvc := dc.Spec.AdditionalServiceConfig.NodePortService
-	seedSvc     := dc.Spec.AdditionalServiceConfig.SeedService
+	seedSvc := dc.Spec.AdditionalServiceConfig.SeedService
 
 	services := map[string]ServiceConfigAdditions{
-		"AdditionalSeedService" : addSeedSvc,
-	    "AllPOdsService" : allPodsSvc,
-		"DatacenterService" : dcSvc,
-		"NodePOrtService" : nodePortSvc,
-		"SeedService" : seedSvc,
+		"AdditionalSeedService": addSeedSvc,
+		"AllPOdsService":        allPodsSvc,
+		"DatacenterService":     dcSvc,
+		"NodePOrtService":       nodePortSvc,
+		"SeedService":           seedSvc,
 	}
 
 	var msg string

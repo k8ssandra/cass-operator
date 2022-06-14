@@ -43,7 +43,7 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 	// place holder for service label maps
 	svcLabelMap := make(map[string]map[string]string)
 	// place holder for service annotation maps
-	svcAnnotationMap :=  make(map[string]map[string]string)
+	svcAnnotationMap := make(map[string]map[string]string)
 
 	k8sMockClientGet(mockClient, nil).
 		Times(4)
@@ -79,7 +79,7 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 	dcSvcAnnotations["AddAnnotation1"] = "AddValue1"
 	dcSvcAnnotations["AddAnnotation2"] = "AddValue2"
 	// In DC Additional Labels, add a label, change a label value and delete a label
-	rc.Datacenter.Spec.AdditionalServiceConfig.DatacenterService.Labels = map[string]string{"AddKey1" : "ChangeValue1", "AddKey3" : "Value3"}
+	rc.Datacenter.Spec.AdditionalServiceConfig.DatacenterService.Labels = map[string]string{"AddKey1": "ChangeValue1", "AddKey3": "Value3"}
 	updatedDcSvcLabels := make(map[string]string)
 	// copy current labels into updated labels
 	for k, v := range dcSvcLabels {
@@ -89,7 +89,7 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 	updatedDcSvcLabels["AddKey1"] = "ChangeValue1"
 	updatedDcSvcLabels["AddKey3"] = "Value3"
 	// In DC Additional Annotations, add an annotation, change an annotation value and delete an annotation
-	rc.Datacenter.Spec.AdditionalServiceConfig.DatacenterService.Annotations = map[string]string{"AddAnnotation1": "ChangeAnnotation1", "AddAnnotation3" : "AddValue3"}
+	rc.Datacenter.Spec.AdditionalServiceConfig.DatacenterService.Annotations = map[string]string{"AddAnnotation1": "ChangeAnnotation1", "AddAnnotation3": "AddValue3"}
 	updatedDcSvcAnnotations := make(map[string]string)
 	// copy current annotations into updated annotations
 	for k, v := range dcSvcAnnotations {
@@ -105,7 +105,7 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			svcName := args.Get(1).(types.NamespacedName)
 			arg := args.Get(2).(*corev1.Service)
-			if (svcName.Name == dcSvcName) {
+			if svcName.Name == dcSvcName {
 				// set the expected service labels
 				arg.SetLabels(dcSvcLabels)
 				// set the expected service annotations
@@ -121,8 +121,8 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 			// store service annotations
 			svcAnnotationMap[arg.GetName()] = arg.GetAnnotations()
 			// verify additional labels and annotations are added for the Datacenter Service
-			if (arg.GetName() == dcSvcName) {
-			    assert.Truef(t, reflect.DeepEqual(arg.GetLabels(), updatedDcSvcLabels), "Datacenter Service Labels do not match. Expected:\n%v\nObserved:\n%v\n", updatedDcSvcLabels, arg.GetLabels())
+			if arg.GetName() == dcSvcName {
+				assert.Truef(t, reflect.DeepEqual(arg.GetLabels(), updatedDcSvcLabels), "Datacenter Service Labels do not match. Expected:\n%v\nObserved:\n%v\n", updatedDcSvcLabels, arg.GetLabels())
 				// resource hash annotation will change, so exclude it from the comparison
 				observedAnnotations := arg.GetAnnotations()
 				delete(observedAnnotations, utils.ResourceHashAnnotationKey)
@@ -133,7 +133,6 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 
 	// re-populate labels and annotations
 	recResult = rc.CheckHeadlessServices()
-
 
 	// kind of weird to check this path we don't want in a test, but
 	// it's useful to see what the error is

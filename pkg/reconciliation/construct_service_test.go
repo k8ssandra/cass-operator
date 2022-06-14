@@ -5,10 +5,10 @@ package reconciliation
 
 import (
 	"fmt"
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"reflect"
 	"testing"
 
-	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -48,6 +48,7 @@ func TestCassandraDatacenter_allPodsServiceLabels(t *testing.T) {
 		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
 		oplabels.NameLabel:      oplabels.NameLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		api.ClusterLabel:        "bob",
 		api.DatacenterLabel:     "dc1",
 		api.PromMetricsLabel:    "true",
@@ -120,6 +121,7 @@ func TestLabelsWithNewSeedServiceForCassandraDatacenter(t *testing.T) {
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
 		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
 		api.ClusterLabel:        "piclem",
 		"Add":                   "label",
@@ -178,6 +180,7 @@ func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T) {
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
 		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
@@ -237,6 +240,7 @@ func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T) {
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
 		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
@@ -297,6 +301,7 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T) {
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
 		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
@@ -356,6 +361,7 @@ func TestLabelsWithNewAdditionalSeedServiceForCassandraDatacenter(t *testing.T) 
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
 		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
@@ -388,6 +394,7 @@ func TestAddingAdditionalLabels(t *testing.T) {
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
 		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",

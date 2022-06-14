@@ -86,6 +86,7 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
 		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
@@ -97,6 +98,7 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
 		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
 		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
@@ -105,7 +107,8 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 		"Add":                   "label",
 	}
 
-	statefulset, newStatefulSetForCassandraDatacenterError := newStatefulSetForCassandraDatacenter(nil, "rack1", dc, 1, false)
+	statefulset, newStatefulSetForCassandraDatacenterError := newStatefulSetForCassandraDatacenter(nil,
+		"rack1", dc, 1, false)
 
 	assert.NoError(t, newStatefulSetForCassandraDatacenterError,
 		"should not have gotten error when creating the new statefulset")

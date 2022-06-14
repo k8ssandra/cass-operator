@@ -10,6 +10,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ```
 
 ## unreleased
+* [BUGFIX] [#355](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars. Include app.kubernetes.io/created-by label. 
 
 ## v1.11.0
 

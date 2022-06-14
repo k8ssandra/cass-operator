@@ -33,9 +33,9 @@ import (
 
 var log = logf.Log.WithName("api")
 
-func (r *CassandraDatacenter) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (dc *CassandraDatacenter) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
+		For(dc).
 		Complete()
 }
 
@@ -45,7 +45,7 @@ func (r *CassandraDatacenter) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Defaulter = &CassandraDatacenter{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *CassandraDatacenter) Default() {
+func (dc *CassandraDatacenter) Default() {
 	// No mutations at this point
 }
 

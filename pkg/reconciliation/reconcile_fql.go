@@ -2,7 +2,6 @@ package reconciliation
 
 import (
 	"errors"
-
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 )

@@ -4,5 +4,5 @@ commands:
 - script: |
     ../../../bin/helm repo add datastax-pulsar https://datastax.github.io/pulsar-helm-chart
     ../../../bin/helm repo update
-    ../../../bin/helm install pulsar --create-namespace -f config/dev-values.yaml datastax-pulsar/pulsar
+    ../../../bin/helm install pulsar --create-namespace -n pulsar -f config/dev-values.yaml datastax-pulsar/pulsar
   ignoreFailure: false

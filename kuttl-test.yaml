@@ -8,5 +8,3 @@ kindConfig: tests/kuttl/config/kind/w1k1.21.yaml
 timeout: 99999
 kindContainers:
 - k8ssandra/cass-operator:latest
-- mgmtapi-4_0:miles
-- cass-config-builder:miles

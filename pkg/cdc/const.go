@@ -1,3 +1,3 @@
 package cdc
 
-var CDCAgentVer = "1.0.5"
+var CDCAgentVer = "2.0.0"

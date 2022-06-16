@@ -7,5 +7,5 @@ commands:
 - script: |
     TESTUTILS_POD=$(kubectl get pods -l=app=cdc-testutil -o=jsonpath='{.items[0].metadata.name}')
     kubectl wait --for=condition=Ready pod $TESTUTILS_POD
-    kubectl exec $TESTUTILS_POD -- bash -c "/opt/bin/pulsar-cdc-testutil --cass-contact-points cluster2-dc1-all-pods-service.default.svc.cluster.local:9042 --pulsar-url pulsar://pulsar-proxy.pulsar.svc.cluster.local:5600 --pulsar-admin-url http://pulsar-proxy.pulsar.svc.cluster.local:8080"
+    until kubectl exec $TESTUTILS_POD -- bash -c "/opt/bin/pulsar-cdc-testutil --cass-contact-points test-cluster-dc1-all-pods-service.cass-operator.svc.cluster.local:9042 --pulsar-url pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650 --pulsar-admin-url http://pulsar-proxy.pulsar.svc.cluster.local:8080"; do sleep 10; done
   ignoreFailure: false

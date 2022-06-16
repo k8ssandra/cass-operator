@@ -5,6 +5,6 @@ testDirs:
 startKIND: true
 kindNodeCache: true
 kindConfig: tests/kuttl/config/kind/w1k1.21.yaml 
-timeout: 99999
+timeout: 1800
 kindContainers:
 - k8ssandra/cass-operator:latest

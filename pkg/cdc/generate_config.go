@@ -119,11 +119,11 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfigur
 
 func getAgentPath(dc cassdcapi.CassandraDatacenter) string {
 	if dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "3") {
-		return fmt.Sprintf("/opt/cdc_agent/agent-c3-pulsar-%s-all.jar", CDCAgentVer)
+		return fmt.Sprintf("/opt/cdc_agent/agent-c3-%s-all.jar", CDCAgentVer)
 	} else if dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "4") {
-		return fmt.Sprintf("/opt/cdc_agent/agent-c4-pulsar-%s-all.jar", CDCAgentVer)
+		return fmt.Sprintf("/opt/cdc_agent/agent-c4-%s-all.jar", CDCAgentVer)
 	} else {
-		return fmt.Sprintf("/opt/cdc_agent/agent-dse4-pulsar-%s-all.jar", CDCAgentVer)
+		return fmt.Sprintf("/opt/cdc_agent/agent-dse4-%s-all.jar", CDCAgentVer)
 	}
 }
 
@@ -140,12 +140,9 @@ func updateCassandraYaml(cassConfig *configData, cdcConfig cassdcapi.CDCConfigur
 }
 
 func updateAdditionalEnvOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration) []string {
-	out := []string{}
+	out := removeEntryFromSlice(optsSlice, "CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
 	if CDCConfig.Enabled {
-		out = removeEntryFromSlice(optsSlice, "CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar") // We want this to be idempotent.
 		out = append(out, "CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
-	} else {
-		out = removeEntryFromSlice(optsSlice, "CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
 	}
 	return out
 }

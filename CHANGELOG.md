@@ -24,7 +24,6 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] [#313](https://github.com/k8ssandra/cass-operator/issues/313) Remove Cassandra 4.0.x regexp restriction, allow 4.x.x
 * [BUGFIX] [#322](https://github.com/k8ssandra/cass-operator/pull/322) Add missing requeue if decommissioned pods haven't been removed yet
 * [BUGFIX] [#315](https://github.com/k8ssandra/cass-operator/pull/315) Validate podnames in the ReplaceNodes before moving them to NodeReplacements
-* [ENHANCEMENT] Add ability for users to define additional-env-opts which will be placed in cassandra-env.sh.
 * [ENHANCEMENT] Add ability for users to define Pulsar CDC agent settings which will cause an agent to start within the Cassandra JVM and pass mutation events from Cassandra back to a Pulsar broker.
 
 ## v1.10.3

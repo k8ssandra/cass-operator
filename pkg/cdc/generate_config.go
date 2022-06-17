@@ -24,11 +24,6 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	if c.CassEnvSh != nil && c.CassEnvSh.AddtnlJVMOptions != nil {
 		additionalJVMOpts = *c.CassEnvSh.AddtnlJVMOptions
 	}
-	// If CassEnvSh.AddtnlEnvOptions exists, populate a string slice with it.
-	var additionalEnvOpts []string
-	if c.CassEnvSh != nil && c.CassEnvSh.AddtnlEnvOptions != nil {
-		additionalEnvOpts = *c.CassEnvSh.AddtnlEnvOptions
-	}
 	// Deal with the possibility that cassdcapi.CDCConfiguration is nil.
 	CDCConfig := cassdcapi.CDCConfiguration{}
 	if cassDC.Spec.CDC == nil {
@@ -43,14 +38,11 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	if err != nil {
 		return nil, err
 	}
-	newEnvOpts := updateAdditionalEnvOpts(additionalEnvOpts, CDCConfig)
 	if c.CassEnvSh != nil {
 		c.CassEnvSh.AddtnlJVMOptions = &newJVMOpts
-		c.CassEnvSh.AddtnlEnvOptions = &newEnvOpts
 	} else {
 		c.CassEnvSh = &cassEnvSh{
 			AddtnlJVMOptions: &newJVMOpts,
-			AddtnlEnvOptions: &newEnvOpts,
 		}
 	}
 	// Marshall everything back to json and mutate the input.
@@ -137,14 +129,6 @@ func updateCassandraYaml(cassConfig *configData, cdcConfig cassdcapi.CDCConfigur
 	case !cdcConfig.Enabled:
 		cassConfig.CassandraYaml["cdc_enabled"] = false
 	}
-}
-
-func updateAdditionalEnvOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration) []string {
-	out := removeEntryFromSlice(optsSlice, "CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
-	if CDCConfig.Enabled {
-		out = append(out, "CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar")
-	}
-	return out
 }
 
 // removeEntryFromSlice removes all an entry from a slice if it contains a substring.

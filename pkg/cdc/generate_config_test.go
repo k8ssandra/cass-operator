@@ -112,9 +112,6 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 				"additional-jvm-opts": [
 					"jvmopt"
 				],
-				"additional-env-opts": [
-					"envopt"
-				],
 				"unknownfield": true	
 			}
 		}
@@ -125,9 +122,6 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 			"cassandra-env-sh": {
 				"additional-jvm-opts": [
 					"jvmopt"
-				],
-				"additional-env-opts": [
-					"envopt"
 				],
 				"unknownfield": true
 			},
@@ -159,10 +153,6 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	assert.Contains(t,
 		test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"],
 		fmt.Sprintf("-javaagent:%s=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-", getAgentPath(dc)),
-	)
-	assert.Contains(t,
-		test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-env-opts"],
-		"CLASSPATH=$CLASSPATH/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar",
 	)
 }
 

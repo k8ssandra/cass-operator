@@ -233,12 +233,12 @@ OS=$(shell go env GOOS)
 ARCH=$(shell go env GOARCH)
 
 HELM = $(shell pwd)/bin/helm
-HELMFILENAME = helm-v3.8.2-${OS}-${ARCH}.tar.gz
+HELMTARNAME = helm-v3.8.2-${OS}-${ARCH}.tar.gz
 bin/helm: ## Download helm locally if necessary.
-	curl -LO https://get.helm.sh/${HELMFILENAME} ;\
-	tar zxvf ${HELMFILENAME} ;\
-	mv darwin-amd64/helm ./bin/ ;\
-	rm -r darwin-amd64 ${HELMFILENAME}
+	curl -LO https://get.helm.sh/${HELMTARNAME} ;\
+	tar zxvf ${HELMTARNAME} ;\
+	mv ${OS}-${ARCH}/helm ${HELM} ;\
+	rm -r ${HELMTARNAME} ${OS}-${ARCH}
 
 # E2E tests from kuttl
 kuttl-test: bin/kubectl-kuttl bin/helm docker-build

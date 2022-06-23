@@ -14,7 +14,6 @@ patches:
       serverImage: docker.io/k8ssandra/cass-management-api:4.0.1-v0.1.42
       cdc:
         enabled: true
-        pulsarServiceUrl: pulsar://pulsar-proxy.default.svc.cluster.local:6650
-        topicPrefix: persistent://public/default/events-cdc-
+        pulsarServiceUrl: pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650
+        topicPrefix: persistent://public/default/events-
         cdcWorkingDir: /var/lib/cassandra/cdc
-        

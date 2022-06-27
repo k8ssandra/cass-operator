@@ -161,18 +161,6 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) desiredStatefulSetForExistingStatefulSet(sts *appsv1.StatefulSet, rackName string) (desiredSts *appsv1.StatefulSet, err error) {
-	dc := rc.Datacenter
-
-	// when Cass Operator was released, we accidentally used the incorrect managed-by
-	// label of "cassandra-operator" we have since fixed this to be "cass-operator",
-	// but unfortunately, we cannot modify the labels in the volumeClaimTemplates of a
-	// StatefulSet. Consequently, we must preserve the old labels in this case.
-	usesDefunct := usesDefunctPvcManagedByLabel(sts)
-
-	return newStatefulSetForCassandraDatacenter(sts, rackName, dc, int(*sts.Spec.Replicas), usesDefunct)
-}
-
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
@@ -188,10 +176,10 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 		}
 		statefulSet := rc.statefulSets[idx]
 
-		desiredSts, err := rc.desiredStatefulSetForExistingStatefulSet(statefulSet, rackName)
+		desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, int(*statefulSet.Spec.Replicas))
 
 		if err != nil {
-			logger.Error(err, "error calling desiredStatefulSetForExistingStatefulSet")
+			logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
 			return result.Error(err)
 		}
 
@@ -340,7 +328,7 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 			// have to use zero here, because each statefulset is created with no replicas
 			// in GetStatefulSetForRack()
-			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, nextRack.NodeCount, false)
+			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, nextRack.NodeCount)
 			if err != nil {
 				logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
 				return result.Error(err)
@@ -1381,8 +1369,7 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 		currentStatefulSet,
 		nextRack.RackName,
 		rc.Datacenter,
-		nextRack.NodeCount,
-		false)
+		nextRack.NodeCount)
 	if err != nil {
 		return nil, false, err
 	}

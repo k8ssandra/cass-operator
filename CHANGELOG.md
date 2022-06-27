@@ -10,6 +10,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ```
 
 ## unreleased
+* [CHANGE] [#354](https://github.com/k8ssandra/cass-operator/issues/354) Remove oldDefunctLabel support since we recreate StS. Fix #335 created-by value to match expected value.
 * [BUGFIX] [#355](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars. Include app.kubernetes.io/created-by label. 
 
 ## v1.11.0

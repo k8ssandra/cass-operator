@@ -5,19 +5,19 @@ package oplabels
 
 import (
 	"fmt"
+
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
 
 const (
-	ManagedByLabel             = "app.kubernetes.io/managed-by"
-	ManagedByLabelValue        = "cass-operator"
-	ManagedByLabelDefunctValue = "cassandra-operator"
-	NameLabel                  = "app.kubernetes.io/name"
-	NameLabelValue             = "cassandra"
-	InstanceLabel              = "app.kubernetes.io/instance"
-	VersionLabel               = "app.kubernetes.io/version"
-	CreatedByLabel             = "app.kubernetes.io/created-by"
-	CreatedByLabelValue        = "cassandradatacenter_controller"
+	ManagedByLabel      = "app.kubernetes.io/managed-by"
+	ManagedByLabelValue = "cass-operator"
+	NameLabel           = "app.kubernetes.io/name"
+	NameLabelValue      = "cassandra"
+	InstanceLabel       = "app.kubernetes.io/instance"
+	VersionLabel        = "app.kubernetes.io/version"
+	CreatedByLabel      = "app.kubernetes.io/created-by"
+	CreatedByLabelValue = ManagedByLabelValue
 )
 
 func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
@@ -32,10 +32,6 @@ func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
 			m[key] = value
 		}
 	}
-}
-
-func AddDefunctManagedByLabel(m map[string]string) {
-	m[ManagedByLabel] = ManagedByLabelDefunctValue
 }
 
 func HasManagedByCassandraOperatorLabel(m map[string]string) bool {

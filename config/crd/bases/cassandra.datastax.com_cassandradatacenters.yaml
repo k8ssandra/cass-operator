@@ -7434,13 +7434,12 @@ spec:
                   re-attach when the CassandraDatacenter workload is resumed.
                 type: boolean
               storageConfig:
-                description: Describes the persistent storage request of each server
-                  node
+                description: StorageConfig describes the persistent storage request
+                  of each server node
                 properties:
                   additionalVolumes:
                     items:
-                      description: AdditionalVolumes StorageConfig defines additional
-                        storage configurations
+                      description: AdditionalVolumes defines additional storage configurations
                       properties:
                         mountPath:
                           description: Mount path into cassandra container

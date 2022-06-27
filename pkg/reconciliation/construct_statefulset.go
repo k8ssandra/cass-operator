@@ -23,19 +23,6 @@ import (
 
 const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
 
-func usesDefunctPvcManagedByLabel(sts *appsv1.StatefulSet) bool {
-	usesDefunct := false
-	for _, pvc := range sts.Spec.VolumeClaimTemplates {
-		value, ok := pvc.Labels[oplabels.ManagedByLabel]
-		if ok && value == oplabels.ManagedByLabelDefunctValue {
-			usesDefunct = true
-			break
-		}
-	}
-
-	return usesDefunct
-}
-
 func newNamespacedNameForStatefulSet(
 	dc *api.CassandraDatacenter,
 	rackName string) types.NamespacedName {
@@ -95,17 +82,13 @@ func newStatefulSetForCassandraDatacenter(
 	sts *appsv1.StatefulSet,
 	rackName string,
 	dc *api.CassandraDatacenter,
-	replicaCount int,
-	useDefunctManagedByForPvc bool) (*appsv1.StatefulSet, error) {
+	replicaCount int) (*appsv1.StatefulSet, error) {
 
 	replicaCountInt32 := int32(replicaCount)
 
 	// see https://github.com/kubernetes/kubernetes/pull/74941
 	// pvc labels are ignored before k8s 1.15.0
 	pvcLabels := dc.GetRackLabels(rackName)
-	if useDefunctManagedByForPvc {
-		oplabels.AddDefunctManagedByLabel(pvcLabels)
-	}
 	oplabels.AddOperatorLabels(pvcLabels, dc)
 
 	statefulSetLabels := dc.GetRackLabels(rackName)

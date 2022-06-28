@@ -119,8 +119,7 @@ func ValidateSingleDatacenter(dc CassandraDatacenter) error {
 		}
 	}
 
-	err := ValidateServiceLabelsAndAnnotations(dc)
-	if err != nil {
+	if err := ValidateServiceLabelsAndAnnotations(dc); err != nil {
 		return err
 	}
 
@@ -270,17 +269,12 @@ func ValidateServiceLabelsAndAnnotations(dc CassandraDatacenter) error {
 		"SeedService":           seedSvc,
 	}
 
-	var msg string
-
 	for svcName, config := range services {
 		if containsReservedAnnotations(config) || containsReservedLabels(config) {
-			msg = string(append([]byte(msg), fmt.Sprintf("configure %s with reserved annotations and/or labels (prefixes %s and/or %s)", svcName, datastaxPrefix, k8ssandraPrefix)...))
+			return attemptedTo(fmt.Sprintf("configure %s with reserved annotations and/or labels (prefixes %s and/or %s)", svcName, datastaxPrefix, k8ssandraPrefix))
 		}
 	}
-	msg = strings.Trim(msg, " ")
-	if msg != "" {
-		return attemptedTo(msg)
-	}
+
 	return nil
 }
 

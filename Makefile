@@ -134,6 +134,10 @@ else
 	cd tests/${M_INTEG_DIR} && go test -v ./... -timeout 300m --ginkgo.progress --ginkgo.v
 endif
 
+.PHONY: version
+version:
+	@echo $(VERSION)
+
 ##@ Build
 
 .PHONY: build

@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [BUGFIX] [#355](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars.
+* [BUGFIX] [#330](https://github.com/k8ssandra/cass-operator/issues/330) Apply correct updates to Service labels and annotations through additionalServiceConfig (they are now validated and don't allow reserved prefixes).
 
 ## v1.10.4
 

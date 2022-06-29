@@ -15,7 +15,7 @@ type Annotated interface {
 	SetAnnotations(annotations map[string]string)
 }
 
-const resourceHashAnnotationKey = "cassandra.datastax.com/resource-hash"
+const ResourceHashAnnotationKey = "cassandra.datastax.com/resource-hash"
 
 func ResourcesHaveSameHash(r1, r2 Annotated) bool {
 	a1 := r1.GetAnnotations()
@@ -23,7 +23,7 @@ func ResourcesHaveSameHash(r1, r2 Annotated) bool {
 	if a1 == nil || a2 == nil {
 		return false
 	}
-	return a1[resourceHashAnnotationKey] == a2[resourceHashAnnotationKey]
+	return a1[ResourceHashAnnotationKey] == a2[ResourceHashAnnotationKey]
 }
 
 func AddHashAnnotation(r Annotated) {
@@ -32,7 +32,7 @@ func AddHashAnnotation(r Annotated) {
 	if m == nil {
 		m = map[string]string{}
 	}
-	m[resourceHashAnnotationKey] = hash
+	m[ResourceHashAnnotationKey] = hash
 	r.SetAnnotations(m)
 }
 

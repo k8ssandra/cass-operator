@@ -116,18 +116,14 @@ func (rc *ReconciliationContext) updateConfigHashAnnotation(secret *corev1.Secre
 func getConfigFromConfigSecret(dc *api.CassandraDatacenter, secret *corev1.Secret) ([]byte, error) {
 	if b, found := secret.Data["config"]; found {
 		jsonConfig, err := dc.GetConfigAsJSON(b)
-		if err == nil {
-			if valid := cdc.Validate(dc.Spec.CDC); !valid {
-				return nil, errors.NewBadRequest("CDC spec invalid")
-			}
-			cdcAdded, err := cdc.UpdateConfig(json.RawMessage(jsonConfig), *dc)
-			if err != nil {
-				return nil, err
-			}
-			return []byte(cdcAdded), nil
-		} else {
+		if err != nil {
 			return nil, err
 		}
+		cdcAdded, err := cdc.UpdateConfig(json.RawMessage(jsonConfig), *dc)
+		if err != nil {
+			return nil, err
+		}
+		return []byte(cdcAdded), nil
 	} else {
 		return nil, fmt.Errorf("invalid config secret %s: config property is required", dc.Spec.ConfigSecret)
 	}

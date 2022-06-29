@@ -363,9 +363,6 @@ func getConfigDataEnVars(dc *api.CassandraDatacenter) ([]corev1.EnvVar, error) {
 	if err != nil {
 		return envVars, err
 	}
-	if valid := cdc.Validate(dc.Spec.CDC); !valid {
-		return nil, errors.New("CDC spec invalid")
-	}
 	cdcAdded, err := cdc.UpdateConfig(json.RawMessage(configData), *dc)
 	if err != nil {
 		return envVars, err

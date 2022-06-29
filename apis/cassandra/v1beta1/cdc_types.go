@@ -3,7 +3,8 @@ package v1beta1
 // CDCConfiguration holds CDC config for the CassandraDatacenter. Note that it cannot contain arrays, channels, maps etc. because of the way the
 // reflection logic works which marshalls it into a string for the purposes of passing on the command line.
 type CDCConfiguration struct {
-	Enabled          bool    `json:"enabled"`
+	Enabled bool `json:"enabled"`
+	// +kubebuilder:validation:MinLength=1
 	PulsarServiceUrl *string `json:"pulsarServiceUrl"`
 	// +optional
 	TopicPrefix *string `json:"topicPrefix,omitempty"`

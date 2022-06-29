@@ -12,6 +12,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -104,6 +105,14 @@ func (rc *ReconciliationContext) CalculateRackInformation() error {
 
 func (rc *ReconciliationContext) CheckSuperuserSecretCreation() result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckSuperuserSecretCreation")
+
+	if rc.Datacenter.Spec.UserInfo != nil {
+		return result.Continue()
+	}
+
+	if rc.IsInitialized() {
+		return result.Continue()
+	}
 
 	_, err := rc.retrieveSuperuserSecretOrCreateDefault()
 	if err != nil {
@@ -876,6 +885,10 @@ func (rc *ReconciliationContext) UpdateSecretWatches() error {
 func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 	dc := rc.Datacenter
 
+	if rc.IsInitialized() {
+		return result.Continue()
+	}
+
 	if val, found := dc.Annotations[api.SkipUserCreationAnnotation]; found && val == "true" {
 		rc.ReqLogger.Info(api.SkipUserCreationAnnotation + " is set, skipping CreateUser")
 		return result.Continue()
@@ -888,15 +901,58 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 
 	rc.ReqLogger.Info("reconcile_racks::CreateUsers")
 
+	// TODO This should be cleaned up after a while (TTL) + when I delete CassandraDatacenter, so we need ownership also. And cass-operator labels
+	if dc.Spec.UserInfo != nil {
+		// Create the job
+		// TODO wait for it to complete before we continue..
+		job := batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: dc.Namespace,
+				Name:      fmt.Sprintf("usercreate-%s", dc.Name),
+			},
+			Spec: batchv1.JobSpec{
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: dc.Spec.UserInfo.Annotations,
+					},
+					Spec: corev1.PodSpec{
+						// TODO Add volumes here if CSI was used
+						Containers: []corev1.Container{
+							{
+								Name:            "client",
+								Image:           "burmanm/k8ssandra-client:latest", // k8ssandra/k8ssandra-client does not have this feature
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								Args:            []string{"users", "add", "--path", "/vault/secrets/database-config.txt", "--dc", dc.Name}, // TODO This path must be configurable
+							},
+						},
+						RestartPolicy: corev1.RestartPolicyNever,
+					},
+					// Create the k8ssandra-client add users job here?
+				},
+			},
+		}
+
+		// TODO Do I have this value somewhere..?
+		job.Spec.Template.Spec.ServiceAccountName = "cass-operator-controller-manager"
+
+		if err := rc.Client.Create(rc.Ctx, &job); err != nil {
+			return result.Error(err)
+		}
+		return result.Continue()
+	}
+
 	err := rc.UpdateSecretWatches()
 	if err != nil {
 		rc.ReqLogger.Error(err, "Failed to update dynamic watches on secrets")
 	}
 
 	// make sure the default superuser secret exists
-	_, err = rc.retrieveSuperuserSecretOrCreateDefault()
-	if err != nil {
-		rc.ReqLogger.Error(err, "Failed to verify superuser secret status")
+	// TODO Nope..
+	if dc.Spec.UserInfo == nil {
+		_, err = rc.retrieveSuperuserSecretOrCreateDefault()
+		if err != nil {
+			rc.ReqLogger.Error(err, "Failed to verify superuser secret status")
+		}
 	}
 
 	users := rc.GetUsers()

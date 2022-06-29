@@ -8072,6 +8072,15 @@ spec:
                       type: string
                   type: object
                 type: array
+              userInfo:
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  serviceAccountName:
+                    type: string
+                type: object
               users:
                 description: Cassandra users to bootstrap
                 items:

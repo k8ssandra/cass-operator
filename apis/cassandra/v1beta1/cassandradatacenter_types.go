@@ -77,6 +77,19 @@ type CassandraUser struct {
 	Superuser  bool   `json:"superuser"`
 }
 
+type UserInfo struct {
+	Annotations    map[string]string `json:"annotations,omitempty"`
+	ServiceAccount string            `json:"serviceAccountName,omitempty"`
+	// TODO Add CSI information here
+	/*
+		TODO Testing:
+			* Add back the Helm utilities
+			* Install Vault + Vault server there
+			* Install CSI driver
+			* Try to create clusters with both methods and see that it succeeds (and uses Vault to fetch the user rights)
+	*/
+}
+
 // CassandraDatacenterSpec defines the desired state of a CassandraDatacenter
 // +k8s:openapi-gen=true
 // +kubebuilder:pruning:PreserveUnknownFields
@@ -183,6 +196,8 @@ type CassandraDatacenterSpec struct {
 	// This secret defines the username and password for the Cassandra server superuser.
 	// If it is omitted, we will generate a secret instead.
 	SuperuserSecretName string `json:"superuserSecretName,omitempty"`
+
+	UserInfo *UserInfo `json:"userInfo,omitempty"`
 
 	// The k8s service account to use for the server pods
 	ServiceAccount string `json:"serviceAccount,omitempty"`

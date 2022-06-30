@@ -142,6 +142,9 @@ func (rc *ReconciliationContext) retrieveSuperuserSecretOrCreateDefault() (*core
 }
 
 func (rc *ReconciliationContext) createInternodeCACredential() (*corev1.Secret, error) {
+	labels := make(map[string]string)
+	oplabels.AddOperatorLabels(labels, rc.Datacenter)
+
 	secret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -150,6 +153,7 @@ func (rc *ReconciliationContext) createInternodeCACredential() (*corev1.Secret, 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rc.keystoreCASecret().Name,
 			Namespace: rc.keystoreCASecret().Namespace,
+			Labels:    labels,
 		},
 	}
 	if keypem, certpem, err := utils.GetNewCAandKey(fmt.Sprintf("%s-ca-keystore", rc.Datacenter.Name), rc.Datacenter.Namespace); err == nil {
@@ -172,6 +176,8 @@ func (rc *ReconciliationContext) createCABootstrappingSecret(jksBlob []byte) err
 	if err == nil { // This secret already exists, nothing to do
 		return nil
 	}
+	labels := make(map[string]string)
+	oplabels.AddOperatorLabels(labels, rc.Datacenter)
 
 	secret := &corev1.Secret{
 
@@ -182,6 +188,7 @@ func (rc *ReconciliationContext) createCABootstrappingSecret(jksBlob []byte) err
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-keystore", rc.Datacenter.Name),
 			Namespace: rc.Datacenter.Namespace,
+			Labels:    labels,
 		},
 	}
 	secret.Data = map[string][]byte{

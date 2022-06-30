@@ -14,6 +14,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [BUGFIX] [#330](https://github.com/k8ssandra/cass-operator/issues/330) Apply correct updates to Service labels and annotations through additionalServiceConfig (they are now validated and don't allow reserved prefixes).
 
+* [CHANGE] [#359](https://github.com/k8ssandra/cass-operator/pull/359) All secrets have base labels with information about cluster
+
 ## v1.11.0
 
 * [CHANGE] [#183](https://github.com/k8ssandra/cass-operator/issues/183) Move from PodDisruptionBudget v1beta1 to v1 (changes min. required Kubernetes version to 1.21)

@@ -901,9 +901,10 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 
 	rc.ReqLogger.Info("reconcile_racks::CreateUsers")
 
-	// TODO This should be cleaned up after a while (TTL) + when I delete CassandraDatacenter, so we need ownership also. And cass-operator labels
+	// TODO This should be cleaned up after a while (TTL)
 	if dc.Spec.UserInfo != nil {
 		// Create the job
+		ttl := int32(86400)
 		// TODO wait for it to complete before we continue..
 		job := batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
@@ -929,7 +930,18 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 					},
 					// Create the k8ssandra-client add users job here?
 				},
+				TTLSecondsAfterFinished: &ttl,
 			},
+		}
+
+		labels := dc.GetClusterLabels()
+		oplabels.AddOperatorLabels(labels, dc)
+		job.ObjectMeta.Labels = labels
+
+		// Set CassandraDatacenter dc as the owner and controller
+		err := setControllerReference(dc, &job, rc.Scheme)
+		if err != nil {
+			return result.Error(err)
 		}
 
 		// TODO Do I have this value somewhere..?

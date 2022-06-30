@@ -168,6 +168,7 @@ spec:
                   pulsarMaxPendingMessagesAcrossPartitions:
                     type: integer
                   pulsarServiceUrl:
+                    minLength: 1
                     type: string
                   sslAllowInsecureConnection:
                     type: string

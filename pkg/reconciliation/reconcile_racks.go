@@ -905,6 +905,16 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 	if dc.Spec.UserInfo != nil {
 		// Create the job
 		ttl := int32(86400)
+
+		// How to get this as input?
+		filePath := dc.Spec.UserInfo.MountPath
+		// filePath := "/vault/secrets/database-config.txt"
+
+		// We want to mount it as a directory and read the files as usernames
+		if dc.Spec.UserInfo.CSI != nil && filePath != "" {
+			filePath = "/mnt/secrets/users"
+		}
+
 		// TODO wait for it to complete before we continue..
 		job := batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
@@ -913,9 +923,6 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 			},
 			Spec: batchv1.JobSpec{
 				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: dc.Spec.UserInfo.Annotations,
-					},
 					Spec: corev1.PodSpec{
 						// TODO Add volumes here if CSI was used
 						Containers: []corev1.Container{
@@ -923,7 +930,7 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 								Name:            "client",
 								Image:           "burmanm/k8ssandra-client:latest", // k8ssandra/k8ssandra-client does not have this feature
 								ImagePullPolicy: corev1.PullIfNotPresent,
-								Args:            []string{"users", "add", "--path", "/vault/secrets/database-config.txt", "--dc", dc.Name}, // TODO This path must be configurable
+								Args:            []string{"users", "add", "--path", filePath, "--dc", dc.Name}, // TODO This path must be configurable
 							},
 						},
 						RestartPolicy: corev1.RestartPolicyNever,
@@ -934,7 +941,39 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 			},
 		}
 
-		labels := dc.GetClusterLabels()
+		// job.Spec.Template.Spec.Volumes
+
+		if len(dc.Spec.UserInfo.Annotations) > 0 {
+			job.ObjectMeta.Annotations = dc.Spec.UserInfo.Annotations
+		}
+
+		// TODO Add verification that we can't have dual injection (CSI + annotations)
+
+		// TODO If Secret name is set, mount it just like the CSI
+
+		if dc.Spec.UserInfo.SecretName != "" {
+
+		}
+
+		if dc.Spec.UserInfo.CSI != nil {
+			vol := corev1.Volume{
+				Name: "user-source",
+				VolumeSource: corev1.VolumeSource{
+					// TODO Add .. something?
+					CSI: dc.Spec.UserInfo.CSI,
+				},
+			}
+			job.Spec.Template.Spec.Volumes = []corev1.Volume{vol}
+			job.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+				{
+					Name:      "user-source",
+					ReadOnly:  true,
+					MountPath: filePath,
+				},
+			}
+		}
+
+		labels := dc.GetDatacenterLabels()
 		oplabels.AddOperatorLabels(labels, dc)
 		job.ObjectMeta.Labels = labels
 

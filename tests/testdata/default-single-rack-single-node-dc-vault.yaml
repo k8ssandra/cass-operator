@@ -18,6 +18,12 @@ spec:
           {{- end }}
           {{- end -}}
         vault.hashicorp.com/agent-pre-populate-only: 'true'
+    mountPath: /vault/secrets/database-config.txt
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: "vault-database"
   managementApiAuth:
     insecure: {}
   size: 1

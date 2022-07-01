@@ -20,7 +20,7 @@ kubectl exec -it vault-0 -- /bin/sh
 
 vault secrets enable -path=internal kv-v2
 
-vault kv put internal/database/config superuser="superpassword"
+vault kv put internal/database/config username="superuser" password="superpassword"
 
 vault auth enable kubernetes
 
@@ -42,11 +42,11 @@ vault write auth/kubernetes/role/internal-app \
 
 ## Install CSI driver:
 
-Not sure if syncSecret is needed, but Vault documentation wants it..
+Remember to enable CSI in the Install Vault step.
 
 ```
-helm install csi secrets-store-csi-driver/secrets-store-csi-driver \
-    --set syncSecret.enabled=true --namespace cass-operator
+helm install csi secrets-store-csi-driver/secrets-store-csi-driver --namespace cass-operator
+#    --set syncSecret.enabled=true 
 ```
 
 Create the SecretProviderClass:
@@ -62,12 +62,13 @@ spec:
     vaultAddress: "http://vault.default:8200"
     roleName: "internal-app"
     objects: |
-      - objectName: "superuser"
+      - objectName: "username"
         secretPath: "internal/database/config"
-        secretKey: "superuser"
+        secretKey: "username"
+      - objectName: "password"
+        secretPath: "internal/database/config"
+        secretKey: "password"
 ```
-
-The objectName becomes the username and the secretKey's data becomes the password.
 
 ## Now create the DC:
 

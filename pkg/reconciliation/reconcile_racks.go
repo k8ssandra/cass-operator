@@ -911,7 +911,7 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 		// filePath := "/vault/secrets/database-config.txt"
 
 		// We want to mount it as a directory and read the files as usernames
-		if dc.Spec.UserInfo.CSI != nil && filePath != "" {
+		if dc.Spec.UserInfo.CSI != nil || dc.Spec.UserInfo.SecretName != "" {
 			filePath = "/mnt/secrets/users"
 		}
 
@@ -951,18 +951,24 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 
 		// TODO If Secret name is set, mount it just like the CSI
 
-		if dc.Spec.UserInfo.SecretName != "" {
-
-		}
-
-		if dc.Spec.UserInfo.CSI != nil {
+		if dc.Spec.UserInfo.SecretName != "" || dc.Spec.UserInfo.CSI != nil {
 			vol := corev1.Volume{
 				Name: "user-source",
-				VolumeSource: corev1.VolumeSource{
-					// TODO Add .. something?
-					CSI: dc.Spec.UserInfo.CSI,
-				},
 			}
+			if dc.Spec.UserInfo.SecretName != "" {
+				vol.VolumeSource = corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: dc.Spec.UserInfo.SecretName,
+					},
+				}
+			}
+
+			if dc.Spec.UserInfo.CSI != nil {
+				vol.VolumeSource = corev1.VolumeSource{
+					CSI: dc.Spec.UserInfo.CSI,
+				}
+			}
+
 			job.Spec.Template.Spec.Volumes = []corev1.Volume{vol}
 			job.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
 				{

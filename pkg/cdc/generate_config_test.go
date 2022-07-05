@@ -2,7 +2,6 @@ package cdc
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -152,7 +151,7 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	test.run(t)
 	assert.Contains(t,
 		test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"],
-		fmt.Sprintf("-javaagent:%s=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-", getAgentPath(dc)),
+		"-javaagent:/opt/cdc_agent/cdc-agent.jar=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-",
 	)
 }
 
@@ -163,16 +162,16 @@ func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 	dc.Spec.CDC = &cassdcapi.CDCConfiguration{
 		Enabled: false,
 	}
-	jvmAddtnlOptionsJson := fmt.Sprintf(`
+	jvmAddtnlOptionsJson := `
 	{
 		"cassandra-env-sh": {
 			"test-option1": "100M",
 			"additional-jvm-opts": [
-				"-javaagent:%s=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-",
+				"-javaagent:/opt/cdc_agent/cdc-agent.jar=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-",
 				"additional-option2"
 			]
 		}
-	}`, getAgentPath(dc))
+	}`
 	test := testCase{
 		Description:   "When CDC is to be disabled UpdateConfig() removes all CDC related parts of additional-jvm-opts while retaining all others.",
 		InitialConfig: jvmAddtnlOptionsJson,
@@ -180,6 +179,6 @@ func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 		Expected:      jvmAddtnlOptionsJson,
 	}
 	test.run(t)
-	assert.NotContains(t, test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"], fmt.Sprintf("-javaagent:%s=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-", getAgentPath(dc)))
+	assert.NotContains(t, test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"], "-javaagent:/opt/cdc_agent/cdc-agent.jar=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-")
 	assert.Contains(t, test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"], "additional-option2")
 }

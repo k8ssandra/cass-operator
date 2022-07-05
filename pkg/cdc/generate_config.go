@@ -33,8 +33,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	}
 	updateCassandraYaml(&c, CDCConfig) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
 	// Figure out what to do and reconcile config.CassEnvSh.AddtnlJVMOptions back to desired state per CDCConfig.
-	agentPath := getAgentPath(cassDC) // get path for agent based on whether we have a DSE or Cassandra server.
-	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, CDCConfig, agentPath)
+	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, CDCConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +53,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 }
 
 // updateAdditionalJVMOpts adds CDC related entries to additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
-func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration, agentPath string) ([]string, error) {
+func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration) ([]string, error) {
 	out := removeEntryFromSlice(optsSlice, "pulsarServiceUrl")
 	//Next, create an additional options entry that instantiates the settings we want.
 	if CDCConfig.Enabled {
@@ -99,7 +98,7 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfigur
 				optsSlice = append(optsSlice, nameTag+"="+fmt.Sprintf("%s", reflectedValue))
 			}
 		}
-		CDCOpt := fmt.Sprintf("-javaagent:%s=%s", agentPath, strings.Join(optsSlice, ","))
+		CDCOpt := fmt.Sprintf("-javaagent:%s=%s", "/opt/cdc_agent/cdc-agent.jar", strings.Join(optsSlice, ","))
 		out = append(out, // We need to add these two elements to the slice first, because the management agent must start before the CDC agent.
 			"-javaagent:/opt/metrics-collector/lib/datastax-mcac-agent.jar",
 			"-javaagent:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar",
@@ -107,16 +106,6 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfigur
 		return append(out, CDCOpt), nil
 	}
 	return out, nil
-}
-
-func getAgentPath(dc cassdcapi.CassandraDatacenter) string {
-	if dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "3") {
-		return fmt.Sprintf("/opt/cdc_agent/agent-c3-%s-all.jar", CDCAgentVer)
-	} else if dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "4") {
-		return fmt.Sprintf("/opt/cdc_agent/agent-c4-%s-all.jar", CDCAgentVer)
-	} else {
-		return fmt.Sprintf("/opt/cdc_agent/agent-dse4-%s-all.jar", CDCAgentVer)
-	}
 }
 
 func updateCassandraYaml(cassConfig *configData, cdcConfig cassdcapi.CDCConfiguration) {

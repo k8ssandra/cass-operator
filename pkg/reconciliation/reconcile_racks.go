@@ -1161,6 +1161,30 @@ func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 	return result.Continue()
 }
 
+func (rc *ReconciliationContext) UpdateHealth() result.ReconcileResult {
+	updated := false
+	dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
+
+	if rc.isClusterDegraded() || !rc.isClusterHealthy() {
+		updated = rc.setCondition(
+			api.NewDatacenterCondition(
+				api.DatacenterHealthy, corev1.ConditionFalse))
+	} else {
+		updated = rc.setCondition(
+			api.NewDatacenterCondition(
+				api.DatacenterHealthy, corev1.ConditionTrue))
+	}
+
+	if updated {
+		err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch)
+		if err != nil {
+			return result.Error(err)
+		}
+	}
+
+	return result.Continue()
+}
+
 func hasBeenXMinutes(x int, sinceTime time.Time) bool {
 	xMinutesAgo := time.Now().Add(time.Minute * time.Duration(-x))
 	return sinceTime.Before(xMinutesAgo)
@@ -1291,6 +1315,32 @@ func (rc *ReconciliationContext) isClusterHealthy() bool {
 	}
 
 	return true
+}
+
+func (rc *ReconciliationContext) isClusterDegraded() bool {
+	dc := rc.Datacenter
+	status := false
+	if corev1.ConditionFalse == dc.GetConditionStatus(api.DatacenterReady) || corev1.ConditionTrue == dc.GetConditionStatus(api.DatacenterResuming) {
+		status = true
+	} else {
+		// Okay, we are ready, but we might be in some sort of degraded state too
+		degradedWhenTrue := []api.DatacenterConditionType{
+			api.DatacenterReplacingNodes,
+			api.DatacenterScalingUp,
+			api.DatacenterUpdating,
+			api.DatacenterResuming,
+			api.DatacenterRollingRestart,
+			api.DatacenterDecommission,
+		}
+		for _, condition := range degradedWhenTrue {
+			if corev1.ConditionTrue == dc.GetConditionStatus(condition) {
+				status = true
+				break
+			}
+		}
+	}
+
+	return status
 }
 
 // labelSeedPods iterates over all pods for a statefulset and makes sure the right number of
@@ -2341,6 +2391,10 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	}
 
 	if recResult := rc.UpdateStatus(); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.UpdateHealth(); recResult.Completed() {
 		return recResult.Output()
 	}
 

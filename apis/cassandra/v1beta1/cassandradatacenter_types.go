@@ -328,6 +328,7 @@ const (
 	DatacenterRollingRestart DatacenterConditionType = "RollingRestart"
 	DatacenterValid          DatacenterConditionType = "Valid"
 	DatacenterDecommission   DatacenterConditionType = "Decommission"
+	DatacenterHealthy        DatacenterConditionType = "Healthy"
 )
 
 type DatacenterCondition struct {

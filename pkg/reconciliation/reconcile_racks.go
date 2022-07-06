@@ -623,12 +623,16 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 
 	// step 3 - get all nodes up
 	// if the cluster isn't healthy, that's ok, but go back to step 1
-	if !rc.isClusterHealthy() {
+	clusterHealthy := rc.isClusterHealthy()
+	if err := rc.updateHealth(clusterHealthy); err != nil {
+		return result.Error(err)
+	}
+
+	if !clusterHealthy {
 		rc.ReqLogger.Info(
 			"cluster isn't healthy",
 		)
-		// FIXME this is one spot I've seen get spammy, should we raise this number?
-		return result.RequeueSoon(2)
+		return result.RequeueSoon(5)
 	}
 
 	needsMoreNodes, err := rc.startAllNodes(endpointData)
@@ -1161,11 +1165,11 @@ func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) UpdateHealth() result.ReconcileResult {
+func (rc *ReconciliationContext) updateHealth(healthy bool) error {
 	updated := false
 	dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
 
-	if rc.isClusterDegraded() || !rc.isClusterHealthy() {
+	if !healthy {
 		updated = rc.setCondition(
 			api.NewDatacenterCondition(
 				api.DatacenterHealthy, corev1.ConditionFalse))
@@ -1178,11 +1182,11 @@ func (rc *ReconciliationContext) UpdateHealth() result.ReconcileResult {
 	if updated {
 		err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch)
 		if err != nil {
-			return result.Error(err)
+			return err
 		}
 	}
 
-	return result.Continue()
+	return nil
 }
 
 func hasBeenXMinutes(x int, sinceTime time.Time) bool {

@@ -1635,23 +1635,3 @@ func TestNodereplacements(t *testing.T) {
 	assert.Equal(1, len(rc.Datacenter.Status.NodeReplacements))
 	assert.Equal(0, len(rc.Datacenter.Spec.ReplaceNodes))
 }
-
-func TestDatacenterHealthyStatus(t *testing.T) {
-	assert := assert.New(t)
-	rc, _, cleanupMockScr := setupTest()
-	defer cleanupMockScr()
-
-	mockClient := &mocks.Client{}
-	rc.Client = mockClient
-	k8sMockClientStatus(rc.Client.(*mocks.Client), mockClient).Times(2)
-	k8sMockClientPatch(mockClient, nil).Twice()
-
-	r := rc.UpdateHealth()
-	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
-	assert.Equal(rc.Datacenter.GetConditionStatus(api.DatacenterHealthy), corev1.ConditionTrue)
-
-	rc.Datacenter.Status.SetCondition(*api.NewDatacenterCondition(api.DatacenterReplacingNodes, corev1.ConditionTrue))
-	r = rc.UpdateHealth()
-	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
-	assert.Equal(rc.Datacenter.GetConditionStatus(api.DatacenterHealthy), corev1.ConditionFalse)
-}

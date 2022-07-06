@@ -151,8 +151,6 @@ spec:
                     type: integer
                   cdcWorkingDir:
                     type: string
-                  enabled:
-                    type: boolean
                   errorCommitLogReprocessEnabled:
                     type: boolean
                   pulsarAuthParams:
@@ -193,7 +191,6 @@ spec:
                   topicPrefix:
                     type: string
                 required:
-                - enabled
                 - pulsarServiceUrl
                 type: object
               clusterName:

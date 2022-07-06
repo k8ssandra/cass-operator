@@ -6,7 +6,7 @@ spec:
   clusterName: test-cluster
   # The number of server nodes.
   size: 1
-  serverImage: docker.io/k8ssandra/cass-management-api:4.0.1-v0.1.42
+  serverImage: docker.io/k8ssandra/cass-management-api:4.0.1-v0.1.43
   cdc:
     enabled: true
     pulsarServiceUrl: pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650

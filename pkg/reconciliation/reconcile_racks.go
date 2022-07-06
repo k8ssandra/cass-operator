@@ -2398,10 +2398,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return recResult.Output()
 	}
 
-	if recResult := rc.UpdateHealth(); recResult.Completed() {
-		return recResult.Output()
-	}
-
 	if recResult := rc.CheckConfigSecret(); recResult.Completed() {
 		return recResult.Output()
 	}

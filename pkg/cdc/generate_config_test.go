@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	testutils "github.com/k8ssandra/cass-operator/pkg/test"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/utils/pointer"
 )
@@ -64,7 +63,7 @@ func (c *testCase) run(t *testing.T) {
 // TestUpdateConfig_ExistingConfig_NoCDC tests for when there are already existing entries in the config field.
 // The main purpose here is to ensure that when marshalling and unmarshalling from the structs, we aren't losing fields.
 func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
-	dc := testutils.GetCassandraDatacenter("test-dc", "test-ns")
+	dc := GetCassandraDatacenter("test-dc", "test-ns")
 	dc.Spec.CDC = (*cassdcapi.CDCConfiguration)(nil)
 	test := testCase{
 		Description:   "When CDC not requested and a config json exists, UpdateConfig() does nothing.",
@@ -133,7 +132,7 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 // TestUpdateConfig_ExistingConfig_WithCDC tests for when there is an existing config, and we are adding the CDC parms. The main purpose
 // of this test is to ensure that the relevant jvm additional opts are added to the existing config.
 func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
-	dc := testutils.GetCassandraDatacenter("test-dc", "test-ns")
+	dc := GetCassandraDatacenter("test-dc", "test-ns")
 	dc.Spec.CDC = &cassdcapi.CDCConfiguration{
 		PulsarServiceUrl: pointer.String("pulsar://pulsar:6650"),
 		TopicPrefix:      pointer.String("test-prefix-"),
@@ -153,7 +152,7 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 // TestUpdateConfig_ExistingConfig_WithoutCDC tests that CDC is removed from additional-jvm-opts when it is present but CDC should be disabled.
 func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 	// Test case when the DC has CDC explicitly marked false.
-	dc := testutils.GetCassandraDatacenter("test-dc", "test-ns")
+	dc := GetCassandraDatacenter("test-dc", "test-ns")
 	dc.Spec.CDC = (*cassdcapi.CDCConfiguration)(nil)
 	jvmAddtnlOptionsJson := `
 	{

@@ -25,11 +25,9 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 		additionalJVMOpts = *c.CassEnvSh.AddtnlJVMOptions
 	}
 	// Deal with the possibility that cassdcapi.CDCConfiguration is nil.
-	CDCConfig := cassdcapi.CDCConfiguration{}
-	if cassDC.Spec.CDC == nil {
-		CDCConfig.Enabled = false
-	} else {
-		CDCConfig = *cassDC.Spec.CDC
+	CDCConfig := (*cassdcapi.CDCConfiguration)(nil)
+	if cassDC.Spec.CDC != nil {
+		CDCConfig = cassDC.Spec.CDC
 	}
 	updateCassandraYaml(&c, CDCConfig) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
 	// Figure out what to do and reconcile config.CassEnvSh.AddtnlJVMOptions back to desired state per CDCConfig.
@@ -53,21 +51,19 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 }
 
 // updateAdditionalJVMOpts adds CDC related entries to additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
-func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfiguration) ([]string, error) {
+func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfiguration) ([]string, error) {
 	out := removeEntryFromSlice(optsSlice, "pulsarServiceUrl")
 	//Next, create an additional options entry that instantiates the settings we want.
-	if CDCConfig.Enabled {
-		reflectedCDCConfig := reflect.ValueOf(CDCConfig)
+	if CDCConfig == nil {
+		return optsSlice, nil
+	} else {
+		reflectedCDCConfig := reflect.ValueOf(*CDCConfig)
 		t := reflectedCDCConfig.Type()
 		optsSlice := []string{}
-	FieldLoop:
 		for i := 0; i < reflectedCDCConfig.NumField(); i++ {
 			// This logic depends on the json tags from the CR mapping to the CDC agent's parameter names.
 			fieldName := t.Field(i).Name
-			if fieldName == "Enabled" {
-				continue FieldLoop // Short circuit here as "Enabled" should not be passed on the command line.
-			}
-			t := reflect.TypeOf(CDCConfig)
+			t := reflect.TypeOf(*CDCConfig)
 			reflectedField, ok := t.FieldByName(fieldName)
 			if !ok {
 				return nil, errors.New(fmt.Sprint("could not get CDC field", fieldName))
@@ -105,18 +101,14 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig cassdcapi.CDCConfigur
 		)
 		return append(out, CDCOpt), nil
 	}
-	return out, nil
 }
 
-func updateCassandraYaml(cassConfig *configData, cdcConfig cassdcapi.CDCConfiguration) {
-	if cassConfig.CassandraYaml == nil {
-		cassConfig.CassandraYaml = make(map[string]interface{})
-	}
-	switch {
-	case cdcConfig.Enabled:
+func updateCassandraYaml(cassConfig *configData, cdcConfig *cassdcapi.CDCConfiguration) {
+	if cdcConfig != nil {
+		if cassConfig.CassandraYaml == nil {
+			cassConfig.CassandraYaml = make(map[string]interface{})
+		}
 		cassConfig.CassandraYaml["cdc_enabled"] = true
-	case !cdcConfig.Enabled:
-		cassConfig.CassandraYaml["cdc_enabled"] = false
 	}
 }
 

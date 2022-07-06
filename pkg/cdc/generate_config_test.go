@@ -65,9 +65,9 @@ func (c *testCase) run(t *testing.T) {
 // The main purpose here is to ensure that when marshalling and unmarshalling from the structs, we aren't losing fields.
 func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 	dc := testutils.GetCassandraDatacenter("test-dc", "test-ns")
-	dc.Spec.CDC = &cassdcapi.CDCConfiguration{Enabled: false}
+	dc.Spec.CDC = (*cassdcapi.CDCConfiguration)(nil)
 	test := testCase{
-		Description:   "When CDC not requested and a config json exists, UpdateConfig() just adds cdc_enabled: false to the cassandra-yaml key.",
+		Description:   "When CDC not requested and a config json exists, UpdateConfig() does nothing.",
 		InitialConfig: existingConfig,
 		DC:            dc,
 		Expected: `{
@@ -82,8 +82,7 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 			  "authorizer": "CassandraAuthorizer",
 			  "num_tokens": 256,
 			  "role_manager": "CassandraRoleManager",
-			  "start_rpc": false,
-              "cdc_enabled": false
+			  "start_rpc": false
 			},
 			"cluster-info": {
 			  "name": "test",
@@ -104,14 +103,14 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 	// Make sure that this also works on cassandra-env-sh.
 
 	test = testCase{
-		Description: "When CDC not requested and a config json with cassandra-env-sh exists, UpdateConfig() adds cdc_enabled: false to cassandra-yaml and preserves all fields in cassandra-env-sh.",
+		Description: "When CDC not requested and a config json with cassandra-env-sh exists, UpdateConfig() preserves all fields in cassandra-env-sh.",
 		InitialConfig: `
 		{
 			"cassandra-env-sh": {
 				"additional-jvm-opts": [
 					"jvmopt"
 				],
-				"unknownfield": true	
+				"unknownfield": true
 			}
 		}
 		`,
@@ -123,9 +122,6 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 					"jvmopt"
 				],
 				"unknownfield": true
-			},
-			"cassandra-yaml": {
-				"cdc_enabled": false
 			}
 		}
 		`,
@@ -139,7 +135,6 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	dc := testutils.GetCassandraDatacenter("test-dc", "test-ns")
 	dc.Spec.CDC = &cassdcapi.CDCConfiguration{
-		Enabled:          true,
 		PulsarServiceUrl: pointer.String("pulsar://pulsar:6650"),
 		TopicPrefix:      pointer.String("test-prefix-"),
 	}
@@ -159,15 +154,12 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 	// Test case when the DC has CDC explicitly marked false.
 	dc := testutils.GetCassandraDatacenter("test-dc", "test-ns")
-	dc.Spec.CDC = &cassdcapi.CDCConfiguration{
-		Enabled: false,
-	}
+	dc.Spec.CDC = (*cassdcapi.CDCConfiguration)(nil)
 	jvmAddtnlOptionsJson := `
 	{
 		"cassandra-env-sh": {
 			"test-option1": "100M",
 			"additional-jvm-opts": [
-				"-javaagent:/opt/cdc_agent/cdc-agent.jar=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-",
 				"additional-option2"
 			]
 		}

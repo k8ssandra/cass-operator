@@ -83,9 +83,8 @@ var _ = Describe(testName, func() {
 				WithFlag("selector", "component=proxy").
 				WithFlag("namespace", "pulsar").
 				FormatOutput("jsonpath={.items[0].status.conditions[?(@.type=='Ready')].status}")
-			if err := kubectl.WaitForOutputContains(readyGetter, "True", 1800); err != nil {
-				Fail(err.Error())
-			}
+			err = kubectl.WaitForOutputContains(readyGetter, "True", 1800)
+			Expect(err).To(Not(HaveOccurred()))
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 1200)
 
@@ -98,7 +97,8 @@ var _ = Describe(testName, func() {
 			readyGetter = kubectl.Get("pods").
 				WithFlag("selector", "app=cdc-testutil").
 				FormatOutput("jsonpath={.items[0].status.conditions[?(@.type=='Ready')].status}")
-			ns.WaitForOutputContains(readyGetter, "True", 1800)
+			err = ns.WaitForOutputContains(readyGetter, "True", 1800)
+			Expect(err).To(Not(HaveOccurred()))
 
 			By("Running testutils applications")
 			podGetter := kubectl.Get("pods").

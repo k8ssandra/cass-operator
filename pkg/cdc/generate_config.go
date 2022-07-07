@@ -13,6 +13,10 @@ import (
 // UpdateConfig updates the json formatted Cassandra config which incorporates the JVM options (under key additional-jvm-opts) passed into the launch scripts
 // for Cassandra via the config builder.
 func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) (json.RawMessage, error) {
+	if cassDC.Spec.CDC == nil {
+		return config, nil
+	}
+
 	// Unmarshall everything into structs.
 	c := configData{}
 	err := json.Unmarshal(config, &c)
@@ -24,14 +28,9 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	if c.CassEnvSh != nil && c.CassEnvSh.AddtnlJVMOptions != nil {
 		additionalJVMOpts = *c.CassEnvSh.AddtnlJVMOptions
 	}
-	// Deal with the possibility that cassdcapi.CDCConfiguration is nil.
-	CDCConfig := (*cassdcapi.CDCConfiguration)(nil)
-	if cassDC.Spec.CDC != nil {
-		CDCConfig = cassDC.Spec.CDC
-	}
-	updateCassandraYaml(&c, CDCConfig) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
+	updateCassandraYaml(&c, cassDC.Spec.CDC) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
 	// Figure out what to do and reconcile config.CassEnvSh.AddtnlJVMOptions back to desired state per CDCConfig.
-	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, CDCConfig)
+	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, cassDC.Spec.CDC)
 	if err != nil {
 		return nil, err
 	}
@@ -54,65 +53,59 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfiguration) ([]string, error) {
 	out := removeEntryFromSlice(optsSlice, "pulsarServiceUrl")
 	//Next, create an additional options entry that instantiates the settings we want.
-	if CDCConfig == nil {
-		return optsSlice, nil
-	} else {
-		reflectedCDCConfig := reflect.ValueOf(*CDCConfig)
-		t := reflectedCDCConfig.Type()
-		optsSlice := []string{}
-		for i := 0; i < reflectedCDCConfig.NumField(); i++ {
-			// This logic depends on the json tags from the CR mapping to the CDC agent's parameter names.
-			fieldName := t.Field(i).Name
-			t := reflect.TypeOf(*CDCConfig)
-			reflectedField, ok := t.FieldByName(fieldName)
-			if !ok {
-				return nil, errors.New(fmt.Sprint("could not get CDC field", fieldName))
-			}
-			nameTag := strings.Split(string(reflectedField.Tag.Get("json")), ",")[0]
-			reflectedValue := interface{}(nil)
-			// We need to get value types back from pointer types here and handle nil pointers.
-			switch reflectedField.Type.Kind() {
-			case reflect.Ptr:
-				if !reflectedCDCConfig.Field(i).IsNil() { // We only want to append the value if it is non-nil
-					reflectedValue = reflectedCDCConfig.Field(i).Elem().Interface()
-					optsSlice = append(optsSlice, nameTag+"="+fmt.Sprintf("%s", reflectedValue))
-				}
-			case reflect.Array:
-				return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect field %s", fieldName)
-			case reflect.Chan:
-				return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect %s", fieldName)
-			case reflect.Func:
-				return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect %s", fieldName)
-			case reflect.Map:
-				return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect %s", fieldName)
-			case reflect.Interface:
-				return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect %s", fieldName)
-			case reflect.Slice:
-				return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect %s", fieldName)
-			default: // no need to call .Elem() when we have a value type.
-				reflectedValue = reflectedCDCConfig.Field(i).Interface()
+	reflectedCDCConfig := reflect.ValueOf(*CDCConfig)
+	t := reflectedCDCConfig.Type()
+	optsSlice = []string{}
+	for i := 0; i < reflectedCDCConfig.NumField(); i++ {
+		// This logic depends on the json tags from the CR mapping to the CDC agent's parameter names.
+		fieldName := t.Field(i).Name
+		t := reflect.TypeOf(*CDCConfig)
+		reflectedField, ok := t.FieldByName(fieldName)
+		if !ok {
+			return nil, errors.New(fmt.Sprint("could not get CDC field", fieldName))
+		}
+		nameTag := strings.Split(string(reflectedField.Tag.Get("json")), ",")[0]
+		reflectedValue := interface{}(nil)
+		// We need to get value types back from pointer types here and handle nil pointers.
+		switch reflectedField.Type.Kind() {
+		case reflect.Ptr:
+			if !reflectedCDCConfig.Field(i).IsNil() { // We only want to append the value if it is non-nil
+				reflectedValue = reflectedCDCConfig.Field(i).Elem().Interface()
 				optsSlice = append(optsSlice, nameTag+"="+fmt.Sprintf("%s", reflectedValue))
 			}
+		case reflect.Array:
+			return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect field %s", fieldName)
+		case reflect.Chan:
+			return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect %s", fieldName)
+		case reflect.Func:
+			return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect %s", fieldName)
+		case reflect.Map:
+			return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect %s", fieldName)
+		case reflect.Interface:
+			return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect %s", fieldName)
+		case reflect.Slice:
+			return nil, fmt.Errorf("invalid type in CDC struct, cannot reflect %s", fieldName)
+		default: // no need to call .Elem() when we have a value type.
+			reflectedValue = reflectedCDCConfig.Field(i).Interface()
+			optsSlice = append(optsSlice, nameTag+"="+fmt.Sprintf("%s", reflectedValue))
 		}
-		CDCOpt := fmt.Sprintf("-javaagent:%s=%s", "/opt/cdc_agent/cdc-agent.jar", strings.Join(optsSlice, ","))
-		out = append(out, // We need to add these two elements to the slice first, because the management agent must start before the CDC agent.
-			"-javaagent:/opt/metrics-collector/lib/datastax-mcac-agent.jar",
-			"-javaagent:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar",
-		)
-		return append(out, CDCOpt), nil
 	}
+	CDCOpt := fmt.Sprintf("-javaagent:%s=%s", "/opt/cdc_agent/cdc-agent.jar", strings.Join(optsSlice, ","))
+	out = append(out, // We need to add these two elements to the slice first, because the management agent must start before the CDC agent.
+		"-javaagent:/opt/metrics-collector/lib/datastax-mcac-agent.jar",
+		"-javaagent:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar",
+	)
+	return append(out, CDCOpt), nil
 }
 
 func updateCassandraYaml(cassConfig *configData, cdcConfig *cassdcapi.CDCConfiguration) {
-	if cdcConfig != nil {
-		if cassConfig.CassandraYaml == nil {
-			cassConfig.CassandraYaml = make(map[string]interface{})
-		}
-		cassConfig.CassandraYaml["cdc_enabled"] = true
+	if cassConfig.CassandraYaml == nil {
+		cassConfig.CassandraYaml = make(map[string]interface{})
 	}
+	cassConfig.CassandraYaml["cdc_enabled"] = true
 }
 
-// removeEntryFromSlice removes all an entry from a slice if it contains a substring.
+// removeEntryFromSlice takes a slice and returns a new slice which has all entries containing the specified substring removed.
 func removeEntryFromSlice(optsSlice []string, substring string) []string {
 	out := []string{}
 	for _, optionEntry := range optsSlice {

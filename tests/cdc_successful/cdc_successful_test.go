@@ -97,11 +97,8 @@ var _ = Describe(testName, func() {
 			By("Confirming testutils ready")
 			readyGetter = kubectl.Get("pods").
 				WithFlag("selector", "app=cdc-testutil").
-				WithFlag("namespace", namespace).
 				FormatOutput("jsonpath={.items[0].status.conditions[?(@.type=='Ready')].status}")
-			if err := kubectl.WaitForOutputContains(readyGetter, "True", 1800); err != nil {
-				Fail(err.Error())
-			}
+			ns.WaitForOutputContains(readyGetter, "True", 1800)
 
 			By("Running testutils applications")
 			podGetter := kubectl.Get("pods").
@@ -110,8 +107,11 @@ var _ = Describe(testName, func() {
 				FormatOutput("jsonpath='{.items[0].metadata.name}'")
 			testUtilsPod := podGetter.OutputPanic()
 			testCommand := kubectl.
-				ExecOnPod(strings.ReplaceAll(testUtilsPod, "'", ""), "--",
-					"bash", "-c", "/opt/bin/pulsar-cdc-testutil --cass-contact-points test-cluster-dc1-all-pods-service.test-cdc.svc.cluster.local:9042 --pulsar-url pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650 --pulsar-admin-url http://pulsar-proxy.pulsar.svc.cluster.local:8080 --pulsar-cass-contact-point test-cluster-dc1-all-pods-service.test-cdc.svc.cluster.local").
+				ExecOnPod(
+					strings.ReplaceAll(testUtilsPod, "'", ""),
+					"--",
+					"bash", "-c",
+					"/opt/bin/pulsar-cdc-testutil --cass-contact-points test-cluster-dc1-all-pods-service.test-cdc.svc.cluster.local:9042 --pulsar-url pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650 --pulsar-admin-url http://pulsar-proxy.pulsar.svc.cluster.local:8080 --pulsar-cass-contact-point test-cluster-dc1-all-pods-service.test-cdc.svc.cluster.local").
 				InNamespace(namespace)
 			if err := kubectl.WaitForOutputContains(testCommand, "SUCCESS", 1200); err != nil {
 				Fail(err.Error())

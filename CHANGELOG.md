@@ -11,8 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 * [BUGFIX] [#355](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars. Include app.kubernetes.io/created-by label. 
-
 * [BUGFIX] [#330](https://github.com/k8ssandra/cass-operator/issues/330) Apply correct updates to Service labels and annotations through additionalServiceConfig (they are now validated and don't allow reserved prefixes).
+* [ENHANCEMENT] [#362](https://github.com/k8ssandra/cass-operator/issues/362) Allow custom Casandra DC name instead of using the CassandraDatacenter name.
 
 ## v1.11.0
 

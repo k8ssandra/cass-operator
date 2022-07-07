@@ -671,7 +671,12 @@ func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
 			return "", errors.Wrap(err, "Error parsing Spec.Config for CassandraDatacenter resource")
 		}
 
-		if err := modelParsed.Merge(configParsed); err != nil {
+		collisionFn := func(dest, src interface{}) interface{} {
+			// Allow overrides of modelValues, e.g., the dc name.
+			return src
+		}
+
+		if err := modelParsed.MergeFn(configParsed, collisionFn); err != nil {
 			return "", errors.Wrap(err, "Error merging Spec.Config for CassandraDatacenter resource")
 		}
 	}

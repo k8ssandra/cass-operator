@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
@@ -21,6 +22,11 @@ import (
 func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 	if rc.Datacenter.GetDeletionTimestamp() == nil {
 		return result.Continue()
+	}
+
+	// If finalizer was removed, we will not do our finalizer processes
+	if !controllerutil.ContainsFinalizer(rc.Datacenter, api.Finalizer) {
+		return result.Done()
 	}
 
 	// set the label here but no need to remove since we're deleting the CassandraDatacenter
@@ -100,7 +106,6 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 
 	// Update CassandraDatacenter
 	if err := rc.Client.Update(rc.Ctx, rc.Datacenter); err != nil {
-		rc.ReqLogger.Error(err, "Failed to update CassandraDatacenter with removed finalizers")
 		return result.Error(err)
 	}
 

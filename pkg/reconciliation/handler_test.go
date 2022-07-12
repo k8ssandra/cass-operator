@@ -12,9 +12,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 )
 
@@ -68,8 +72,20 @@ func TestCalculateReconciliationActions_FailedUpdate(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func emptySecretWatcher(rc *ReconciliationContext) {
+	mockClient := &mocks.Client{}
+	rc.SecretWatches = dynamicwatch.NewDynamicSecretWatches(mockClient)
+	k8sMockClientList(mockClient, nil).
+		Run(func(args mock.Arguments) {
+			arg := args.Get(1).(*unstructured.UnstructuredList)
+			arg.Items = []unstructured.Unstructured{}
+		})
+}
+
+// TestProcessDeletion_FailedDelete fails one step of the deletion process and should not cause
+// the removal of the finalizer, instead controller-runtime will return an error and retry later
 func TestProcessDeletion_FailedDelete(t *testing.T) {
-	t.Skip()
+	assert := assert.New(t)
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
@@ -87,16 +103,104 @@ func TestProcessDeletion_FailedDelete(t *testing.T) {
 		})
 
 	k8sMockClientDelete(mockClient, fmt.Errorf(""))
-	k8sMockClientUpdate(mockClient, nil).Times(1)
+	// k8sMockClientUpdate(mockClient, nil).Times(0)
+
+	emptySecretWatcher(rc)
+	k8sMockClientStatus(rc.Client.(*mocks.Client), mockClient).Times(1)
+	k8sMockClientPatch(mockClient, nil).Once()
+
+	rc.Datacenter.SetFinalizers([]string{"finalizer.cassandra.datastax.com"})
+	now := metav1.Now()
+	rc.Datacenter.SetDeletionTimestamp(&now)
+
+	result, err := rc.CalculateReconciliationActions()
+	assert.Errorf(err, "Should have returned an error while calculating reconciliation actions")
+	assert.Equal(reconcile.Result{}, result, "Should not requeue request as error does cause requeue")
+	assert.True(len(rc.Datacenter.GetFinalizers()) > 0)
+
+	mockClient.AssertExpectations(t)
+}
+
+// TestProcessDeletion verifies the correct amount of calls to k8sClient on the deletion process
+func TestProcessDeletion(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	mockClient := &mocks.Client{}
+	rc.Client = mockClient
+
+	k8sMockClientList(mockClient, nil).
+		Run(func(args mock.Arguments) {
+			arg := args.Get(1).(*v1.PersistentVolumeClaimList)
+			arg.Items = []v1.PersistentVolumeClaim{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pvc-1",
+				},
+			}}
+		})
+
+	k8sMockClientDelete(mockClient, nil)
+	k8sMockClientUpdate(mockClient, nil).Times(1) // Remove finalizer
+
+	emptySecretWatcher(rc)
+	k8sMockClientStatus(rc.Client.(*mocks.Client), mockClient).Times(1)
+	k8sMockClientPatch(mockClient, nil).Once()
+
+	rc.Datacenter.SetFinalizers([]string{"finalizer.cassandra.datastax.com"})
+	now := metav1.Now()
+	rc.Datacenter.SetDeletionTimestamp(&now)
+
+	result, err := rc.CalculateReconciliationActions()
+	assert.NoError(err)
+	assert.Equal(reconcile.Result{}, result, "Should not requeue request")
+
+	mockClient.AssertExpectations(t)
+}
+
+// TestProcessDeletion_NoFinalizer verifies that the removal of finalizer means cass-operator will do nothing
+// on the deletion process.
+func TestProcessDeletion_NoFinalizer(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	mockClient := &mocks.Client{}
+	rc.Client = mockClient
 
 	now := metav1.Now()
 	rc.Datacenter.SetDeletionTimestamp(&now)
 
 	result, err := rc.CalculateReconciliationActions()
-	assert.Errorf(t, err, "Should have returned an error while calculating reconciliation actions")
-	assert.Equal(t, reconcile.Result{Requeue: true}, result, "Should requeue request")
+	assert.NoError(err)
+	assert.Equal(reconcile.Result{Requeue: false}, result, "Should not requeue request")
 
 	mockClient.AssertExpectations(t)
+}
+
+func TestAddFinalizer(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	mockClient := &mocks.Client{}
+	rc.Client = mockClient
+	k8sMockClientUpdate(mockClient, nil).Times(1) // Add finalizer
+
+	err := rc.addFinalizer()
+	assert.NoError(err)
+	assert.True(controllerutil.ContainsFinalizer(rc.Datacenter, api.Finalizer))
+	mockClient.AssertExpectations(t)
+
+	// This should not add the finalizer again
+	mockClient = &mocks.Client{}
+	rc.Client = mockClient
+	rc.Datacenter.Annotations = make(map[string]string)
+	rc.Datacenter.Annotations[api.NoFinalizerAnnotation] = "true"
+	controllerutil.RemoveFinalizer(rc.Datacenter, api.Finalizer)
+	err = rc.addFinalizer()
+	assert.NoError(err)
+	assert.False(controllerutil.ContainsFinalizer(rc.Datacenter, api.Finalizer))
 }
 
 // func TestReconcile(t *testing.T) {
@@ -361,9 +465,9 @@ func TestProcessDeletion_FailedDelete(t *testing.T) {
 
 // 	fakeClient := fake.NewFakeClient(trackObjects...)
 
-// 	r := &ReconcileCassandraDatacenter{
-// 		client: fakeClient,
-// 		scheme: s,
+// 	r := &controllers.CassandraDatacenterReconciler{
+// 		Client: fakeClient,
+// 		Scheme: s,
 // 	}
 
 // 	request := reconcile.Request{
@@ -373,7 +477,7 @@ func TestProcessDeletion_FailedDelete(t *testing.T) {
 // 		},
 // 	}
 
-// 	result, err := r.Reconcile(request)
+// 	result, err := r.Reconcile(context.TODO(), request)
 // 	if err != nil {
 // 		t.Fatalf("Reconciliation Failure: (%v)", err)
 // 	}

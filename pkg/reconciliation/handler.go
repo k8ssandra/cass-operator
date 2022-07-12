@@ -176,14 +176,17 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 // https://godoc.org/github.com/go-logr/logr
 
 func (rc *ReconciliationContext) addFinalizer() error {
-	if len(rc.Datacenter.GetFinalizers()) < 1 && rc.Datacenter.GetDeletionTimestamp() == nil {
+	if _, found := rc.Datacenter.Annotations[api.NoFinalizerAnnotation]; found {
+		return nil
+	}
+
+	if !controllerutil.ContainsFinalizer(rc.Datacenter, api.Finalizer) && rc.Datacenter.GetDeletionTimestamp() == nil {
 		rc.ReqLogger.Info("Adding Finalizer for the CassandraDatacenter")
-		rc.Datacenter.SetFinalizers([]string{"finalizer.cassandra.datastax.com"})
+		controllerutil.AddFinalizer(rc.Datacenter, api.Finalizer)
 
 		// Update CR
 		err := rc.Client.Update(rc.Ctx, rc.Datacenter)
 		if err != nil {
-			rc.ReqLogger.Error(err, "Failed to update CassandraDatacenter with finalizer")
 			return err
 		}
 	}

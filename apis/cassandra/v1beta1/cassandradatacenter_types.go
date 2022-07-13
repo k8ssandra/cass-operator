@@ -336,6 +336,10 @@ const (
 	DatacenterRollingRestart DatacenterConditionType = "RollingRestart"
 	DatacenterValid          DatacenterConditionType = "Valid"
 	DatacenterDecommission   DatacenterConditionType = "Decommission"
+
+	// DatacenterHealthy indicates if QUORUM can be reached from all deployed nodes.
+	// If this check fails, certain operations such as scaling up will not proceed.
+	DatacenterHealthy DatacenterConditionType = "Healthy"
 )
 
 type DatacenterCondition struct {

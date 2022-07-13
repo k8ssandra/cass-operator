@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 * [ENHANCEMENT] [#366](https://github.com/k8ssandra/cass-operator/issues/366) If no finalizer is present, do not do the process deletion. To prevent re-adding the finalizer, add an annotation no-finalizer that prevents re-adding.
 * [ENHANCEMENT] [#360](https://github.com/k8ssandra/cass-operator/pull/360) If Datacenter quorum reports unhealthy state, change Status Condition DatacenterHealthy to False (DBPE-2283)
+* [ENHANCEMENT] Add ability for users to define CDC settings which will cause an agent to start within the Cassandra JVM and pass mutation events from Cassandra back to a Pulsar broker. (Tested on OSS Cassandra 4.x only.)
 * [BUGFIX] [#355](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars. Include app.kubernetes.io/created-by label. 
 * [BUGFIX] [#330](https://github.com/k8ssandra/cass-operator/issues/330) Apply correct updates to Service labels and annotations through additionalServiceConfig (they are now validated and don't allow reserved prefixes).
 

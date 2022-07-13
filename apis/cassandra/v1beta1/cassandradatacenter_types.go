@@ -228,6 +228,9 @@ type CassandraDatacenterSpec struct {
 
 	// Additional Labels allows to define additional labels that will be included in all objects created by the operator. Note, user can override values set by default from the cass-operator and doing so could break cass-operator functionality.
 	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
+
+	// CDC allows configuration of the change data capture agent which can run within the Management API container. Use it to send data to Pulsar.
+	CDC *CDCConfiguration `json:"cdc,omitempty"`
 }
 
 type NetworkingConfig struct {

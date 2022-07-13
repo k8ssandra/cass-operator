@@ -6,6 +6,7 @@ package reconciliation
 // This file defines constructors for k8s objects
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -13,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/cdc"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
@@ -358,11 +360,14 @@ func getConfigDataEnVars(dc *api.CassandraDatacenter) ([]corev1.EnvVar, error) {
 	}
 
 	configData, err := dc.GetConfigAsJSON(dc.Spec.Config)
-
 	if err != nil {
 		return envVars, err
 	}
-	envVars = append(envVars, corev1.EnvVar{Name: "CONFIG_FILE_DATA", Value: configData})
+	cdcAdded, err := cdc.UpdateConfig(json.RawMessage(configData), *dc)
+	if err != nil {
+		return envVars, err
+	}
+	envVars = append(envVars, corev1.EnvVar{Name: "CONFIG_FILE_DATA", Value: string(cdcAdded)})
 
 	return envVars, nil
 }

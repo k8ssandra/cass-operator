@@ -73,6 +73,7 @@ jobs:
         # Three worker tests:
         - canary_upgrade
         - config_change_condition
+        - cdc_successful
         # - delete_node_lost_readiness # DSE specific behavior
         - host_network
         - internode-encryption-generated

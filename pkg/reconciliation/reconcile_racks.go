@@ -1307,6 +1307,8 @@ func (rc *ReconciliationContext) deleteStuckNodes() (bool, error) {
 	return false, nil
 }
 
+// isClusterHealthy does a LOCAL_QUORUM query to the Cassandra pods and returns true if all the pods were able to
+// respond without error.
 func (rc *ReconciliationContext) isClusterHealthy() bool {
 	pods := FilterPodListByCassNodeState(rc.clusterPods, stateStarted)
 
@@ -1319,32 +1321,6 @@ func (rc *ReconciliationContext) isClusterHealthy() bool {
 	}
 
 	return true
-}
-
-func (rc *ReconciliationContext) isClusterDegraded() bool {
-	dc := rc.Datacenter
-	status := false
-	if corev1.ConditionFalse == dc.GetConditionStatus(api.DatacenterReady) || corev1.ConditionTrue == dc.GetConditionStatus(api.DatacenterResuming) {
-		status = true
-	} else {
-		// Okay, we are ready, but we might be in some sort of degraded state too
-		degradedWhenTrue := []api.DatacenterConditionType{
-			api.DatacenterReplacingNodes,
-			api.DatacenterScalingUp,
-			api.DatacenterUpdating,
-			api.DatacenterResuming,
-			api.DatacenterRollingRestart,
-			api.DatacenterDecommission,
-		}
-		for _, condition := range degradedWhenTrue {
-			if corev1.ConditionTrue == dc.GetConditionStatus(condition) {
-				status = true
-				break
-			}
-		}
-	}
-
-	return status
 }
 
 // labelSeedPods iterates over all pods for a statefulset and makes sure the right number of

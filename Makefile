@@ -119,7 +119,7 @@ lint: ## Run golangci-lint against code.
 	golangci-lint run ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
+test: manifests generate fmt vet lint envtest ## Run tests.
 	# Old unit tests first - these use mocked client / fakeclient
 	go test ./pkg/... -coverprofile cover-pkg.out
 	# Then the envtest ones
@@ -133,6 +133,10 @@ ifeq ($(M_INTEG_DIR), all)
 else
 	cd tests/${M_INTEG_DIR} && go test -v ./... -timeout 300m --ginkgo.progress --ginkgo.v
 endif
+
+.PHONY: version
+version:
+	@echo $(VERSION)
 
 ##@ Build
 

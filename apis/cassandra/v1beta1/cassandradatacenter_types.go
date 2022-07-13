@@ -52,6 +52,14 @@ const (
 	// CassandraDatacenter is deleted.
 	DecommissionOnDeleteAnnotation = "cassandra.datastax.com/decommission-on-delete"
 
+	// NoFinalizerAnnotation prevents cass-operator from re-adding the finalizer to managed objects if finalizer is
+	// removed. Removing finalizer means deletion is not processed as usual.
+	NoFinalizerAnnotation = "cassandra.datastax.com/no-finalizer"
+
+	// Finalizer is the finalizer set by cass-operator to the resources it wants to prevent from being deleted.
+	// If no finalizer is set, the cass-operator ProcessDeletion() is not run
+	Finalizer = "finalizer.cassandra.datastax.com"
+
 	CassNodeState = "cassandra.datastax.com/node-state"
 
 	ProgressUpdating ProgressState = "Updating"

@@ -170,6 +170,7 @@ func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetAction(en
 			"wget",
 			"--output-document", "/dev/null",
 			"--no-check-certificate",
+			"--timeout 20",
 			fmt.Sprintf("http://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
@@ -184,6 +185,7 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetAction(endp
 			"--certificate", tlsCrt,
 			"--private-key", tlsKey,
 			"--ca-certificate", caCertPath,
+			"--timeout 20",
 			fmt.Sprintf("https://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
@@ -195,6 +197,7 @@ func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetPostActio
 			"wget",
 			"--output-document", "/dev/null",
 			"--no-check-certificate",
+			"--timeout 20",
 			fmt.Sprintf("--post-data='%s'", postData),
 			fmt.Sprintf("http://%s%s", WgetTargetHostAndPort, endpoint),
 		},
@@ -210,6 +213,7 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(
 			"--certificate", tlsCrt,
 			"--private-key", tlsKey,
 			"--ca-certificate", caCertPath,
+			"--timeout 20",
 			fmt.Sprintf("--post-data='%s'", postData),
 			fmt.Sprintf("https://%s%s", WgetTargetHostAndPort, endpoint),
 		},

@@ -917,7 +917,7 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 			Err:        fmt.Errorf("incorrect status code of %d when calling endpoint", res.StatusCode),
 		}
 		if res.StatusCode != http.StatusNotFound {
-			client.Log.Info("incorrect status code when calling Node Management Endpoint",
+			client.Log.Error(reqErr, "incorrect status code when calling Node Management Endpoint",
 				"statusCode", res.StatusCode,
 				"pod", request.host)
 		}

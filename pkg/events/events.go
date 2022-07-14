@@ -30,6 +30,7 @@ const (
 	StartingCassandraAndReplacingNode string = "StartingCassandraAndReplacingNode"
 	StartingCassandra                 string = "StartingCassandra"
 	DecommissionDatacenter            string = "DecommissionDatacenter"
+	UnhealthyDatacenter               string = "UnhealthyDatacenter"
 )
 
 type LoggingEventRecorder struct {

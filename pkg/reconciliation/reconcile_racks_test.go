@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -1634,4 +1635,55 @@ func TestNodereplacements(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(1, len(rc.Datacenter.Status.NodeReplacements))
 	assert.Equal(0, len(rc.Datacenter.Spec.ReplaceNodes))
+}
+
+// TestFailedStart verifies the pod is deleted if nodeMgmtClient start fails
+func TestFailedStart(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	mockClient := &mocks.Client{}
+	rc.Client = mockClient
+
+	k8sMockClientDelete(mockClient, nil).Times(1)
+
+	res := &http.Response{
+		StatusCode: http.StatusInternalServerError,
+		Body:       io.NopCloser(strings.NewReader("OK")),
+	}
+
+	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req != nil
+			})).
+		Return(res, nil).
+		Once()
+
+	client := httphelper.NodeMgmtClient{
+		Client:   mockHttpClient,
+		Log:      rc.ReqLogger,
+		Protocol: "http",
+	}
+
+	rc.NodeMgmtClient = client
+
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{},
+	}
+
+	pod := makeReloadTestPod()
+
+	fakeRecorder := record.NewFakeRecorder(5)
+	rc.Recorder = fakeRecorder
+
+	err := rc.startCassandra(epData, pod)
+	assert.Error(t, err)
+
+	close(fakeRecorder.Events)
+	// Should have 2 events, one to indicate Cassandra is starting, one to indicate it failed to start
+	assert.Equal(t, 2, len(fakeRecorder.Events))
+
+	mockClient.AssertExpectations(t)
 }

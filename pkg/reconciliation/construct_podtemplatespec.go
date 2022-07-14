@@ -105,13 +105,17 @@ func selectorFromFieldPath(fieldPath string) *corev1.EnvVarSource {
 	}
 }
 
+func httpGetAction(port int, path string) *corev1.HTTPGetAction {
+	return &corev1.HTTPGetAction{
+		Port: intstr.FromInt(port),
+		Path: path,
+	}
+}
+
 func probe(port int, path string, initDelay int, period int) *corev1.Probe {
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Port: intstr.FromInt(port),
-				Path: path,
-			},
+			HTTPGet: httpGetAction(port, path),
 		},
 		InitialDelaySeconds: int32(initDelay),
 		PeriodSeconds:       int32(period),
@@ -426,11 +430,11 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	if cassContainer.LivenessProbe == nil {
-		cassContainer.LivenessProbe = probe(8080, "/api/v0/probes/liveness", 15, 15)
+		cassContainer.LivenessProbe = probe(8080, httphelper.LivenessEndpoint, 15, 15)
 	}
 
 	if cassContainer.ReadinessProbe == nil {
-		cassContainer.ReadinessProbe = probe(8080, "/api/v0/probes/readiness", 20, 10)
+		cassContainer.ReadinessProbe = probe(8080, httphelper.ReadinessEndpoint, 20, 10)
 	}
 
 	if cassContainer.Lifecycle == nil {
@@ -438,7 +442,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	if cassContainer.Lifecycle.PreStop == nil {
-		action, err := httphelper.GetMgmtApiWgetPostAction(dc, httphelper.WgetNodeDrainEndpoint, "")
+		action, err := httphelper.GetMgmtApiWgetPostAction(dc, httphelper.NodeDrainEndpoint, "")
 		if err != nil {
 			return err
 		}

@@ -992,7 +992,7 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 		dc.Status.NodeStatuses = map[string]api.CassandraNodeStatus{}
 	}
 
-	for _, pod := range rc.dcPods {
+	for _, pod := range ListAllStartedPods(rc.dcPods) {
 		nodeStatus, ok := dc.Status.NodeStatuses[pod.Name]
 		if !ok {
 			nodeStatus = api.CassandraNodeStatus{}
@@ -1018,8 +1018,6 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 					if nodeStatus.HostID == "" {
 						logger.Info("Failed to find host ID", "pod", pod.Name)
 					}
-				} else {
-					rc.ReqLogger.Error(err, "Could not get endpoints data")
 				}
 			}
 		}

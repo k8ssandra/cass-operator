@@ -24,6 +24,7 @@ const (
 	WgetTargetHostAndPort = "localhost:8080"
 	LivenessEndpoint      = "/api/v0/probes/liveness"
 	ReadinessEndpoint     = "/api/v0/probes/readiness"
+	DefaultTimeout        = 10
 
 	caCertPath = "/management-api-certs/ca.crt"
 	tlsCrt     = "/management-api-certs/tls.crt"
@@ -32,7 +33,7 @@ const (
 
 // API for Node Management mAuth Config
 func GetManagementApiProtocol(dc *api.CassandraDatacenter) (string, error) {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return "", err
 	}
@@ -40,7 +41,7 @@ func GetManagementApiProtocol(dc *api.CassandraDatacenter) (string, error) {
 }
 
 func BuildManagementApiHttpClient(dc *api.CassandraDatacenter, client client.Client, ctx context.Context) (HttpClient, error) {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
@@ -48,14 +49,14 @@ func BuildManagementApiHttpClient(dc *api.CassandraDatacenter, client client.Cli
 }
 
 func AddManagementApiServerSecurity(dc *api.CassandraDatacenter, pod *corev1.PodTemplateSpec) error {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return err
 	}
 	return provider.AddServerSecurity(pod)
 }
 
-func BuildManagmenetApiSecurityProvider(dc *api.CassandraDatacenter) (ManagementApiSecurityProvider, error) {
+func BuildManagementApiSecurityProvider(dc *api.CassandraDatacenter) (ManagementApiSecurityProvider, error) {
 	options := []func(*api.CassandraDatacenter) (ManagementApiSecurityProvider, error){
 		buildManualApiSecurityProvider,
 		buildInsecureManagementApiSecurityProvider,
@@ -84,7 +85,7 @@ func BuildManagmenetApiSecurityProvider(dc *api.CassandraDatacenter) (Management
 }
 
 func ValidateManagementApiConfig(dc *api.CassandraDatacenter, client client.Client, ctx context.Context) []error {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return []error{err}
 	}
@@ -95,8 +96,8 @@ func ValidateManagementApiConfig(dc *api.CassandraDatacenter, client client.Clie
 // SPI for adding new mechanisms for securing the management API
 type ManagementApiSecurityProvider interface {
 	BuildHttpClient(client client.Client, ctx context.Context) (HttpClient, error)
-	BuildMgmtApiWgetAction(endpoint string) *corev1.ExecAction
-	BuildMgmtApiWgetPostAction(endpoint string, postData string) *corev1.ExecAction
+	BuildMgmtApiWgetAction(endpoint string, timeout int) *corev1.ExecAction
+	BuildMgmtApiWgetPostAction(endpoint string, postData string, timeout int) *corev1.ExecAction
 	AddServerSecurity(pod *corev1.PodTemplateSpec) error
 	GetProtocol() string
 	ValidateConfig(client client.Client, ctx context.Context) []error
@@ -148,35 +149,35 @@ func (provider *ManualManagementApiSecurityProvider) GetProtocol() string {
 	return "https"
 }
 
-func GetMgmtApiWgetAction(dc *api.CassandraDatacenter, endpoint string) (*corev1.ExecAction, error) {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+func GetMgmtApiWgetAction(dc *api.CassandraDatacenter, endpoint string, timeout int) (*corev1.ExecAction, error) {
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
-	return provider.BuildMgmtApiWgetAction(endpoint), nil
+	return provider.BuildMgmtApiWgetAction(endpoint, timeout), nil
 }
 
-func GetMgmtApiWgetPostAction(dc *api.CassandraDatacenter, endpoint string, postData string) (*corev1.ExecAction, error) {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+func GetMgmtApiWgetPostAction(dc *api.CassandraDatacenter, endpoint string, postData string, timeout int) (*corev1.ExecAction, error) {
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
-	return provider.BuildMgmtApiWgetPostAction(endpoint, postData), nil
+	return provider.BuildMgmtApiWgetPostAction(endpoint, postData, timeout), nil
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetAction(endpoint string) *corev1.ExecAction {
+func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetAction(endpoint string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"wget",
 			"--output-document", "/dev/null",
 			"--no-check-certificate",
-			"--timeout 20",
+			fmt.Sprintf("--timeout %d", timeout),
 			fmt.Sprintf("http://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetAction(endpoint string) *corev1.ExecAction {
+func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetAction(endpoint string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"wget",
@@ -185,26 +186,26 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetAction(endp
 			"--certificate", tlsCrt,
 			"--private-key", tlsKey,
 			"--ca-certificate", caCertPath,
-			"--timeout 20",
+			fmt.Sprintf("--timeout %d", timeout),
 			fmt.Sprintf("https://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(endpoint string, postData string) *corev1.ExecAction {
+func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(endpoint string, postData string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"wget",
 			"--output-document", "/dev/null",
 			"--no-check-certificate",
-			"--timeout 20",
+			fmt.Sprintf("--timeout %d", timeout),
 			fmt.Sprintf("--post-data='%s'", postData),
 			fmt.Sprintf("http://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(endpoint string, postData string) *corev1.ExecAction {
+func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(endpoint string, postData string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"wget",
@@ -213,7 +214,7 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(
 			"--certificate", tlsCrt,
 			"--private-key", tlsKey,
 			"--ca-certificate", caCertPath,
-			"--timeout 20",
+			fmt.Sprintf("--timeout %d", timeout),
 			fmt.Sprintf("--post-data='%s'", postData),
 			fmt.Sprintf("https://%s%s", WgetTargetHostAndPort, endpoint),
 		},
@@ -305,9 +306,15 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 			ProbeHandler: corev1.ProbeHandler{},
 		}
 	}
+
+	livenessTimeout := int(container.LivenessProbe.TimeoutSeconds)
+	if livenessTimeout < 1 {
+		livenessTimeout = DefaultTimeout
+	}
+
 	container.LivenessProbe.ProbeHandler.HTTPGet = nil
 	container.LivenessProbe.ProbeHandler.TCPSocket = nil
-	container.LivenessProbe.ProbeHandler.Exec = provider.BuildMgmtApiWgetAction(LivenessEndpoint)
+	container.LivenessProbe.ProbeHandler.Exec = provider.BuildMgmtApiWgetAction(LivenessEndpoint, livenessTimeout)
 
 	// Update Readiness probe to account for mutual auth (can't just use HTTP probe now)
 	// TODO: Get endpoint from configured HTTPGet probe
@@ -316,9 +323,15 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 			ProbeHandler: corev1.ProbeHandler{},
 		}
 	}
+
+	readinessTimeout := int(container.ReadinessProbe.TimeoutSeconds)
+	if readinessTimeout < 1 {
+		readinessTimeout = DefaultTimeout
+	}
+
 	container.ReadinessProbe.ProbeHandler.HTTPGet = nil
 	container.ReadinessProbe.ProbeHandler.TCPSocket = nil
-	container.ReadinessProbe.ProbeHandler.Exec = provider.BuildMgmtApiWgetAction(ReadinessEndpoint)
+	container.ReadinessProbe.ProbeHandler.Exec = provider.BuildMgmtApiWgetAction(ReadinessEndpoint, readinessTimeout)
 
 	return nil
 }

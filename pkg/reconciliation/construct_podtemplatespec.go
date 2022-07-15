@@ -112,13 +112,14 @@ func httpGetAction(port int, path string) *corev1.HTTPGetAction {
 	}
 }
 
-func probe(port int, path string, initDelay int, period int) *corev1.Probe {
+func probe(port int, path string, initDelay int, period int, timeout int) *corev1.Probe {
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: httpGetAction(port, path),
 		},
 		InitialDelaySeconds: int32(initDelay),
 		PeriodSeconds:       int32(period),
+		TimeoutSeconds:      int32(timeout),
 	}
 }
 
@@ -430,11 +431,11 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	if cassContainer.LivenessProbe == nil {
-		cassContainer.LivenessProbe = probe(8080, httphelper.LivenessEndpoint, 15, 15)
+		cassContainer.LivenessProbe = probe(8080, httphelper.LivenessEndpoint, 15, 15, 10)
 	}
 
 	if cassContainer.ReadinessProbe == nil {
-		cassContainer.ReadinessProbe = probe(8080, httphelper.ReadinessEndpoint, 20, 10)
+		cassContainer.ReadinessProbe = probe(8080, httphelper.ReadinessEndpoint, 20, 10, 10)
 	}
 
 	if cassContainer.Lifecycle == nil {

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -171,7 +172,7 @@ func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetAction(en
 			"wget",
 			"--output-document", "/dev/null",
 			"--no-check-certificate",
-			fmt.Sprintf("--timeout %d", timeout),
+			"--timeout", strconv.Itoa(timeout),
 			fmt.Sprintf("http://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
@@ -186,7 +187,7 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetAction(endp
 			"--certificate", tlsCrt,
 			"--private-key", tlsKey,
 			"--ca-certificate", caCertPath,
-			fmt.Sprintf("--timeout %d", timeout),
+			"--timeout", strconv.Itoa(timeout),
 			fmt.Sprintf("https://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
@@ -198,7 +199,7 @@ func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetPostActio
 			"wget",
 			"--output-document", "/dev/null",
 			"--no-check-certificate",
-			fmt.Sprintf("--timeout %d", timeout),
+			"--timeout", strconv.Itoa(timeout),
 			fmt.Sprintf("--post-data='%s'", postData),
 			fmt.Sprintf("http://%s%s", WgetTargetHostAndPort, endpoint),
 		},
@@ -214,7 +215,7 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(
 			"--certificate", tlsCrt,
 			"--private-key", tlsKey,
 			"--ca-certificate", caCertPath,
-			fmt.Sprintf("--timeout %d", timeout),
+			"--timeout", strconv.Itoa(timeout),
 			fmt.Sprintf("--post-data='%s'", postData),
 			fmt.Sprintf("https://%s%s", WgetTargetHostAndPort, endpoint),
 		},

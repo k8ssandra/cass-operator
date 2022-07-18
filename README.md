@@ -9,6 +9,39 @@ To create a full featured cluster, the recommend approach is to use the Helm cha
 
 If you wish to use cass-operator only we provide Kustomize templates that can be used to install with kubectl only. This approach is also recommended if you wish to modify the installation beyond our provided examples. If updating from previous versions, please see ``Upgrade instructions`` section first.
 
+## Supported versions
+
+We actively maintain two different versions of cass-operator, the [1.10.x series](https://github.com/k8ssandra/cass-operator/tree/1.10.x) as well as the newest version cut from the master branch. The [1.10.x branch](https://github.com/k8ssandra/cass-operator/tree/1.10.x) receives only bugfixes, while all the new features will only land to the newer versions.
+
+### Kubernetes and Openshift version support
+
+1.10.x versions support Kubernetes versions 1.18 to 1.25. For Openshift, 1.10.x supports 4.7 and 4.8 (it will not pass validations in 4.9 due to the use of deprecated APIs).
+
+Newer releases (1.11.0 and up) are tested and supported only in supported Kubernetes versions. That means versions 1.21 and up. For Openshift installations, 1.11.0 and up are supported in 4.9 and newer.
+
+### Cassandra version support
+
+For Cassandra versions, 1.10.x will only support 3.11.x and 4.0.x. Support for 4.1 will only land in upcoming versions (1.13.0 or later). Both versions support all DSE 6.8.x releases.
+
+## Changelog between versions
+
+The next major/minor version always includes changes from the previously released supported version, but no more than that. That is, if the patch release is released after the next (next in semver) major/minor, the patches are not integrated to it, but are repeated in the changelog for the next version if required (in some cases the bugfixes are not necessary for the next major/minor).
+
+As an example, lets say the changelog has the following release sequence:
+
+```
+1.12.0
+1.10.5
+1.11.0
+1.10.4
+..
+1.10.0
+```
+
+1.11.0 will include everything under it, including fixes from 1.10.4, however 1.11.0 does not have the fixes from 1.10.5 (as 1.11.0 was released before 1.10.5). 1.12.0 on the other hand will include all the fixes from 1.10.5, but those fixes are repeated as 1.12.0 lists everything changed from the previous major/minor, that is changes between 1.11.0 and 1.12.0.
+
+While the 1.10.x branch will only have fixes released from that branch, the master branch will include all the versions.
+
 ### Installing the operator with Kustomize
 
 The operator can be installed in a namespace scoped settings or cluster wide. If installed cluster wide, one can define which namespaces (or all) are watched for ``CassandraDatacenter`` objects.

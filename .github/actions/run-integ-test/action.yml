@@ -45,6 +45,9 @@ runs:
         node_image: kindest/node:v1.23.6
         cluster_name: kind
         config: tests/testdata/kind/kind_config_6_workers.yaml
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      id: install_helm
     - name: Download cass-operator image
       uses: actions/download-artifact@v2
       with:

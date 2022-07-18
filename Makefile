@@ -246,7 +246,7 @@ ifeq (,$(shell which helm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(HELM)) ;\
 	curl -sSLo bin/${HELMTARNAME} https://get.helm.sh/${HELMTARNAME} ;\
-	tar -zxvf bin/${HELMTARNAME} ;\
+	tar -zxf bin/${HELMTARNAME} -C bin/;\
 	mv bin/${OS}-${ARCH}/helm ${HELM} ;\
 	rm -rf bin/${HELMTARNAME} bin/${OS}-${ARCH} ;\
 	chmod +x $(HELM) ;\

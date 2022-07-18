@@ -750,7 +750,6 @@ func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(client clie
 		InsecureSkipVerify:    true,
 		VerifyPeerCertificate: buildVerifyPeerCertificateNoHostCheck(caCertPool),
 	}
-	tlsConfig.BuildNameToCertificate()
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	httpClient := &http.Client{Transport: transport}
 

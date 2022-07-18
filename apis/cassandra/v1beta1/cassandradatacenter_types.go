@@ -32,7 +32,6 @@ const (
 	// RackLabel is the operator's label for the rack name
 	RackLabel = "cassandra.datastax.com/rack"
 
-	// RackLabel is the operator's label for the rack name
 	CassOperatorProgressLabel = "cassandra.datastax.com/operator-progress"
 
 	// PromMetricsLabel is a service label that can be selected for prometheus metrics scraping
@@ -53,19 +52,16 @@ const (
 	// CassandraDatacenter is deleted.
 	DecommissionOnDeleteAnnotation = "cassandra.datastax.com/decommission-on-delete"
 
-	// CassNodeState
 	CassNodeState = "cassandra.datastax.com/node-state"
 
-	// Progress states for status
 	ProgressUpdating ProgressState = "Updating"
 	ProgressReady    ProgressState = "Ready"
 
-	// Default port numbers
 	DefaultNativePort    = 9042
 	DefaultInternodePort = 7000
 )
 
-// This type exists so there's no chance of pushing random strings to our progress status
+// ProgressState - this type exists so there's no chance of pushing random strings to our progress status
 type ProgressState string
 
 type CassandraUser struct {
@@ -238,7 +234,7 @@ type NodePortConfig struct {
 	InternodeSSL int `json:"internodeSSL,omitempty"`
 }
 
-// Is the NodePort service enabled?
+// IsNodePortEnabled is the NodePort service enabled?
 func (dc *CassandraDatacenter) IsNodePortEnabled() bool {
 	return dc.Spec.Networking != nil && dc.Spec.Networking.NodePort != nil
 }
@@ -254,7 +250,7 @@ type DseWorkloads struct {
 	SearchEnabled    bool `json:"searchEnabled,omitempty"`
 }
 
-// StorageConfig defines additional storage configurations
+// AdditionalVolumes StorageConfig defines additional storage configurations
 type AdditionalVolumes struct {
 	// Mount path into cassandra container
 	MountPath string `json:"mountPath"`
@@ -533,19 +529,30 @@ func (dc *CassandraDatacenter) SetCondition(condition DatacenterCondition) {
 // GetDatacenterLabels ...
 func (dc *CassandraDatacenter) GetDatacenterLabels() map[string]string {
 	labels := dc.GetClusterLabels()
-	labels[DatacenterLabel] = dc.Name
+	labels[DatacenterLabel] = CleanLabelValue(dc.Name)
 	return labels
 }
 
 // GetClusterLabels returns a new map with the cluster label key and cluster name value
 func (dc *CassandraDatacenter) GetClusterLabels() map[string]string {
 	return map[string]string{
-		ClusterLabel: dc.Spec.ClusterName,
+		ClusterLabel: CleanLabelValue(dc.Spec.ClusterName),
 	}
 }
 
 // apimachinery validation does not expose this, copied here
 const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+
+var whitelistRegex = regexp.MustCompile(`(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?`)
+
+// CleanLabelValue a valid label must be an empty string or consist of alphanumeric characters,
+// '-', '_' or '.', and must start and end with an alphanumeric.
+// Note: we apply a prefix of "cassandra-" to the cluster name value used as label name.
+// As such, empty string isn't a valid case.
+func CleanLabelValue(value string) string {
+	regexpResult := whitelistRegex.FindAllString(strings.Replace(value, " ", "", -1), -1)
+	return strings.Join(regexpResult, "")
+}
 
 func CleanupForKubernetes(input string) string {
 	if len(validation.IsDNS1035Label(input)) > 0 {
@@ -653,8 +660,7 @@ func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
 	}
 
 	// Combine the model values with the user-specified values
-
-	modelParsed, err := gabs.ParseJSON([]byte(modelBytes))
+	modelParsed, err := gabs.ParseJSON(modelBytes)
 	if err != nil {
 		return "", errors.Wrap(err, "Model information for CassandraDatacenter resource was not properly configured")
 	}
@@ -673,6 +679,7 @@ func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
 	return modelParsed.String(), nil
 }
 
+// GetNodePortNativePort
 // Gets the defined CQL port for NodePort.
 // 0 will be returned if NodePort is not configured.
 // The SSL port will be returned if it is defined,
@@ -691,6 +698,7 @@ func (dc *CassandraDatacenter) GetNodePortNativePort() int {
 	}
 }
 
+// GetNodePortInternodePort
 // Gets the defined internode/broadcast port for NodePort.
 // 0 will be returned if NodePort is not configured.
 // The SSL port will be returned if it is defined,

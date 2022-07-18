@@ -1,10 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
   name: cassandradatacenters.cassandra.datastax.com
 spec:
@@ -188,12 +187,12 @@ spec:
                 description: "ConfigSecret is the name of a secret that contains configuration
                   for Cassandra. The secret is expected to have a property named config
                   whose value should be a JSON formatted string that should look like
-                  this: \n    config: |-      {        \"cassandra-yaml\": {          \"read_request_timeout_in_ms\":
-                  10000        },        \"jmv-options\": {          \"max_heap_size\":
-                  1024M        }      } \n ConfigSecret is mutually exclusive with
-                  Config. ConfigSecret takes precedence and will be used exclusively
-                  if both properties are set. The operator sets a watch such that
-                  an update to the secret will trigger an update of the StatefulSets."
+                  this: \n config: |- { \"cassandra-yaml\": { \"read_request_timeout_in_ms\":
+                  10000 }, \"jmv-options\": { \"max_heap_size\": 1024M } } \n ConfigSecret
+                  is mutually exclusive with Config. ConfigSecret takes precedence
+                  and will be used exclusively if both properties are set. The operator
+                  sets a watch such that an update to the secret will trigger an update
+                  of the StatefulSets."
                 type: string
               disableSystemLoggerSidecar:
                 description: Configuration for disabling the simple log tailing sidecar
@@ -5448,13 +5447,13 @@ spec:
                                 with a pod if it doesn''t satisfy the spread constraint.
                                 - DoNotSchedule (default) tells the scheduler not
                                 to schedule it. - ScheduleAnyway tells the scheduler
-                                to schedule the pod in any location,   but giving
-                                higher precedence to topologies that would help reduce
-                                the   skew. A constraint is considered "Unsatisfiable"
-                                for an incoming pod if and only if every possible
-                                node assigment for that pod would violate "MaxSkew"
-                                on some topology. For example, in a 3-zone cluster,
-                                MaxSkew is set to 1, and pods with the same labelSelector
+                                to schedule the pod in any location, but giving higher
+                                precedence to topologies that would help reduce the
+                                skew. A constraint is considered "Unsatisfiable" for
+                                an incoming pod if and only if every possible node
+                                assigment for that pod would violate "MaxSkew" on
+                                some topology. For example, in a 3-zone cluster, MaxSkew
+                                is set to 1, and pods with the same labelSelector
                                 spread as 3/1/1: | zone1 | zone2 | zone3 | | P P P
                                 |   P   |   P   | If WhenUnsatisfiable is set to DoNotSchedule,
                                 incoming pod can only be scheduled to zone2(zone3)
@@ -5891,13 +5890,12 @@ spec:
                                 when the pod is removed. \n Use this if: a) the volume
                                 is only needed while the pod runs, b) features of
                                 normal volumes like restoring from snapshot or capacity
-                                \   tracking are needed, c) the storage driver is
-                                specified through a storage class, and d) the storage
-                                driver supports dynamic volume provisioning through
-                                \   a PersistentVolumeClaim (see EphemeralVolumeSource
-                                for more    information on the connection between
-                                this volume type    and PersistentVolumeClaim). \n
-                                Use PersistentVolumeClaim or one of the vendor-specific
+                                tracking are needed, c) the storage driver is specified
+                                through a storage class, and d) the storage driver
+                                supports dynamic volume provisioning through a PersistentVolumeClaim
+                                (see EphemeralVolumeSource for more information on
+                                the connection between this volume type and PersistentVolumeClaim).
+                                \n Use PersistentVolumeClaim or one of the vendor-specific
                                 APIs for volumes that persist for longer than the
                                 lifecycle of an individual pod. \n Use CSI for light-weight
                                 local ephemeral volumes if the CSI driver is meant
@@ -6024,14 +6022,15 @@ spec:
                                             are two important differences between
                                             DataSource and DataSourceRef: * While
                                             DataSource only allows two specific types
-                                            of objects, DataSourceRef   allows any
-                                            non-core object, as well as PersistentVolumeClaim
+                                            of objects, DataSourceRef allows any non-core
+                                            object, as well as PersistentVolumeClaim
                                             objects. * While DataSource ignores disallowed
-                                            values (dropping them), DataSourceRef   preserves
-                                            all values, and generates an error if
-                                            a disallowed value is   specified. (Alpha)
-                                            Using this field requires the AnyVolumeDataSource
-                                            feature gate to be enabled.'
+                                            values (dropping them), DataSourceRef
+                                            preserves all values, and generates an
+                                            error if a disallowed value is specified.
+                                            (Alpha) Using this field requires the
+                                            AnyVolumeDataSource feature gate to be
+                                            enabled.'
                                           properties:
                                             apiGroup:
                                               description: APIGroup is the group for
@@ -7197,7 +7196,8 @@ spec:
                 properties:
                   additionalVolumes:
                     items:
-                      description: StorageConfig defines additional storage configurations
+                      description: AdditionalVolumes StorageConfig defines additional
+                        storage configurations
                       properties:
                         mountPath:
                           description: Mount path into cassandra container
@@ -7260,11 +7260,11 @@ spec:
                                 if one of them is empty and the other is non-empty.
                                 There are two important differences between DataSource
                                 and DataSourceRef: * While DataSource only allows
-                                two specific types of objects, DataSourceRef   allows
+                                two specific types of objects, DataSourceRef allows
                                 any non-core object, as well as PersistentVolumeClaim
                                 objects. * While DataSource ignores disallowed values
-                                (dropping them), DataSourceRef   preserves all values,
-                                and generates an error if a disallowed value is   specified.
+                                (dropping them), DataSourceRef preserves all values,
+                                and generates an error if a disallowed value is specified.
                                 (Alpha) Using this field requires the AnyVolumeDataSource
                                 feature gate to be enabled.'
                               properties:
@@ -7433,10 +7433,10 @@ spec:
                           if one of them is empty and the other is non-empty. There
                           are two important differences between DataSource and DataSourceRef:
                           * While DataSource only allows two specific types of objects,
-                          DataSourceRef   allows any non-core object, as well as PersistentVolumeClaim
+                          DataSourceRef allows any non-core object, as well as PersistentVolumeClaim
                           objects. * While DataSource ignores disallowed values (dropping
-                          them), DataSourceRef   preserves all values, and generates
-                          an error if a disallowed value is   specified. (Alpha) Using
+                          them), DataSourceRef preserves all values, and generates
+                          an error if a disallowed value is specified. (Alpha) Using
                           this field requires the AnyVolumeDataSource feature gate
                           to be enabled.'
                         properties:
@@ -7707,23 +7707,23 @@ spec:
                   description: 'ObjectReference contains enough information to let
                     you inspect or modify the referred object. --- New uses of this
                     type are discouraged because of difficulty describing its usage
-                    when embedded in APIs.  1. Ignored fields.  It includes many fields
+                    when embedded in APIs. 1. Ignored fields.  It includes many fields
                     which are not generally honored.  For instance, ResourceVersion
-                    and FieldPath are both very rarely valid in actual usage.  2.
-                    Invalid usage help.  It is impossible to add specific help for
-                    individual usage.  In most embedded usages, there are particular     restrictions
+                    and FieldPath are both very rarely valid in actual usage. 2. Invalid
+                    usage help.  It is impossible to add specific help for individual
+                    usage.  In most embedded usages, there are particular restrictions
                     like, "must refer only to types A and B" or "UID not honored"
-                    or "name must be restricted".     Those cannot be well described
-                    when embedded.  3. Inconsistent validation.  Because the usages
-                    are different, the validation rules are different by usage, which
-                    makes it hard for users to predict what will happen.  4. The fields
+                    or "name must be restricted". Those cannot be well described when
+                    embedded. 3. Inconsistent validation.  Because the usages are
+                    different, the validation rules are different by usage, which
+                    makes it hard for users to predict what will happen. 4. The fields
                     are both imprecise and overly precise.  Kind is not a precise
-                    mapping to a URL. This can produce ambiguity     during interpretation
+                    mapping to a URL. This can produce ambiguity during interpretation
                     and require a REST mapping.  In most cases, the dependency is
-                    on the group,resource tuple     and the version of the actual
-                    struct is irrelevant.  5. We cannot easily change it.  Because
-                    this type is embedded in many locations, updates to this type     will
-                    affect numerous schemas.  Don''t make new APIs embed an underspecified
+                    on the group,resource tuple and the version of the actual struct
+                    is irrelevant. 5. We cannot easily change it.  Because this type
+                    is embedded in many locations, updates to this type will affect
+                    numerous schemas.  Don''t make new APIs embed an underspecified
                     API type they do not control. Instead of using this type, create
                     a locally provided and used type that is well-focused on your
                     reference. For example, ServiceReferences for admission registration:

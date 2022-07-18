@@ -9,6 +9,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [BUGFIX] [#355](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars.
+
 ## v1.10.4
 
 * [CHANGE] [#264](https://github.com/k8ssandra/cass-operator/issues/264) Generate PodTemplateSpec in CassandraDatacenter with metadata

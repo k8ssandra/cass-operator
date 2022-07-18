@@ -67,6 +67,31 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				oplabels.VersionLabel:   "4.0.1",
 			},
 		}, {
+			name: "Cluster name with spaces",
+			args: args{
+				resourceLabels: make(map[string]string),
+				rc: &ReconciliationContext{
+					Datacenter: &api.CassandraDatacenter{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "exampleDC",
+						},
+						Spec: api.CassandraDatacenterSpec{
+							ClusterName:   "Example Cluster",
+							ServerVersion: "4.0.1",
+						},
+					},
+				},
+			},
+			want: true,
+			wantLabels: map[string]string{
+				api.ClusterLabel:        "ExampleCluster",
+				oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+				oplabels.NameLabel:      oplabels.NameLabelValue,
+				oplabels.InstanceLabel:  fmt.Sprintf("%s-ExampleCluster", oplabels.NameLabelValue),
+				oplabels.VersionLabel:   "4.0.1",
+			},
+		},
+		{
 			name: "Nil labels",
 			args: args{
 				resourceLabels: nil,

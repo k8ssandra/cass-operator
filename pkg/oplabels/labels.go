@@ -24,9 +24,7 @@ func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
 	m[ManagedByLabel] = ManagedByLabelValue
 	m[NameLabel] = NameLabelValue
 	m[VersionLabel] = dc.Spec.ServerVersion
-
-	instanceName := fmt.Sprintf("cassandra-%s", dc.Spec.ClusterName)
-	m[InstanceLabel] = instanceName
+	m[InstanceLabel] = fmt.Sprintf("cassandra-%s", api.CleanLabelValue(dc.Spec.ClusterName))
 
 	if len(dc.Spec.AdditionalLabels) != 0 {
 		for key, value := range dc.Spec.AdditionalLabels {

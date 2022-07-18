@@ -1809,6 +1809,13 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 	}
 
 	if err != nil {
+		// Pod was unable to start. Most likely this is not a recoverable error, so lets kill the pod and
+		// try again.
+		if deleteErr := rc.Client.Delete(rc.Ctx, pod); deleteErr != nil {
+			return deleteErr
+		}
+		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.StartingCassandra,
+			"Failed to start pod %s, deleting it", pod.Name)
 		return err
 	}
 	return rc.labelServerPodStarting(pod)

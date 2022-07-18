@@ -108,8 +108,7 @@ var _ = Describe(testName, func() {
 					"bash", "-c",
 					"/opt/bin/pulsar-cdc-testutil --cass-contact-points test-cluster-dc1-all-pods-service.test-cdc.svc.cluster.local:9042 --pulsar-url pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650 --pulsar-admin-url http://pulsar-proxy.pulsar.svc.cluster.local:8080 --pulsar-cass-contact-point test-cluster-dc1-all-pods-service.test-cdc.svc.cluster.local").
 				InNamespace(namespace)
-			err = ns.WaitForOutputContains(testCommand, "SUCCESS", 1200)
-			Expect(err).ShouldNot(HaveOccurred())
+			ns.WaitForOutputContainsAndLog(step, testCommand, "SUCCESS", 1200)
 		})
 	})
 })

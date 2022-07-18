@@ -442,10 +442,6 @@ func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
 			statefulSet.SetLabels(updatedLabels)
 
 			if err := rc.Client.Patch(rc.Ctx, statefulSet, patch); err != nil {
-				rc.ReqLogger.Info("Unable to update statefulSet with labels",
-					"statefulSet", statefulSet)
-
-				// FIXME we had not been passing this error up - why?
 				return result.Error(err)
 			}
 
@@ -1271,9 +1267,8 @@ func (rc *ReconciliationContext) isNodeStuckWithoutPVC(pod *corev1.Pod) bool {
 			if errors.IsNotFound(err) {
 				return true
 			} else {
-				rc.ReqLogger.Info(
-					"Unable to get PersistentVolumeClaim",
-					"error", err.Error())
+				rc.ReqLogger.Error(err,
+					"Unable to get PersistentVolumeClaim")
 			}
 		}
 	}
@@ -1314,6 +1309,9 @@ func (rc *ReconciliationContext) isClusterHealthy() bool {
 	for _, pod := range pods {
 		err := rc.NodeMgmtClient.CallProbeClusterEndpoint(pod, "LOCAL_QUORUM", numRacks)
 		if err != nil {
+			reason := fmt.Sprintf("Pod %s failed the LOCAL_QUORUM check", pod.Name)
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.UnhealthyDatacenter,
+				reason)
 			return false
 		}
 	}

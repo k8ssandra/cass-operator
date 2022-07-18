@@ -416,7 +416,7 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 			msg := fmt.Sprintf("Not enough free space available to decommission. %s has %d free space, but %d is needed.",
 				pod.Name, free, int64(spaceUsedByDecommPod),
 			)
-			rc.ReqLogger.Info(msg)
+			rc.ReqLogger.Error(fmt.Errorf(msg), msg)
 
 			dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
 			updated := rc.setCondition(

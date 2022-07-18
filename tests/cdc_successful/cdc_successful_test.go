@@ -75,13 +75,14 @@ var _ = Describe(testName, func() {
 			err = shutil.RunV("helm", "install", "--create-namespace", "-n", "pulsar", "-f", pulsarValues, "pulsar", "datastax-pulsar/pulsar")
 			Expect(err).ShouldNot(HaveOccurred())
 
-			step = "Waiting for all components ready"
+			By("Waiting for all components to be ready")
 			readyGetter := kubectl.Get("pods").
 				WithFlag("selector", "app=cdc-testutil").
 				WithFlag("selector", "component=proxy").
 				WithFlag("namespace", "pulsar").
 				FormatOutput("jsonpath={.items[0].status.conditions[?(@.type=='Ready')].status}")
-			ns.WaitForOutputContainsAndLog(step, readyGetter, "True", 1800)
+			err = kubectl.WaitForOutputContains(readyGetter, "True", 1800)
+			Expect(err).ShouldNot(HaveOccurred())
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 1200)
 

@@ -21,6 +21,16 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] [#368](https://github.com/k8ssandra/cass-operator/issues/368) Do not fetch endpointStatus from pods that have not started
 * [BUGFIX] [#364](https://github.com/k8ssandra/cass-operator/issues/364) Do not log any errors if we fail to get endpoint states from nodes.
 
+## v1.10.5
+
+* [CHANGE] [#370](https://github.com/k8ssandra/cass-operator/issues/370) If Cassandra start call fails, delete the pod
+* [ENHANCEMENT] [#360](https://github.com/k8ssandra/cass-operator/pull/360) If Datacenter quorum reports unhealthy state, change Status Condition DatacenterHealthy to False (DBPE-2283)
+* [BUGFIX] [#377](https://github.com/k8ssandra/cass-operator/issues/377) Add timeout to all calls made with wget (mutual-auth)
+* [BUGFIX] [#355](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars.
+* [BUGFIX] [#330](https://github.com/k8ssandra/cass-operator/issues/330) Apply correct updates to Service labels and annotations through additionalServiceConfig (they are now validated and don't allow reserved prefixes).
+* [BUGFIX] [#368](https://github.com/k8ssandra/cass-operator/issues/368) Do not fetch endpointStatus from pods that have not started
+* [BUGFIX] [#364](https://github.com/k8ssandra/cass-operator/issues/364) Do not log any errors if we fail to get endpoint states from nodes.
+
 ## v1.11.0
 
 * [CHANGE] [#183](https://github.com/k8ssandra/cass-operator/issues/183) Move from PodDisruptionBudget v1beta1 to v1 (changes min. required Kubernetes version to 1.21)

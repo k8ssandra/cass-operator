@@ -112,7 +112,7 @@ jobs:
             VERSION=${{ steps.vars.outputs.version }}
           context: .
           push: ${{ !env.ACT }}
-          tags: k8ssandra/cass-operator-bundle:${{ steps.vars.outputs.version }}
+          tags: k8ssandra/cass-operator-bundle:v${{ steps.vars.outputs.version }}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache

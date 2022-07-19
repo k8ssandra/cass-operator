@@ -9,10 +9,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.12.0
 
 * [CHANGE] [#370](https://github.com/k8ssandra/cass-operator/issues/370) If Cassandra start call fails, delete the pod
-* [ENHANCEMENT] [#366](https://github.com/k8ssandra/cass-operator/issues/366) If no finalizer is present, do not do the process deletion. To prevent re-adding the finalizer, add an annotation no-finalizer that prevents re-adding.
+* [ENHANCEMENT] [#366](https://github.com/k8ssandra/cass-operator/issues/366) If no finalizer is present, do not process the deletion. To prevent cass-operator from re-adding the finalizer, add an annotation no-finalizer that prevents the re-adding.
 * [ENHANCEMENT] [#360](https://github.com/k8ssandra/cass-operator/pull/360) If Datacenter quorum reports unhealthy state, change Status Condition DatacenterHealthy to False (DBPE-2283)
 * [ENHANCEMENT] [#317](https://github.com/k8ssandra/cass-operator/issues/317) Add ability for users to define CDC settings which will cause an agent to start within the Cassandra JVM and pass mutation events from Cassandra back to a Pulsar broker. (Tested on OSS Cassandra 4.x only.)
 * [ENHANCEMENT] [#369](https://github.com/k8ssandra/cass-operator/issues/369) Add configurable timeout for liveness / readiness and drain when mutual auth is used and a default timeout for all wget execs (required with mutual auth)

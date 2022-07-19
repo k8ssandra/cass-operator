@@ -126,7 +126,7 @@ test: manifests generate fmt vet lint envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v ./apis/... ./controllers/... -coverprofile cover.out
 
 .PHONY: integ-test
-integ-test: kustomize cert-manager ./bin/helm ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
+integ-test: kustomize cert-manager helm ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
 ifeq ($(M_INTEG_DIR), all)
 	# Run all the tests (exclude kustomize & testdata directories)
 	cd tests && go test -v ./... -timeout 300m --ginkgo.progress --ginkgo.v
@@ -214,7 +214,7 @@ endif
 
 .PHONY: cert-manager
 cert-manager: ## Install cert-manager to the cluster
-	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml
+	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.2/cert-manager.yaml
 	kubectl wait --for=condition=Established crd certificates.cert-manager.io
 	kubectl rollout status deployment cert-manager-webhook -n cert-manager
 
@@ -236,27 +236,25 @@ envtest: ## Download envtest-setup locally if necessary.
 OS=$(shell go env GOOS)
 ARCH=$(shell go env GOARCH)
 
-HELM = $(shell pwd)/bin/helm
-HELMTARNAME = helm-v3.8.2-${OS}-${ARCH}.tar.gz
-bin/helm: ## Download helm locally if necessary.
-	curl -LO https://get.helm.sh/${HELMTARNAME} ;\
-	tar zxvf ${HELMTARNAME} ;\
-	mv ${OS}-${ARCH}/helm ${HELM} ;\
-	rm -r ${HELMTARNAME} ${OS}-${ARCH}
-
-# E2E tests from kuttl
-kuttl-test: bin/kubectl-kuttl bin/helm docker-build
-	./bin/kubectl-kuttl test --test test-cdc
-
- # Install kuttl for e2e tests.
-bin/kubectl-kuttl: 
-	mkdir -p ./bin ; \
-	cd ./bin ; \
-	OS="$$(uname | tr '[:upper:]' '[:lower:]')" ; \
-  	ARCH="$$(uname -m | sed -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$$/arm64/')" ; \
-	curl -LO https://github.com/kudobuilder/kuttl/releases/download/v0.11.1/kuttl_0.11.1_$${OS}_$${ARCH}.tar.gz ; \
-	tar -zxvf kuttl_0.11.1_$${OS}_$${ARCH}.tar.gz ; 
-
+.PHONY: helm
+HELM = ./bin/helm
+HELMTARNAME = helm-v3.9.0-${OS}-${ARCH}.tar.gz
+helm: ## Download helm locally if necessary.
+ifeq (,$(wildcard $(HELM)))
+ifeq (,$(shell which helm 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(HELM)) ;\
+	curl -sSLo bin/${HELMTARNAME} https://get.helm.sh/${HELMTARNAME} ;\
+	tar -zxf bin/${HELMTARNAME} -C bin/;\
+	mv bin/${OS}-${ARCH}/helm ${HELM} ;\
+	rm -rf bin/${HELMTARNAME} bin/${OS}-${ARCH} ;\
+	chmod +x $(HELM) ;\
+	}
+else
+HELM = $(shell which helm)
+endif
+endif
 
 .PHONY: operator-sdk
 OPSDK = ./bin/operator-sdk

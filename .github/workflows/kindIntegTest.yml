@@ -66,7 +66,7 @@ jobs:
         - podspec_simple
         # - smoke_test_oss # See next job
         - smoke_test_dse
-        # - terminate # Completes too fast, the test doesn't catch it
+        - terminate
         - timeout_prestop_termination
         - upgrade_operator
         - webhook_validation

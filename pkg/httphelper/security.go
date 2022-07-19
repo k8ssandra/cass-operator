@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -20,11 +21,11 @@ import (
 )
 
 const (
-	WgetNodeDrainEndpoint = "localhost:8080/api/v0/ops/node/drain"
-	// TODO: Get endpoint from configured HTTPGet probe
-	livenessEndpoint = "localhost:8080/api/v0/probes/liveness"
-	// TODO: Get endpoint from configured HTTPGet probe
-	readinessEndpoint = "localhost:8080/api/v0/probes/readiness"
+	NodeDrainEndpoint     = "/api/v0/ops/node/drain"
+	WgetTargetHostAndPort = "localhost:8080"
+	LivenessEndpoint      = "/api/v0/probes/liveness"
+	ReadinessEndpoint     = "/api/v0/probes/readiness"
+	DefaultTimeout        = 10
 
 	caCertPath = "/management-api-certs/ca.crt"
 	tlsCrt     = "/management-api-certs/tls.crt"
@@ -33,7 +34,7 @@ const (
 
 // API for Node Management mAuth Config
 func GetManagementApiProtocol(dc *api.CassandraDatacenter) (string, error) {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return "", err
 	}
@@ -41,7 +42,7 @@ func GetManagementApiProtocol(dc *api.CassandraDatacenter) (string, error) {
 }
 
 func BuildManagementApiHttpClient(dc *api.CassandraDatacenter, client client.Client, ctx context.Context) (HttpClient, error) {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
@@ -49,14 +50,14 @@ func BuildManagementApiHttpClient(dc *api.CassandraDatacenter, client client.Cli
 }
 
 func AddManagementApiServerSecurity(dc *api.CassandraDatacenter, pod *corev1.PodTemplateSpec) error {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return err
 	}
 	return provider.AddServerSecurity(pod)
 }
 
-func BuildManagmenetApiSecurityProvider(dc *api.CassandraDatacenter) (ManagementApiSecurityProvider, error) {
+func BuildManagementApiSecurityProvider(dc *api.CassandraDatacenter) (ManagementApiSecurityProvider, error) {
 	options := []func(*api.CassandraDatacenter) (ManagementApiSecurityProvider, error){
 		buildManualApiSecurityProvider,
 		buildInsecureManagementApiSecurityProvider,
@@ -70,7 +71,7 @@ func BuildManagmenetApiSecurityProvider(dc *api.CassandraDatacenter) (Management
 			return nil, err
 		}
 		if provider != nil && selectedProvider != nil {
-			return nil, fmt.Errorf("Multiple options specified for 'managementApiAuth', but expected exactly one.")
+			return nil, fmt.Errorf("multiple options specified for 'managementApiAuth', but expected exactly one")
 		}
 		if provider != nil {
 			selectedProvider = provider
@@ -78,14 +79,14 @@ func BuildManagmenetApiSecurityProvider(dc *api.CassandraDatacenter) (Management
 	}
 
 	if selectedProvider == nil {
-		return nil, fmt.Errorf("No security strategy specified for 'managementApiAuth'.")
+		return nil, fmt.Errorf("no security strategy specified for 'managementApiAuth'")
 	}
 
 	return selectedProvider, nil
 }
 
 func ValidateManagementApiConfig(dc *api.CassandraDatacenter, client client.Client, ctx context.Context) []error {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return []error{err}
 	}
@@ -96,8 +97,8 @@ func ValidateManagementApiConfig(dc *api.CassandraDatacenter, client client.Clie
 // SPI for adding new mechanisms for securing the management API
 type ManagementApiSecurityProvider interface {
 	BuildHttpClient(client client.Client, ctx context.Context) (HttpClient, error)
-	BuildMgmtApiWgetAction(endpoint string) *corev1.ExecAction
-	BuildMgmtApiWgetPostAction(endpoint string, postData string) *corev1.ExecAction
+	BuildMgmtApiWgetAction(endpoint string, timeout int) *corev1.ExecAction
+	BuildMgmtApiWgetPostAction(endpoint string, postData string, timeout int) *corev1.ExecAction
 	AddServerSecurity(pod *corev1.PodTemplateSpec) error
 	GetProtocol() string
 	ValidateConfig(client client.Client, ctx context.Context) []error
@@ -149,34 +150,35 @@ func (provider *ManualManagementApiSecurityProvider) GetProtocol() string {
 	return "https"
 }
 
-func GetMgmtApiWgetAction(dc *api.CassandraDatacenter, endpoint string) (*corev1.ExecAction, error) {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+func GetMgmtApiWgetAction(dc *api.CassandraDatacenter, endpoint string, timeout int) (*corev1.ExecAction, error) {
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
-	return provider.BuildMgmtApiWgetAction(endpoint), nil
+	return provider.BuildMgmtApiWgetAction(endpoint, timeout), nil
 }
 
-func GetMgmtApiWgetPostAction(dc *api.CassandraDatacenter, endpoint string, postData string) (*corev1.ExecAction, error) {
-	provider, err := BuildManagmenetApiSecurityProvider(dc)
+func GetMgmtApiWgetPostAction(dc *api.CassandraDatacenter, endpoint string, postData string, timeout int) (*corev1.ExecAction, error) {
+	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
-	return provider.BuildMgmtApiWgetPostAction(endpoint, postData), nil
+	return provider.BuildMgmtApiWgetPostAction(endpoint, postData, timeout), nil
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetAction(endpoint string) *corev1.ExecAction {
+func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetAction(endpoint string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"wget",
 			"--output-document", "/dev/null",
 			"--no-check-certificate",
-			fmt.Sprintf("http://%s", endpoint),
+			"--timeout", strconv.Itoa(timeout),
+			fmt.Sprintf("http://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetAction(endpoint string) *corev1.ExecAction {
+func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetAction(endpoint string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"wget",
@@ -185,24 +187,26 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetAction(endp
 			"--certificate", tlsCrt,
 			"--private-key", tlsKey,
 			"--ca-certificate", caCertPath,
-			fmt.Sprintf("https://%s", endpoint),
+			"--timeout", strconv.Itoa(timeout),
+			fmt.Sprintf("https://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(endpoint string, postData string) *corev1.ExecAction {
+func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(endpoint string, postData string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"wget",
 			"--output-document", "/dev/null",
 			"--no-check-certificate",
+			"--timeout", strconv.Itoa(timeout),
 			fmt.Sprintf("--post-data='%s'", postData),
-			fmt.Sprintf("http://%s", endpoint),
+			fmt.Sprintf("http://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(endpoint string, postData string) *corev1.ExecAction {
+func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(endpoint string, postData string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"wget",
@@ -211,8 +215,9 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiWgetPostAction(
 			"--certificate", tlsCrt,
 			"--private-key", tlsKey,
 			"--ca-certificate", caCertPath,
+			"--timeout", strconv.Itoa(timeout),
 			fmt.Sprintf("--post-data='%s'", postData),
-			fmt.Sprintf("https://%s", endpoint),
+			fmt.Sprintf("https://%s%s", WgetTargetHostAndPort, endpoint),
 		},
 	}
 }
@@ -228,7 +233,7 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 	}
 
 	if container == nil {
-		return fmt.Errorf("Could not find cassandra container")
+		return fmt.Errorf("could not find cassandra container")
 	}
 
 	// Add volume containing certificates
@@ -302,9 +307,15 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 			ProbeHandler: corev1.ProbeHandler{},
 		}
 	}
+
+	livenessTimeout := int(container.LivenessProbe.TimeoutSeconds)
+	if livenessTimeout < 1 {
+		livenessTimeout = DefaultTimeout
+	}
+
 	container.LivenessProbe.ProbeHandler.HTTPGet = nil
 	container.LivenessProbe.ProbeHandler.TCPSocket = nil
-	container.LivenessProbe.ProbeHandler.Exec = provider.BuildMgmtApiWgetAction(livenessEndpoint)
+	container.LivenessProbe.ProbeHandler.Exec = provider.BuildMgmtApiWgetAction(LivenessEndpoint, livenessTimeout)
 
 	// Update Readiness probe to account for mutual auth (can't just use HTTP probe now)
 	// TODO: Get endpoint from configured HTTPGet probe
@@ -313,9 +324,15 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 			ProbeHandler: corev1.ProbeHandler{},
 		}
 	}
+
+	readinessTimeout := int(container.ReadinessProbe.TimeoutSeconds)
+	if readinessTimeout < 1 {
+		readinessTimeout = DefaultTimeout
+	}
+
 	container.ReadinessProbe.ProbeHandler.HTTPGet = nil
 	container.ReadinessProbe.ProbeHandler.TCPSocket = nil
-	container.ReadinessProbe.ProbeHandler.Exec = provider.BuildMgmtApiWgetAction(readinessEndpoint)
+	container.ReadinessProbe.ProbeHandler.Exec = provider.BuildMgmtApiWgetAction(ReadinessEndpoint, readinessTimeout)
 
 	return nil
 }
@@ -339,15 +356,15 @@ func validatePrivateKey(data []byte) []error {
 			if block.Type == "RSA PRIVATE KEY" {
 				validationErrors = append(
 					validationErrors,
-					fmt.Errorf("%s, but found PKCS#1 format using preamble '%s'.", privateKeyExpect, block.Type))
+					fmt.Errorf("%s, but found PKCS#1 format using preamble '%s'", privateKeyExpect, block.Type))
 			} else if block.Type == "CERTIFICATE" {
 				validationErrors = append(
 					validationErrors,
-					fmt.Errorf("%s, but found certificate using preamble '%s'.", privateKeyExpect, block.Type))
+					fmt.Errorf("%s, but found certificate using preamble '%s'", privateKeyExpect, block.Type))
 			} else if strings.Contains(block.Type, "ENCRYPTED") {
 				validationErrors = append(
 					validationErrors,
-					fmt.Errorf("%s, but found certificate using preamble '%s'.", privateKeyExpect, block.Type))
+					fmt.Errorf("%s, but found certificate using preamble '%s'", privateKeyExpect, block.Type))
 			} else {
 				validationErrors = append(
 					validationErrors,
@@ -368,7 +385,7 @@ func validatePrivateKey(data []byte) []error {
 	if !foundBlocks {
 		validationErrors = append(
 			validationErrors,
-			fmt.Errorf("%s, but provided key does not appear to be PEM encoded.", privateKeyExpect))
+			fmt.Errorf("%s, but provided key does not appear to be PEM encoded", privateKeyExpect))
 	}
 
 	return validationErrors
@@ -390,13 +407,13 @@ func validateCertificate(data []byte) []error {
 		if block.Type != "CERTIFICATE" {
 			validationErrors = append(
 				validationErrors,
-				fmt.Errorf("Certificate should be PEM encoded with preamble 'CERTIFICATE', but found preamble '%s'.", block.Type))
+				fmt.Errorf("certificate should be PEM encoded with preamble 'CERTIFICATE', but found preamble '%s'", block.Type))
 		} else {
 			_, err := x509.ParseCertificates(block.Bytes)
 			if err != nil {
 				validationErrors = append(
 					validationErrors,
-					fmt.Errorf("Found PEM block with correct preamble of 'CERTIFICATE', but content does not appear to be a valid certificate. %w", err))
+					fmt.Errorf("found PEM block with correct preamble of 'CERTIFICATE', but content does not appear to be a valid certificate. %w", err))
 			}
 		}
 	}
@@ -404,7 +421,7 @@ func validateCertificate(data []byte) []error {
 	if !foundBlocks {
 		validationErrors = append(
 			validationErrors,
-			fmt.Errorf("Did not find any certificates."))
+			fmt.Errorf("did not find any certificates"))
 	}
 
 	return validationErrors
@@ -437,7 +454,7 @@ func validateKeyAndCertificate(certificate, privateKey, caCertificate []byte) []
 	if err != nil {
 		validationErrors = append(
 			validationErrors,
-			fmt.Errorf("Could not load x509 key pair. %w", err))
+			fmt.Errorf("could not load x509 key pair. %w", err))
 	}
 
 	return validationErrors
@@ -472,7 +489,7 @@ func validateCertificateChain(chain []*x509.Certificate) error {
 		err := certificateA.CheckSignatureFrom(certificateB)
 		if err != nil {
 			return fmt.Errorf(
-				"Failed to validate chain, certificate %s not signed by certificate %s. %w",
+				"failed to validate chain, certificate %s not signed by certificate %s. %w",
 				certificateA.Subject.CommonName, certificateB.Subject.CommonName, err)
 		}
 	}
@@ -535,7 +552,7 @@ func validatePeerACertificateSignedByPeerBCa(peerACertificate, peerACa, peerBCa 
 		// chain to test which means we should either return above or have an
 		// error here. But it would cause an insidious bug if the logic above
 		// was broken and we didn't do this check.
-		lastVerifyCertificateError = errors.New("No candidate chains found to check.")
+		lastVerifyCertificateError = errors.New("no candidate chains found to check")
 	}
 
 	return lastVerifyCertificateError
@@ -550,7 +567,7 @@ func validateSecretStructure(secret *corev1.Secret) error {
 	// Check secret type
 	if secret.Type != "kubernetes.io/tls" {
 		// Not the right type
-		err := fmt.Errorf("Expected Secret %s to have type 'kubernetes.io/tls' but was '%s'",
+		err := fmt.Errorf("expected Secret %s to have type 'kubernetes.io/tls' but was '%s'",
 			secretNamespacedName.String(),
 			secret.Type)
 		return err
@@ -559,7 +576,7 @@ func validateSecretStructure(secret *corev1.Secret) error {
 	// Ensure all keys are present
 	for _, key := range []string{"ca.crt", "tls.crt", "tls.key"} {
 		if _, ok := secret.Data[key]; !ok {
-			err := fmt.Errorf("Expected Secret %s to have data key '%s' but was not found",
+			err := fmt.Errorf("expected Secret %s to have data key '%s' but was not found",
 				secretNamespacedName.String(),
 				key)
 			return err
@@ -641,7 +658,7 @@ func (provider *ManualManagementApiSecurityProvider) ValidateConfig(client clien
 		if err != nil {
 			validationErrors = append(
 				validationErrors,
-				fmt.Errorf("Failed to load Management API secret specified at %s with value '%s'. %w",
+				fmt.Errorf("failed to load Management API secret specified at %s with value '%s'. %w",
 					check.configKey, check.secretName, err))
 			return validationErrors
 		}
@@ -650,7 +667,7 @@ func (provider *ManualManagementApiSecurityProvider) ValidateConfig(client clien
 		for _, err := range errs {
 			validationErrors = append(
 				validationErrors,
-				fmt.Errorf("Loaded Management API secret specified at %s with value '%s' is not valid. %w",
+				fmt.Errorf("loaded Management API secret specified at %s with value '%s' is not valid. %w",
 					check.configKey, check.secretName, err))
 		}
 	}
@@ -679,7 +696,7 @@ func (provider *ManualManagementApiSecurityProvider) ValidateConfig(client clien
 		if err != nil {
 			validationErrors = append(
 				validationErrors,
-				fmt.Errorf("Loaded Management API client secret specified at %s with value '%s' is not properly signed. %w", check.configKey, secretName, err))
+				fmt.Errorf("loaded Management API client secret specified at %s with value '%s' is not properly signed. %w", check.configKey, secretName, err))
 		}
 	}
 
@@ -713,7 +730,7 @@ func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(client clie
 	caCertPool := x509.NewCertPool()
 	ok := caCertPool.AppendCertsFromPEM(secret.Data["ca.crt"])
 	if !ok {
-		err = fmt.Errorf("No certificates found in %s when parsing 'ca.crt' value: %v",
+		err = fmt.Errorf("no certificates found in %s when parsing 'ca.crt' value: %v",
 			secretNamespacedName.String(),
 			secret.Data["ca.crt"])
 		return nil, err
@@ -733,7 +750,6 @@ func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(client clie
 		InsecureSkipVerify:    true,
 		VerifyPeerCertificate: buildVerifyPeerCertificateNoHostCheck(caCertPool),
 	}
-	tlsConfig.BuildNameToCertificate()
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	httpClient := &http.Client{Transport: transport}
 

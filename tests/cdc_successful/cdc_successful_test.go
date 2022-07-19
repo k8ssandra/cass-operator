@@ -65,42 +65,38 @@ var _ = Describe(testName, func() {
 			k := kubectl.ApplyFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
-			step = "Deploying Pulsar"
-			if err := shutil.RunV("../../bin/helm", "repo", "add", "datastax-pulsar", "https://datastax.github.io/pulsar-helm-chart"); err != nil {
-				Fail(err.Error())
-			}
-			ns.ExecAndLog(step, k)
-			if err := shutil.RunV("../../bin/helm", "repo", "update"); err != nil {
-				Fail(err.Error())
-			}
-			ns.ExecAndLog(step, k)
-			if err := shutil.RunV("../../bin/helm", "install", "--create-namespace", "-n", "pulsar", "-f", pulsarValues, "pulsar", "datastax-pulsar/pulsar"); err != nil {
-				Fail(err.Error())
-			}
-			By("Waiting for all components ready")
+			By("Deploying Pulsar")
+			err = shutil.RunV("helm", "repo", "add", "datastax-pulsar", "https://datastax.github.io/pulsar-helm-chart")
+			Expect(err).ShouldNot(HaveOccurred())
+
+			err = shutil.RunV("helm", "repo", "update")
+			Expect(err).ShouldNot(HaveOccurred())
+
+			err = shutil.RunV("helm", "install", "--create-namespace", "-n", "pulsar", "-f", pulsarValues, "pulsar", "datastax-pulsar/pulsar")
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("Waiting for all components to be ready")
 			readyGetter := kubectl.Get("pods").
 				WithFlag("selector", "app=cdc-testutil").
 				WithFlag("selector", "component=proxy").
 				WithFlag("namespace", "pulsar").
 				FormatOutput("jsonpath={.items[0].status.conditions[?(@.type=='Ready')].status}")
 			err = kubectl.WaitForOutputContains(readyGetter, "True", 1800)
-			Expect(err).To(Not(HaveOccurred()))
+			Expect(err).ShouldNot(HaveOccurred())
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 1200)
 
-			By("Creating a testutils deployment")
-			step = "Deploying TestUtils"
+			step = "Creating a testutils deployment"
 			k = kubectl.ApplyFiles(testUtilsDeployment)
 			ns.ExecAndLog(step, k)
 
-			By("Confirming testutils ready")
+			step = "Confirming testutils ready"
 			readyGetter = kubectl.Get("pods").
 				WithFlag("selector", "app=cdc-testutil").
 				FormatOutput("jsonpath={.items[0].status.conditions[?(@.type=='Ready')].status}")
-			err = ns.WaitForOutputContains(readyGetter, "True", 1800)
-			Expect(err).To(Not(HaveOccurred()))
+			ns.WaitForOutputContainsAndLog(step, readyGetter, "True", 1800)
 
-			By("Running testutils applications")
+			step = "Running testutils applications"
 			podGetter := kubectl.Get("pods").
 				WithFlag("selector", "app=cdc-testutil").
 				WithFlag("namespace", namespace).
@@ -113,9 +109,7 @@ var _ = Describe(testName, func() {
 					"bash", "-c",
 					"/opt/bin/pulsar-cdc-testutil --cass-contact-points test-cluster-dc1-all-pods-service.test-cdc.svc.cluster.local:9042 --pulsar-url pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650 --pulsar-admin-url http://pulsar-proxy.pulsar.svc.cluster.local:8080 --pulsar-cass-contact-point test-cluster-dc1-all-pods-service.test-cdc.svc.cluster.local").
 				InNamespace(namespace)
-			if err := kubectl.WaitForOutputContains(testCommand, "SUCCESS", 1200); err != nil {
-				Fail(err.Error())
-			}
+			ns.WaitForOutputContainsAndLog(step, testCommand, "SUCCESS", 1200)
 		})
 	})
 })

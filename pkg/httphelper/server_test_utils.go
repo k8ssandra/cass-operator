@@ -13,7 +13,8 @@ var featuresReply = `{
 	"cassandra_version": "4.0.1",
 	"features": [
 		"async_sstable_tasks",
-		"rebuild"
+		"rebuild",
+		"async_upgrade_sstable_task"
 	]
 	}`
 
@@ -64,7 +65,7 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 			w.WriteHeader(http.StatusOK)
 			jobId := query.Get("job_id")
 			_, err = w.Write([]byte(fmt.Sprintf(jobDetailsCompleted, jobId)))
-		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild") {
+		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild" || r.URL.Path == "/api/v1/ops/tables/sstables/upgrade") {
 			w.WriteHeader(http.StatusOK)
 			// Write jobId
 			jobId++
@@ -98,7 +99,7 @@ func FakeExecutorServerWithDetailsFails(callDetails *CallDetails) (*httptest.Ser
 			w.WriteHeader(http.StatusOK)
 			jobId := query.Get("job_id")
 			_, err = w.Write([]byte(fmt.Sprintf(jobDetailsFailed, jobId)))
-		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild") {
+		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild" || r.URL.Path == "/api/v1/ops/tables/sstables/upgrade") {
 			w.WriteHeader(http.StatusOK)
 			// Write jobId
 			jobId++
@@ -115,7 +116,7 @@ func FakeExecutorServerWithDetailsFails(callDetails *CallDetails) (*httptest.Ser
 
 func FakeServerWithoutFeaturesEndpoint(callDetails *CallDetails) (*httptest.Server, error) {
 	return FakeMgmtApiServer(callDetails, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/api/v0/ops/keyspace/cleanup" {
+		if r.Method == http.MethodPost && (r.URL.Path == "/api/v0/ops/keyspace/cleanup" || r.URL.Path == "/api/v0/ops/tables/sstables/upgrade") {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusNotFound)

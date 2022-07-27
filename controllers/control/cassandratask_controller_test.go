@@ -188,6 +188,19 @@ var _ = Describe("Execute jobs against all pods", func() {
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
 			})
 		})
+		It("Run a UpgradeSSTables task against the datacenter pods", func() {
+			By("Create a task for rebuild")
+			taskKey := createTask(api.CommandUpgradeSSTables, testNamespaceName)
+
+			completedTask := waitForTaskCompletion(taskKey)
+
+			Expect(callDetails.URLCounts["/api/v1/ops/tables/sstables/upgrade"]).To(Equal(3))
+			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
+			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
+
+			// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+			Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+		})
 		When("Running cleanup twice in the same datacenter", func() {
 			It("Run a cleanup task against the datacenter pods", func() {
 				By("Create a task for cleanup")
@@ -291,6 +304,21 @@ var _ = Describe("Execute jobs against all pods", func() {
 			completedTask := waitForTaskCompletion(taskKey)
 
 			Expect(callDetails.URLCounts["/api/v0/ops/keyspace/cleanup"]).To(Equal(3))
+			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
+			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+
+			// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+			Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+		})
+
+		It("Run a upgradesstables task against the datacenter pods", func() {
+			By("Create a task for upgradesstables restart")
+			time.Sleep(1 * time.Second) // Otherwise the CreationTimestamp could be too new
+			taskKey := createTask(api.CommandUpgradeSSTables, testNamespaceName)
+
+			completedTask := waitForTaskCompletion(taskKey)
+
+			Expect(callDetails.URLCounts["/api/v0/ops/tables/sstables/upgrade"]).To(Equal(3))
 			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
 			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
 

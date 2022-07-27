@@ -55,19 +55,32 @@ type CassandraTaskReconciler struct {
 }
 
 // AsyncTaskExecutorFunc is called for all methods that support async processing
-type AsyncTaskExecutorFunc func(httphelper.NodeMgmtClient, *corev1.Pod, map[string]string) (string, error)
+type AsyncTaskExecutorFunc func(httphelper.NodeMgmtClient, *corev1.Pod, *TaskConfiguration) (string, error)
 
 // SyncTaskExecutorFunc is called as a backup if async one isn't supported
-type SyncTaskExecutorFunc func(httphelper.NodeMgmtClient, *corev1.Pod, map[string]string) error
+type SyncTaskExecutorFunc func(httphelper.NodeMgmtClient, *corev1.Pod, *TaskConfiguration) error
+
+// ValidatorExecutorFunc validates that necessary parameters are set for the task
+type ValidatorExecutorFunc func(*TaskConfiguration) error
 
 // TaskConfiguration sets the command's functions to execute
 type TaskConfiguration struct {
 	Id            string
 	AsyncFunc     AsyncTaskExecutorFunc
 	SyncFunc      SyncTaskExecutorFunc
+	ValidateFunc  ValidatorExecutorFunc
 	AsyncFeature  httphelper.Feature
 	RestartPolicy corev1.RestartPolicy
+	Context       context.Context
 	Arguments     map[string]string
+	TaskStartTime *metav1.Time
+}
+
+func (t *TaskConfiguration) Validate() error {
+	if t.ValidateFunc != nil {
+		return t.ValidateFunc(t)
+	}
+	return nil
 }
 
 //+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=cassandratasks,verbs=get;list;watch;create;update;patch;delete
@@ -209,21 +222,47 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	var err error
 	var failed, completed int
 	for _, job := range cassTask.Spec.Jobs {
-		taskConfigProto := &TaskConfiguration{
+		taskConfig := &TaskConfiguration{
 			RestartPolicy: cassTask.Spec.RestartPolicy,
 			Id:            taskId,
+			TaskStartTime: cassTask.Status.StartTime,
+			Context:       ctx,
+			Arguments:     job.Arguments,
 		}
+
+		// Process all the reconcileEveryPodTasks
 		switch job.Command {
 		case "rebuild":
-			res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, rebuild(taskConfigProto, job.Arguments))
+			rebuild(taskConfig)
 		case "cleanup":
-			res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, cleanup(taskConfigProto))
+			cleanup(taskConfig)
 		case "decommission":
 			// res, err = r.reconcileEveryPodTask(ctx, taskId, &dc, decommission())
+		case "restart":
+			r.restart(taskConfig)
+		case "replacenode":
+			// TODO If I modify the CassandraDatacenter Status, how will I make cass-operator understand that it should be replaced? Status updates
+			//		do not trigger reconcile.
+			// res, failed, completed, err = r.reconcileTargetPodTask(ctx, &dc, replace(taskConfigProto))
+		case "forceupgraderacks":
+			// res, failed, completed, err = r.reconcileDatacenter(ctx, &dc, forceupgrade(taskConfigProto))
+		case "upgradesstables":
+			upgradesstables(taskConfig)
+		case "scrub":
+			// res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, scrub(taskConfigProto))
+		case "compact":
+			// res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, compact(taskConfigProto, job.Arguments))
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err
 		}
+
+		err = taskConfig.Validate()
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, taskConfig)
 
 		// TODO How would we detect what sort of error we've had here? For the correct reconcile action
 		if err != nil {
@@ -367,32 +406,6 @@ var (
 	jobRunningRequeue          = time.Duration(10 * time.Second)
 )
 
-func callCleanup(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, args map[string]string) (string, error) {
-	return nodeMgmtClient.CallKeyspaceCleanup(pod, -1, "", nil)
-}
-
-func callCleanupSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, args map[string]string) error {
-	return nodeMgmtClient.CallKeyspaceCleanupEndpoint(pod, -1, "", nil)
-}
-
-func cleanup(taskConfig *TaskConfiguration) *TaskConfiguration {
-	taskConfig.AsyncFeature = httphelper.AsyncSSTableTasks
-	taskConfig.AsyncFunc = callCleanup
-	taskConfig.SyncFunc = callCleanupSync
-	return taskConfig
-}
-
-func callRebuild(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, args map[string]string) (string, error) {
-	return nodeMgmtClient.CallDatacenterRebuild(pod, args["source_datacenter"])
-}
-
-func rebuild(taskConfig *TaskConfiguration, args map[string]string) *TaskConfiguration {
-	taskConfig.AsyncFeature = httphelper.Rebuild
-	taskConfig.AsyncFunc = callRebuild
-	taskConfig.Arguments = args
-	return taskConfig
-}
-
 func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]corev1.Pod, error) {
 	var pods corev1.PodList
 
@@ -425,6 +438,17 @@ func (r *CassandraTaskReconciler) cleanupJobAnnotations(ctx context.Context, dc 
 	return nil
 }
 
+// reconcileOnePodTask tries to execute the given task successfully at least once against any pod in the Datacenter
+// func (r *CassandraTaskReconciler) reconcileOnePodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, error) {
+// 	return ctrl.Result{}, fmt.Errorf("not implemented")
+// }
+
+// reconcileTargetPodTask runs the given task against the target pod only in the Datacenter
+// func (r *CassandraTaskReconciler) reconcileTargetPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, error) {
+// 	return ctrl.Result{}, fmt.Errorf("not implemented")
+// }
+
+// reconcileEveryPodTask executes the given task against all the Datacenter pods
 func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, int, int, error) {
 	logger := log.FromContext(ctx)
 
@@ -537,6 +561,10 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					return ctrl.Result{RequeueAfter: jobRunningRequeue}, failed, completed, nil
 				}
 			} else {
+				// TODO Could the jobRunner be some other job that's being executed? Do we have a risk of checking the wrong job?
+				/*
+					I guess in theory we do, if our execution of go job hasn't started before we start doing the reads..
+				*/
 				if len(jobRunner) > 0 {
 					// Something is still holding the worker
 					return ctrl.Result{RequeueAfter: jobRunningRequeue}, failed, completed, nil
@@ -558,7 +586,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 
 		if features.Supports(taskConfig.AsyncFeature) {
 			// Pod isn't running anything at the moment, this pod should run next
-			jobId, err := taskConfig.AsyncFunc(nodeMgmtClient, &pod, taskConfig.Arguments)
+			jobId, err := taskConfig.AsyncFunc(nodeMgmtClient, &pod, taskConfig)
 			if err != nil {
 				// We can retry this later, it will only restart the cleanup but won't otherwise hurt
 				return ctrl.Result{}, failed, completed, err
@@ -608,13 +636,14 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				logger.V(1).Info("starting execution of sync blocking job", "Pod", targetPod)
 				jobRunner <- idx
 				defer func() {
+					// TODO But this isn't necessarily the same idx? Just some idx..
 					// Read the value from the jobRunner
 					<-jobRunner
 				}()
 
 				// podPatch := client.MergeFromWithOptions(targetPod.DeepCopy(), client.MergeFromWithOptimisticLock{})
 				// podPatch := client.MergeFrom(targetPod.DeepCopy())
-				if err = taskConfig.SyncFunc(nodeMgmtClient, targetPod, taskConfig.Arguments); err != nil {
+				if err = taskConfig.SyncFunc(nodeMgmtClient, targetPod, taskConfig); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod
 					logger.Error(err, "executing the sync task failed", "Pod", targetPod)
 					jobStatus.Status = podJobError

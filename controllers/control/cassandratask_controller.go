@@ -60,25 +60,56 @@ type AsyncTaskExecutorFunc func(httphelper.NodeMgmtClient, *corev1.Pod, *TaskCon
 // SyncTaskExecutorFunc is called as a backup if async one isn't supported
 type SyncTaskExecutorFunc func(httphelper.NodeMgmtClient, *corev1.Pod, *TaskConfiguration) error
 
+// ValidatorFunc validates that necessary parameters are set for the task
+type ValidatorFunc func(*TaskConfiguration) error
+
 // ValidatorExecutorFunc validates that necessary parameters are set for the task
-type ValidatorExecutorFunc func(*TaskConfiguration) error
+type ProcessFunc func(*TaskConfiguration) error
+
+// PodFilter approves or rejects the target pod for processing purposes.
+type PodFilterFunc func(*corev1.Pod, *TaskConfiguration) bool
 
 // TaskConfiguration sets the command's functions to execute
 type TaskConfiguration struct {
+	// Meta / status
 	Id            string
-	AsyncFunc     AsyncTaskExecutorFunc
-	SyncFunc      SyncTaskExecutorFunc
-	ValidateFunc  ValidatorExecutorFunc
-	AsyncFeature  httphelper.Feature
-	RestartPolicy corev1.RestartPolicy
-	Context       context.Context
-	Arguments     map[string]string
 	TaskStartTime *metav1.Time
+	Datacenter    *cassapi.CassandraDatacenter
+	Context       context.Context
+
+	// Input parameters
+	RestartPolicy corev1.RestartPolicy
+	Arguments     map[string]string
+
+	// Execution functionality per pod
+	AsyncFeature httphelper.Feature
+	AsyncFunc    AsyncTaskExecutorFunc
+	SyncFunc     SyncTaskExecutorFunc
+	PodFilter    PodFilterFunc
+
+	// Functions not targeting the pod
+	ValidateFunc   ValidatorFunc
+	PreProcessFunc ProcessFunc
 }
 
 func (t *TaskConfiguration) Validate() error {
 	if t.ValidateFunc != nil {
 		return t.ValidateFunc(t)
+	}
+	return nil
+}
+
+func (t *TaskConfiguration) Filter(pod *corev1.Pod) bool {
+	if t.PodFilter != nil {
+		return t.PodFilter(pod, t)
+	}
+
+	return true
+}
+
+func (t *TaskConfiguration) Process() error {
+	if t.PreProcessFunc != nil {
+		return t.PreProcessFunc(t)
 	}
 	return nil
 }
@@ -144,12 +175,12 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// Get the CassandraDatacenter
-	dc := cassapi.CassandraDatacenter{}
+	dc := &cassapi.CassandraDatacenter{}
 	dcNamespacedName := types.NamespacedName{
 		Namespace: cassTask.Spec.Datacenter.Namespace,
 		Name:      cassTask.Spec.Datacenter.Name,
 	}
-	if err := r.Get(ctx, dcNamespacedName, &dc); err != nil {
+	if err := r.Get(ctx, dcNamespacedName, dc); err != nil {
 		logger.Error(err, "unable to fetch CassandraDatacenter", "Datacenter", cassTask.Spec.Datacenter)
 		// This is unrecoverable error at this point, do not requeue
 		return ctrl.Result{}, err
@@ -161,7 +192,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// If we're active, we can proceed - otherwise verify if we're allowed to run
 	if !found {
 		// Does our concurrencypolicy allow the task to run? Are there any other active ones?
-		activeTasks, err := r.activeTasks(ctx, &dc)
+		activeTasks, err := r.activeTasks(ctx, dc)
 		if err != nil {
 			logger.Error(err, "unable to fetch active CassandraTasks", "Request", req.NamespacedName)
 			return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -189,13 +220,13 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		// Link this resource to the Datacenter and copy labels from it
-		if err := controllerutil.SetControllerReference(&dc, &cassTask, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(dc, &cassTask, r.Scheme); err != nil {
 			logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassTask.Spec.Datacenter, "CassandraTask", req.NamespacedName)
 			return ctrl.Result{}, err
 		}
 
 		utils.MergeMap(cassTask.Labels, dc.GetDatacenterLabels())
-		oplabels.AddOperatorLabels(cassTask.GetLabels(), &dc)
+		oplabels.AddOperatorLabels(cassTask.GetLabels(), dc)
 
 		// Starting the run, set the Active label so we can quickly fetch the active ones
 		cassTask.GetLabels()[taskStatusLabel] = activeTaskLabelValue
@@ -225,6 +256,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		taskConfig := &TaskConfiguration{
 			RestartPolicy: cassTask.Spec.RestartPolicy,
 			Id:            taskId,
+			Datacenter:    dc,
 			TaskStartTime: cassTask.Status.StartTime,
 			Context:       ctx,
 			Arguments:     job.Arguments,
@@ -232,37 +264,42 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		// Process all the reconcileEveryPodTasks
 		switch job.Command {
-		case "rebuild":
+		case api.CommandRebuild:
 			rebuild(taskConfig)
-		case "cleanup":
+		case api.CommandCleanup:
 			cleanup(taskConfig)
-		case "decommission":
-			// res, err = r.reconcileEveryPodTask(ctx, taskId, &dc, decommission())
-		case "restart":
+		case api.CommandRestart:
 			r.restart(taskConfig)
-		case "replacenode":
-			// TODO If I modify the CassandraDatacenter Status, how will I make cass-operator understand that it should be replaced? Status updates
-			//		do not trigger reconcile.
-			// res, failed, completed, err = r.reconcileTargetPodTask(ctx, &dc, replace(taskConfigProto))
+		case api.CommandReplaceNode:
+			/*
+				TODO The death of those pods should cause a restart.. what happens if someone wants to replace all the pods? Will we kill
+				  the datacenter? Do we need to wait for the new pods to be alive before we continue? Can we requeue from the process
+				  to make sure we retry the process (it isn't finished yet..) or just make it stuck?
+			*/
+			r.replace(taskConfig)
 		case "forceupgraderacks":
 			// res, failed, completed, err = r.reconcileDatacenter(ctx, &dc, forceupgrade(taskConfigProto))
-		case "upgradesstables":
+		case api.CommandUpgradeSSTables:
 			upgradesstables(taskConfig)
-		case "scrub":
+		case api.CommandScrub:
 			// res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, scrub(taskConfigProto))
-		case "compact":
+		case api.CommandCompaction:
 			// res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, compact(taskConfigProto, job.Arguments))
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err
 		}
 
-		err = taskConfig.Validate()
-		if err != nil {
+		if err := taskConfig.Validate(); err != nil {
+			// TODO Or should we mark this task as failed and simply stop processing?
 			return ctrl.Result{}, err
 		}
 
-		res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, taskConfig)
+		if err := taskConfig.Process(); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		res, failed, completed, err = r.reconcileEveryPodTask(ctx, dc, taskConfig)
 
 		// TODO How would we detect what sort of error we've had here? For the correct reconcile action
 		if err != nil {
@@ -283,7 +320,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return res, err
 		}
 
-		err = r.cleanupJobAnnotations(ctx, &dc, taskId)
+		err = r.cleanupJobAnnotations(ctx, dc, taskId)
 		if err != nil {
 			// Not the end of the world
 			logger.Error(err, "Failed to cleanup job annotations from pods")
@@ -438,16 +475,6 @@ func (r *CassandraTaskReconciler) cleanupJobAnnotations(ctx context.Context, dc 
 	return nil
 }
 
-// reconcileOnePodTask tries to execute the given task successfully at least once against any pod in the Datacenter
-// func (r *CassandraTaskReconciler) reconcileOnePodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, error) {
-// 	return ctrl.Result{}, fmt.Errorf("not implemented")
-// }
-
-// reconcileTargetPodTask runs the given task against the target pod only in the Datacenter
-// func (r *CassandraTaskReconciler) reconcileTargetPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, error) {
-// 	return ctrl.Result{}, fmt.Errorf("not implemented")
-// }
-
 // reconcileEveryPodTask executes the given task against all the Datacenter pods
 func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, int, int, error) {
 	logger := log.FromContext(ctx)
@@ -475,7 +502,16 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 	}
 
 	failed, completed := 0, 0
+
 	for idx, pod := range dcPods {
+		// TODO Do we need post-pod processing functionality also? In case we need to wait for some other event to happen (processed by cass-operator).
+		//		or could we requeue with the filter instead of only bypassing? Or could we requeue in the Async / SyncFunc?
+		//		Waiting for a long time in the sync func doesn't sound very nice strategy and our async process is tied to JobDetails at this point.
+		//		Alternatively, we could modify "Success" to be a function that's then waited for.
+		if !taskConfig.Filter(&pod) {
+			continue
+		}
+
 		features, err := nodeMgmtClient.FeatureSet(&pod)
 		if err != nil {
 			return ctrl.Result{}, failed, completed, err
@@ -490,8 +526,6 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 			return ctrl.Result{}, failed, completed, err
 		}
 
-		// podPatch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
-		// podPatch := client.MergeFrom(pod.DeepCopy())
 		if jobStatus.Id != "" {
 			// Check the completed statuses
 			if jobStatus.Status == podJobCompleted {

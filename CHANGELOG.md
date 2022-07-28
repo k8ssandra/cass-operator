@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#383](https://github.com/k8ssandra/cass-operator/pull/383) (make separate tickets..) Add UpgradeSSTables, Compaction and Scrub to management-api client. Improve CassandraTasks to have the ability to validate input parameters, filter target pods and do processing outside of pods. Add UpgradeSSTables and ReplaceNode as new tasks.
+
 ## v1.12.0
 
 * [CHANGE] [#370](https://github.com/k8ssandra/cass-operator/issues/370) If Cassandra start call fails, delete the pod

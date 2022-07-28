@@ -64,6 +64,9 @@ const (
 	CommandRebuild         CassandraCommand = "rebuild"
 	CommandRestart         CassandraCommand = "restart"
 	CommandUpgradeSSTables CassandraCommand = "upgradesstables"
+	CommandReplaceNode     CassandraCommand = "replacenode"
+	CommandCompaction      CassandraCommand = "compact"
+	CommandScrub           CassandraCommand = "scrub"
 )
 
 type CassandraJob struct {

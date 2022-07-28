@@ -71,40 +71,44 @@ func createDatacenter(dcName, namespace string) func() {
 		Expect(k8sClient.Status().Patch(context.Background(), testDc, patchCassdc)).Should(Succeed())
 
 		for i := 0; i < int(testDc.Spec.Size); i++ {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("test-cassdc-%s-pod%d", dcName, i),
-					Namespace: namespace,
-					Labels: map[string]string{
-						cassdcapi.ClusterLabel:    clusterName,
-						cassdcapi.DatacenterLabel: dcName,
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "cassandra",
-							Image: "k8ssandra/cassandra-nothere:latest",
-						},
-					},
-				},
-			}
-			Expect(k8sClient.Create(context.Background(), pod)).Should(Succeed())
-
-			podIP := "127.0.0.1"
-
-			patchPod := client.MergeFrom(pod.DeepCopy())
-			pod.Status = corev1.PodStatus{
-				PodIP: podIP,
-				PodIPs: []corev1.PodIP{
-					{
-						IP: podIP,
-					},
-				},
-			}
-			Expect(k8sClient.Status().Patch(context.Background(), pod, patchPod)).Should(Succeed())
+			createPod(namespace, clusterName, dcName, i)
 		}
 	}
+}
+
+func createPod(namespace, clusterName, dcName string, i int) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("test-cassdc-%s-pod%d", dcName, i),
+			Namespace: namespace,
+			Labels: map[string]string{
+				cassdcapi.ClusterLabel:    clusterName,
+				cassdcapi.DatacenterLabel: dcName,
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "cassandra",
+					Image: "k8ssandra/cassandra-nothere:latest",
+				},
+			},
+		},
+	}
+	Expect(k8sClient.Create(context.Background(), pod)).Should(Succeed())
+
+	podIP := "127.0.0.1"
+
+	patchPod := client.MergeFrom(pod.DeepCopy())
+	pod.Status = corev1.PodStatus{
+		PodIP: podIP,
+		PodIPs: []corev1.PodIP{
+			{
+				IP: podIP,
+			},
+		},
+	}
+	Expect(k8sClient.Status().Patch(context.Background(), pod, patchPod)).Should(Succeed())
 }
 
 func buildTask(command api.CassandraCommand, namespace string) (types.NamespacedName, *api.CassandraTask) {
@@ -312,7 +316,7 @@ var _ = Describe("Execute jobs against all pods", func() {
 		})
 
 		It("Run a upgradesstables task against the datacenter pods", func() {
-			By("Create a task for upgradesstables restart")
+			By("Create a task for upgradesstables")
 			time.Sleep(1 * time.Second) // Otherwise the CreationTimestamp could be too new
 			taskKey := createTask(api.CommandUpgradeSSTables, testNamespaceName)
 
@@ -321,6 +325,36 @@ var _ = Describe("Execute jobs against all pods", func() {
 			Expect(callDetails.URLCounts["/api/v0/ops/tables/sstables/upgrade"]).To(Equal(3))
 			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
 			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+
+			// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+			Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+		})
+
+		It("Replace a node in the datacenter", func() {
+			By("Create a task for replacenode")
+			// TODO This needs a modification to the e2e test also, which uses the old method
+			time.Sleep(1 * time.Second) // Otherwise the CreationTimestamp could be too new
+			taskKey, task := buildTask(api.CommandReplaceNode, testNamespaceName)
+
+			podKey := types.NamespacedName{
+				Name:      fmt.Sprintf("test-cassdc-%s-pod%d", testDatacenterName, 2),
+				Namespace: testNamespaceName,
+			}
+
+			task.Spec.Jobs[0].Arguments = map[string]string{"pod_name": podKey.Name}
+			Expect(k8sClient.Create(context.TODO(), task)).Should(Succeed())
+
+			// Verify the pod2 was deleted
+			Eventually(func() bool {
+				pod := &corev1.Pod{}
+				err := k8sClient.Get(context.TODO(), podKey, pod)
+				return err != nil && errors.IsNotFound(err)
+			}, time.Duration(3*time.Second)).Should(BeTrue())
+
+			// Recreate it so the process "finishes"
+			createPod(testNamespaceName, fmt.Sprintf("test-%s", testDatacenterName), testDatacenterName, 2)
+
+			completedTask := waitForTaskCompletion(taskKey)
 
 			// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 			Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))

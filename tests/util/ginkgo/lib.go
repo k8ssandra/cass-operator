@@ -531,3 +531,12 @@ func (ns *NsWrapper) CheckForCassandraTasks(dcName, command string, completed bo
 func (ns *NsWrapper) CheckForCompletedCassandraTasks(dcName, command string, count int) {
 	ns.CheckForCassandraTasks(dcName, command, true, count)
 }
+
+func (ns *NsWrapper) WaitForCompleteTask(taskName string) {
+	step := "checking that cassandratask status CompletionTime has a value"
+	json := "jsonpath={.status.completionTime}"
+	k := kubectl.Get("cassandratask", taskName).
+		FormatOutput(json)
+
+	ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, 360)
+}

@@ -150,7 +150,7 @@ type CassandraDatacenterSpec struct {
 	// Describes the persistent storage request of each server node
 	StorageConfig StorageConfig `json:"storageConfig"`
 
-	// A list of pod names that need to be replaced.
+	// DEPRECATED Use CassandraTask replacenode to achieve correct node replacement. A list of pod names that need to be replaced.
 	ReplaceNodes []string `json:"replaceNodes,omitempty"`
 
 	// The name by which CQL clients and instances will know the cluster. If the same

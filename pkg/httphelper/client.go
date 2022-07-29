@@ -1008,7 +1008,6 @@ func (client *NodeMgmtClient) FeatureSet(pod *corev1.Pod) (*FeatureSet, error) {
 				return &FeatureSet{}, nil
 			}
 		}
-		client.Log.Error(err, "failed to fetch features from management-api")
 		return nil, err
 	}
 

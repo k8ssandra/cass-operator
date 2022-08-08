@@ -332,7 +332,6 @@ var _ = Describe("Execute jobs against all pods", func() {
 
 		It("Replace a node in the datacenter", func() {
 			By("Create a task for replacenode")
-			// TODO This needs a modification to the e2e test also, which uses the old method
 			time.Sleep(1 * time.Second) // Otherwise the CreationTimestamp could be too new
 			taskKey, task := buildTask(api.CommandReplaceNode, testNamespaceName)
 

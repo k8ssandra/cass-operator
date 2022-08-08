@@ -65,13 +65,9 @@ func (r *CassandraTaskReconciler) callRestartSync(nodeMgmtClient httphelper.Node
 		err := nodeMgmtClient.CallDrainEndpoint(pod)
 		if err != nil {
 			return err
-			// TODO And a logger..
-			// logger.Error(err, "error during drain during rolling restart",
-			// 	"pod", pod.Name)
 		}
 
 		// Delete the pod
-		// TODO And a Kubernetes client it seems..
 		err = r.Client.Delete(context.Background(), pod)
 		if err != nil {
 			return err

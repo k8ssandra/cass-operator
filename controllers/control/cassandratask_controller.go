@@ -39,6 +39,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -46,6 +47,8 @@ const (
 	activeTaskLabelValue    = "active"
 	completedTaskLabelValue = "completed"
 	defaultTTL              = time.Duration(86400) * time.Second
+	jobRunningRequeue       = time.Duration(10 * time.Second)
+	taskRunningRequeue      = time.Duration(5 * time.Second)
 )
 
 // CassandraTaskReconciler reconciles a CassandraJob object
@@ -181,9 +184,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Name:      cassTask.Spec.Datacenter.Name,
 	}
 	if err := r.Get(ctx, dcNamespacedName, dc); err != nil {
-		logger.Error(err, "unable to fetch CassandraDatacenter", "Datacenter", cassTask.Spec.Datacenter)
-		// This is unrecoverable error at this point, do not requeue
-		return ctrl.Result{}, err
+		return ctrl.Result{}, errors.Wrapf(err, "unable to fetch target CassandraDatacenter: %s", cassTask.Spec.Datacenter)
 	}
 
 	logger = log.FromContext(ctx, "datacenterName", dc.Name, "clusterName", dc.Spec.ClusterName)
@@ -194,7 +195,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// Does our concurrencypolicy allow the task to run? Are there any other active ones?
 		activeTasks, err := r.activeTasks(ctx, dc)
 		if err != nil {
-			logger.Error(err, "unable to fetch active CassandraTasks", "Request", req.NamespacedName)
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 
@@ -207,22 +207,20 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		if len(activeTasks) > 0 {
 			if cassTask.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
-				// TODO Or should we push an event?
 				logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
-				return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
+				return ctrl.Result{RequeueAfter: taskRunningRequeue}, nil
 			}
 			for _, task := range activeTasks {
 				if task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 					logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
-					return ctrl.Result{Requeue: true}, nil // TODO Add some sane time here
+					return ctrl.Result{RequeueAfter: taskRunningRequeue}, nil
 				}
 			}
 		}
 
 		// Link this resource to the Datacenter and copy labels from it
 		if err := controllerutil.SetControllerReference(dc, &cassTask, r.Scheme); err != nil {
-			logger.Error(err, "unable to set ownerReference to the task", "Datacenter", cassTask.Spec.Datacenter, "CassandraTask", req.NamespacedName)
-			return ctrl.Result{}, err
+			return ctrl.Result{}, errors.Wrapf(err, "unable to set ownerReference to the task %v", req.NamespacedName)
 		}
 
 		utils.MergeMap(cassTask.Labels, dc.GetDatacenterLabels())
@@ -389,9 +387,13 @@ func (r *CassandraTaskReconciler) activeTasks(ctx context.Context, dc *cassapi.C
 	return taskList.Items, nil
 }
 
-/**
+/*
+*
+
 	Jobs executing something on every pod in the datacenter
-**/
+
+*
+*/
 const (
 	// PodJobAnnotationPrefix defines the prefix key for a job data (json serialized) in the annotations of the pod
 	PodJobAnnotationPrefix = "control.k8ssandra.io/job"
@@ -439,8 +441,8 @@ func JobStatusToPodAnnotations(taskId string, annotations map[string]string, job
 
 var (
 	// TODO This should be per Datacenter for sync tasks also
-	jobRunner         chan int = make(chan int, 1)
-	jobRunningRequeue          = time.Duration(10 * time.Second)
+	jobRunner chan int = make(chan int, 1)
+	// jobRunningRequeue          = time.Duration(10 * time.Second)
 )
 
 func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]corev1.Pod, error) {
@@ -595,10 +597,6 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					return ctrl.Result{RequeueAfter: jobRunningRequeue}, failed, completed, nil
 				}
 			} else {
-				// TODO Could the jobRunner be some other job that's being executed? Do we have a risk of checking the wrong job?
-				/*
-					I guess in theory we do, if our execution of go job hasn't started before we start doing the reads..
-				*/
 				if len(jobRunner) > 0 {
 					// Something is still holding the worker
 					return ctrl.Result{RequeueAfter: jobRunningRequeue}, failed, completed, nil
@@ -625,7 +623,6 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				// We can retry this later, it will only restart the cleanup but won't otherwise hurt
 				return ctrl.Result{}, failed, completed, err
 			}
-			// podPatch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
 			jobStatus.Handler = jobHandlerMgmtApi
 			jobStatus.Id = jobId
 
@@ -670,13 +667,10 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				logger.V(1).Info("starting execution of sync blocking job", "Pod", targetPod)
 				jobRunner <- idx
 				defer func() {
-					// TODO But this isn't necessarily the same idx? Just some idx..
-					// Read the value from the jobRunner
+					// Remove the value from the jobRunner
 					<-jobRunner
 				}()
 
-				// podPatch := client.MergeFromWithOptions(targetPod.DeepCopy(), client.MergeFromWithOptimisticLock{})
-				// podPatch := client.MergeFrom(targetPod.DeepCopy())
 				if err = taskConfig.SyncFunc(nodeMgmtClient, targetPod, taskConfig); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod
 					logger.Error(err, "executing the sync task failed", "Pod", targetPod)

@@ -47,8 +47,12 @@ const (
 	activeTaskLabelValue    = "active"
 	completedTaskLabelValue = "completed"
 	defaultTTL              = time.Duration(86400) * time.Second
-	jobRunningRequeue       = time.Duration(10 * time.Second)
-	taskRunningRequeue      = time.Duration(5 * time.Second)
+)
+
+// These are vars to allow modifications for testing
+var (
+	jobRunningRequeue  = time.Duration(10 * time.Second)
+	taskRunningRequeue = time.Duration(5 * time.Second)
 )
 
 // CassandraTaskReconciler reconciles a CassandraJob object

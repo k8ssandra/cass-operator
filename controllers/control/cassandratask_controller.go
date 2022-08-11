@@ -51,7 +51,7 @@ const (
 
 // These are vars to allow modifications for testing
 var (
-	jobRunningRequeue  = time.Duration(10 * time.Second)
+	jobRunningRequeue  = 10 * time.Second
 	taskRunningRequeue = time.Duration(5 * time.Second)
 )
 
@@ -70,10 +70,11 @@ type SyncTaskExecutorFunc func(httphelper.NodeMgmtClient, *corev1.Pod, *TaskConf
 // ValidatorFunc validates that necessary parameters are set for the task
 type ValidatorFunc func(*TaskConfiguration) error
 
-// ValidatorExecutorFunc validates that necessary parameters are set for the task
+// ProcessFunc is a function that's run before the pods are being processed individually, or after
+// the pods have been processed.
 type ProcessFunc func(*TaskConfiguration) error
 
-// PodFilter approves or rejects the target pod for processing purposes.
+// PodFilterFunc approves or rejects the target pod for processing purposes.
 type PodFilterFunc func(*corev1.Pod, *TaskConfiguration) bool
 
 // TaskConfiguration sets the command's functions to execute
@@ -114,7 +115,7 @@ func (t *TaskConfiguration) Filter(pod *corev1.Pod) bool {
 	return true
 }
 
-func (t *TaskConfiguration) Process() error {
+func (t *TaskConfiguration) PreProcess() error {
 	if t.PreProcessFunc != nil {
 		return t.PreProcessFunc(t)
 	}
@@ -273,11 +274,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		case api.CommandRestart:
 			r.restart(taskConfig)
 		case api.CommandReplaceNode:
-			/*
-				TODO The death of those pods should cause a restart.. what happens if someone wants to replace all the pods? Will we kill
-				  the datacenter? Do we need to wait for the new pods to be alive before we continue? Can we requeue from the process
-				  to make sure we retry the process (it isn't finished yet..) or just make it stuck?
-			*/
 			r.replace(taskConfig)
 		case "forceupgraderacks":
 			// res, failed, completed, err = r.reconcileDatacenter(ctx, &dc, forceupgrade(taskConfigProto))
@@ -297,7 +293,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, err
 		}
 
-		if err := taskConfig.Process(); err != nil {
+		if err := taskConfig.PreProcess(); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -624,7 +620,6 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 			// Pod isn't running anything at the moment, this pod should run next
 			jobId, err := taskConfig.AsyncFunc(nodeMgmtClient, &pod, taskConfig)
 			if err != nil {
-				// We can retry this later, it will only restart the cleanup but won't otherwise hurt
 				return ctrl.Result{}, failed, completed, err
 			}
 			jobStatus.Handler = jobHandlerMgmtApi

@@ -127,7 +127,9 @@ type FeatureSet struct {
 	Features         map[string]struct{}
 }
 
+// Features are generational (mgmt-api version bound) and can include multiple endpoints under a single Feature name.
 const (
+	// AsyncSSTableTasks includes "cleanup" and "decommission"
 	AsyncSSTableTasks       Feature = "async_sstable_tasks"
 	AsyncUpgradeSSTableTask Feature = "async_upgrade_sstable_task"
 	AsyncCompactionTasks    Feature = "async_compaction_task"
@@ -240,7 +242,7 @@ func (client *NodeMgmtClient) CallMetadataEndpointsEndpoint(pod *corev1.Pod) (Ca
 // UUIDs and the values are lists of nodes' IPs that are at that version. The JSON response
 // looks like this:
 //
-//    {"2207c2a9-f598-3971-986b-2926e09e239d": ["10.244.1.4", "10.244.2.3, 10.244.3.3"]}
+//	{"2207c2a9-f598-3971-986b-2926e09e239d": ["10.244.1.4", "10.244.2.3, 10.244.3.3"]}
 //
 // A map length of 1 indicates schema agreement.
 func (client *NodeMgmtClient) CallSchemaVersionsEndpoint(pod *corev1.Pod) (map[string][]string, error) {

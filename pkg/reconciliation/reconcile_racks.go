@@ -2127,7 +2127,7 @@ func (rc *ReconciliationContext) CheckCassandraNodeStatuses() result.ReconcileRe
 
 func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	// Verify if the cleanup task has completed before moving on the with ScalingUp finished
-	task, err := rc.findActiveTask("cleanup")
+	task, err := rc.findActiveTask(taskapi.CommandCleanup)
 	if err != nil {
 		return result.Error(err)
 	}
@@ -2137,7 +2137,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	}
 
 	// Create the cleanup task
-	err = rc.createTask("cleanup")
+	err = rc.createTask(taskapi.CommandCleanup)
 	if err != nil {
 		return result.Error(err)
 	}
@@ -2181,7 +2181,7 @@ func (rc *ReconciliationContext) findActiveTask(command taskapi.CassandraCommand
 	return nil, nil
 }
 
-func (rc *ReconciliationContext) createTask(command string) error {
+func (rc *ReconciliationContext) createTask(command taskapi.CassandraCommand) error {
 	generatedName := fmt.Sprintf("%s-%d", command, time.Now().Unix())
 	dc := rc.Datacenter
 
@@ -2199,7 +2199,7 @@ func (rc *ReconciliationContext) createTask(command string) error {
 			Jobs: []taskapi.CassandraJob{
 				{
 					Name:    fmt.Sprintf("%s-%s", command, rc.Datacenter.Name),
-					Command: taskapi.CommandCleanup,
+					Command: command,
 				},
 			},
 		},

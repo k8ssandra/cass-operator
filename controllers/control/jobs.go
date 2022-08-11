@@ -78,9 +78,6 @@ func (r *CassandraTaskReconciler) callRestartSync(nodeMgmtClient httphelper.Node
 }
 
 func (r *CassandraTaskReconciler) restart(taskConfig *TaskConfiguration) {
-	// As a short version, what if we just upgraded the Datacenter.Status fields and let dc reconciler take care of the function still?
-	// We only need to get the dc reconciler to refresh itself when we do that (by default it ignores status updates)
-	taskConfig.AsyncFeature = httphelper.Feature("") // This should never match
 	taskConfig.SyncFunc = r.callRestartSync
 }
 
@@ -172,7 +169,7 @@ func replaceFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
 	return pod.Name == podName
 }
 
-// replaceProcess adds enough information to CassandraDatacenter to ensure cass-operator knows this pod is being replaced
+// replacePreProcess adds enough information to CassandraDatacenter to ensure cass-operator knows this pod is being replaced
 func (r *CassandraTaskReconciler) replacePreProcess(taskConfig *TaskConfiguration) error {
 	dc := taskConfig.Datacenter
 	podName := taskConfig.Arguments[replacePodNameArgument]
@@ -193,7 +190,6 @@ func (r *CassandraTaskReconciler) setDatacenterCondition(dc *cassapi.CassandraDa
 }
 
 func (r *CassandraTaskReconciler) replace(taskConfig *TaskConfiguration) {
-	taskConfig.AsyncFeature = httphelper.Feature("") // This should never match
 	taskConfig.SyncFunc = r.replacePod
 	taskConfig.ValidateFunc = r.replaceValidator
 	taskConfig.PodFilter = replaceFilter

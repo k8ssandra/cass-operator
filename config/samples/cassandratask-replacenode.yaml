@@ -10,4 +10,4 @@ spec:
     - name: replace-run
       command: replacenode
       args:
-        pod_name: cluster1-dc1-r3-sts-0
+        pod_name: cluster1-dc1-r2-sts-0

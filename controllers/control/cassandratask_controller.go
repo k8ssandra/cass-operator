@@ -247,12 +247,11 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	var res ctrl.Result
 	// completedCount := int32(0)
 
-	// TODO We only support a single job at this stage (helps dev work)
+	// We only support a single job at this stage
 	if len(cassTask.Spec.Jobs) > 1 {
 		return ctrl.Result{}, fmt.Errorf("only a single job can be defined in this version of cass-operator")
 	}
 
-	// TODO We need to verify that the cluster is actually healthy before we run these..
 	taskId := string(cassTask.UID)
 
 	var err error
@@ -291,17 +290,23 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		if err := taskConfig.Validate(); err != nil {
-			// TODO Or should we mark this task as failed and simply stop processing?
 			return ctrl.Result{}, err
 		}
 
-		if err := taskConfig.PreProcess(); err != nil {
-			return ctrl.Result{}, err
+		if !r.HasCondition(cassTask, api.JobRunning, corev1.ConditionTrue) {
+			if err := taskConfig.PreProcess(); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
+		if modified := SetCondition(&cassTask, api.JobRunning, corev1.ConditionTrue); modified {
+			if err = r.Client.Status().Update(ctx, &cassTask); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 
 		res, failed, completed, err = r.reconcileEveryPodTask(ctx, dc, taskConfig)
 
-		// TODO How would we detect what sort of error we've had here? For the correct reconcile action
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -339,12 +344,12 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	cassTask.Status.Succeeded = completed
 	cassTask.Status.Failed = failed
 
-	// TODO Add conditions also
+	SetCondition(&cassTask, api.JobComplete, corev1.ConditionTrue)
+
 	if err = r.Client.Status().Update(ctx, &cassTask); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// log.V(1).Info for DEBUG logging
 	return res, err
 }
 
@@ -353,6 +358,42 @@ func (r *CassandraTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.CassandraTask{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Complete(r)
+}
+
+func (r *CassandraTaskReconciler) HasCondition(task api.CassandraTask, condition api.JobConditionType, status corev1.ConditionStatus) bool {
+	for _, cond := range task.Status.Conditions {
+		if cond.Type == condition {
+			return cond.Status == status
+		}
+	}
+	return false
+}
+
+func SetCondition(task *api.CassandraTask, condition api.JobConditionType, status corev1.ConditionStatus) bool {
+	existing := false
+	for _, cond := range task.Status.Conditions {
+		if cond.Type == condition {
+			if cond.Status == status {
+				// Already correct status
+				return false
+			}
+			cond.Status = status
+			cond.LastTransitionTime = metav1.Now()
+			existing = true
+			break
+		}
+	}
+
+	if !existing {
+		cond := api.JobCondition{
+			Type:               condition,
+			Status:             status,
+			LastTransitionTime: metav1.Now(),
+		}
+		task.Status.Conditions = append(task.Status.Conditions, cond)
+	}
+
+	return true
 }
 
 func setDefaults(cassTask *api.CassandraTask) {
@@ -584,7 +625,6 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				} else if details.Status == podJobCompleted {
 					// Pod has finished, remove the job_id and let us move to the next pod
 					jobStatus.Status = podJobCompleted
-					// TODO Repeating code - refactor
 					if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
 						return ctrl.Result{}, failed, completed, err
 					}
@@ -647,7 +687,6 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 			jobId := strconv.Itoa(idx)
 
 			// This pod should run next, mark it
-			// podPatch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
 			jobStatus.Handler = oplabels.ManagedByLabelValue
 			jobStatus.Id = jobId
 

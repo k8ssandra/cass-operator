@@ -7420,7 +7420,8 @@ spec:
                   type: object
                 type: array
               replaceNodes:
-                description: A list of pod names that need to be replaced.
+                description: DEPRECATED Use CassandraTask replacenode to achieve correct
+                  node replacement. A list of pod names that need to be replaced.
                 items:
                   type: string
                 type: array

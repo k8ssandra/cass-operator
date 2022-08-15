@@ -127,10 +127,15 @@ type FeatureSet struct {
 	Features         map[string]struct{}
 }
 
+// Features are generational (mgmt-api version bound) and can include multiple endpoints under a single Feature name.
 const (
-	AsyncSSTableTasks Feature = "async_sstable_tasks"
-	FullQuerySupport  Feature = "full_query_logging"
-	Rebuild           Feature = "rebuild"
+	// AsyncSSTableTasks includes "cleanup" and "decommission"
+	AsyncSSTableTasks       Feature = "async_sstable_tasks"
+	AsyncUpgradeSSTableTask Feature = "async_upgrade_sstable_task"
+	AsyncCompactionTasks    Feature = "async_compaction_task"
+	AsyncScrubTask          Feature = "async_scrub_task"
+	FullQuerySupport        Feature = "full_query_logging"
+	Rebuild                 Feature = "rebuild"
 )
 
 func (f *FeatureSet) UnmarshalJSON(b []byte) error {
@@ -237,7 +242,7 @@ func (client *NodeMgmtClient) CallMetadataEndpointsEndpoint(pod *corev1.Pod) (Ca
 // UUIDs and the values are lists of nodes' IPs that are at that version. The JSON response
 // looks like this:
 //
-//    {"2207c2a9-f598-3971-986b-2926e09e239d": ["10.244.1.4", "10.244.2.3, 10.244.3.3"]}
+//	{"2207c2a9-f598-3971-986b-2926e09e239d": ["10.244.1.4", "10.244.2.3, 10.244.3.3"]}
 //
 // A map length of 1 indicates schema agreement.
 func (client *NodeMgmtClient) CallSchemaVersionsEndpoint(pod *corev1.Pod) (map[string][]string, error) {
@@ -440,6 +445,192 @@ func (client *NodeMgmtClient) CallDatacenterRebuild(pod *corev1.Pod, sourceDatac
 	}
 
 	return string(jobId), nil
+}
+
+// CallUpgradeSSTables calls the v1 version of upgradeSSTables, returning the jobId
+func (client *NodeMgmtClient) CallUpgradeSSTables(pod *corev1.Pod, jobs int, keyspaceName string, tables []string) (string, error) {
+	client.Log.Info(
+		"calling Management API keyspace sstable upgrade - POST /api/v1/ops/tables/sstables/upgrade",
+		"pod", pod.Name,
+	)
+
+	req, err := createKeySpaceRequest(pod, jobs, keyspaceName, tables, "/api/v1/ops/tables/sstables/upgrade")
+	if err != nil {
+		return "", err
+	}
+
+	req.timeout = 20 * time.Second
+
+	jobId, err := callNodeMgmtEndpoint(client, *req, "application/json")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jobId), nil
+}
+
+// CallUpgradeSSTablesEndpoint calls the v0 version of upgradeSSTables endpoint (blocking operation)
+func (client *NodeMgmtClient) CallUpgradeSSTablesEndpoint(pod *corev1.Pod, jobs int, keyspaceName string, tables []string) error {
+	client.Log.Info(
+		"calling Management API keyspace sstable upgrade - POST /api/v0/ops/tables/sstables/upgrade",
+		"pod", pod.Name,
+	)
+
+	req, err := createKeySpaceRequest(pod, jobs, keyspaceName, tables, "/api/v0/ops/tables/sstables/upgrade")
+	if err != nil {
+		return err
+	}
+
+	req.timeout = 20 * time.Second
+
+	_, err = callNodeMgmtEndpoint(client, *req, "application/json")
+	return err
+}
+
+type CompactRequest struct {
+	SplitOutput      bool     `json:"split_output,omitempty"`
+	UserDefined      bool     `json:"user_defined,omitempty"`
+	StartToken       string   `json:"start_token,omitempty"`
+	EndToken         string   `json:"end_token,omitempty"`
+	KeyspaceName     string   `json:"keyspace_name"`
+	UserDefinedFiles []string `json:"user_defined_files,omitempty"`
+	Tables           []string `json:"tables"`
+}
+
+func createCompactRequest(pod *corev1.Pod, compactRequest *CompactRequest, endpoint string) (*nodeMgmtRequest, error) {
+	body, err := json.Marshal(compactRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	request := &nodeMgmtRequest{
+		endpoint: endpoint,
+		host:     podHost,
+		method:   http.MethodPost,
+		body:     body,
+	}
+
+	return request, nil
+}
+
+// CallCompaction calls the v1 version of compaction to force a (major) compaction on one or more tables or user-defined compaction on given SSTables, returning the jobId
+func (client *NodeMgmtClient) CallCompaction(pod *corev1.Pod, compactRequest *CompactRequest) (string, error) {
+	client.Log.Info(
+		"calling Management API keyspace force compaction - POST /api/v1/ops/tables/compact",
+		"pod", pod.Name,
+	)
+
+	req, err := createCompactRequest(pod, compactRequest, "/api/v1/ops/tables/compact")
+	if err != nil {
+		return "", err
+	}
+	req.timeout = 20 * time.Second
+
+	jobId, err := callNodeMgmtEndpoint(client, *req, "application/json")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jobId), nil
+}
+
+// CallCompactionEndpoint calls the blocking version (v0) of compactionto force a (major) compaction on one or more tables or user-defined compaction on given SSTables
+func (client *NodeMgmtClient) CallCompactionEndpoint(pod *corev1.Pod, compactRequest *CompactRequest) error {
+	client.Log.Info(
+		"calling Management API keyspace force compaction - POST /api/v0/ops/tables/compact",
+		"pod", pod.Name,
+	)
+
+	req, err := createCompactRequest(pod, compactRequest, "/api/v0/ops/tables/compact")
+	if err != nil {
+		return err
+	}
+	req.timeout = 60 * time.Second
+
+	_, err = callNodeMgmtEndpoint(client, *req, "application/json")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type ScrubRequest struct {
+	DisableSnapshot       bool     `json:"disable_snapshot"`
+	SkipCorrupted         bool     `json:"skip_corrupted"`
+	CheckData             bool     `json:"check_data"`
+	ReinsertOverflowedTTL bool     `json:"reinsert_overflowed_ttl"`
+	Jobs                  int      `json:"jobs"`
+	KeyspaceName          string   `json:"keyspace_name"`
+	Tables                []string `json:"tables"`
+}
+
+// TODO This, keyspaceRequest and compactRequest are all pretty much the same..
+func createScrubRequest(pod *corev1.Pod, scrubRequest *ScrubRequest, endpoint string) (*nodeMgmtRequest, error) {
+	body, err := json.Marshal(scrubRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	request := &nodeMgmtRequest{
+		endpoint: endpoint,
+		host:     podHost,
+		method:   http.MethodPost,
+		body:     body,
+	}
+
+	return request, nil
+}
+
+// CallScrub calls the v1 version of scrub, rebuilding sstables for one or more tables, returning the jobId.
+func (client *NodeMgmtClient) CallScrub(pod *corev1.Pod, scrubRequest *ScrubRequest) (string, error) {
+	client.Log.Info(
+		"calling Management API scrub - POST /api/v1/ops/tables/scrub",
+		"pod", pod.Name,
+	)
+	req, err := createScrubRequest(pod, scrubRequest, "/api/v1/ops/tables/scrub")
+	if err != nil {
+		return "", err
+	}
+	req.timeout = 20 * time.Second
+
+	jobId, err := callNodeMgmtEndpoint(client, *req, "application/json")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jobId), nil
+}
+
+// CallScrubEndpoint calls the blocking version of scrub (v0 version) rebuilding sstables for one or more tables
+func (client *NodeMgmtClient) CallScrubEndpoint(pod *corev1.Pod, scrubRequest *ScrubRequest) error {
+	client.Log.Info(
+		"calling Management API scrub - POST /api/v0/ops/tables/scrub",
+		"pod", pod.Name,
+	)
+
+	req, err := createScrubRequest(pod, scrubRequest, "/api/v0/ops/tables/scrub")
+	if err != nil {
+		return err
+	}
+	req.timeout = 60 * time.Second
+
+	_, err = callNodeMgmtEndpoint(client, *req, "application/json")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // CreateKeyspace calls management API to create a new Keyspace.
@@ -819,7 +1010,6 @@ func (client *NodeMgmtClient) FeatureSet(pod *corev1.Pod) (*FeatureSet, error) {
 				return &FeatureSet{}, nil
 			}
 		}
-		client.Log.Error(err, "failed to fetch features from management-api")
 		return nil, err
 	}
 

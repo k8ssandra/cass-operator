@@ -60,8 +60,13 @@ type CassandraTaskSpec struct {
 type CassandraCommand string
 
 const (
-	CommandCleanup CassandraCommand = "cleanup"
-	CommandRebuild CassandraCommand = "rebuild"
+	CommandCleanup         CassandraCommand = "cleanup"
+	CommandRebuild         CassandraCommand = "rebuild"
+	CommandRestart         CassandraCommand = "restart"
+	CommandUpgradeSSTables CassandraCommand = "upgradesstables"
+	CommandReplaceNode     CassandraCommand = "replacenode"
+	CommandCompaction      CassandraCommand = "compact"
+	CommandScrub           CassandraCommand = "scrub"
 )
 
 type CassandraJob struct {

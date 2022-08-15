@@ -1,0 +1,13 @@
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: CassandraTask
+metadata:
+  name: example-replace
+spec:
+  datacenter:
+    name: dc1
+    namespace: cass-operator
+  jobs:
+    - name: replace-run
+      command: replacenode
+      args:
+        pod_name: cluster1-dc1-r2-sts-0

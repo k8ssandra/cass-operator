@@ -514,12 +514,29 @@ func (ns NsWrapper) CqlExecute(podName string, stepDesc string, cql string, user
 	ns.ExecVPanic(k)
 }
 
-func (ns *NsWrapper) CheckForCompletedCassandraTasks(dcName, command string, count int) {
+func (ns *NsWrapper) CheckForCassandraTasks(dcName, command string, completed bool, count int) {
 	step := fmt.Sprintf("checking that cassandratask command %s has succeeded", command)
 	json := "jsonpath={.items[*].spec.jobs[0].command}"
 	k := kubectl.Get("cassandratask").
-		WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)).
-		WithLabel("control.k8ssandra.io/status=completed").
-		FormatOutput(json)
+		WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName))
+
+	if completed {
+		k = k.WithLabel("control.k8ssandra.io/status=completed")
+	}
+
+	k = k.FormatOutput(json)
 	ns.WaitForOutputAndLog(step, k, duplicate(command, count), 120)
+}
+
+func (ns *NsWrapper) CheckForCompletedCassandraTasks(dcName, command string, count int) {
+	ns.CheckForCassandraTasks(dcName, command, true, count)
+}
+
+func (ns *NsWrapper) WaitForCompleteTask(taskName string) {
+	step := "checking that cassandratask status CompletionTime has a value"
+	json := "jsonpath={.status.completionTime}"
+	k := kubectl.Get("cassandratask", taskName).
+		FormatOutput(json)
+
+	ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, 360)
 }

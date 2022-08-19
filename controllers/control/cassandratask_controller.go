@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -273,7 +274,18 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		case api.CommandCleanup:
 			cleanup(taskConfig)
 		case api.CommandRestart:
-			r.restart(taskConfig)
+			// This job is targeting StatefulSets and not Pods
+			sts, err := r.getDatacenterStatefulSets(ctx, dc)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			res, err = r.restartSts(ctx, sts, taskConfig)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			break
 		case api.CommandReplaceNode:
 			r.replace(taskConfig)
 		case "forceupgraderacks":
@@ -333,6 +345,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		cassTask.Status.Active = 0
 		cassTask.Status.CompletionTime = &timeNow
+		SetCondition(&cassTask, api.JobComplete, corev1.ConditionTrue)
 
 		// Requeue for deletion later
 		deletionTime := calculateDeletionTime(&cassTask)
@@ -343,8 +356,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	cassTask.Status.Succeeded = completed
 	cassTask.Status.Failed = failed
-
-	SetCondition(&cassTask, api.JobComplete, corev1.ConditionTrue)
 
 	if err = r.Client.Status().Update(ctx, &cassTask); err != nil {
 		return ctrl.Result{}, err
@@ -496,6 +507,16 @@ func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cas
 	}
 
 	return pods.Items, nil
+}
+
+func (r *CassandraTaskReconciler) getDatacenterStatefulSets(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]appsv1.StatefulSet, error) {
+	var sts appsv1.StatefulSetList
+
+	if err := r.Client.List(ctx, &sts, client.InNamespace(dc.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
+		return nil, err
+	}
+
+	return sts.Items, nil
 }
 
 // cleanupJobAnnotations removes the job annotations from the pod once it has finished

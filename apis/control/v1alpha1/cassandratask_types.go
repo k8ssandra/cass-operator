@@ -69,6 +69,12 @@ const (
 	CommandScrub           CassandraCommand = "scrub"
 )
 
+const (
+	KeyspaceArgument         string = "keyspace_name"
+	RackArgument             string = "rack"
+	SourceDatacenterArgument string = "source_datacenter"
+)
+
 type CassandraJob struct {
 	Name string `json:"name"`
 

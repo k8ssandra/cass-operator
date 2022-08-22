@@ -12,6 +12,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#354](https://github.com/k8ssandra/cass-operator/issues/354) Remove oldDefunctLabel support since we recreate StS. Fix #335 created-by value to match expected value.
+* [CHANGE] [#385](https://github.com/k8ssandra/cass-operator/issues/385) Deprecate CassandraDatacenter's RollingRestartRequested. Use CassandraTask instead.
+* [ENHANCEMENT] [#385](https://github.com/k8ssandra/cass-operator/issues/385) Add rolling restart as a CassandraTask action.
 * [ENHANCEMENT] [#383](https://github.com/k8ssandra/cass-operator/pull/383) Add UpgradeSSTables, Compaction and Scrub to management-api client. Improve CassandraTasks to have the ability to validate input parameters, filter target pods and do processing outside of pods.
 * [ENHANCEMENT] [#384](https://github.com/k8ssandra/cass-operator/issues/384) Add a new CassandraTask operation "replacenode" that removes the existing PVCs from the pod, deletes the pod and starts a replacement process.
 * [ENHANCEMENT] [#387](https://github.com/k8ssandra/cass-operator/issues/387) Add a new CassandraTask operation "upgradesstables" that allows to do SSTable upgrades after Cassandra version upgrade.

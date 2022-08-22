@@ -7452,9 +7452,9 @@ spec:
                     type: object
                 type: object
               rollingRestartRequested:
-                description: Whether to do a rolling restart at the next opportunity.
-                  The operator will set this back to false once the restart is in
-                  progress.
+                description: DEPRECATED. Use CassandraTask for rolling restarts. Whether
+                  to do a rolling restart at the next opportunity. The operator will
+                  set this back to false once the restart is in progress.
                 type: boolean
               serverImage:
                 description: 'Cassandra server image name. Use of ImageConfig to match

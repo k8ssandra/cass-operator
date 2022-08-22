@@ -187,7 +187,7 @@ type CassandraDatacenterSpec struct {
 	// The k8s service account to use for the server pods
 	ServiceAccount string `json:"serviceAccount,omitempty"`
 
-	// Whether to do a rolling restart at the next opportunity. The operator will set this back
+	// DEPRECATED. Use CassandraTask for rolling restarts. Whether to do a rolling restart at the next opportunity. The operator will set this back
 	// to false once the restart is in progress.
 	RollingRestartRequested bool `json:"rollingRestartRequested,omitempty"`
 

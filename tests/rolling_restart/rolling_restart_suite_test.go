@@ -97,13 +97,12 @@ var _ = Describe(testName, func() {
 			ns.WaitForCompleteTask("rolling-restart")
 
 			// Verify each pod does have the annotation..
-			json := `{.items[0].metadata.annotations.control\.k8ssandra\.io/restartedAt}`
+			json := `jsonpath={.items[0].metadata.annotations.control\.k8ssandra\.io/restartedAt}`
 			k = kubectl.Get("pods").
 				WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)).
 				WithFlag("field-selector", "status.phase=Running").
 				FormatOutput(json)
-
-			Expect(ns.OutputAndLog(step, k)).To(MatchRegexp(`\b \b`))
+			ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, 360)
 		})
 	})
 })

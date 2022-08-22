@@ -80,7 +80,7 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 		if st.Spec.Template.ObjectMeta.Annotations == nil {
 			st.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
 		}
-		if st.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] == restartTime {
+		if st.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation] == restartTime {
 			// This one has been called to restart already - is it ready?
 
 			status := st.Status
@@ -95,7 +95,7 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 			// This is still restarting
 			return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
 		}
-		st.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = restartTime
+		st.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation] = restartTime
 		if err := r.Client.Update(ctx, &st); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -105,10 +105,6 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 
 	// We're done
 	return ctrl.Result{}, nil
-}
-
-func (r *CassandraTaskReconciler) restart(taskConfig *TaskConfiguration) {
-	// taskConfig.SyncFunc = r.callRestartSync
 }
 
 // UpgradeSSTables functionality

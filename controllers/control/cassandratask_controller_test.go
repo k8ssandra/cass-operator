@@ -13,6 +13,7 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,12 +26,16 @@ var (
 	callDetails *httphelper.CallDetails
 	// testNamespaceName  = ""
 	testDatacenterName = "dc1"
+	testDc             *cassdcapi.CassandraDatacenter
+	clusterName        = ""
+	nodeCount          = 9
+	rackCount          = 3
 )
 
 func createDatacenter(dcName, namespace string) func() {
 	return func() {
 		By("Create Datacenter, pods and set dc status to Ready")
-		clusterName := fmt.Sprintf("test-%s", dcName)
+		clusterName = fmt.Sprintf("test-%s", dcName)
 		testNamespace := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespace,
@@ -43,7 +48,7 @@ func createDatacenter(dcName, namespace string) func() {
 			Namespace: namespace,
 		}
 
-		testDc := &cassdcapi.CassandraDatacenter{
+		testDc = &cassdcapi.CassandraDatacenter{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        cassdcKey.Name,
 				Namespace:   cassdcKey.Namespace,
@@ -52,10 +57,17 @@ func createDatacenter(dcName, namespace string) func() {
 			Spec: cassdcapi.CassandraDatacenterSpec{
 				ClusterName:   clusterName,
 				ServerType:    "cassandra",
-				ServerVersion: "4.0.1",
-				Size:          3,
+				ServerVersion: "4.0.5",
+				Size:          int32(nodeCount),
 			},
 			Status: cassdcapi.CassandraDatacenterStatus{},
+		}
+
+		testDc.Spec.Racks = make([]cassdcapi.Rack, 3)
+		for i := 0; i < rackCount; i++ {
+			testDc.Spec.Racks[i] = cassdcapi.Rack{
+				Name: fmt.Sprintf("r%d", i),
+			}
 		}
 
 		Expect(k8sClient.Create(context.Background(), testDc)).Should(Succeed())
@@ -70,16 +82,57 @@ func createDatacenter(dcName, namespace string) func() {
 		}
 		Expect(k8sClient.Status().Patch(context.Background(), testDc, patchCassdc)).Should(Succeed())
 
-		for i := 0; i < int(testDc.Spec.Size); i++ {
-			createPod(namespace, clusterName, dcName, i)
+		createStatefulSets(cassdcKey.Namespace)
+		podsPerRack := nodeCount / rackCount
+		for _, rack := range testDc.Spec.Racks {
+			for j := 0; j < podsPerRack; j++ {
+				createPod(namespace, clusterName, dcName, rack.Name, j)
+			}
 		}
 	}
 }
 
-func createPod(namespace, clusterName, dcName string, i int) {
+func createStatefulSets(namespace string) {
+	podsPerRack := int32(nodeCount / rackCount)
+
+	for _, rack := range testDc.Spec.Racks {
+		name := fmt.Sprintf("%s-%s-%s-sts", clusterName, testDc.Name, rack.Name)
+		sts := &appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels:    testDc.GetRackLabels(rack.Name),
+			},
+			Spec: appsv1.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: testDc.GetRackLabels(rack.Name),
+				},
+				Replicas:            &podsPerRack,
+				ServiceName:         testDc.GetAllPodsServiceName(),
+				PodManagementPolicy: appsv1.ParallelPodManagement,
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: testDc.GetRackLabels(rack.Name),
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "cassandra",
+								Image: "k8ssandra/cassandra-nothere:latest",
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(context.Background(), sts)).Should(Succeed())
+	}
+}
+
+func createPod(namespace, clusterName, dcName, rackName string, ordinal int) {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("test-cassdc-%s-pod%d", dcName, i),
+			Name:      fmt.Sprintf("%s-%s-%s-sts-%d", clusterName, dcName, rackName, ordinal),
 			Namespace: namespace,
 			Labels: map[string]string{
 				cassdcapi.ClusterLabel:    clusterName,
@@ -109,6 +162,13 @@ func createPod(namespace, clusterName, dcName string, i int) {
 		},
 	}
 	Expect(k8sClient.Status().Patch(context.Background(), pod, patchPod)).Should(Succeed())
+}
+
+func deleteDatacenter(namespace string) {
+	// Delete pods, statefulsets and dc
+	Expect(k8sClient.DeleteAllOf(context.TODO(), &appsv1.StatefulSet{}, client.InNamespace(namespace))).Should(Succeed())
+	Expect(k8sClient.DeleteAllOf(context.TODO(), &corev1.Pod{}, client.InNamespace(namespace))).Should(Succeed())
+	Expect(k8sClient.DeleteAllOf(context.TODO(), testDc, client.InNamespace(namespace))).Should(Succeed())
 }
 
 func buildTask(command api.CassandraCommand, namespace string) (types.NamespacedName, *api.CassandraTask) {
@@ -158,254 +218,346 @@ func waitForTaskCompletion(taskKey types.NamespacedName) *api.CassandraTask {
 	return emptyTask
 }
 
-var _ = Describe("Execute jobs against all pods", func() {
-	jobRunningRequeue = time.Duration(1 * time.Millisecond)
-	taskRunningRequeue = time.Duration(1 * time.Millisecond)
-	Context("Async jobs", func() {
-		var testNamespaceName string
-		BeforeEach(func() {
-			By("Creating a fake mgmt-api server")
-			var err error
-			callDetails = httphelper.NewCallDetails()
-			mockServer, err = httphelper.FakeExecutorServerWithDetails(callDetails)
-			testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
-			Expect(err).ToNot(HaveOccurred())
-			mockServer.Start()
-			By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
-		})
+var _ = Describe("CassandraTask controller tests", func() {
+	Describe("Execute jobs against all pods", func() {
+		jobRunningRequeue = time.Duration(1 * time.Millisecond)
+		taskRunningRequeue = time.Duration(1 * time.Millisecond)
+		Context("Async jobs", func() {
+			var testNamespaceName string
+			BeforeEach(func() {
+				By("Creating a fake mgmt-api server")
+				var err error
+				callDetails = httphelper.NewCallDetails()
+				mockServer, err = httphelper.FakeExecutorServerWithDetails(callDetails)
+				testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
+				Expect(err).ToNot(HaveOccurred())
+				mockServer.Start()
+				By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
+			})
 
-		AfterEach(func() {
-			mockServer.Close()
-		})
+			AfterEach(func() {
+				mockServer.Close()
+				deleteDatacenter(testNamespaceName)
+			})
 
-		When("Running rebuild in datacenter", func() {
-			It("Runs a rebuild task against the datacenter pods", func() {
+			When("Running rebuild in datacenter", func() {
+				It("Runs a rebuild task against the datacenter pods", func() {
+					By("Creating a task for rebuild")
+					taskKey := createTask(api.CommandRebuild, testNamespaceName)
+
+					completedTask := waitForTaskCompletion(taskKey)
+
+					Expect(callDetails.URLCounts["/api/v1/ops/node/rebuild"]).To(Equal(nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+
+					// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+					Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+				})
+			})
+			It("Runs a UpgradeSSTables task against the datacenter pods", func() {
 				By("Creating a task for rebuild")
-				taskKey := createTask(api.CommandRebuild, testNamespaceName)
+				taskKey := createTask(api.CommandUpgradeSSTables, testNamespaceName)
 
 				completedTask := waitForTaskCompletion(taskKey)
 
-				Expect(callDetails.URLCounts["/api/v1/ops/node/rebuild"]).To(Equal(3))
-				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
+				Expect(callDetails.URLCounts["/api/v1/ops/tables/sstables/upgrade"]).To(Equal(nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
 			})
+			When("Running cleanup twice in the same datacenter", func() {
+				It("Runs a cleanup task against the datacenter pods", func() {
+					By("Creating a task for cleanup")
+					taskKey := createTask(api.CommandCleanup, testNamespaceName)
+
+					completedTask := waitForTaskCompletion(taskKey)
+
+					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+
+					// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+					Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+
+					// This is hacky approach to run two jobs twice in the same test - resetting the callDetails
+					callDetails.URLCounts = make(map[string]int)
+					By("Creating a task for second cleanup")
+					taskKey = createTask("cleanup", testNamespaceName)
+
+					completedTask = waitForTaskCompletion(taskKey)
+
+					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+
+					// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+					Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+				})
+			})
 		})
-		It("Runs a UpgradeSSTables task against the datacenter pods", func() {
-			By("Creating a task for rebuild")
-			taskKey := createTask(api.CommandUpgradeSSTables, testNamespaceName)
+		Context("Failing jobs", func() {
+			When("In a datacenter", func() {
+				It("Should fail once when no retryPolicy is set", func() {
+					By("Creating fake mgmt-api server")
+					callDetails := httphelper.NewCallDetails()
+					mockServer, err := httphelper.FakeExecutorServerWithDetailsFails(callDetails)
+					testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())
+					Expect(err).ToNot(HaveOccurred())
+					mockServer.Start()
+					defer mockServer.Close()
 
-			completedTask := waitForTaskCompletion(taskKey)
+					By("create datacenter", createDatacenter("dc1", testFailedNamespaceName))
+					By("Create a task for cleanup")
+					taskKey := createTask(api.CommandCleanup, testFailedNamespaceName)
 
-			Expect(callDetails.URLCounts["/api/v1/ops/tables/sstables/upgrade"]).To(Equal(3))
-			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
-			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
+					completedTask := waitForTaskCompletion(taskKey)
 
-			// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
-			Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+
+					Expect(completedTask.Status.Failed).To(BeNumerically(">=", nodeCount))
+				})
+				It("If retryPolicy is set, we should see a retry", func() {
+					By("Creating fake mgmt-api server")
+					callDetails := httphelper.NewCallDetails()
+					mockServer, err := httphelper.FakeExecutorServerWithDetailsFails(callDetails)
+					testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())
+					Expect(err).ToNot(HaveOccurred())
+					mockServer.Start()
+					defer mockServer.Close()
+
+					By("create datacenter", createDatacenter("dc1", testFailedNamespaceName))
+					By("Creating a task for cleanup")
+					taskKey, task := buildTask(api.CommandCleanup, testFailedNamespaceName)
+					task.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+					Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+					completedTask := waitForTaskCompletion(taskKey)
+
+					// Due to retry, we have double the amount of calls
+					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(nodeCount * 2))
+					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount*2))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount*2))
+
+					Expect(completedTask.Status.Failed).To(BeNumerically(">=", nodeCount))
+				})
+			})
 		})
-		When("Running cleanup twice in the same datacenter", func() {
+		Context("Sync jobs", func() {
+			var testNamespaceName string
+			BeforeEach(func() {
+				By("Creating fake synchronous mgmt-api server")
+				var err error
+				callDetails = httphelper.NewCallDetails()
+				mockServer, err = httphelper.FakeServerWithoutFeaturesEndpoint(callDetails)
+				testNamespaceName = fmt.Sprintf("test-sync-task-%d", rand.Int31())
+				Expect(err).ToNot(HaveOccurred())
+				mockServer.Start()
+				By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
+			})
+
+			AfterEach(func() {
+				mockServer.Close()
+				deleteDatacenter(testNamespaceName)
+			})
+
 			It("Runs a cleanup task against the datacenter pods", func() {
 				By("Creating a task for cleanup")
 				taskKey := createTask(api.CommandCleanup, testNamespaceName)
 
 				completedTask := waitForTaskCompletion(taskKey)
 
-				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
-				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
+				Expect(callDetails.URLCounts["/api/v0/ops/keyspace/cleanup"]).To(Equal(nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
 
-				// This is hacky approach to run two jobs twice in the same test - resetting the callDetails
-				callDetails.URLCounts = make(map[string]int)
-				By("Creating a task for second cleanup")
-				taskKey = createTask("cleanup", testNamespaceName)
+			It("Runs a upgradesstables task against the datacenter pods", func() {
+				By("Creating a task for upgradesstables")
+				time.Sleep(1 * time.Second) // Otherwise the CreationTimestamp could be too new
+				taskKey := createTask(api.CommandUpgradeSSTables, testNamespaceName)
 
-				completedTask = waitForTaskCompletion(taskKey)
+				completedTask := waitForTaskCompletion(taskKey)
 
-				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
-				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
+				Expect(callDetails.URLCounts["/api/v0/ops/tables/sstables/upgrade"]).To(Equal(nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+
+				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
+
+			It("Replaces a node in the datacenter", func() {
+				By("Creating a task for replacenode")
+				time.Sleep(1 * time.Second) // Otherwise the CreationTimestamp could be too new
+				taskKey, task := buildTask(api.CommandReplaceNode, testNamespaceName)
+
+				podKey := types.NamespacedName{
+					Name:      fmt.Sprintf("%s-%s-r1-sts-%d", clusterName, testDatacenterName, 2),
+					Namespace: testNamespaceName,
+				}
+
+				task.Spec.Jobs[0].Arguments = map[string]string{"pod_name": podKey.Name}
+				Expect(k8sClient.Create(context.TODO(), task)).Should(Succeed())
+
+				// Verify the pod2 was deleted
+				Eventually(func() bool {
+					pod := &corev1.Pod{}
+					err := k8sClient.Get(context.TODO(), podKey, pod)
+					return err != nil && errors.IsNotFound(err)
+				}, time.Duration(3*time.Second)).Should(BeTrue())
+
+				// Recreate it so the process "finishes"
+				createPod(testNamespaceName, clusterName, testDatacenterName, "r1", 2)
+
+				completedTask := waitForTaskCompletion(taskKey)
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
 			})
 		})
-	})
-	Context("Failing jobs", func() {
-		When("In a datacenter", func() {
-			It("Should fail once when no retryPolicy is set", func() {
-				By("Creating fake mgmt-api server")
-				callDetails := httphelper.NewCallDetails()
-				mockServer, err := httphelper.FakeExecutorServerWithDetailsFails(callDetails)
-				testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())
-				Expect(err).ToNot(HaveOccurred())
-				mockServer.Start()
-				defer mockServer.Close()
-
-				By("create datacenter", createDatacenter("dc1", testFailedNamespaceName))
-				By("Create a task for cleanup")
-				taskKey := createTask(api.CommandCleanup, testFailedNamespaceName)
-
-				completedTask := waitForTaskCompletion(taskKey)
-
-				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3))
-				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
-
-				Expect(completedTask.Status.Failed).To(BeNumerically(">=", 3))
+		Context("Task TTL", func() {
+			var testNamespaceName string
+			BeforeEach(func() {
+				testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
+				testNamespace := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testNamespaceName,
+					},
+				}
+				Expect(k8sClient.Create(context.Background(), testNamespace)).Should(Succeed())
 			})
-			It("If retryPolicy is set, we should see a retry", func() {
-				By("Creating fake mgmt-api server")
-				callDetails := httphelper.NewCallDetails()
-				mockServer, err := httphelper.FakeExecutorServerWithDetailsFails(callDetails)
-				testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())
-				Expect(err).ToNot(HaveOccurred())
-				mockServer.Start()
-				defer mockServer.Close()
-
-				By("create datacenter", createDatacenter("dc1", testFailedNamespaceName))
-				By("Creating a task for cleanup")
-				taskKey, task := buildTask(api.CommandCleanup, testFailedNamespaceName)
-				task.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+			It("Ensures task is deleted after TTL has expired", func() {
+				taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
+				metav1.SetMetaDataLabel(&task.ObjectMeta, taskStatusLabel, completedTaskLabelValue)
+				ttlTime := new(int32)
+				*ttlTime = 1
+				task.Spec.TTLSecondsAfterFinished = ttlTime
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
-				completedTask := waitForTaskCompletion(taskKey)
+				timeNow := metav1.Now()
+				task.Status.CompletionTime = &timeNow
+				Expect(k8sClient.Status().Update(context.TODO(), task)).Should(Succeed())
 
-				// Due to retry, we have double the amount of calls
-				Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(6))
-				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 6))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 6))
+				Eventually(func() bool {
+					deletedTask := api.CassandraTask{}
+					err := k8sClient.Get(context.TODO(), taskKey, &deletedTask)
+					return err != nil && errors.IsNotFound(err)
+				}).Should(BeTrue())
+			})
+			It("Ensures task is not deleted if TTL is set to 0", func() {
+				taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
+				metav1.SetMetaDataLabel(&task.ObjectMeta, taskStatusLabel, completedTaskLabelValue)
+				ttlTime := new(int32)
+				*ttlTime = 0
+				task.Spec.TTLSecondsAfterFinished = ttlTime
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
-				Expect(completedTask.Status.Failed).To(BeNumerically(">=", 3))
+				timeNow := metav1.Now()
+				task.Status.CompletionTime = &timeNow
+
+				Expect(k8sClient.Status().Update(context.TODO(), task)).Should(Succeed())
+				Consistently(func() bool {
+					deletedTask := api.CassandraTask{}
+					err := k8sClient.Get(context.TODO(), taskKey, &deletedTask)
+					return err == nil
+				}).Should(BeTrue())
 			})
 		})
 	})
-	Context("Sync jobs", func() {
+	Describe("Execute jobs against all StatefulSets", func() {
 		var testNamespaceName string
 		BeforeEach(func() {
-			By("Creating fake synchronous mgmt-api server")
-			var err error
-			callDetails = httphelper.NewCallDetails()
-			mockServer, err = httphelper.FakeServerWithoutFeaturesEndpoint(callDetails)
-			testNamespaceName = fmt.Sprintf("test-sync-task-%d", rand.Int31())
-			Expect(err).ToNot(HaveOccurred())
-			mockServer.Start()
+			testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
 			By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
 		})
 
 		AfterEach(func() {
-			mockServer.Close()
+			deleteDatacenter(testNamespaceName)
+			// Expect(k8sClient.Delete(context.TODO(), testDc)).Should(Succeed())
 		})
 
-		It("Runs a cleanup task against the datacenter pods", func() {
-			By("Creating a task for cleanup")
-			taskKey := createTask(api.CommandCleanup, testNamespaceName)
+		Context("Restart", func() {
+			It("Restarts a single rack", func() {
+				stsKey := types.NamespacedName{Namespace: testNamespaceName, Name: fmt.Sprintf("%s-%s-r1-sts", clusterName, testDc.Name)}
+				var sts appsv1.StatefulSet
+				Expect(k8sClient.Get(context.TODO(), stsKey, &sts)).Should(Succeed())
 
-			completedTask := waitForTaskCompletion(taskKey)
+				// Create task to restart r1
+				taskKey, task := buildTask(api.CommandRestart, testNamespaceName)
+				task.Spec.Jobs[0].Arguments = map[string]string{"rack": "r1"}
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
-			Expect(callDetails.URLCounts["/api/v0/ops/keyspace/cleanup"]).To(Equal(3))
-			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
-			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				Eventually(func() bool {
+					Expect(k8sClient.Get(context.TODO(), stsKey, &sts)).Should(Succeed())
+					_, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]
+					return found
+				}).Should(BeTrue())
 
-			// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
-			Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
-		})
+				// Imitate statefulset_controller
+				Expect(k8sClient.Get(context.TODO(), stsKey, &sts)).Should(Succeed())
+				sts.Status.UpdatedReplicas = sts.Status.Replicas
+				sts.Status.ReadyReplicas = sts.Status.Replicas
+				sts.Status.CurrentReplicas = sts.Status.Replicas
+				sts.Status.UpdateRevision = "1"
+				sts.Status.CurrentRevision = sts.Status.UpdateRevision
 
-		It("Runs a upgradesstables task against the datacenter pods", func() {
-			By("Creating a task for upgradesstables")
-			time.Sleep(1 * time.Second) // Otherwise the CreationTimestamp could be too new
-			taskKey := createTask(api.CommandUpgradeSSTables, testNamespaceName)
+				Expect(k8sClient.Status().Update(context.TODO(), &sts)).Should(Succeed())
 
-			completedTask := waitForTaskCompletion(taskKey)
+				// Set StatefulSet properties here so that the task completes.. verify first that there's been a change (but only to r1)
+				_ = waitForTaskCompletion(taskKey)
 
-			Expect(callDetails.URLCounts["/api/v0/ops/tables/sstables/upgrade"]).To(Equal(3))
-			Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
-			Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				// Verify other racks haven't been modified
+				var stsAll appsv1.StatefulSetList
+				Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
+				Expect(len(stsAll.Items)).To(Equal(rackCount))
 
-			// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
-			Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
-		})
+				for _, sts := range stsAll.Items {
+					if sts.Name == stsKey.Name {
+						continue
+					}
+					_, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]
+					Expect(found).ToNot(BeTrue())
+				}
+			})
+			It("Restarts datacenter", func() {
+				var stsAll appsv1.StatefulSetList
+				Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
+				Expect(len(stsAll.Items)).To(Equal(rackCount))
 
-		It("Replaces a node in the datacenter", func() {
-			By("Creating a task for replacenode")
-			time.Sleep(1 * time.Second) // Otherwise the CreationTimestamp could be too new
-			taskKey, task := buildTask(api.CommandReplaceNode, testNamespaceName)
+				// Create task to restart all
+				taskKey, task := buildTask(api.CommandRestart, testNamespaceName)
+				// task.Spec.Jobs[0].Arguments = map[string]string{"rack": "r1"}
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
-			podKey := types.NamespacedName{
-				Name:      fmt.Sprintf("test-cassdc-%s-pod%d", testDatacenterName, 2),
-				Namespace: testNamespaceName,
-			}
+				Eventually(func() bool {
+					Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
+					for _, sts := range stsAll.Items {
+						if _, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]; found {
+							// Imitate statefulset_controller
+							sts.Status.UpdatedReplicas = sts.Status.Replicas
+							sts.Status.ReadyReplicas = sts.Status.Replicas
+							sts.Status.CurrentReplicas = sts.Status.Replicas
+							sts.Status.UpdateRevision = "1"
+							sts.Status.CurrentRevision = sts.Status.UpdateRevision
 
-			task.Spec.Jobs[0].Arguments = map[string]string{"pod_name": podKey.Name}
-			Expect(k8sClient.Create(context.TODO(), task)).Should(Succeed())
+							Expect(k8sClient.Status().Update(context.TODO(), &sts)).Should(Succeed())
+						} else if !found {
+							return false
+						}
+					}
+					return true
+				}).Should(BeTrue())
 
-			// Verify the pod2 was deleted
-			Eventually(func() bool {
-				pod := &corev1.Pod{}
-				err := k8sClient.Get(context.TODO(), podKey, pod)
-				return err != nil && errors.IsNotFound(err)
-			}, time.Duration(3*time.Second)).Should(BeTrue())
-
-			// Recreate it so the process "finishes"
-			createPod(testNamespaceName, fmt.Sprintf("test-%s", testDatacenterName), testDatacenterName, 2)
-
-			completedTask := waitForTaskCompletion(taskKey)
-
-			// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
-			Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
-		})
-	})
-	Context("Task TTL", func() {
-		var testNamespaceName string
-		BeforeEach(func() {
-			testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
-			testNamespace := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: testNamespaceName,
-				},
-			}
-			Expect(k8sClient.Create(context.Background(), testNamespace)).Should(Succeed())
-		})
-		It("Ensures task is deleted after TTL has expired", func() {
-			taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
-			metav1.SetMetaDataLabel(&task.ObjectMeta, taskStatusLabel, completedTaskLabelValue)
-			ttlTime := new(int32)
-			*ttlTime = 1
-			task.Spec.TTLSecondsAfterFinished = ttlTime
-			Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
-
-			timeNow := metav1.Now()
-			task.Status.CompletionTime = &timeNow
-			Expect(k8sClient.Status().Update(context.TODO(), task)).Should(Succeed())
-
-			Eventually(func() bool {
-				deletedTask := api.CassandraTask{}
-				err := k8sClient.Get(context.TODO(), taskKey, &deletedTask)
-				return err != nil && errors.IsNotFound(err)
-			}).Should(BeTrue())
-		})
-		It("Ensures task is not deleted if TTL is set to 0", func() {
-			taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
-			metav1.SetMetaDataLabel(&task.ObjectMeta, taskStatusLabel, completedTaskLabelValue)
-			ttlTime := new(int32)
-			*ttlTime = 0
-			task.Spec.TTLSecondsAfterFinished = ttlTime
-			Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
-
-			timeNow := metav1.Now()
-			task.Status.CompletionTime = &timeNow
-
-			Expect(k8sClient.Status().Update(context.TODO(), task)).Should(Succeed())
-			Consistently(func() bool {
-				deletedTask := api.CassandraTask{}
-				err := k8sClient.Get(context.TODO(), taskKey, &deletedTask)
-				return err == nil
-			}).Should(BeTrue())
+				_ = waitForTaskCompletion(taskKey)
+			})
 		})
 	})
 })

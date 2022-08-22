@@ -22,6 +22,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	RestartedAtAnnotation = "control.k8ssandra.io/restartedAt"
+)
+
 // CassandraTaskSpec defines the desired state of CassandraTask
 type CassandraTaskSpec struct {
 

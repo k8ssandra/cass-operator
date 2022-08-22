@@ -257,6 +257,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	var err error
 	var failed, completed int
+JobDefinition:
 	for _, job := range cassTask.Spec.Jobs {
 		taskConfig := &TaskConfiguration{
 			RestartPolicy: cassTask.Spec.RestartPolicy,
@@ -284,8 +285,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-
-			break
+			break JobDefinition
 		case api.CommandReplaceNode:
 			r.replace(taskConfig)
 		case "forceupgraderacks":

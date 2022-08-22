@@ -540,19 +540,6 @@ var _ = Describe("CassandraTask controller tests", func() {
 				Eventually(func() bool {
 					Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
 
-					inflight := 0
-					for _, sts := range stsAll.Items {
-						if _, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]; found {
-							if sts.Status.UpdateRevision == "" {
-								// Inflight
-								inflight++
-							}
-						}
-					}
-
-					// Never more than 1 inflight
-					Expect(inflight).To(Equal(1))
-
 					for _, sts := range stsAll.Items {
 						// TODO Verify that the restart wasn't set to all StS at once
 						if _, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]; found {

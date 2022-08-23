@@ -11,12 +11,13 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#395](https://github.com/k8ssandra/cass-operator/issues/395) Make CassandraTask job arguments strongly typed
 * [CHANGE] [#354](https://github.com/k8ssandra/cass-operator/issues/354) Remove oldDefunctLabel support since we recreate StS. Fix #335 created-by value to match expected value.
 * [CHANGE] [#385](https://github.com/k8ssandra/cass-operator/issues/385) Deprecate CassandraDatacenter's RollingRestartRequested. Use CassandraTask instead.
-* [ENHANCEMENT] [#385](https://github.com/k8ssandra/cass-operator/issues/385) Add rolling restart as a CassandraTask action.
 * [CHANGE] [#397](https://github.com/k8ssandra/cass-operator/issues/397) Remove direct dependency to k8s.io/kubernetes
 * [FEATURE] [#384](https://github.com/k8ssandra/cass-operator/issues/384) Add a new CassandraTask operation "replacenode" that removes the existing PVCs from the pod, deletes the pod and starts a replacement process.
 * [FEATURE] [#387](https://github.com/k8ssandra/cass-operator/issues/387) Add a new CassandraTask operation "upgradesstables" that allows to do SSTable upgrades after Cassandra version upgrade.
+* [ENHANCEMENT] [#385](https://github.com/k8ssandra/cass-operator/issues/385) Add rolling restart as a CassandraTask action.
 * [ENHANCEMENT] [#398](https://github.com/k8ssandra/cass-operator/issues/398) Update to go1.18 builds, update to use Kubernetes 1.24 envtest + dependencies, operator-sdk 1.23, controller-gen 0.9.2, Kustomize 4.5.7, controller-runtime 0.12.2
 * [ENHANCEMENT] [#383](https://github.com/k8ssandra/cass-operator/pull/383) Add UpgradeSSTables, Compaction and Scrub to management-api client. Improve CassandraTasks to have the ability to validate input parameters, filter target pods and do processing outside of pods.
 * [BUGFIX] [#327](https://github.com/k8ssandra/cass-operator/issues/327) Replace node done through CassandraTask can replace a node that's stuck in the Starting state.

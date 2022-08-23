@@ -90,7 +90,7 @@ type TaskConfiguration struct {
 
 	// Input parameters
 	RestartPolicy corev1.RestartPolicy
-	Arguments     map[string]string
+	Arguments     api.JobArguments
 
 	// Execution functionality per pod
 	AsyncFeature httphelper.Feature

@@ -73,20 +73,23 @@ const (
 	CommandScrub           CassandraCommand = "scrub"
 )
 
-const (
-	KeyspaceArgument         string = "keyspace_name"
-	RackArgument             string = "rack"
-	SourceDatacenterArgument string = "source_datacenter"
-)
-
 type CassandraJob struct {
 	Name string `json:"name"`
 
 	// Command defines what is run against Cassandra pods
 	Command CassandraCommand `json:"command"`
 
-	// +optional
-	Arguments map[string]string `json:"args,omitempty"`
+	// Arguments are additional parameters for the command
+	Arguments JobArguments `json:"args,omitempty"`
+}
+
+type JobArguments struct {
+	KeyspaceName     string `json:"keyspace_name,omitempty"`
+	SourceDatacenter string `json:"source_datacenter,omitempty"`
+	PodName          string `json:"pod_name,omitempty"`
+	RackName         string `json:"rack,omitempty"`
+
+	// Add compaction arguments
 }
 
 // CassandraTaskStatus defines the observed state of CassandraJob

@@ -22,19 +22,13 @@ import (
 
 func callCleanup(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
 	// TODO Add more arguments configurations
-	keyspaceName := ""
-	if keyspace, found := taskConfig.Arguments[api.KeyspaceArgument]; found {
-		keyspaceName = keyspace
-	}
+	keyspaceName := taskConfig.Arguments.KeyspaceName
 	return nodeMgmtClient.CallKeyspaceCleanup(pod, -1, keyspaceName, nil)
 }
 
 func callCleanupSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
 	// TODO Add more arguments configurations
-	keyspaceName := ""
-	if keyspace, found := taskConfig.Arguments[api.KeyspaceArgument]; found {
-		keyspaceName = keyspace
-	}
+	keyspaceName := taskConfig.Arguments.KeyspaceName
 	return nodeMgmtClient.CallKeyspaceCleanupEndpoint(pod, -1, keyspaceName, nil)
 }
 
@@ -47,7 +41,7 @@ func cleanup(taskConfig *TaskConfiguration) {
 // Rebuild functionality
 
 func callRebuild(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
-	return nodeMgmtClient.CallDatacenterRebuild(pod, taskConfig.Arguments[api.SourceDatacenterArgument])
+	return nodeMgmtClient.CallDatacenterRebuild(pod, taskConfig.Arguments.SourceDatacenter)
 }
 
 func rebuild(taskConfig *TaskConfiguration) {
@@ -65,10 +59,10 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 
 	restartTime := taskConfig.TaskStartTime.Format(time.RFC3339)
 
-	if rackFilter, found := taskConfig.Arguments[api.RackArgument]; found {
+	if taskConfig.Arguments.RackName != "" {
 		singleSts := make([]appsv1.StatefulSet, 1)
 		for _, st := range sts {
-			if st.ObjectMeta.Labels[cassapi.RackLabel] == rackFilter {
+			if st.ObjectMeta.Labels[cassapi.RackLabel] == taskConfig.Arguments.RackName {
 				singleSts[0] = st
 				sts = singleSts
 				break
@@ -112,19 +106,13 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 
 func callUpgradeSSTables(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
 	// TODO Add more arguments configurations
-	keyspaceName := ""
-	if keyspace, found := taskConfig.Arguments["keyspace_name"]; found {
-		keyspaceName = keyspace
-	}
+	keyspaceName := taskConfig.Arguments.KeyspaceName
 	return nodeMgmtClient.CallUpgradeSSTables(pod, -1, keyspaceName, nil)
 }
 
 func callUpgradeSSTablesSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
 	// TODO Add more arguments configurations
-	keyspaceName := ""
-	if keyspace, found := taskConfig.Arguments["keyspace_name"]; found {
-		keyspaceName = keyspace
-	}
+	keyspaceName := taskConfig.Arguments.KeyspaceName
 	return nodeMgmtClient.CallUpgradeSSTablesEndpoint(pod, -1, keyspaceName, nil)
 }
 
@@ -135,10 +123,6 @@ func upgradesstables(taskConfig *TaskConfiguration) {
 }
 
 // Replace nodes functionality
-
-const (
-	replacePodNameArgument = "pod_name"
-)
 
 // replacePod will drain the node, remove the PVCs and delete the pod. cass-operator will then call replace-node process when it starts Cassandra
 func (r *CassandraTaskReconciler) replacePod(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
@@ -175,13 +159,13 @@ func (r *CassandraTaskReconciler) replacePod(nodeMgmtClient httphelper.NodeMgmtC
 
 func (r *CassandraTaskReconciler) replaceValidator(taskConfig *TaskConfiguration) error {
 	// Check that arguments has replaceable pods and that those pods are actually existing pods
-	if podName, found := taskConfig.Arguments[replacePodNameArgument]; found {
+	if taskConfig.Arguments.PodName != "" {
 		pods, err := r.getDatacenterPods(taskConfig.Context, taskConfig.Datacenter)
 		if err != nil {
 			return err
 		}
 		for _, pod := range pods {
-			if pod.Name == podName {
+			if pod.Name == taskConfig.Arguments.PodName {
 				return nil
 			}
 		}
@@ -192,14 +176,14 @@ func (r *CassandraTaskReconciler) replaceValidator(taskConfig *TaskConfiguration
 
 func replaceFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
 	// If pod isn't in the to be replaced pods, return false
-	podName := taskConfig.Arguments[replacePodNameArgument]
+	podName := taskConfig.Arguments.PodName
 	return pod.Name == podName
 }
 
 // replacePreProcess adds enough information to CassandraDatacenter to ensure cass-operator knows this pod is being replaced
 func (r *CassandraTaskReconciler) replacePreProcess(taskConfig *TaskConfiguration) error {
 	dc := taskConfig.Datacenter
-	podName := taskConfig.Arguments[replacePodNameArgument]
+	podName := taskConfig.Arguments.PodName
 	dc.Status.NodeReplacements = utils.AppendValuesToStringArrayIfNotPresent(
 		dc.Status.NodeReplacements, podName)
 

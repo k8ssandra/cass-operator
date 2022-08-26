@@ -79,10 +79,10 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "Ready", 30)
 
 			step = "attempt to use invalid dse version"
-			json = "{\"spec\": {\"serverType\": \"dse\", \"serverVersion\": \"4.8.0\"}}"
+			json = "{\"spec\": {\"serverType\": \"dse\", \"serverVersion\": \"6.7.0\"}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLogAndExpectErrorString(step, k,
-				`spec.serverVersion: Invalid value: "4.8.0": spec.serverVersion in body should match '(6\.8\.\d+)|(3\.11\.\d+)|(4\.0\.\d+)'`)
+				`spec.serverVersion: Invalid value: "6.7.0": spec.serverVersion in body should match '(6\.8\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)'`)
 			step = "attempt to change the dc name"
 			json = "{\"spec\": {\"clusterName\": \"NewName\"}}"
 			k = kubectl.PatchMerge(dcResource, json)

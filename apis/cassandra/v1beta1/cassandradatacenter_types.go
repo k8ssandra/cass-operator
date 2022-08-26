@@ -80,7 +80,7 @@ type CassandraDatacenterSpec struct {
 
 	// Version string for config builder,
 	// used to generate Cassandra server configuration
-	// +kubebuilder:validation:Pattern=(6\.8\.\d+)|(3\.11\.\d+)|(4\.0\.\d+)
+	// +kubebuilder:validation:Pattern=(6\.8\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)
 	ServerVersion string `json:"serverVersion"`
 
 	// Cassandra server image name. Use of ImageConfig to match ServerVersion is recommended instead of this value.
@@ -407,8 +407,8 @@ type CassandraDatacenterStatus struct {
 
 // CassandraDatacenter is the Schema for the cassandradatacenters API
 // +k8s:openapi-gen=true
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:path=cassandradatacenters,scope=Namespaced,shortName=cassdc;cassdcs
 type CassandraDatacenter struct {
 	metav1.TypeMeta   `json:",inline"`

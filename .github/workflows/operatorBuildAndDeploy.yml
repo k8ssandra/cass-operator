@@ -78,6 +78,7 @@ jobs:
         run: |
           echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
           echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
+          echo ::set-output name=version::$(make version)
       - name: Build and push
         id: docker_build_cass_operator
         uses: docker/build-push-action@v2
@@ -85,7 +86,7 @@ jobs:
           file: Dockerfile
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: k8ssandra/cass-operator:${{ steps.vars.outputs.sha_short }}, k8ssandra/cass-operator:latest
+          tags: k8ssandra/cass-operator:${{ steps.vars.outputs.sha_short }}, k8ssandra/cass-operator:latest, k8ssandra/cass-operator:${{ steps.vars.outputs.version }}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
@@ -101,20 +102,20 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Create bundle
         run: |
-          make IMG=k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}} VERSION=${{ env.TARGET_VERSION }} bundle
+          make IMG=k8ssandra/cass-operator:${{ steps.vars.outputs.version }} VERSION=${{ steps.vars.outputs.version }} CHANNEL=dev bundle
       - name: Build and push cass-operator-bundle
         id: docker_build_cass-operator_bundle
         uses: docker/build-push-action@v2
         with:
           file: bundle.Dockerfile
           build-args: |
-            VERSION=${{ env.TARGET_VERSION }}
+            VERSION=${{ steps.vars.outputs.version }}
           context: .
           push: ${{ !env.ACT }}
-          tags: k8ssandra/cass-operator-bundle:${{ steps.vars.outputs.tag_name}}
+          tags: k8ssandra/cass-operator-bundle:v${{ steps.vars.outputs.version }}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build and update cass-operator-catalog
         run: |
-          make VERSION=${{ env.TARGET_VERSION }} CHANNEL=dev catalog-build catalog-push
+          make VERSION=${{ steps.vars.outputs.version }} CHANNEL=dev catalog-build catalog-push

@@ -105,6 +105,9 @@ var _ = Describe(testName, func() {
 			// Ensure we have three CassandraTasks created which are cleanup (and they succeeded)
 			ns.CheckForCompletedCassandraTasks(dcName, "cleanup", 3)
 
+			// Also verify that we have exactly 3 tasks, no more
+			ns.CheckForCassandraTasks(dcName, "cleanup", false, 3)
+
 			step = "check recorded host IDs"
 			ns.Log(step)
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)

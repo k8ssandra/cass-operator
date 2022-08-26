@@ -1,0 +1,108 @@
+#
+#  Copyright 2022 DataStax, Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#
+#
+
+enableAntiAffinity: false
+enableTls: false
+enableTokenAuth: false
+restartOnConfigMapChange:
+  enabled: true
+extra:
+  function: true
+  burnell: true
+  burnellLogCollector: false
+  pulsarHeartbeat: true
+  pulsarAdminConsole: true
+
+zookeeper:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 300Mi
+      cpu: 0.3
+  configData:
+    PULSAR_MEM: "-Xms300m -Xmx300m -Djute.maxbuffer=10485760 -XX:+ExitOnOutOfMemoryError"
+
+bookkeeper:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 0.3
+  configData:
+    BOOKIE_MEM: "-Xms312m -Xmx312m -XX:MaxDirectMemorySize=200m -XX:+ExitOnOutOfMemoryError"
+
+broker:
+  component: broker
+  replicaCount: 1
+  ledger:
+    defaultEnsembleSize: 1
+    defaultAckQuorum: 1
+    defaultWriteQuorum: 1
+  resources:
+    requests:
+      memory: 600Mi
+      cpu: 0.3
+  configData:
+    PULSAR_MEM: "-Xms400m -Xmx400m -XX:MaxDirectMemorySize=200m -XX:+ExitOnOutOfMemoryError"
+
+autoRecovery:
+  resources:
+    requests:
+      memory: 300Mi
+      cpu: 0.3
+
+function:
+  replicaCount: 1
+  functionReplicaCount: 1
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 0.3
+  configData:
+    PULSAR_MEM: "-Xms312m -Xmx312m -XX:MaxDirectMemorySize=200m -XX:+ExitOnOutOfMemoryError"
+
+proxy:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 0.3
+  wsResources:
+    requests:
+      memory: 512Mi
+      cpu: 0.3
+  configData:
+    PULSAR_MEM: "-Xms400m -Xmx400m -XX:MaxDirectMemorySize=112m"
+  autoPortAssign:
+    enablePlainTextWithTLS: true
+  service:
+    autoPortAssign:
+      enabled: true
+
+grafanaDashboards:
+  enabled: false
+
+pulsarAdminConsole:
+  replicaCount: 1
+
+kube-prometheus-stack:
+  enabled: false
+  prometheusOperator:
+    enabled: false
+  grafana:
+    enabled: false
+    adminPassword: e9JYtk83*4#PM8

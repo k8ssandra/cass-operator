@@ -258,3 +258,6 @@ testbin/
 # bundle files+directories are generated
 bundle.Dockerfile
 bundle/
+kind-logs*/
+
+kubeconfig

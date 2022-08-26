@@ -52,6 +52,14 @@ const (
 	// CassandraDatacenter is deleted.
 	DecommissionOnDeleteAnnotation = "cassandra.datastax.com/decommission-on-delete"
 
+	// NoFinalizerAnnotation prevents cass-operator from re-adding the finalizer to managed objects if finalizer is
+	// removed. Removing finalizer means deletion is not processed as usual.
+	NoFinalizerAnnotation = "cassandra.datastax.com/no-finalizer"
+
+	// Finalizer is the finalizer set by cass-operator to the resources it wants to prevent from being deleted.
+	// If no finalizer is set, the cass-operator ProcessDeletion() is not run
+	Finalizer = "finalizer.cassandra.datastax.com"
+
 	CassNodeState = "cassandra.datastax.com/node-state"
 
 	ProgressUpdating ProgressState = "Updating"
@@ -80,7 +88,7 @@ type CassandraDatacenterSpec struct {
 
 	// Version string for config builder,
 	// used to generate Cassandra server configuration
-	// +kubebuilder:validation:Pattern=(6\.8\.\d+)|(3\.11\.\d+)|(4\.0\.\d+)
+	// +kubebuilder:validation:Pattern=(6\.8\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)
 	ServerVersion string `json:"serverVersion"`
 
 	// Cassandra server image name. Use of ImageConfig to match ServerVersion is recommended instead of this value.
@@ -142,7 +150,7 @@ type CassandraDatacenterSpec struct {
 	// StorageConfig describes the persistent storage request of each server node
 	StorageConfig StorageConfig `json:"storageConfig"`
 
-	// A list of pod names that need to be replaced.
+	// DEPRECATED Use CassandraTask replacenode to achieve correct node replacement. A list of pod names that need to be replaced.
 	ReplaceNodes []string `json:"replaceNodes,omitempty"`
 
 	// The name by which CQL clients and instances will know the cluster. If the same
@@ -220,6 +228,9 @@ type CassandraDatacenterSpec struct {
 
 	// Additional Labels allows to define additional labels that will be included in all objects created by the operator. Note, user can override values set by default from the cass-operator and doing so could break cass-operator functionality.
 	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
+
+	// CDC allows configuration of the change data capture agent which can run within the Management API container. Use it to send data to Pulsar.
+	CDC *CDCConfiguration `json:"cdc,omitempty"`
 }
 
 type NetworkingConfig struct {
@@ -328,6 +339,10 @@ const (
 	DatacenterRollingRestart DatacenterConditionType = "RollingRestart"
 	DatacenterValid          DatacenterConditionType = "Valid"
 	DatacenterDecommission   DatacenterConditionType = "Decommission"
+
+	// DatacenterHealthy indicates if QUORUM can be reached from all deployed nodes.
+	// If this check fails, certain operations such as scaling up will not proceed.
+	DatacenterHealthy DatacenterConditionType = "Healthy"
 )
 
 type DatacenterCondition struct {
@@ -403,8 +418,8 @@ type CassandraDatacenterStatus struct {
 
 // CassandraDatacenter is the Schema for the cassandradatacenters API
 // +k8s:openapi-gen=true
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:path=cassandradatacenters,scope=Namespaced,shortName=cassdc;cassdcs
 type CassandraDatacenter struct {
 	metav1.TypeMeta   `json:",inline"`

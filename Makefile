@@ -4,7 +4,7 @@
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 
-VERSION ?= 1.11.0
+VERSION ?= 1.13.0
 
 COMMIT := $(shell git rev-parse --short HEAD)
 DATE := $(shell date +%Y%m%d)
@@ -119,20 +119,24 @@ lint: ## Run golangci-lint against code.
 	golangci-lint run ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
+test: manifests generate fmt vet lint envtest ## Run tests.
 	# Old unit tests first - these use mocked client / fakeclient
 	go test ./pkg/... -coverprofile cover-pkg.out
 	# Then the envtest ones
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v ./apis/... ./controllers/... -coverprofile cover.out
 
 .PHONY: integ-test
-integ-test: kustomize cert-manager ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
+integ-test: kustomize cert-manager helm ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
 ifeq ($(M_INTEG_DIR), all)
 	# Run all the tests (exclude kustomize & testdata directories)
 	cd tests && go test -v ./... -timeout 300m --ginkgo.progress --ginkgo.v
 else
 	cd tests/${M_INTEG_DIR} && go test -v ./... -timeout 300m --ginkgo.progress --ginkgo.v
 endif
+
+.PHONY: version
+version:
+	@echo $(VERSION)
 
 ##@ Build
 
@@ -210,7 +214,7 @@ endif
 
 .PHONY: cert-manager
 cert-manager: ## Install cert-manager to the cluster
-	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml
+	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.2/cert-manager.yaml
 	kubectl wait --for=condition=Established crd certificates.cert-manager.io
 	kubectl rollout status deployment cert-manager-webhook -n cert-manager
 
@@ -231,6 +235,27 @@ envtest: ## Download envtest-setup locally if necessary.
 
 OS=$(shell go env GOOS)
 ARCH=$(shell go env GOARCH)
+
+.PHONY: helm
+HELM = ./bin/helm
+HELMTARNAME = helm-v3.9.0-${OS}-${ARCH}.tar.gz
+helm: ## Download helm locally if necessary.
+ifeq (,$(wildcard $(HELM)))
+ifeq (,$(shell which helm 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(HELM)) ;\
+	curl -sSLo bin/${HELMTARNAME} https://get.helm.sh/${HELMTARNAME} ;\
+	tar -zxf bin/${HELMTARNAME} -C bin/;\
+	mv bin/${OS}-${ARCH}/helm ${HELM} ;\
+	rm -rf bin/${HELMTARNAME} bin/${OS}-${ARCH} ;\
+	chmod +x $(HELM) ;\
+	}
+else
+HELM = $(shell which helm)
+endif
+endif
+
 .PHONY: operator-sdk
 OPSDK = ./bin/operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary
@@ -275,7 +300,7 @@ bundle-build: ## Build the bundle image.
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+	docker push $(BUNDLE_IMG)
 
 .PHONY: opm
 OPM = ./bin/opm
@@ -316,4 +341,4 @@ catalog-build: opm ## Build a catalog image.
 # Push the catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
-	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+	docker push $(CATALOG_IMG)

@@ -430,10 +430,6 @@ func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
 			statefulSet.SetLabels(updatedLabels)
 
 			if err := rc.Client.Patch(rc.Ctx, statefulSet, patch); err != nil {
-				rc.ReqLogger.Info("Unable to update statefulSet with labels",
-					"statefulSet", statefulSet)
-
-				// FIXME we had not been passing this error up - why?
 				return result.Error(err)
 			}
 
@@ -611,12 +607,16 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 
 	// step 3 - get all nodes up
 	// if the cluster isn't healthy, that's ok, but go back to step 1
-	if !rc.isClusterHealthy() {
+	clusterHealthy := rc.isClusterHealthy()
+	if err := rc.updateHealth(clusterHealthy); err != nil {
+		return result.Error(err)
+	}
+
+	if !clusterHealthy {
 		rc.ReqLogger.Info(
 			"cluster isn't healthy",
 		)
-		// FIXME this is one spot I've seen get spammy, should we raise this number?
-		return result.RequeueSoon(2)
+		return result.RequeueSoon(5)
 	}
 
 	needsMoreNodes, err := rc.startAllNodes(endpointData)
@@ -958,7 +958,7 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 		dc.Status.NodeStatuses = map[string]api.CassandraNodeStatus{}
 	}
 
-	for _, pod := range rc.dcPods {
+	for _, pod := range ListAllStartedPods(rc.dcPods) {
 		nodeStatus, ok := dc.Status.NodeStatuses[pod.Name]
 		if !ok {
 			nodeStatus = api.CassandraNodeStatus{}
@@ -984,8 +984,6 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 					if nodeStatus.HostID == "" {
 						logger.Info("Failed to find host ID", "pod", pod.Name)
 					}
-				} else {
-					rc.ReqLogger.Error(err, "Could not get endpoints data")
 				}
 			}
 		}
@@ -1149,6 +1147,30 @@ func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 	return result.Continue()
 }
 
+func (rc *ReconciliationContext) updateHealth(healthy bool) error {
+	updated := false
+	dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
+
+	if !healthy {
+		updated = rc.setCondition(
+			api.NewDatacenterCondition(
+				api.DatacenterHealthy, corev1.ConditionFalse))
+	} else {
+		updated = rc.setCondition(
+			api.NewDatacenterCondition(
+				api.DatacenterHealthy, corev1.ConditionTrue))
+	}
+
+	if updated {
+		err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func hasBeenXMinutes(x int, sinceTime time.Time) bool {
 	xMinutesAgo := time.Now().Add(time.Minute * time.Duration(-x))
 	return sinceTime.Before(xMinutesAgo)
@@ -1233,9 +1255,8 @@ func (rc *ReconciliationContext) isNodeStuckWithoutPVC(pod *corev1.Pod) bool {
 			if errors.IsNotFound(err) {
 				return true
 			} else {
-				rc.ReqLogger.Info(
-					"Unable to get PersistentVolumeClaim",
-					"error", err.Error())
+				rc.ReqLogger.Error(err,
+					"Unable to get PersistentVolumeClaim")
 			}
 		}
 	}
@@ -1267,6 +1288,8 @@ func (rc *ReconciliationContext) deleteStuckNodes() (bool, error) {
 	return false, nil
 }
 
+// isClusterHealthy does a LOCAL_QUORUM query to the Cassandra pods and returns true if all the pods were able to
+// respond without error.
 func (rc *ReconciliationContext) isClusterHealthy() bool {
 	pods := FilterPodListByCassNodeState(rc.clusterPods, stateStarted)
 
@@ -1274,6 +1297,9 @@ func (rc *ReconciliationContext) isClusterHealthy() bool {
 	for _, pod := range pods {
 		err := rc.NodeMgmtClient.CallProbeClusterEndpoint(pod, "LOCAL_QUORUM", numRacks)
 		if err != nil {
+			reason := fmt.Sprintf("Pod %s failed the LOCAL_QUORUM check", pod.Name)
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.UnhealthyDatacenter,
+				reason)
 			return false
 		}
 	}
@@ -1770,6 +1796,13 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 	}
 
 	if err != nil {
+		// Pod was unable to start. Most likely this is not a recoverable error, so lets kill the pod and
+		// try again.
+		if deleteErr := rc.Client.Delete(rc.Ctx, pod); deleteErr != nil {
+			return deleteErr
+		}
+		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.StartingCassandra,
+			"Failed to start pod %s, deleting it", pod.Name)
 		return err
 	}
 	return rc.labelServerPodStarting(pod)
@@ -2081,7 +2114,7 @@ func (rc *ReconciliationContext) CheckCassandraNodeStatuses() result.ReconcileRe
 
 func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	// Verify if the cleanup task has completed before moving on the with ScalingUp finished
-	task, err := rc.findActiveTask("cleanup")
+	task, err := rc.findActiveTask(taskapi.CommandCleanup)
 	if err != nil {
 		return result.Error(err)
 	}
@@ -2091,7 +2124,7 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	}
 
 	// Create the cleanup task
-	err = rc.createTask("cleanup")
+	err = rc.createTask(taskapi.CommandCleanup)
 	if err != nil {
 		return result.Error(err)
 	}
@@ -2135,7 +2168,7 @@ func (rc *ReconciliationContext) findActiveTask(command taskapi.CassandraCommand
 	return nil, nil
 }
 
-func (rc *ReconciliationContext) createTask(command string) error {
+func (rc *ReconciliationContext) createTask(command taskapi.CassandraCommand) error {
 	generatedName := fmt.Sprintf("%s-%d", command, time.Now().Unix())
 	dc := rc.Datacenter
 
@@ -2153,7 +2186,7 @@ func (rc *ReconciliationContext) createTask(command string) error {
 			Jobs: []taskapi.CassandraJob{
 				{
 					Name:    fmt.Sprintf("%s-%s", command, rc.Datacenter.Name),
-					Command: taskapi.CommandCleanup,
+					Command: command,
 				},
 			},
 		},

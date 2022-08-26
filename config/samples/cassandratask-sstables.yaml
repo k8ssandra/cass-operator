@@ -1,0 +1,11 @@
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: CassandraTask
+metadata:
+  name: example-upgradesstables
+spec:
+  datacenter:
+    name: dc1
+    namespace: cass-operator
+  jobs:
+    - name: upgrade-run
+      command: upgradesstables

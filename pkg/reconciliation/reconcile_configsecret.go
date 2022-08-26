@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/cdc"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -114,11 +116,14 @@ func (rc *ReconciliationContext) updateConfigHashAnnotation(secret *corev1.Secre
 func getConfigFromConfigSecret(dc *api.CassandraDatacenter, secret *corev1.Secret) ([]byte, error) {
 	if b, found := secret.Data["config"]; found {
 		jsonConfig, err := dc.GetConfigAsJSON(b)
-		if err == nil {
-			return []byte(jsonConfig), nil
-		} else {
+		if err != nil {
 			return nil, err
 		}
+		cdcAdded, err := cdc.UpdateConfig(json.RawMessage(jsonConfig), *dc)
+		if err != nil {
+			return nil, err
+		}
+		return []byte(cdcAdded), nil
 	} else {
 		return nil, fmt.Errorf("invalid config secret %s: config property is required", dc.Spec.ConfigSecret)
 	}

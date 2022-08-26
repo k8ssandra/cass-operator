@@ -126,7 +126,7 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 		if err := rc.updateDcMaps(); err != nil {
 			// We will not skip reconciliation if the map update failed
 			// return result.Error(err).Output()
-			rc.ReqLogger.V(1).Info("Failed to update dc map")
+			rc.ReqLogger.V(1).Error(err, "Failed to update dc map")
 		}
 	}
 
@@ -176,14 +176,17 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 // https://godoc.org/github.com/go-logr/logr
 
 func (rc *ReconciliationContext) addFinalizer() error {
-	if len(rc.Datacenter.GetFinalizers()) < 1 && rc.Datacenter.GetDeletionTimestamp() == nil {
+	if _, found := rc.Datacenter.Annotations[api.NoFinalizerAnnotation]; found {
+		return nil
+	}
+
+	if !controllerutil.ContainsFinalizer(rc.Datacenter, api.Finalizer) && rc.Datacenter.GetDeletionTimestamp() == nil {
 		rc.ReqLogger.Info("Adding Finalizer for the CassandraDatacenter")
-		rc.Datacenter.SetFinalizers([]string{"finalizer.cassandra.datastax.com"})
+		controllerutil.AddFinalizer(rc.Datacenter, api.Finalizer)
 
 		// Update CR
 		err := rc.Client.Update(rc.Ctx, rc.Datacenter)
 		if err != nil {
-			rc.ReqLogger.Error(err, "Failed to update CassandraDatacenter with finalizer")
 			return err
 		}
 	}
@@ -203,6 +206,9 @@ func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
 
 	// Validate FQL config
 	errs = append(errs, api.ValidateFQLConfig(*dc))
+
+	// Validate Service labels and annotations
+	errs = append(errs, api.ValidateServiceLabelsAndAnnotations(*dc))
 
 	// Validate Management API config
 	errs = append(errs, httphelper.ValidateManagementApiConfig(dc, rc.Client, rc.Ctx)...)

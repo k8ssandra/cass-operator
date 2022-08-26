@@ -10,8 +10,35 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ```
 
 ## unreleased
+
 * [CHANGE] [#354](https://github.com/k8ssandra/cass-operator/issues/354) Remove oldDefunctLabel support since we recreate StS. Fix #335 created-by value to match expected value.
+* [ENHANCEMENT] [#383](https://github.com/k8ssandra/cass-operator/pull/383) Add UpgradeSSTables, Compaction and Scrub to management-api client. Improve CassandraTasks to have the ability to validate input parameters, filter target pods and do processing outside of pods.
+* [ENHANCEMENT] [#384](https://github.com/k8ssandra/cass-operator/issues/384) Add a new CassandraTask operation "replacenode" that removes the existing PVCs from the pod, deletes the pod and starts a replacement process.
+* [ENHANCEMENT] [#387](https://github.com/k8ssandra/cass-operator/issues/387) Add a new CassandraTask operation "upgradesstables" that allows to do SSTable upgrades after Cassandra version upgrade.
+* [BUGFIX] [#327](https://github.com/k8ssandra/cass-operator/issues/327) Replace node done through CassandraTask can replace a node that's stuck in the Starting state.
+
+
+## v1.12.0
+
+* [CHANGE] [#370](https://github.com/k8ssandra/cass-operator/issues/370) If Cassandra start call fails, delete the pod
+* [ENHANCEMENT] [#366](https://github.com/k8ssandra/cass-operator/issues/366) If no finalizer is present, do not process the deletion. To prevent cass-operator from re-adding the finalizer, add an annotation no-finalizer that prevents the re-adding.
+* [ENHANCEMENT] [#360](https://github.com/k8ssandra/cass-operator/pull/360) If Datacenter quorum reports unhealthy state, change Status Condition DatacenterHealthy to False (DBPE-2283)
+* [ENHANCEMENT] [#317](https://github.com/k8ssandra/cass-operator/issues/317) Add ability for users to define CDC settings which will cause an agent to start within the Cassandra JVM and pass mutation events from Cassandra back to a Pulsar broker. (Tested on OSS Cassandra 4.x only.)
+* [ENHANCEMENT] [#369](https://github.com/k8ssandra/cass-operator/issues/369) Add configurable timeout for liveness / readiness and drain when mutual auth is used and a default timeout for all wget execs (required with mutual auth)
 * [BUGFIX] [#355](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars. Include app.kubernetes.io/created-by label. 
+* [BUGFIX] [#330](https://github.com/k8ssandra/cass-operator/issues/330) Apply correct updates to Service labels and annotations through additionalServiceConfig (they are now validated and don't allow reserved prefixes).
+* [BUGFIX] [#368](https://github.com/k8ssandra/cass-operator/issues/368) Do not fetch endpointStatus from pods that have not started
+* [BUGFIX] [#364](https://github.com/k8ssandra/cass-operator/issues/364) Do not log any errors if we fail to get endpoint states from nodes.
+
+## v1.10.5
+
+* [CHANGE] [#370](https://github.com/k8ssandra/cass-operator/issues/370) If Cassandra start call fails, delete the pod
+* [ENHANCEMENT] [#360](https://github.com/k8ssandra/cass-operator/pull/360) If Datacenter quorum reports unhealthy state, change Status Condition DatacenterHealthy to False (DBPE-2283)
+* [BUGFIX] [#377](https://github.com/k8ssandra/cass-operator/issues/377) Add timeout to all calls made with wget (mutual-auth)
+* [BUGFIX] [#355](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars.
+* [BUGFIX] [#330](https://github.com/k8ssandra/cass-operator/issues/330) Apply correct updates to Service labels and annotations through additionalServiceConfig (they are now validated and don't allow reserved prefixes).
+* [BUGFIX] [#368](https://github.com/k8ssandra/cass-operator/issues/368) Do not fetch endpointStatus from pods that have not started
+* [BUGFIX] [#364](https://github.com/k8ssandra/cass-operator/issues/364) Do not log any errors if we fail to get endpoint states from nodes.
 
 ## v1.11.0
 

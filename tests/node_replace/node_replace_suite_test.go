@@ -27,6 +27,7 @@ var (
 	podNames         = []string{"cluster1-dc1-r1-sts-0", "cluster1-dc1-r2-sts-0", "cluster1-dc1-r3-sts-0"}
 	podNameToReplace = podNames[2]
 	dcYaml           = "../testdata/default-three-rack-three-node-dc-4x.yaml"
+	taskYaml         = "../testdata/tasks/replace_node_task.yaml"
 	dcResource       = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	ns               = ginkgo_util.NewWrapper(testName, namespace)
 )
@@ -101,28 +102,50 @@ func DeleteIgnoreFinalizersAndLog(description string, resourceName string) {
 	wg.Wait()
 }
 
+func verifyAllPodsAreCorrect() {
+	step := "verify in nodetool that we still have the right number of cassandra nodes and correct HostID is reflected in CRD"
+	By(step)
+	for _, podName := range podNames {
+		nodeInfos := ns.RetrieveStatusFromNodetool(podName)
+		Expect(len(nodeInfos)).To(Equal(len(podNames)), "Expect nodetool to return info on exactly %d nodes", len(podNames))
+
+		for _, nodeInfo := range nodeInfos {
+			Expect(nodeInfo.Status).To(Equal("up"), "Expected all nodes to be up, but node %s was down", nodeInfo.HostId)
+			Expect(nodeInfo.State).To(Equal("normal"), "Expected all nodes to have a state of normal, but node %s was %s", nodeInfo.HostId, nodeInfo.State)
+
+			// Make sure that NodeStatus reflects the HostID for the replacement pod. Otherwise subsequent replaces will fail as the CassandraDatacenter has stale information
+			k := kubectl.Get("pod", podNameToReplace).FormatOutput("jsonpath={.status.podIP}")
+			step = "get podIP"
+			podIP := ns.OutputAndLog(step, k)
+			if podName == podNameToReplace && podIP == nodeInfo.Address {
+				step = "verify nodeStatus HostID is up to date"
+				json := fmt.Sprintf("jsonpath={.status.nodeStatuses['%s'].hostID}", podNameToReplace)
+				hostIdInCassandraDatacenter := ns.OutputAndLog(step, kubectl.Get("cassandradatacenter", dcName).FormatOutput(json))
+				Expect(nodeInfo.HostId).To(Equal(hostIdInCassandraDatacenter), "Expected HostId to be %s but got %s in CassandraDatacenter CRD", nodeInfo.HostId, hostIdInCassandraDatacenter)
+			}
+		}
+	}
+}
+
 var _ = Describe(testName, func() {
 	Context("when in a new cluster", func() {
-		Specify("the operator can replace a defunct cassandra node on pod start", func() {
-			var step string
-			var json string
-			var k kubectl.KCmd
-
+		Specify("operator is installed and cluster is created", func() {
 			By("deploy cass-operator with kustomize")
 			err := kustomize.Deploy(namespace)
 			Expect(err).ToNot(HaveOccurred())
 
 			ns.WaitForOperatorReady()
 
-			step = "creating a datacenter resource with 3 racks/3 nodes"
-			k = kubectl.ApplyFiles(dcYaml)
+			step := "creating a datacenter resource with 3 racks/3 nodes"
+			k := kubectl.ApplyFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
-
-			step = "ensure we actually recorded the host IDs for our cassandra nodes"
-			json = fmt.Sprintf("jsonpath={.status.nodeStatuses[%s].hostID}", quotedList(podNames))
-			k = kubectl.Get("cassandradatacenter", dcName).FormatOutput(json)
+		})
+		Specify("the operator can replace a defunct cassandra node on pod start", func() {
+			step := "ensure we actually recorded the host IDs for our cassandra nodes"
+			json := fmt.Sprintf("jsonpath={.status.nodeStatuses[%s].hostID}", quotedList(podNames))
+			k := kubectl.Get("cassandradatacenter", dcName).FormatOutput(json)
 			ns.WaitForOutputPatternAndLog(step, k, duplicate(`[a-zA-Z0-9-]{36}`, len(podNames)), 60)
 
 			step = "retrieve the persistent volume claim"
@@ -182,28 +205,28 @@ var _ = Describe(testName, func() {
 			// If we do this wrong and start the node we replaced normally (instead of setting the replace
 			// flag), we will end up with an additional node in our cluster. This issue should be caught by
 			// checking nodetool.
-			step = "verify in nodetool that we still have the right number of cassandra nodes and correct HostID is reflected in CRD"
-			By(step)
-			for _, podName := range podNames {
-				nodeInfos := ns.RetrieveStatusFromNodetool(podName)
-				Expect(len(nodeInfos)).To(Equal(len(podNames)), "Expect nodetool to return info on exactly %d nodes", len(podNames))
+			verifyAllPodsAreCorrect()
+		})
+		Specify("cassandratask can be used to replace a node", func() {
+			// Create CassandraTask that should replace a node
+			step := "creating a cassandra task to replace a node"
+			k := kubectl.ApplyFiles(taskYaml)
+			ns.ExecAndLog(step, k)
 
-				for _, nodeInfo := range nodeInfos {
-					Expect(nodeInfo.Status).To(Equal("up"), "Expected all nodes to be up, but node %s was down", nodeInfo.HostId)
-					Expect(nodeInfo.State).To(Equal("normal"), "Expected all nodes to have a state of normal, but node %s was %s", nodeInfo.HostId, nodeInfo.State)
+			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionTrue))
 
-					// Make sure that NodeStatus reflects the HostID for the replacement pod. Otherwise subsequent replaces will fail as the CassandraDatacenter has stale information
-					k = kubectl.Get("pod", podNameToReplace).FormatOutput("jsonpath={.status.podIP}")
-					step = "get podIP"
-					podIP := ns.OutputAndLog(step, k)
-					if podName == podNameToReplace && podIP == nodeInfo.Address {
-						step = "verify nodeStatus HostID is up to date"
-						json = fmt.Sprintf("jsonpath={.status.nodeStatuses['%s'].hostID}", podNameToReplace)
-						hostIdInCassandraDatacenter := ns.OutputAndLog(step, kubectl.Get("cassandradatacenter", dcName).FormatOutput(json))
-						Expect(nodeInfo.HostId).To(Equal(hostIdInCassandraDatacenter), "Expected HostId to be %s but got %s in CassandraDatacenter CRD", nodeInfo.HostId, hostIdInCassandraDatacenter)
-					}
-				}
-			}
+			// Wait for the task to be completed
+			ns.WaitForCompleteTask("replace-node")
+			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionFalse))
+			Expect(len(ns.GetDatacenterReadyPodNames(dcName))).To(Equal(3))
+
+			step = "wait for the pod to return to life"
+			json := "jsonpath={.status.containerStatuses[?(.name=='cassandra')].ready}"
+			k = kubectl.Get("pod", podNameToReplace).
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "true", 1200)
+
+			verifyAllPodsAreCorrect()
 		})
 	})
 })

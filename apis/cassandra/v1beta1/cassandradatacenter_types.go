@@ -147,7 +147,7 @@ type CassandraDatacenterSpec struct {
 	// the number of racks cannot easily be changed once a datacenter is deployed.
 	Racks []Rack `json:"racks,omitempty"`
 
-	// Describes the persistent storage request of each server node
+	// StorageConfig describes the persistent storage request of each server node
 	StorageConfig StorageConfig `json:"storageConfig"`
 
 	// DEPRECATED Use CassandraTask replacenode to achieve correct node replacement. A list of pod names that need to be replaced.
@@ -261,7 +261,7 @@ type DseWorkloads struct {
 	SearchEnabled    bool `json:"searchEnabled,omitempty"`
 }
 
-// AdditionalVolumes StorageConfig defines additional storage configurations
+// AdditionalVolumes defines additional storage configurations
 type AdditionalVolumes struct {
 	// Mount path into cassandra container
 	MountPath string `json:"mountPath"`

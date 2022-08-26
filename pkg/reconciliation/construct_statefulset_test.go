@@ -5,12 +5,13 @@ package reconciliation
 
 import (
 	"fmt"
+	"reflect"
+	"testing"
+
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
-	"testing"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -48,7 +49,7 @@ func Test_newStatefulSetForCassandraDatacenter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount, false)
+		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount)
 		assert.NoError(t, err, "newStatefulSetForCassandraDatacenter should not have errored")
 		assert.NotNil(t, got, "newStatefulSetForCassandraDatacenter should not have returned a nil statefulset")
 		assert.Equal(t, map[string]string{"dedicated": "cassandra"}, got.Spec.Template.Spec.NodeSelector)
@@ -108,7 +109,7 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 	}
 
 	statefulset, newStatefulSetForCassandraDatacenterError := newStatefulSetForCassandraDatacenter(nil,
-		"rack1", dc, 1, false)
+		"rack1", dc, 1)
 
 	assert.NoError(t, newStatefulSetForCassandraDatacenterError,
 		"should not have gotten error when creating the new statefulset")
@@ -170,7 +171,7 @@ func Test_newStatefulSetForCassandraDatacenter_ServiceName(t *testing.T) {
 		},
 	}
 
-	sts, err := newStatefulSetForCassandraDatacenter(&appsv1.StatefulSet{}, "default", dc, 1, false)
+	sts, err := newStatefulSetForCassandraDatacenter(&appsv1.StatefulSet{}, "default", dc, 1)
 
 	require.NoError(t, err)
 	assert.Equal(t, dc.GetAllPodsServiceName(), sts.Spec.ServiceName)
@@ -244,7 +245,7 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount, false)
+		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount)
 		assert.NoError(t, err, "newStatefulSetForCassandraDatacenter should not have errored")
 		assert.NotNil(t, got, "newStatefulSetForCassandraDatacenter should not have returned a nil statefulset")
 
@@ -434,7 +435,7 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		statefulSet, err := newStatefulSetForCassandraDatacenter(nil, rack, tt.dc, replicas, false)
+		statefulSet, err := newStatefulSetForCassandraDatacenter(nil, rack, tt.dc, replicas)
 		assert.NoError(t, err, fmt.Sprintf("%s: failed to create new statefulset", tt.name))
 		assert.NotNil(t, statefulSet, fmt.Sprintf("%s: statefulset is nil", tt.name))
 

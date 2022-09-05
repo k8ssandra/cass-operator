@@ -508,6 +508,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(k8sClient.Get(context.TODO(), taskKey, task)).To(Succeed())
 				Expect(task.Status.CompletionTime).To(BeNil())
+
 				// Imitate statefulset_controller
 				Expect(k8sClient.Get(context.TODO(), stsKey, &sts)).Should(Succeed())
 				sts.Status.UpdatedReplicas = sts.Status.Replicas
@@ -515,6 +516,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				sts.Status.CurrentReplicas = sts.Status.Replicas
 				sts.Status.UpdateRevision = "1"
 				sts.Status.CurrentRevision = sts.Status.UpdateRevision
+				sts.Status.ObservedGeneration = sts.GetObjectMeta().GetGeneration()
 
 				Expect(k8sClient.Status().Update(context.TODO(), &sts)).Should(Succeed())
 
@@ -559,7 +561,6 @@ var _ = Describe("CassandraTask controller tests", func() {
 					Expect(inflight).To(BeNumerically("<=", 1))
 
 					for _, sts := range stsAll.Items {
-						// TODO Verify that the restart wasn't set to all StS at once
 						if _, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]; found {
 							// Imitate statefulset_controller
 							if sts.Status.UpdateRevision != "1" {
@@ -568,6 +569,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 								sts.Status.CurrentReplicas = sts.Status.Replicas
 								sts.Status.UpdateRevision = "1"
 								sts.Status.CurrentRevision = sts.Status.UpdateRevision
+								sts.Status.ObservedGeneration = sts.GetObjectMeta().GetGeneration()
 
 								Expect(k8sClient.Status().Update(context.TODO(), &sts)).Should(Succeed())
 							}

@@ -87,7 +87,8 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 			if status.CurrentRevision == status.UpdateRevision &&
 				status.UpdatedReplicas == status.Replicas &&
 				status.CurrentReplicas == status.Replicas &&
-				status.ReadyReplicas == status.Replicas {
+				status.ReadyReplicas == status.Replicas &&
+				status.ObservedGeneration == st.GetObjectMeta().GetGeneration() {
 				// This one has been updated, move on to the next one
 				continue
 			}

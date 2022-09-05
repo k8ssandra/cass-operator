@@ -8,7 +8,8 @@ import (
 	"testing"
 )
 
-/**
+/*
+*
 A valid label must be an empty string or consist of alphanumeric characters,
 '-', '_' or '.', and must start and end with an alphanumeric.
 */

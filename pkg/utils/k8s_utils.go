@@ -11,9 +11,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-//
 // StringSet helper functions
-//
 type StringSet map[string]bool
 
 func UnionStringSet(a, b StringSet) StringSet {
@@ -46,9 +44,7 @@ func IntersectionStringSet(a, b StringSet) StringSet {
 	return result
 }
 
-//
 // k8s Node helper functions
-//
 func GetNodeNameSet(nodes []*corev1.Node) StringSet {
 	result := StringSet{}
 	for _, node := range nodes {
@@ -84,9 +80,7 @@ func FilterNodesWithTaintKeyValueEffect(nodes []*corev1.Node, taintKey, value st
 	})
 }
 
-//
 // k8s Pod helper functions
-//
 func IsPodUnschedulable(pod *corev1.Pod) bool {
 	for _, condition := range pod.Status.Conditions {
 		if condition.Reason == corev1.PodReasonUnschedulable &&
@@ -153,9 +147,7 @@ func FilterPodsWithLabel(pods []*corev1.Pod, label, value string) []*corev1.Pod 
 	})
 }
 
-//
 // k8s PVC helpers
-//
 func FilterPVCsWithFn(pvcs []*corev1.PersistentVolumeClaim, fn func(*corev1.PersistentVolumeClaim) bool) []*corev1.PersistentVolumeClaim {
 	result := []*corev1.PersistentVolumeClaim{}
 	for _, pvc := range pvcs {

@@ -187,6 +187,48 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 			errString: "attempted to define config jvm-server-options with cassandra-3.11.7",
 		},
 		{
+			name: "Cassandra 3.11 invalid cassandra-yaml full_query_options",
+			dc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: CassandraDatacenterSpec{
+					ServerType:    "cassandra",
+					ServerVersion: "3.11.11",
+					Config: json.RawMessage(`
+					{
+						"cassandra-yaml": {
+							"full_query_logging_options": {
+								"log_dir": "/var/log/cassandra/fql"
+							}
+						}
+					}
+					`),
+				},
+			},
+			errString: "property full_query_logging_options is not valid for serverVersion 3.11.11",
+		},
+		{
+			name: "Cassandra 4.0.1 invalid cassandra-yaml thrift_max_message_length_in_mb",
+			dc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: CassandraDatacenterSpec{
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.1",
+					Config: json.RawMessage(`
+					{
+						"cassandra-yaml": {
+							"thrift_max_message_length_in_mb": "256"
+						}
+					}
+					`),
+				},
+			},
+			errString: "property thrift_max_message_length_in_mb is not valid for serverVersion 4.0.1",
+		},
+		{
 			name: "DSE 6.8 invalid config file jvm-options",
 			dc: &CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{

@@ -759,7 +759,6 @@ func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(client clie
 // Below implementation modified from:
 //
 // https://go-review.googlesource.com/c/go/+/193620/5/src/crypto/tls/example_test.go#210
-//
 func buildVerifyPeerCertificateNoHostCheck(rootCAs *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
 	f := func(certificates [][]byte, _ [][]*x509.Certificate) error {
 		certs := make([]*x509.Certificate, len(certificates))

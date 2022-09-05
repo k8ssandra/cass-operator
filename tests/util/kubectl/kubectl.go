@@ -56,18 +56,18 @@ func WatchPodsInNs(namespace string) {
 	kCmd.ExecVPanic()
 }
 
-//==============================================
+// ==============================================
 // KCmd represents an executable kubectl command
-//==============================================
+// ==============================================
 type KCmd struct {
 	Command string
 	Args    []string
 	Flags   map[string]string
 }
 
-//==============================================
+// ==============================================
 // Execute KCmd by running kubectl
-//==============================================
+// ==============================================
 func (k KCmd) ToCliArgs() []string {
 	var args []string
 	// Write out flags first because we don't know
@@ -105,10 +105,10 @@ func (k KCmd) OutputPanic() string {
 	return shutil.OutputPanic("kubectl", k.ToCliArgs()...)
 }
 
-//==============================================
+// ==============================================
 // Helper functions to build up a KCmd object
 // for common actions
-//==============================================
+// ==============================================
 func (k KCmd) InNamespace(namespace string) KCmd {
 	return k.WithFlag("namespace", namespace)
 }

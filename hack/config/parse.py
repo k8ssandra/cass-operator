@@ -82,4 +82,4 @@ def create_config_values(version: str):
     }
     """)
 
-generate_configs(['311', '40', 'trunk'])
+generate_configs(['311', '40', '400', '406', 'trunk', 'DSE'])

@@ -506,6 +506,8 @@ var _ = Describe("CassandraTask controller tests", func() {
 					return found
 				}).Should(BeTrue())
 
+				Expect(k8sClient.Get(context.TODO(), taskKey, task)).To(Succeed())
+				Expect(task.Status.CompletionTime).To(BeNil())
 				// Imitate statefulset_controller
 				Expect(k8sClient.Get(context.TODO(), stsKey, &sts)).Should(Succeed())
 				sts.Status.UpdatedReplicas = sts.Status.Replicas

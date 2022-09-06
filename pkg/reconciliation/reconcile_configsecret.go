@@ -10,11 +10,11 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/cdc"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
+	"github.com/k8ssandra/cass-operator/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/hash"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -102,7 +102,7 @@ func (rc *ReconciliationContext) updateConfigHashAnnotation(secret *corev1.Secre
 	rc.ReqLogger.Info("updating config hash annotation")
 
 	hasher := sha256.New()
-	hash.DeepHashObject(hasher, secret)
+	utils.DeepHashObject(hasher, secret)
 	hashBytes := hasher.Sum([]byte{})
 	b64Hash := base64.StdEncoding.EncodeToString(hashBytes)
 

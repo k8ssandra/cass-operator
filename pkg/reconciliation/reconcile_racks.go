@@ -18,7 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/slice"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -322,8 +321,7 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 	for idx, nextRack := range rc.desiredRackInformation {
 		rackName := rc.desiredRackInformation[idx].RackName
-		if slice.ContainsString(forceRacks, rackName, nil) {
-
+		if utils.IndexOfString(forceRacks, rackName) >= 0 {
 			statefulSet := rc.statefulSets[idx]
 
 			// have to use zero here, because each statefulset is created with no replicas

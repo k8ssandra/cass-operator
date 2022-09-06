@@ -6,7 +6,6 @@ import (
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/utils/pointer"
 )
 
 var existingConfig = `
@@ -133,9 +132,11 @@ func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 // of this test is to ensure that the relevant jvm additional opts are added to the existing config.
 func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	dc := GetCassandraDatacenter("test-dc", "test-ns")
+	pulsarServiceUrl := "pulsar://pulsar:6650"
+	topicPrefix := "test-prefix-"
 	dc.Spec.CDC = &cassdcapi.CDCConfiguration{
-		PulsarServiceUrl: pointer.String("pulsar://pulsar:6650"),
-		TopicPrefix:      pointer.String("test-prefix-"),
+		PulsarServiceUrl: &pulsarServiceUrl,
+		TopicPrefix:      &topicPrefix,
 	}
 	test := testCase{
 		Description:   "When CDC IS requested and a config json exists, UpdateConfig() adds the expected CDC related additional-jvm-opts.",

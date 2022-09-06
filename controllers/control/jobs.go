@@ -3,14 +3,19 @@ package control
 import (
 	"context"
 	"fmt"
+	"sort"
+	"time"
 
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	cassapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 )
 
 // Cleanup functionality
@@ -18,7 +23,7 @@ import (
 func callCleanup(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
 	// TODO Add more arguments configurations
 	keyspaceName := ""
-	if keyspace, found := taskConfig.Arguments["keyspace_name"]; found {
+	if keyspace, found := taskConfig.Arguments[api.KeyspaceArgument]; found {
 		keyspaceName = keyspace
 	}
 	return nodeMgmtClient.CallKeyspaceCleanup(pod, -1, keyspaceName, nil)
@@ -27,7 +32,7 @@ func callCleanup(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, task
 func callCleanupSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
 	// TODO Add more arguments configurations
 	keyspaceName := ""
-	if keyspace, found := taskConfig.Arguments["keyspace_name"]; found {
+	if keyspace, found := taskConfig.Arguments[api.KeyspaceArgument]; found {
 		keyspaceName = keyspace
 	}
 	return nodeMgmtClient.CallKeyspaceCleanupEndpoint(pod, -1, keyspaceName, nil)
@@ -42,7 +47,7 @@ func cleanup(taskConfig *TaskConfiguration) {
 // Rebuild functionality
 
 func callRebuild(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
-	return nodeMgmtClient.CallDatacenterRebuild(pod, taskConfig.Arguments["source_datacenter"])
+	return nodeMgmtClient.CallDatacenterRebuild(pod, taskConfig.Arguments[api.SourceDatacenterArgument])
 }
 
 func rebuild(taskConfig *TaskConfiguration) {
@@ -52,33 +57,55 @@ func rebuild(taskConfig *TaskConfiguration) {
 
 // Rolling restart functionality
 
-func (r *CassandraTaskReconciler) callRestartSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
-	podStartTime := pod.GetCreationTimestamp()
-	// TODO How do we verify the previous pod has actually restarted before we move on to restart the next one?
-	//		cass-operator used to take care of this.
-	if podStartTime.Before(taskConfig.TaskStartTime) {
-		// TODO Our taskController needs events
-		// rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.RestartingCassandra,
-		// 	"Restarting Cassandra for pod %s", pod.Name)
+func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.StatefulSet, taskConfig *TaskConfiguration) (ctrl.Result, error) {
+	// Sort to ensure we don't process StatefulSets in wrong order and restart multiple racks at the same time
+	sort.Slice(sts, func(i, j int) bool {
+		return sts[i].Name < sts[j].Name
+	})
 
-		// Drain the node
-		err := nodeMgmtClient.CallDrainEndpoint(pod)
-		if err != nil {
-			return err
-		}
+	restartTime := taskConfig.TaskStartTime.Format(time.RFC3339)
 
-		// Delete the pod
-		err = r.Client.Delete(context.Background(), pod)
-		if err != nil {
-			return err
+	if rackFilter, found := taskConfig.Arguments[api.RackArgument]; found {
+		singleSts := make([]appsv1.StatefulSet, 1)
+		for _, st := range sts {
+			if st.ObjectMeta.Labels[cassapi.RackLabel] == rackFilter {
+				singleSts[0] = st
+				sts = singleSts
+				break
+			}
 		}
 	}
 
-	return nil
-}
+	for _, st := range sts {
+		if st.Spec.Template.ObjectMeta.Annotations == nil {
+			st.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+		}
+		if st.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation] == restartTime {
+			// This one has been called to restart already - is it ready?
 
-func (r *CassandraTaskReconciler) restart(taskConfig *TaskConfiguration) {
-	taskConfig.SyncFunc = r.callRestartSync
+			status := st.Status
+			if status.CurrentRevision == status.UpdateRevision &&
+				status.UpdatedReplicas == status.Replicas &&
+				status.CurrentReplicas == status.Replicas &&
+				status.ReadyReplicas == status.Replicas &&
+				status.ObservedGeneration == st.GetObjectMeta().GetGeneration() {
+				// This one has been updated, move on to the next one
+				continue
+			}
+
+			// This is still restarting
+			return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
+		}
+		st.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation] = restartTime
+		if err := r.Client.Update(ctx, &st); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
+	}
+
+	// We're done
+	return ctrl.Result{}, nil
 }
 
 // UpgradeSSTables functionality

@@ -22,6 +22,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	RestartedAtAnnotation = "control.k8ssandra.io/restartedAt"
+)
+
 // CassandraTaskSpec defines the desired state of CassandraTask
 type CassandraTaskSpec struct {
 
@@ -67,6 +71,12 @@ const (
 	CommandReplaceNode     CassandraCommand = "replacenode"
 	CommandCompaction      CassandraCommand = "compact"
 	CommandScrub           CassandraCommand = "scrub"
+)
+
+const (
+	KeyspaceArgument         string = "keyspace_name"
+	RackArgument             string = "rack"
+	SourceDatacenterArgument string = "source_datacenter"
 )
 
 type CassandraJob struct {

@@ -409,7 +409,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 					Namespace: testNamespaceName,
 				}
 
-				task.Spec.Jobs[0].Arguments = map[string]string{"pod_name": podKey.Name}
+				task.Spec.Jobs[0].Arguments.PodName = podKey.Name
 				Expect(k8sClient.Create(context.TODO(), task)).Should(Succeed())
 
 				// Verify the pod2 was deleted
@@ -497,7 +497,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				// Create task to restart r1
 				taskKey, task := buildTask(api.CommandRestart, testNamespaceName)
-				task.Spec.Jobs[0].Arguments = map[string]string{"rack": "r1"}
+				task.Spec.Jobs[0].Arguments.RackName = "r1"
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				Eventually(func() bool {

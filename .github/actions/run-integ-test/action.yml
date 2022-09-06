@@ -21,10 +21,10 @@ runs:
       run: |
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /usr/share/dotnet
-    - name: Set up Go 1.17
+    - name: Set up Go 1.18
       uses: actions/setup-go@v1
       with:
-        go-version: 1.17
+        go-version: 1.18
     - uses: actions/cache@v2
       with:
         path: ~/go/pkg/mod
@@ -42,7 +42,7 @@ runs:
       uses: helm/kind-action@v1.3.0
       with:
         version: v0.14.0
-        node_image: kindest/node:v1.23.6
+        node_image: kindest/node:v1.24.3
         cluster_name: kind
         config: tests/testdata/kind/kind_config_6_workers.yaml
     - name: Install Helm

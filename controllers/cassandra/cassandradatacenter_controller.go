@@ -157,9 +157,6 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	log := r.Log.
-		WithName("cassandradatacenter_controller")
-
 	managedByCassandraOperatorPredicate := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return oplabels.HasManagedByCassandraOperatorLabel(e.Object.GetLabels())
@@ -178,20 +175,16 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 
 	// Create a new managed controller builder
 	c := ctrl.NewControllerManagedBy(mgr).
-		Named("cassandradatacenter-controller").
-		WithLogger(log).
+		Named("cassandradatacenter_controller").
 		For(&api.CassandraDatacenter{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Owns(&appsv1.StatefulSet{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
 		Owns(&policyv1.PodDisruptionBudget{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
 		Owns(&corev1.Service{}, builder.WithPredicates(managedByCassandraOperatorPredicate))
 
 	configSecretMapFn := func(mapObj client.Object) []reconcile.Request {
-		log.Info("config secret watch called", "Secret", mapObj.GetName())
-
 		requests := make([]reconcile.Request, 0)
 		secret := mapObj.(*corev1.Secret)
 		if v, ok := secret.Annotations[api.DatacenterAnnotation]; ok {
-			log.Info("adding reconciliation request for config secret", "Secret", secret.Name)
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: secret.Namespace,

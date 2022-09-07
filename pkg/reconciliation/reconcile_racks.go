@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -594,12 +595,12 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 
 	// step 2 - get one node up per rack
 
-	rackWaitingForANode, err := rc.startOneNodePerRack(endpointData, seedCount)
+	notReady, err := rc.startOneNodePerRack(endpointData, seedCount)
 
 	if err != nil {
 		return result.Error(err)
 	}
-	if rackWaitingForANode != "" {
+	if notReady {
 		return result.RequeueSoon(2)
 	}
 
@@ -617,11 +618,11 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 		return result.RequeueSoon(5)
 	}
 
-	needsMoreNodes, err := rc.startAllNodes(endpointData)
+	notReady, err = rc.startAllNodes(endpointData)
 	if err != nil {
 		return result.Error(err)
 	}
-	if needsMoreNodes {
+	if notReady {
 		return result.RequeueSoon(2)
 	}
 
@@ -1806,22 +1807,11 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 	return rc.labelServerPodStarting(pod)
 }
 
-// returns the name of one rack without any ready node
-func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.CassMetadataEndpoints, readySeeds int) (string, error) {
+// startOneNodePerRack starts the first pod in each rack in a deterministic order. It returns true
+// if there is a rack where the first pod is not ready.
+func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.CassMetadataEndpoints, readySeeds int) (bool, error) {
 
 	rc.ReqLogger.Info("reconcile_racks::startOneNodePerRack")
-
-	rackReadyCount := map[string]int{}
-	for _, rackInfo := range rc.desiredRackInformation {
-		rackReadyCount[rackInfo.RackName] = 0
-	}
-
-	for _, pod := range rc.dcPods {
-		rackName := pod.Labels[api.RackLabel]
-		if isServerReady(pod) {
-			rackReadyCount[rackName]++
-		}
-	}
 
 	// if the DC has no ready seeds, label a pod as a seed before we start Cassandra on it
 	// and also consider additional seeds
@@ -1833,70 +1823,87 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 
 	labelSeedBeforeStart := readySeeds == 0 && len(rc.Datacenter.Spec.AdditionalSeeds) == 0 && externalSeedPoints == 0
 
-	rackThatNeedsNode := ""
-	for rackName, readyCount := range rackReadyCount {
-		if readyCount > 0 {
+	for _, rackInfo := range rc.desiredRackInformation {
+
+		pod := rc.findPodInRack(rackInfo.RackName, 0)
+
+		if pod == nil {
+			return true, nil
+		}
+		if isServerReady(pod) {
 			continue
 		}
-		rackThatNeedsNode = rackName
-		for _, pod := range rc.dcPods {
-			mgmtApiUp := isMgmtApiRunning(pod)
-			if !isServerReadyToStart(pod) || !mgmtApiUp {
-				continue
-			}
-			podRack := pod.Labels[api.RackLabel]
-			if podRack == rackName {
-				// this is the one exception to all seed labelling happening in labelSeedPods()
-				if labelSeedBeforeStart {
-					patch := client.MergeFrom(pod.DeepCopy())
-					pod.Labels[api.SeedNodeLabel] = "true"
-					if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
-						return "", err
-					}
-
-					rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsSeed,
-						"Labeled pod a seed node %s", pod.Name)
-
-					// sleeping five seconds for DNS paranoia
-					time.Sleep(5 * time.Second)
-				}
-				if err := rc.startCassandra(endpointData, pod); err != nil {
-					return "", err
-				}
-				return rackName, nil
-			}
+		if !isServerReadyToStart(pod) || !isMgmtApiRunning(pod) {
+			return true, nil
 		}
-	}
 
-	return rackThatNeedsNode, nil
+		// this is the one exception to all seed labelling happening in labelSeedPods()
+		if labelSeedBeforeStart {
+			patch := client.MergeFrom(pod.DeepCopy())
+			pod.Labels[api.SeedNodeLabel] = "true"
+			if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
+				return false, err
+			}
+
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsSeed,
+				"Labeled pod a seed node %s", pod.Name)
+
+			// sleeping five seconds for DNS paranoia
+			time.Sleep(5 * time.Second)
+		}
+
+		if err := rc.startCassandra(endpointData, pod); err != nil {
+			return false, err
+		}
+		return true, nil
+
+	}
+	return false, nil
 }
 
-// returns whether one or more server nodes is not running or ready
+// startAllNodes starts all nodes in the datacenter in a deterministic order, and in such a way that
+// at any given time, the number of started nodes in a rack cannot be greater or lesser than the
+// number of started nodes in all other racks by more than 1. It returns true if at least one server
+// nodes is not running or not ready.
 func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetadataEndpoints) (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::startAllNodes")
 
-	for _, pod := range rc.dcPods {
-		if isMgmtApiRunning(pod) && !isServerReady(pod) && !isServerStarted(pod) {
-			if err := rc.startCassandra(endpointData, pod); err != nil {
-				return false, err
-			}
+	for i := 0; i < int(rc.Datacenter.Spec.Size); i++ {
+
+		rackIndex := i % len(rc.desiredRackInformation)
+		podIndex := i / len(rc.desiredRackInformation)
+
+		rack := rc.desiredRackInformation[rackIndex]
+		pod := rc.findPodInRack(rack.RackName, podIndex)
+
+		if pod == nil {
 			return true, nil
 		}
-	}
-
-	// this extra pass only does anything when we have a combination of
-	// ready server pods and pods that are not running - possibly stuck pending
-	for _, pod := range rc.dcPods {
-		if !isMgmtApiRunning(pod) {
-			rc.ReqLogger.Info(
-				"management api is not running on pod",
-				"pod", pod.Name,
-			)
+		if isServerReady(pod) {
+			continue
+		}
+		if !isServerReadyToStart(pod) || !isMgmtApiRunning(pod) {
 			return true, nil
 		}
-	}
 
+		if err := rc.startCassandra(endpointData, pod); err != nil {
+			return false, err
+		}
+		return true, nil
+
+	}
 	return false, nil
+}
+
+func (rc *ReconciliationContext) findPodInRack(rackName string, index int) *corev1.Pod {
+	podName := newStatefulSetName(rc.Datacenter, rackName) + "-" + strconv.Itoa(index)
+	pods := utils.FilterPodsWithFn(rc.dcPods, func(pod *corev1.Pod) bool {
+		return pod.Name == podName
+	})
+	if len(pods) > 0 {
+		return pods[0]
+	}
+	return nil
 }
 
 func (rc *ReconciliationContext) countReadyAndStarted() (int, int) {

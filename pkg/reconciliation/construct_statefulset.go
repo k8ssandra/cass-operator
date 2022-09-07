@@ -27,13 +27,17 @@ func newNamespacedNameForStatefulSet(
 	dc *api.CassandraDatacenter,
 	rackName string) types.NamespacedName {
 
-	name := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-" + rackName + "-sts"
+	name := newStatefulSetName(dc, rackName)
 	ns := dc.Namespace
 
 	return types.NamespacedName{
 		Name:      name,
 		Namespace: ns,
 	}
+}
+
+func newStatefulSetName(dc *api.CassandraDatacenter, rackName string) string {
+	return api.CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-" + rackName + "-sts"
 }
 
 // Check if we need to define a SecurityContext.

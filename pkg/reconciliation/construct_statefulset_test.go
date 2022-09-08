@@ -11,6 +11,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -447,6 +448,44 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 			assert.True(t, reflect.DeepEqual(tt.expected, actual),
 				fmt.Sprintf("%s: pod security context does not match expected value:\n expected: %+v\n actual: %+v", tt.name, tt.expected, actual))
 		}
+	}
+}
+
+func TestValidName(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "cluster1",
+		},
+	}
+
+	tests := []struct {
+		name     string
+		expected string
+	}{
+		{
+			name:     "r1",
+			expected: "cluster1-dc1-r1-sts",
+		},
+		{
+			name:     "r1.r2",
+			expected: "cluster1-dc1-r1.r2-sts",
+		},
+		{
+			name:     "Rack1",
+			expected: "cluster1-dc1-rack1-sts",
+		},
+		{
+			name:     "invalid_pod_name*",
+			expected: "cluster1-dc1-invalid-pod-name-sts",
+		},
+	}
+	for _, tt := range tests {
+		typedName := newNamespacedNameForStatefulSet(dc, tt.name)
+		assert.Equal(typedName.Name, tt.expected)
 	}
 }
 

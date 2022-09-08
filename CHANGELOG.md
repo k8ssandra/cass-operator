@@ -21,7 +21,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#398](https://github.com/k8ssandra/cass-operator/issues/398) Update to go1.18 builds, update to use Kubernetes 1.24 envtest + dependencies, operator-sdk 1.23, controller-gen 0.9.2, Kustomize 4.5.7, controller-runtime 0.12.2
 * [ENHANCEMENT] [#383](https://github.com/k8ssandra/cass-operator/pull/383) Add UpgradeSSTables, Compaction and Scrub to management-api client. Improve CassandraTasks to have the ability to validate input parameters, filter target pods and do processing outside of pods.
 * [BUGFIX] [#327](https://github.com/k8ssandra/cass-operator/issues/327) Replace node done through CassandraTask can replace a node that's stuck in the Starting state.
-
+* [BUGFIX] [#404](https://github.com/k8ssandra/cass-operator/issues/404) Filter unallowed values from the rackname when used in Kubernetes resources
 
 ## v1.12.0
 
@@ -30,7 +30,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#360](https://github.com/k8ssandra/cass-operator/pull/360) If Datacenter quorum reports unhealthy state, change Status Condition DatacenterHealthy to False (DBPE-2283)
 * [ENHANCEMENT] [#317](https://github.com/k8ssandra/cass-operator/issues/317) Add ability for users to define CDC settings which will cause an agent to start within the Cassandra JVM and pass mutation events from Cassandra back to a Pulsar broker. (Tested on OSS Cassandra 4.x only.)
 * [ENHANCEMENT] [#369](https://github.com/k8ssandra/cass-operator/issues/369) Add configurable timeout for liveness / readiness and drain when mutual auth is used and a default timeout for all wget execs (required with mutual auth)
-* [BUGFIX] [#355](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars. Include app.kubernetes.io/created-by label. 
+* [BUGFIX] [#335](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars. Include app.kubernetes.io/created-by label. 
 * [BUGFIX] [#330](https://github.com/k8ssandra/cass-operator/issues/330) Apply correct updates to Service labels and annotations through additionalServiceConfig (they are now validated and don't allow reserved prefixes).
 * [BUGFIX] [#368](https://github.com/k8ssandra/cass-operator/issues/368) Do not fetch endpointStatus from pods that have not started
 * [BUGFIX] [#364](https://github.com/k8ssandra/cass-operator/issues/364) Do not log any errors if we fail to get endpoint states from nodes.

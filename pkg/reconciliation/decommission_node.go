@@ -188,6 +188,9 @@ func (rc *ReconciliationContext) callDecommission(pod *corev1.Pod) error {
 
 // Wait for decommissioning nodes to finish before continuing to reconcile
 func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.CassMetadataEndpoints) result.ReconcileResult {
+
+	rc.ReqLogger.Info("reconcile_racks::CheckDecommissioningNodes")
+
 	if rc.Datacenter.GetConditionStatus(api.DatacenterScalingDown) != corev1.ConditionTrue {
 		return result.Continue()
 	}
@@ -198,7 +201,7 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 		if pod.Labels[api.CassNodeState] == stateDecommissioning {
 			if !IsDoneDecommissioning(pod, epData, nodeStatuses, rc.ReqLogger) {
 				if !HasStartedDecommissioning(pod, epData, nodeStatuses) {
-					rc.ReqLogger.V(1).Info("Decommission has not started trying again", "Pod", pod.Name)
+					rc.ReqLogger.V(1).Info("Decommission has not started, trying again", "Pod", pod.Name)
 					err := rc.callDecommission(pod)
 					if err != nil {
 						return result.Error(err)

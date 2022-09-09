@@ -5,6 +5,7 @@ package reconciliation
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -595,12 +596,12 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 
 	// step 2 - get one node up per rack
 
-	notReady, err := rc.startOneNodePerRack(endpointData, seedCount)
+	nodeNotReady, err := rc.startOneNodePerRack(endpointData, seedCount)
 
 	if err != nil {
 		return result.Error(err)
 	}
-	if notReady {
+	if nodeNotReady {
 		return result.RequeueSoon(2)
 	}
 
@@ -618,11 +619,11 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 		return result.RequeueSoon(5)
 	}
 
-	notReady, err = rc.startAllNodes(endpointData)
+	nodeNotReady, err = rc.startAllNodes(endpointData)
 	if err != nil {
 		return result.Error(err)
 	}
-	if notReady {
+	if nodeNotReady {
 		return result.RequeueSoon(2)
 	}
 
@@ -1864,28 +1865,38 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 // startAllNodes starts all nodes in the datacenter in a deterministic order, and in such a way that
 // at any given time, the number of started nodes in a rack cannot be greater or lesser than the
 // number of started nodes in all other racks by more than 1. It returns true if at least one server
-// nodes is not running or not ready.
+// is not running or not ready.
 func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetadataEndpoints) (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::startAllNodes")
 
-	for i := 0; i < int(rc.Datacenter.Spec.Size); i++ {
+	expectedSize := int(rc.Datacenter.Spec.Size)
+	if len(rc.dcPods) >= expectedSize {
+		rc.ReqLogger.Info("Found more pods than expected in the datacenter, they may be started out of sequence")
+	}
 
-		rackIndex := i % len(rc.desiredRackInformation)
-		podIndex := i / len(rc.desiredRackInformation)
+	for i, pod := range rc.dcPods {
 
-		rack := rc.desiredRackInformation[rackIndex]
-		pod := rc.findPodInRack(rack.RackName, podIndex)
+		if i < expectedSize {
 
-		if pod == nil {
-			return true, nil
+			// check that we are starting the right pod
+			rackIndex := i % len(rc.desiredRackInformation)
+			podIndex := i / len(rc.desiredRackInformation)
+			rack := rc.desiredRackInformation[rackIndex]
+			expectedPodName := stsPodName(rc.Datacenter, rack.RackName, podIndex)
+
+			if pod.Name != expectedPodName {
+				rc.ReqLogger.Info("Next pod in line waiting to start was missing", "pod", expectedPodName)
+				return true, nil
+			}
+
 		}
+
 		if isServerReady(pod) {
 			continue
 		}
 		if !isServerReadyToStart(pod) || !isMgmtApiRunning(pod) {
 			return true, nil
 		}
-
 		if err := rc.startCassandra(endpointData, pod); err != nil {
 			return false, err
 		}
@@ -1895,15 +1906,56 @@ func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetad
 	return false, nil
 }
 
-func (rc *ReconciliationContext) findPodInRack(rackName string, index int) *corev1.Pod {
-	podName := newStatefulSetName(rc.Datacenter, rackName) + "-" + strconv.Itoa(index)
-	pods := utils.FilterPodsWithFn(rc.dcPods, func(pod *corev1.Pod) bool {
-		return pod.Name == podName
+func (rc *ReconciliationContext) sortPods(pods []*corev1.Pod) []*corev1.Pod {
+	copiedPods := make([]*corev1.Pod, len(pods))
+	copy(copiedPods, pods)
+	sort.Slice(copiedPods, func(i, j int) bool {
+		podIndex1 := stsPodIndex(copiedPods[i].Name)
+		podIndex2 := stsPodIndex(copiedPods[j].Name)
+		if podIndex1 == podIndex2 {
+			rackIndex1 := rc.rackIndex(copiedPods[i].Labels[api.RackLabel])
+			rackIndex2 := rc.rackIndex(copiedPods[j].Labels[api.RackLabel])
+			return rackIndex1 < rackIndex2
+		}
+		return podIndex1 < podIndex2
 	})
-	if len(pods) > 0 {
-		return pods[0]
+	return copiedPods
+}
+
+func (rc *ReconciliationContext) rackIndex(rackName string) int {
+	for i, rackInfo := range rc.desiredRackInformation {
+		if rackInfo.RackName == rackName {
+			return i
+		}
+	}
+	return math.MaxInt
+}
+
+func (rc *ReconciliationContext) findPodInRack(rackName string, index int) *corev1.Pod {
+	podName := stsPodName(rc.Datacenter, rackName, index)
+	for _, pod := range rc.dcPods {
+		if pod.Name == podName {
+			return pod
+		}
 	}
 	return nil
+}
+
+func stsPodIndex(podName string) int {
+	parts := strings.Split(podName, "-")
+	if len(parts) < 2 {
+		return math.MaxInt
+	}
+	last := parts[len(parts)-1]
+	index, err := strconv.Atoi(last)
+	if err != nil {
+		return math.MaxInt
+	}
+	return index
+}
+
+func stsPodName(datacenter *api.CassandraDatacenter, rackName string, index int) string {
+	return newStatefulSetName(datacenter, rackName) + "-" + strconv.Itoa(index)
 }
 
 func (rc *ReconciliationContext) countReadyAndStarted() (int, int) {
@@ -2357,7 +2409,7 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	rc.clusterPods = PodPtrsFromPodList(podList)
 
 	dcSelector := rc.Datacenter.GetDatacenterLabels()
-	rc.dcPods = FilterPodListByLabels(rc.clusterPods, dcSelector)
+	rc.dcPods = rc.sortPods(FilterPodListByLabels(rc.clusterPods, dcSelector))
 
 	endpointData := rc.getCassMetadataEndpoints()
 

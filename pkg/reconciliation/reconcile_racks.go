@@ -1862,14 +1862,14 @@ func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetad
 
 // hasAdditionalSeeds returns true if the datacenter has at least one additional seed.
 func (rc *ReconciliationContext) hasAdditionalSeeds() bool {
-	if len(rc.Datacenter.Spec.AdditionalSeeds) == 0 {
-		externalSeedPoints := 0
-		if existingEndpoints, err := rc.GetAdditionalSeedEndpoint(); err == nil {
-			externalSeedPoints = len(existingEndpoints.Subsets[0].Addresses)
-		}
-		return externalSeedPoints > 0
+	if len(rc.Datacenter.Spec.AdditionalSeeds) > 0 {
+		return true
 	}
-	return true
+	additionalSeedEndpoints := 0
+	if additionalSeedEndpoint, err := rc.GetAdditionalSeedEndpoint(); err == nil {
+		additionalSeedEndpoints = len(additionalSeedEndpoint.Subsets[0].Addresses)
+	}
+	return additionalSeedEndpoints > 0
 }
 
 // startNode starts the Cassandra node in the given pod, if it wasn't started yet. It returns true

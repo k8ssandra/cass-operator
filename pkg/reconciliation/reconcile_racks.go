@@ -1837,21 +1837,21 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetadataEndpoints) (notReady bool, err error) {
 	rc.ReqLogger.Info("reconcile_racks::startAllNodes")
 
-	for podIndex := 0; ; podIndex++ {
+	for podRankWithinRack := 0; ; podRankWithinRack++ {
 
 		done := true
 		for _, statefulSet := range rc.statefulSets {
 
-			maxPodIndex := int(*statefulSet.Spec.Replicas) - 1
-			if podIndex <= maxPodIndex {
+			maxPodRankInThisRack := int(*statefulSet.Spec.Replicas) - 1
+			if podRankWithinRack <= maxPodRankInThisRack {
 
-				pod := rc.getDCPodByName(statefulSet.Name + "-" + strconv.Itoa(podIndex))
+				pod := rc.getDCPodByName(statefulSet.Name + "-" + strconv.Itoa(podRankWithinRack))
 				notReady, err = rc.startNode(pod, false, endpointData)
 				if notReady {
 					return
 				}
 
-				done = done && podIndex == maxPodIndex
+				done = done && podRankWithinRack == maxPodRankInThisRack
 			}
 		}
 		if done {

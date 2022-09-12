@@ -1837,7 +1837,7 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetadataEndpoints) (notReady bool, err error) {
 	rc.ReqLogger.Info("reconcile_racks::startAllNodes")
 
-	for podIndex := 1; ; podIndex++ {
+	for podIndex := 0; ; podIndex++ {
 
 		done := true
 		for _, statefulSet := range rc.statefulSets {

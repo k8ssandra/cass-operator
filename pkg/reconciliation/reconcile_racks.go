@@ -604,8 +604,8 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 		return result.RequeueSoon(2)
 	}
 
-	// step 3 - get all nodes up
-	// if the cluster isn't healthy, that's ok, but go back to step 1
+	// step 3 - if the cluster isn't healthy, that's ok, but go back to step 1
+
 	clusterHealthy := rc.isClusterHealthy()
 	if err := rc.updateHealth(clusterHealthy); err != nil {
 		return result.Error(err)

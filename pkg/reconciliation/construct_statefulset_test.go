@@ -451,7 +451,7 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 	}
 }
 
-func TestValidName(t *testing.T) {
+func TestValidSubdomainNames(t *testing.T) {
 	assert := assert.New(t)
 	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
@@ -485,7 +485,7 @@ func TestValidName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		typedName := newNamespacedNameForStatefulSet(dc, tt.name)
-		assert.Equal(typedName.Name, tt.expected)
+		assert.Equal(tt.expected, typedName.Name)
 	}
 }
 

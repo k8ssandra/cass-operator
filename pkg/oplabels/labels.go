@@ -29,7 +29,7 @@ func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
 
 	if len(dc.Spec.AdditionalLabels) != 0 {
 		for key, value := range dc.Spec.AdditionalLabels {
-			m[key] = value
+			m[key] = api.CleanLabelValue(value)
 		}
 	}
 }

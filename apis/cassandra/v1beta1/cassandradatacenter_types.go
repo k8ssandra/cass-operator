@@ -559,12 +559,12 @@ func (dc *CassandraDatacenter) GetClusterLabels() map[string]string {
 const (
 	dns1035LabelFmt     string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 	dns1123SubdomainFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*"
-	labelFmt            string = "(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?"
+	dns1123LabelFmt     string = "(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?"
 )
 
 var dns1035LabelRegexp = regexp.MustCompile(dns1035LabelFmt)
 var dns1123SubdomainRegexp = regexp.MustCompile(dns1123SubdomainFmt)
-var dns1123LabelRegexp = regexp.MustCompile(labelFmt)
+var dns1123LabelRegexp = regexp.MustCompile(dns1123LabelFmt)
 
 // CleanLabelValue a valid label must be an empty string or consist of alphanumeric characters,
 // '-', '_' or '.', and must start and end with an alphanumeric.

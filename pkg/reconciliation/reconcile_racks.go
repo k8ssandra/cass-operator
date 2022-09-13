@@ -1812,7 +1812,7 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 // startOneNodePerRack starts the first pod in each rack in a deterministic order, dictated by the
 // order in which the racks were declared in the datacenter spec. It returns true if a Cassandra
 // node is not ready yet, and an error if that node also failed to start.
-func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.CassMetadataEndpoints, readySeeds int) (notReady bool, err error) {
+func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.CassMetadataEndpoints, readySeeds int) (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::startOneNodePerRack")
 
 	labelSeedBeforeStart := readySeeds == 0 && !rc.hasAdditionalSeeds()
@@ -1820,13 +1820,13 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 	for _, statefulSet := range rc.statefulSets {
 
 		pod := rc.getDCPodByName(statefulSet.Name + "-0")
-		notReady, err = rc.startNode(pod, labelSeedBeforeStart, endpointData)
-		if notReady {
-			break
+		notReady, err := rc.startNode(pod, labelSeedBeforeStart, endpointData)
+		if notReady || err != nil {
+			return notReady, err
 		}
 
 	}
-	return
+	return false, nil
 }
 
 // startAllNodes starts all nodes in the datacenter in a deterministic order, dictated by the order
@@ -1834,7 +1834,7 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 // time, the number of started nodes in a rack cannot be greater or lesser than the number of
 // started nodes in all other racks by more than 1. It returns true if a Cassandra node is not ready
 // yet, and an error if that node also failed to start.
-func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetadataEndpoints) (notReady bool, err error) {
+func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetadataEndpoints) (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::startAllNodes")
 
 	for podRankWithinRack := 0; ; podRankWithinRack++ {
@@ -1846,16 +1846,16 @@ func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetad
 			if podRankWithinRack <= maxPodRankInThisRack {
 
 				pod := rc.getDCPodByName(statefulSet.Name + "-" + strconv.Itoa(podRankWithinRack))
-				notReady, err = rc.startNode(pod, false, endpointData)
-				if notReady {
-					return
+				notReady, err := rc.startNode(pod, false, endpointData)
+				if notReady || err != nil {
+					return notReady, err
 				}
 
 				done = done && podRankWithinRack == maxPodRankInThisRack
 			}
 		}
 		if done {
-			return
+			return false, nil
 		}
 	}
 }
@@ -1875,11 +1875,10 @@ func (rc *ReconciliationContext) hasAdditionalSeeds() bool {
 // startNode starts the Cassandra node in the given pod, if it wasn't started yet. It returns true
 // if the node isn't ready yet, and a non-nil error if the node that isn't ready yet also failed to
 // start.
-func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart bool, endpointData httphelper.CassMetadataEndpoints) (notReady bool, err error) {
+func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart bool, endpointData httphelper.CassMetadataEndpoints) (bool, error) {
 	if pod == nil {
-		notReady = true
+		return true, nil
 	} else if !isServerReady(pod) {
-		notReady = true
 		if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
 
 			// this is the one exception to all seed labelling happening in labelSeedPods()
@@ -1887,8 +1886,8 @@ func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart
 
 				patch := client.MergeFrom(pod.DeepCopy())
 				pod.Labels[api.SeedNodeLabel] = "true"
-				if err = rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
-					return
+				if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
+					return true, err
 				}
 
 				rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsSeed,
@@ -1898,10 +1897,14 @@ func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart
 				time.Sleep(5 * time.Second)
 			}
 
-			err = rc.startCassandra(endpointData, pod)
+			err := rc.startCassandra(endpointData, pod)
+			if err != nil {
+				return true, err
+			}
 		}
+		return true, nil
 	}
-	return
+	return false, nil
 }
 
 func (rc *ReconciliationContext) countReadyAndStarted() (int, int) {

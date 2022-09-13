@@ -595,12 +595,12 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 
 	// step 2 - get one node up per rack
 
-	nodeNotReady, err := rc.startOneNodePerRack(endpointData, seedCount)
+	atLeastOneFirstNodeNotReady, err := rc.startOneNodePerRack(endpointData, seedCount)
 
 	if err != nil {
 		return result.Error(err)
 	}
-	if nodeNotReady {
+	if atLeastOneFirstNodeNotReady {
 		return result.RequeueSoon(2)
 	}
 
@@ -620,11 +620,11 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 
 	// step 4 - make sure all nodes are ready
 
-	nodeNotReady, err = rc.startAllNodes(endpointData)
+	atLeastOneNodeNotReady, err := rc.startAllNodes(endpointData)
 	if err != nil {
 		return result.Error(err)
 	}
-	if nodeNotReady {
+	if atLeastOneNodeNotReady {
 		return result.RequeueSoon(2)
 	}
 

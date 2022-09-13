@@ -2,13 +2,11 @@ package reconciliation
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 
 	"github.com/go-logr/logr"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -18,40 +16,20 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (rc *ReconciliationContext) CalculateRackInfoForDecomm(currentSize int) ([]*RackInformation, error) {
-	racks := rc.Datacenter.GetRacks()
-	rackCount := len(racks)
-
-	// only worry about scaling 1 node at a time
-	desiredSize := currentSize - 1
-
-	if desiredSize < rackCount && rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) != corev1.ConditionTrue {
-		return nil, fmt.Errorf("the number of nodes cannot be smaller than the number of racks")
-	}
-
-	var decommRackInfo []*RackInformation
-	rackNodeCounts := api.SplitRacks(desiredSize, rackCount)
-
-	for rackIndex, currentRack := range racks {
-		nextRack := &RackInformation{}
-		nextRack.RackName = currentRack.Name
-		nextRack.NodeCount = rackNodeCounts[rackIndex]
-
-		decommRackInfo = append(decommRackInfo, nextRack)
-	}
-
-	return decommRackInfo, nil
-}
-
 func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadataEndpoints) result.ReconcileResult {
 	logger := rc.ReqLogger
 	logger.Info("reconcile_racks::DecommissionNodes")
 	dc := rc.Datacenter
 
+	// Always choose the stateful set with the most replicas to decommission first; if two stateful
+	// sets have the same number of replicas, choose the one with the highest ordinal in order to
+	// respect the rack declaration *reverse* order.
+	var stsToDecomm *appsv1.StatefulSet
 	var currentSize int32
 	for _, sts := range rc.statefulSets {
-		if sts != nil {
-			currentSize += *sts.Spec.Replicas
+		currentSize += *sts.Spec.Replicas
+		if stsToDecomm == nil || *stsToDecomm.Spec.Replicas <= *sts.Spec.Replicas {
+			stsToDecomm = sts
 		}
 	}
 
@@ -59,102 +37,85 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 
 	if rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionTrue {
 		targetSize = 0
+	} else if int(targetSize) < len(rc.Datacenter.GetRacks()) {
+		err := fmt.Errorf("the number of nodes cannot be smaller than the number of racks")
+		logger.Error(err, "error calculating rack info for decommissioning nodes")
+		return result.Error(err)
 	}
 
 	if currentSize <= targetSize {
 		return result.Continue()
 	}
 
-	decommRackInfo, err := rc.CalculateRackInfoForDecomm(int(currentSize))
-	if err != nil {
-		logger.Error(err, "error calculating rack info for decommissioning nodes")
+	dcPatch := client.MergeFrom(dc.DeepCopy())
+
+	updated := rc.setCondition(
+		api.NewDatacenterCondition(
+			api.DatacenterScalingDown, corev1.ConditionTrue))
+
+	if updated {
+		err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch)
+		if err != nil {
+			logger.Error(err, "error patching datacenter status for scaling down rack started")
+			return result.Error(err)
+		}
+	}
+
+	rackName := stsToDecomm.Labels[api.RackLabel]
+	rc.ReqLogger.Info(
+		"Scaling down rack",
+		"Rack",
+		rackName,
+		"TargetSize",
+		*stsToDecomm.Spec.Replicas-1,
+	)
+
+	rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.ScalingDownRack,
+		"Scaling down rack %s", rackName)
+
+	if err := setOperatorProgressStatus(rc, api.ProgressUpdating); err != nil {
 		return result.Error(err)
 	}
 
-	for idx := range decommRackInfo {
-		rackInfo := decommRackInfo[idx]
-		statefulSet := rc.statefulSets[idx]
-		desiredNodeCount := int32(rackInfo.NodeCount)
-		maxReplicas := *statefulSet.Spec.Replicas
-		lastPodSuffix := stsLastPodSuffix(maxReplicas)
-
-		if maxReplicas > desiredNodeCount {
-			logger.V(1).Info("reconcile_racks::DecommissionNodes::scaleDownRack", "Rack", rackInfo.RackName, "maxReplicas", maxReplicas, "desiredNodeCount", desiredNodeCount)
-
-			dcPatch := client.MergeFrom(dc.DeepCopy())
-			updated := false
-
-			updated = rc.setCondition(
-				api.NewDatacenterCondition(
-					api.DatacenterScalingDown, corev1.ConditionTrue)) || updated
-
-			if updated {
-				err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch)
-				if err != nil {
-					logger.Error(err, "error patching datacenter status for scaling down rack started")
-					return result.Error(err)
-				}
-			}
-
-			rc.ReqLogger.Info(
-				"Need to update the rack's node count",
-				"Rack", rackInfo.RackName,
-				"maxReplicas", maxReplicas,
-				"desiredSize", desiredNodeCount,
-			)
-
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.ScalingDownRack,
-				"Scaling down rack %s", rackInfo.RackName)
-
-			if err := setOperatorProgressStatus(rc, api.ProgressUpdating); err != nil {
-				return result.Error(err)
-			}
-
-			err := rc.DecommissionNodeOnRack(rackInfo.RackName, epData, lastPodSuffix)
-			if err != nil {
-				return result.Error(err)
-			}
-
-			return result.RequeueSoon(10)
-		}
+	if err := rc.DecommissionNodeOnRack(stsToDecomm, epData); err != nil {
+		return result.Error(err)
 	}
 
-	return result.Continue()
+	return result.RequeueSoon(10)
 }
 
-func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData httphelper.CassMetadataEndpoints, lastPodSuffix string) error {
-	for _, pod := range rc.dcPods {
-		podRack := pod.Labels[api.RackLabel]
-		if podRack == rackName && strings.HasSuffix(pod.Name, lastPodSuffix) {
-			mgmtApiUp := isMgmtApiRunning(pod)
-			if !mgmtApiUp {
-				return fmt.Errorf("management API is not up on node that we are trying to decommission")
-			}
+func (rc *ReconciliationContext) DecommissionNodeOnRack(sts *appsv1.StatefulSet, epData httphelper.CassMetadataEndpoints) error {
 
-			if err := rc.EnsurePodsCanAbsorbDecommData(pod, epData); err != nil {
-				return err
-			}
-
-			if err := rc.callDecommission(pod); err != nil {
-				return err
-			}
-
-			rc.ReqLogger.V(1).Info("Marking node as decommissioning")
-			patch := client.MergeFrom(pod.DeepCopy())
-			metav1.SetMetaDataLabel(&pod.ObjectMeta, api.CassNodeState, stateDecommissioning)
-			if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
-				return err
-			}
-
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsDecommissioning,
-				"Labeled node as decommissioning %s", pod.Name)
-
-			return nil
-		}
+	podName := sts.Name + "-" + strconv.Itoa(int(*sts.Spec.Replicas)-1)
+	pod := rc.getDCPodByName(podName)
+	if pod == nil {
+		// this shouldn't happen
+		return fmt.Errorf("could not find pod to decommission on rack %s", sts.Labels[api.RackLabel])
 	}
 
-	// this shouldn't happen
-	return fmt.Errorf("could not find pod to decommission on rack %s", rackName)
+	if !isMgmtApiRunning(pod) {
+		return fmt.Errorf("management API is not up on node that we are trying to decommission")
+	}
+
+	if err := rc.EnsurePodsCanAbsorbDecommData(pod, epData); err != nil {
+		return err
+	}
+
+	if err := rc.callDecommission(pod); err != nil {
+		return err
+	}
+
+	rc.ReqLogger.V(1).Info("Marking node as decommissioning")
+	patch := client.MergeFrom(pod.DeepCopy())
+	metav1.SetMetaDataLabel(&pod.ObjectMeta, api.CassNodeState, stateDecommissioning)
+	if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
+		return err
+	}
+
+	rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsDecommissioning,
+		"Labeled node as decommissioning %s", pod.Name)
+
+	return nil
 }
 
 func (rc *ReconciliationContext) callDecommission(pod *corev1.Pod) error {
@@ -363,22 +324,17 @@ func (rc *ReconciliationContext) RemoveDecommissionedPodFromSts(pod *corev1.Pod)
 		return fmt.Errorf("failed to find matching statefulSet for pod rack: %s", podRack)
 	}
 
-	maxReplicas := *sts.Spec.Replicas
-	lastPodSuffix := stsLastPodSuffix(maxReplicas)
-	if strings.HasSuffix(pod.Name, lastPodSuffix) {
-		rc.ReqLogger.Info(fmt.Sprintf("UpdateRackNodeCount in STS %s to %d", sts.Name, *sts.Spec.Replicas-1))
+	expectedPodName := sts.Name + "-" + strconv.Itoa(int(*sts.Spec.Replicas-1))
+	if pod.Name == expectedPodName {
 		return rc.UpdateRackNodeCount(sts, *sts.Spec.Replicas-1)
 	} else {
-		rc.ReqLogger.Error(fmt.Errorf("pod does not match the last pod in the STS"), "Could not find last matching pod", "PodName", pod.Name, "lastPodSuffix", lastPodSuffix)
+		err := fmt.Errorf("pod does not match the last pod in the STS")
+		rc.ReqLogger.Error(err, "Could not find last matching pod", "PodName", pod.Name, "ExpectedPodName", expectedPodName)
 		// Pod does not match the last pod in statefulSet
 		// This scenario should only happen if the pod
 		// has already been terminated
 		return nil
 	}
-}
-
-func stsLastPodSuffix(maxReplicas int32) string {
-	return fmt.Sprintf("sts-%v", maxReplicas-1)
 }
 
 func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1.Pod, epData httphelper.CassMetadataEndpoints) error {

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -1819,7 +1818,8 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 
 	for _, statefulSet := range rc.statefulSets {
 
-		pod := rc.getDCPodByName(statefulSet.Name + "-0")
+		podName := getStatefulSetPodNameForIdx(statefulSet, 0)
+		pod := rc.getDCPodByName(podName)
 		notReady, err := rc.startNode(pod, labelSeedBeforeStart, endpointData)
 		if notReady || err != nil {
 			return notReady, err
@@ -1837,15 +1837,16 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetadataEndpoints) (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::startAllNodes")
 
-	for podRankWithinRack := 0; ; podRankWithinRack++ {
+	for podRankWithinRack := int32(0); ; podRankWithinRack++ {
 
 		done := true
 		for _, statefulSet := range rc.statefulSets {
 
-			maxPodRankInThisRack := int(*statefulSet.Spec.Replicas) - 1
+			maxPodRankInThisRack := *statefulSet.Spec.Replicas - 1
 			if podRankWithinRack <= maxPodRankInThisRack {
 
-				pod := rc.getDCPodByName(statefulSet.Name + "-" + strconv.Itoa(podRankWithinRack))
+				podName := getStatefulSetPodNameForIdx(statefulSet, podRankWithinRack)
+				pod := rc.getDCPodByName(podName)
 				notReady, err := rc.startNode(pod, false, endpointData)
 				if notReady || err != nil {
 					return notReady, err

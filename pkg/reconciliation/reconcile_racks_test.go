@@ -10,7 +10,6 @@ import (
 	"k8s.io/utils/pointer"
 	"net/http"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1676,15 +1675,21 @@ func TestFailedStart(t *testing.T) {
 
 func TestReconciliationContext_startAllNodes(t *testing.T) {
 
+	// A boolean representing the state of a pod (started or not).
+	type pod bool
+
+	// racks is a map of rack names to a list of pods in that rack.
+	type racks map[string][]pod
+
 	tests := []struct {
 		name         string
-		racks        map[string][]bool
+		racks        racks
 		wantNotReady bool
 		wantEvents   []string
 	}{
 		{
 			name: "balanced racks, all started",
-			racks: map[string][]bool{
+			racks: racks{
 				"rack1": {true, true, true},
 				"rack2": {true, true, true},
 				"rack3": {true, true, true},
@@ -1693,7 +1698,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 		},
 		{
 			name: "balanced racks, some pods not started",
-			racks: map[string][]bool{
+			racks: racks{
 				"rack1": {true, true, false},
 				"rack2": {true, false, false},
 				"rack3": {true, false, false},
@@ -1703,7 +1708,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 		},
 		{
 			name: "unbalanced racks, all started",
-			racks: map[string][]bool{
+			racks: racks{
 				"rack1": {true, true},
 				"rack2": {true},
 				"rack3": {true, true, true},
@@ -1712,7 +1717,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 		},
 		{
 			name: "unbalanced racks, some pods not started",
-			racks: map[string][]bool{
+			racks: racks{
 				"rack1": {true, true},
 				"rack2": {true},
 				"rack3": {true, true, false},
@@ -1732,10 +1737,10 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				}
 				rc.statefulSets = append(rc.statefulSets, sts)
 				for i, started := range rackPods {
-					pod := &corev1.Pod{}
-					pod.Name = sts.Name + "-" + strconv.Itoa(i)
-					pod.Labels = map[string]string{}
-					pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					p := &corev1.Pod{}
+					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
+					p.Labels = map[string]string{}
+					p.Status.ContainerStatuses = []corev1.ContainerStatus{
 						{
 							Name: "cassandra",
 							State: corev1.ContainerState{
@@ -1743,15 +1748,15 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 									StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
 								},
 							},
-							Ready: started,
+							Ready: bool(started),
 						},
 					}
 					if started {
-						pod.Labels[api.CassNodeState] = stateStarted
+						p.Labels[api.CassNodeState] = stateStarted
 					} else {
-						pod.Labels[api.CassNodeState] = stateReadyToStart
+						p.Labels[api.CassNodeState] = stateReadyToStart
 					}
-					rc.dcPods = append(rc.dcPods, pod)
+					rc.dcPods = append(rc.dcPods, p)
 				}
 			}
 

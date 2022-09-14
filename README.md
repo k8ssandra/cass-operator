@@ -137,6 +137,68 @@ And following resource. Apply ``github.com/k8ssandra/cass-operator/config/`` bef
 
 You can find more resources on how Kustomize works from their [documentation](https://kubectl.docs.kubernetes.io/installation/kustomize/). You can install kustomize with ``make kustomize`` if you do not have it already (this will install it to ``bin/kustomize``).
 
+##### Using kustomize to modify the default registry that's used by cass-operator
+
+cass-operator's default image name patterns and repositories are defined in a [image_config.yaml](https://github.com/k8ssandra/cass-operator/blob/master/config/manager/image_config.yaml) file. The image_config.yaml will define only the deployed Cassandra / DSE and server-system-logger images, not the cass-operator itself. To modify imageConfig when deploying, we can create a kustomize component to replace this file in the deployment with our own one.
+
+In this example, create two directories, ``our_installation`` and ``private_config_component``. You can name these as you wish, just remember to replace the directory names in the yaml files.
+
+In ``private_config_component`` create two files, ``kustomization.yaml`` and ``image_config.yaml``. Lets say our registry is located at ``localhost:5000``, here's the ``private_config_component/image_config.yaml``:
+
+```yaml
+apiVersion: config.k8ssandra.io/v1beta1
+kind: ImageConfig
+metadata:
+  name: image-config
+images:
+  system-logger: "k8ssandra/system-logger:v1.12.0"
+  config-builder: "datastax/cass-config-builder:1.0.4-ubi7"
+  imageRegistry: "localhost:5000"
+defaults:
+  cassandra:
+    repository: "k8ssandra/cass-management-api"
+  dse:
+    repository: "datastax/dse-server"
+    suffix: "-ubi7"
+```
+
+And for ``private_config_component/kustomization.yaml`` you will need the following:
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+configMapGenerator:
+- files:
+  - image_config.yaml
+  behavior: merge
+  name: manager-config
+```
+
+Finally, the kustomization file which we'll deploy will look this (add cluster component if you wish to deploy in cluster-scope), add to ``our_installation/kustomization.yaml``:
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.12.0
+
+components:
+  - components/private_image_config
+```
+
+If you also wish to load the cass-operator from a different path, you will need to add the following part to the ``our_installation/kustomization.yaml``:
+
+```yaml
+images:
+- name: controller
+  newName: localhost:5000/k8ssandra/cass-operator
+  newTag: v1.12.0
+```
+
+Run ``kubectl apply -k our_installation`` to install cass-operator.
+
 ### Creating a storage class
 
 If the ``default`` StorageClass is not suitable for use (volumeBindingMode WaitForFirstConsumer is required) or you wish to use different one, you will need to create an appropriate storage class which will define the type of storage to use for Cassandra nodes in a cluster. For example, here is a storage class for using SSDs in GKE:

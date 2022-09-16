@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/utils/pointer"
 	"net/http"
 	"reflect"
 	"strings"
@@ -1670,4 +1671,128 @@ func TestFailedStart(t *testing.T) {
 	assert.Equal(t, 2, len(fakeRecorder.Events))
 
 	mockClient.AssertExpectations(t)
+}
+
+func TestReconciliationContext_startAllNodes(t *testing.T) {
+
+	// A boolean representing the state of a pod (started or not).
+	type pod bool
+
+	// racks is a map of rack names to a list of pods in that rack.
+	type racks map[string][]pod
+
+	tests := []struct {
+		name         string
+		racks        racks
+		wantNotReady bool
+		wantEvents   []string
+	}{
+		{
+			name: "balanced racks, all started",
+			racks: racks{
+				"rack1": {true, true, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, true},
+			},
+			wantNotReady: false,
+		},
+		{
+			name: "balanced racks, some pods not started",
+			racks: racks{
+				"rack1": {true, true, false},
+				"rack2": {true, false, false},
+				"rack3": {true, false, false},
+			},
+			wantNotReady: true,
+			wantEvents:   []string{"Normal StartingCassandra Starting Cassandra for pod rack2-1"},
+		},
+		{
+			name: "unbalanced racks, all started",
+			racks: racks{
+				"rack1": {true, true},
+				"rack2": {true},
+				"rack3": {true, true, true},
+			},
+			wantNotReady: false,
+		},
+		{
+			name: "unbalanced racks, some pods not started",
+			racks: racks{
+				"rack1": {true, true},
+				"rack2": {true},
+				"rack3": {true, true, false},
+			},
+			wantNotReady: true,
+			wantEvents:   []string{"Normal StartingCassandra Starting Cassandra for pod rack3-2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, _ := setupTest()
+			for _, rackName := range []string{"rack1", "rack2", "rack3"} {
+				rackPods := tt.racks[rackName]
+				sts := &appsv1.StatefulSet{
+					ObjectMeta: metav1.ObjectMeta{Name: rackName},
+					Spec:       appsv1.StatefulSetSpec{Replicas: pointer.Int32(int32(len(rackPods)))},
+				}
+				rc.statefulSets = append(rc.statefulSets, sts)
+				for i, started := range rackPods {
+					p := &corev1.Pod{}
+					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
+					p.Labels = map[string]string{}
+					p.Status.ContainerStatuses = []corev1.ContainerStatus{
+						{
+							Name: "cassandra",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{
+									StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
+								},
+							},
+							Ready: bool(started),
+						},
+					}
+					if started {
+						p.Labels[api.CassNodeState] = stateStarted
+					} else {
+						p.Labels[api.CassNodeState] = stateReadyToStart
+					}
+					rc.dcPods = append(rc.dcPods, p)
+				}
+			}
+
+			mockClient := &mocks.Client{}
+			rc.Client = mockClient
+
+			if tt.wantNotReady {
+				// mock the calls in labelServerPodStarting:
+				// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
+				k8sMockClientPatch(mockClient, nil)
+				// get the status client
+				k8sMockClientStatus(mockClient, mockClient)
+				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
+				k8sMockClientPatch(mockClient, nil)
+			}
+
+			epData := httphelper.CassMetadataEndpoints{
+				Entity: []httphelper.EndpointState{},
+			}
+
+			gotNotReady, err := rc.startAllNodes(epData)
+
+			assert.NoError(t, err)
+			assert.Equalf(t, tt.wantNotReady, gotNotReady, "expected not ready to be %v", tt.wantNotReady)
+
+			fakeRecorder := rc.Recorder.(*record.FakeRecorder)
+			close(fakeRecorder.Events)
+			if assert.Lenf(t, fakeRecorder.Events, len(tt.wantEvents), "expected %d events, got %d", len(tt.wantEvents), len(fakeRecorder.Events)) {
+				var gotEvents []string
+				for i := range fakeRecorder.Events {
+					gotEvents = append(gotEvents, i)
+				}
+				assert.Equal(t, tt.wantEvents, gotEvents)
+			}
+
+			mockClient.AssertExpectations(t)
+		})
+	}
 }

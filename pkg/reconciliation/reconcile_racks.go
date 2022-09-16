@@ -594,17 +594,17 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 
 	// step 2 - get one node up per rack
 
-	rackWaitingForANode, err := rc.startOneNodePerRack(endpointData, seedCount)
+	atLeastOneFirstNodeNotReady, err := rc.startOneNodePerRack(endpointData, seedCount)
 
 	if err != nil {
 		return result.Error(err)
 	}
-	if rackWaitingForANode != "" {
+	if atLeastOneFirstNodeNotReady {
 		return result.RequeueSoon(2)
 	}
 
-	// step 3 - get all nodes up
-	// if the cluster isn't healthy, that's ok, but go back to step 1
+	// step 3 - if the cluster isn't healthy, that's ok, but go back to step 1
+
 	clusterHealthy := rc.isClusterHealthy()
 	if err := rc.updateHealth(clusterHealthy); err != nil {
 		return result.Error(err)
@@ -617,11 +617,13 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 		return result.RequeueSoon(5)
 	}
 
-	needsMoreNodes, err := rc.startAllNodes(endpointData)
+	// step 4 - make sure all nodes are ready
+
+	atLeastOneNodeNotReady, err := rc.startAllNodes(endpointData)
 	if err != nil {
 		return result.Error(err)
 	}
-	if needsMoreNodes {
+	if atLeastOneNodeNotReady {
 		return result.RequeueSoon(2)
 	}
 
@@ -1806,96 +1808,103 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 	return rc.labelServerPodStarting(pod)
 }
 
-// returns the name of one rack without any ready node
-func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.CassMetadataEndpoints, readySeeds int) (string, error) {
-
+// startOneNodePerRack starts the first pod in each rack in a deterministic order, dictated by the
+// order in which the racks were declared in the datacenter spec. It returns true if a Cassandra
+// node is not ready yet, and an error if that node also failed to start.
+func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.CassMetadataEndpoints, readySeeds int) (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::startOneNodePerRack")
 
-	rackReadyCount := map[string]int{}
-	for _, rackInfo := range rc.desiredRackInformation {
-		rackReadyCount[rackInfo.RackName] = 0
-	}
+	labelSeedBeforeStart := readySeeds == 0 && !rc.hasAdditionalSeeds()
 
-	for _, pod := range rc.dcPods {
-		rackName := pod.Labels[api.RackLabel]
-		if isServerReady(pod) {
-			rackReadyCount[rackName]++
+	for _, statefulSet := range rc.statefulSets {
+
+		podName := getStatefulSetPodNameForIdx(statefulSet, 0)
+		pod := rc.getDCPodByName(podName)
+		notReady, err := rc.startNode(pod, labelSeedBeforeStart, endpointData)
+		if notReady || err != nil {
+			return notReady, err
 		}
+
 	}
-
-	// if the DC has no ready seeds, label a pod as a seed before we start Cassandra on it
-	// and also consider additional seeds
-
-	externalSeedPoints := 0
-	if existingEndpoints, err := rc.GetAdditionalSeedEndpoint(); err == nil {
-		externalSeedPoints = len(existingEndpoints.Subsets[0].Addresses)
-	}
-
-	labelSeedBeforeStart := readySeeds == 0 && len(rc.Datacenter.Spec.AdditionalSeeds) == 0 && externalSeedPoints == 0
-
-	rackThatNeedsNode := ""
-	for rackName, readyCount := range rackReadyCount {
-		if readyCount > 0 {
-			continue
-		}
-		rackThatNeedsNode = rackName
-		for _, pod := range rc.dcPods {
-			mgmtApiUp := isMgmtApiRunning(pod)
-			if !isServerReadyToStart(pod) || !mgmtApiUp {
-				continue
-			}
-			podRack := pod.Labels[api.RackLabel]
-			if podRack == rackName {
-				// this is the one exception to all seed labelling happening in labelSeedPods()
-				if labelSeedBeforeStart {
-					patch := client.MergeFrom(pod.DeepCopy())
-					pod.Labels[api.SeedNodeLabel] = "true"
-					if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
-						return "", err
-					}
-
-					rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsSeed,
-						"Labeled pod a seed node %s", pod.Name)
-
-					// sleeping five seconds for DNS paranoia
-					time.Sleep(5 * time.Second)
-				}
-				if err := rc.startCassandra(endpointData, pod); err != nil {
-					return "", err
-				}
-				return rackName, nil
-			}
-		}
-	}
-
-	return rackThatNeedsNode, nil
+	return false, nil
 }
 
-// returns whether one or more server nodes is not running or ready
+// startAllNodes starts all nodes in the datacenter in a deterministic order, dictated by the order
+// in which the racks were declared in the datacenter spec, and in such a way that at any given
+// time, the number of started nodes in a rack cannot be greater or lesser than the number of
+// started nodes in all other racks by more than 1. It returns true if a Cassandra node is not ready
+// yet, and an error if that node also failed to start.
 func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetadataEndpoints) (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::startAllNodes")
 
-	for _, pod := range rc.dcPods {
-		if isMgmtApiRunning(pod) && !isServerReady(pod) && !isServerStarted(pod) {
-			if err := rc.startCassandra(endpointData, pod); err != nil {
-				return false, err
+	for podRankWithinRack := int32(0); ; podRankWithinRack++ {
+
+		done := true
+		for _, statefulSet := range rc.statefulSets {
+
+			maxPodRankInThisRack := *statefulSet.Spec.Replicas - 1
+			if podRankWithinRack <= maxPodRankInThisRack {
+
+				podName := getStatefulSetPodNameForIdx(statefulSet, podRankWithinRack)
+				pod := rc.getDCPodByName(podName)
+				notReady, err := rc.startNode(pod, false, endpointData)
+				if notReady || err != nil {
+					return notReady, err
+				}
+
+				done = done && podRankWithinRack == maxPodRankInThisRack
 			}
-			return true, nil
+		}
+		if done {
+			return false, nil
 		}
 	}
+}
 
-	// this extra pass only does anything when we have a combination of
-	// ready server pods and pods that are not running - possibly stuck pending
-	for _, pod := range rc.dcPods {
-		if !isMgmtApiRunning(pod) {
-			rc.ReqLogger.Info(
-				"management api is not running on pod",
-				"pod", pod.Name,
-			)
-			return true, nil
-		}
+// hasAdditionalSeeds returns true if the datacenter has at least one additional seed.
+func (rc *ReconciliationContext) hasAdditionalSeeds() bool {
+	if len(rc.Datacenter.Spec.AdditionalSeeds) > 0 {
+		return true
 	}
+	additionalSeedEndpoints := 0
+	if additionalSeedEndpoint, err := rc.GetAdditionalSeedEndpoint(); err == nil {
+		additionalSeedEndpoints = len(additionalSeedEndpoint.Subsets[0].Addresses)
+	}
+	return additionalSeedEndpoints > 0
+}
 
+// startNode starts the Cassandra node in the given pod, if it wasn't started yet. It returns true
+// if the node isn't ready yet, and a non-nil error if the node that isn't ready yet also failed to
+// start.
+func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart bool, endpointData httphelper.CassMetadataEndpoints) (bool, error) {
+	if pod == nil {
+		return true, nil
+	} else if !isServerReady(pod) {
+		if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
+
+			// this is the one exception to all seed labelling happening in labelSeedPods()
+			if labelSeedBeforeStart {
+
+				patch := client.MergeFrom(pod.DeepCopy())
+				pod.Labels[api.SeedNodeLabel] = "true"
+				if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
+					return true, err
+				}
+
+				rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsSeed,
+					"Labeled pod a seed node %s", pod.Name)
+
+				// sleeping five seconds for DNS paranoia
+				time.Sleep(5 * time.Second)
+			}
+
+			err := rc.startCassandra(endpointData, pod)
+			if err != nil {
+				return true, err
+			}
+		}
+		return true, nil
+	}
 	return false, nil
 }
 

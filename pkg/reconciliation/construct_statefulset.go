@@ -40,7 +40,7 @@ func newNamespacedNameForStatefulSet(
 	dc *api.CassandraDatacenter,
 	rackName string) types.NamespacedName {
 
-	name := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-" + rackName + "-sts"
+	name := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-" + api.CleanupSubdomain(rackName) + "-sts"
 	ns := dc.Namespace
 
 	return types.NamespacedName{

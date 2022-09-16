@@ -463,7 +463,7 @@ func (dc *CassandraDatacenter) GetServerImage() string {
 // GetRackLabels ...
 func (dc *CassandraDatacenter) GetRackLabels(rackName string) map[string]string {
 	labels := dc.GetDatacenterLabels()
-	labels[RackLabel] = rackName
+	labels[RackLabel] = CleanLabelValue(rackName)
 	return labels
 }
 
@@ -544,23 +544,44 @@ func (dc *CassandraDatacenter) GetClusterLabels() map[string]string {
 	}
 }
 
-// apimachinery validation does not expose this, copied here
-const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+// apimachinery validation does not expose these, copied here
+const (
+	dns1035LabelFmt     string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+	dns1123SubdomainFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*"
+	dns1123LabelFmt     string = "(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?"
+)
 
-var whitelistRegex = regexp.MustCompile(`(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?`)
+var dns1035LabelRegexp = regexp.MustCompile(dns1035LabelFmt)
+var dns1123SubdomainRegexp = regexp.MustCompile(dns1123SubdomainFmt)
+var dns1123LabelRegexp = regexp.MustCompile(dns1123LabelFmt)
 
 // CleanLabelValue a valid label must be an empty string or consist of alphanumeric characters,
 // '-', '_' or '.', and must start and end with an alphanumeric.
 // Note: we apply a prefix of "cassandra-" to the cluster name value used as label name.
 // As such, empty string isn't a valid case.
 func CleanLabelValue(value string) string {
-	regexpResult := whitelistRegex.FindAllString(strings.Replace(value, " ", "", -1), -1)
+	regexpResult := dns1123LabelRegexp.FindAllString(strings.Replace(value, " ", "", -1), -1)
 	return strings.Join(regexpResult, "")
+}
+
+func CleanupSubdomain(input string) string {
+	if len(validation.IsDNS1123Subdomain(input)) > 0 {
+		r := dns1123SubdomainRegexp
+
+		// Invalid domain name, Kubernetes will reject this. Try to modify it to a suitable string
+		input = strings.ToLower(input)
+		input = strings.ReplaceAll(input, "_", "-")
+		validParts := r.FindAllString(input, -1)
+
+		return strings.Join(validParts, "")
+	}
+
+	return input
 }
 
 func CleanupForKubernetes(input string) string {
 	if len(validation.IsDNS1035Label(input)) > 0 {
-		r := regexp.MustCompile(dns1035LabelFmt)
+		r := dns1035LabelRegexp
 
 		// Invalid domain name, Kubernetes will reject this. Try to modify it to a suitable string
 		input = strings.ToLower(input)

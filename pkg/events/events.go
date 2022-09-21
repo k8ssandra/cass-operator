@@ -30,6 +30,7 @@ const (
 	StartingCassandraAndReplacingNode string = "StartingCassandraAndReplacingNode"
 	StartingCassandra                 string = "StartingCassandra"
 	DecommissionDatacenter            string = "DecommissionDatacenter"
+	DecommissioningNode               string = "DecommissioningNode"
 	UnhealthyDatacenter               string = "UnhealthyDatacenter"
 )
 

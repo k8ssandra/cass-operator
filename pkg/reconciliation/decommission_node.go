@@ -188,6 +188,7 @@ func (rc *ReconciliationContext) callDecommission(pod *corev1.Pod) error {
 
 // Wait for decommissioning nodes to finish before continuing to reconcile
 func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.CassMetadataEndpoints) result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::CheckDecommissioningNodes")
 	if rc.Datacenter.GetConditionStatus(api.DatacenterScalingDown) != corev1.ConditionTrue {
 		return result.Continue()
 	}
@@ -210,7 +211,7 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 					return res
 				}
 			}
-			// TODO Add event here to indicate decommissioning this node is still taking place?
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.DecommissioningNode, fmt.Sprintf("Decommissioning node %s", pod.Name))
 			return result.RequeueSoon(5)
 		}
 	}

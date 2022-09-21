@@ -117,7 +117,7 @@ jobs:
           github_pat: ${{ github.token }}
           preflight: "latest"
       - name: Build and push system-logger
-        id: docker_build_system-logger
+        id: docker_build_load_system-logger
         uses: docker/build-push-action@v3
         with:
           file: logger.Dockerfile
@@ -130,7 +130,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build and push cass-operator
-        id: docker_build_cass-operator
+        id: docker_build_load_cass-operator
         uses: docker/build-push-action@v3
         with:
           file: Dockerfile

@@ -34,13 +34,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
-      - name: Login to connect.redhat.com
-        if: ${{ !env.ACT }}
-        uses: docker/login-action@v2
-        with:
-          registry: scan.connect.redhat.com
-          username: unused
-          password: ${{ secrets.CONNECT_PODMAN_PASSWORD }}
       - name: Set git parsed values
         id: vars
         shell: bash

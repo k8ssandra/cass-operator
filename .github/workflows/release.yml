@@ -107,9 +107,9 @@ jobs:
         run: |
           docker tag k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}} scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}}
           docker tag k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}} scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}}
-          docker login -u unused scan.connect.redhat.com -p ${{ secrets.CONNECT_PODMAN_PASSWORD }}
+          docker login -u unused scan.connect.redhat.com -p ${{ secrets.CASS_OPERATOR_CONNECT_SECRET }}
           docker push scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}}
-          docker login -u unused scan.connect.redhat.com -p ${{ secrets.CONNECT_PODMAN_PASSWORD }}
+          docker login -u unused scan.connect.redhat.com -p ${{ secrets.SYSTEM_LOGGER_CONNECT_SECRET }}
           docker push scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}}
       - name: Install CLI tools from OpenShift Mirror
         uses: redhat-actions/openshift-tools-installer@v1

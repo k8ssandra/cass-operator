@@ -12,6 +12,10 @@ inputs:
   serverImage:
     description: "Override server image used in the test file"
     required: false
+  GITHUB_TOKEN:
+    description: "GitHub Token (used by Helm action)"
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -48,6 +52,8 @@ runs:
     - name: Install Helm
       uses: azure/setup-helm@v3
       id: install_helm
+      with:
+        GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
     - name: Download cass-operator image
       uses: actions/download-artifact@v2
       with:
@@ -66,9 +72,9 @@ runs:
     - name: Load image on the nodes of the cluster
       shell: bash
       run: |
-        kind load docker-image --name=kind k8ssandra/cass-operator:latest
-        kind load docker-image --name=kind k8ssandra/system-logger:latest
+        kind load docker-image --name=kind us-docker.pkg.dev/k8ssandra/images/cass-operator:latest
+        kind load docker-image --name=kind us-docker.pkg.dev/k8ssandra/images/system-logger:latest
     - name: Run integration test ( ${{ inputs.integration_test }} )
       shell: bash
       run: |
-        IMG=k8ssandra/cass-operator:latest make integ-test
+        IMG=us-docker.pkg.dev/k8ssandra/images/cass-operator:latest make integ-test

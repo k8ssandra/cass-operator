@@ -8,7 +8,7 @@ fi
 TAG=$1
 PREVTAG=$2
 #PREVTAG=$(git describe --abbrev=0 --tags)
-IMG=k8ssandra/cass-operator:${TAG}
+IMG=us-docker.pkg.dev/k8ssandra/images/cass-operator:${TAG}
 
 # Ensure kustomize is installed
 make kustomize
@@ -25,4 +25,4 @@ sed -i -e "s/$PREVTAG/$TAG/g" README.md
 cd config/manager && $KUSTOMIZE edit set image controller=$IMG && cd -
 
 # Modify config/manager/image_config.yaml to have proper version for server-system-logger
-LOG_IMG=k8ssandra/system-logger:${TAG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
+LOG_IMG=us-docker.pkg.dev/k8ssandra/images/system-logger:${TAG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml

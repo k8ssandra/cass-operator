@@ -261,3 +261,7 @@ bundle/
 kind-logs*/
 
 kubeconfig
+
+# For GHA testing
+.act/
+.actrc

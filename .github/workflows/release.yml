@@ -56,21 +56,9 @@ jobs:
           build-args: |
             VERSION=${{ env.TARGET_VERSION }}
           context: .
+          load: true
           push: ${{ !env.ACT }}
           tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
-          platforms: linux/amd64
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Build and push system-logger to RH
-        id: docker_build_rh_system-logger
-        uses: docker/build-push-action@v3
-        with:
-          file: logger.Dockerfile
-          build-args: |
-            VERSION=${{ env.TARGET_VERSION }}
-          context: .
-          push: ${{ !env.ACT }}
-          tags: scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
@@ -82,21 +70,9 @@ jobs:
           build-args: |
             VERSION=${{ env.TARGET_VERSION }}
           context: .
+          load: true
           push: ${{ !env.ACT }}
           tags: k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}
-          platforms: linux/amd64
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Build and push cass-operator to RH
-        id: docker_build_rh_cass-operator
-        uses: docker/build-push-action@v3
-        with:
-          file: Dockerfile
-          build-args: |
-            VERSION=${{ env.TARGET_VERSION }}
-          context: .
-          push: ${{ !env.ACT }}
-          tags: scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
@@ -114,18 +90,23 @@ jobs:
           build-args: |
             VERSION=${{ env.TARGET_VERSION }}
           context: .
-          push: true
+          load: true
+          push: ${{ !env.ACT }}
           tags: k8ssandra/cass-operator-bundle:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
-      # - name: Tag and push images for Red Hat certified usage
-      #   run: |
-      #     docker tag k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}} scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}}
-      #     docker tag k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}} scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}}
-      #     docker login -u unused scan.connect.redhat.com -p ${{ secrets.CONNECT_PODMAN_PASSWORD }}
-      #     docker push scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}}
-      #     docker push scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}}
+      - name: Tag and push images for Red Hat certification
+        shell: bash
+        if: ${{ !env.ACT }}
+        # The double docker login is a workaround for RH's odd login issues
+        run: |
+          docker tag k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}} scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}}
+          docker tag k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}} scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}}
+          docker login -u unused scan.connect.redhat.com -p ${{ secrets.CONNECT_PODMAN_PASSWORD }}
+          docker push scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}}
+          docker login -u unused scan.connect.redhat.com -p ${{ secrets.CONNECT_PODMAN_PASSWORD }}
+          docker push scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}}
       - name: Install CLI tools from OpenShift Mirror
         uses: redhat-actions/openshift-tools-installer@v1
         with:
@@ -137,32 +118,6 @@ jobs:
           source: "github"
           github_pat: ${{ github.token }}
           preflight: "latest"
-      - name: Build system-logger
-        id: docker_build_load_rh_system-logger
-        uses: docker/build-push-action@v3
-        with:
-          file: logger.Dockerfile
-          build-args: |
-            VERSION=${{ env.TARGET_VERSION }}
-          context: .
-          load: true
-          tags: scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}}
-          platforms: linux/amd64
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Build cass-operator
-        id: docker_build_load_rh_cass-operator
-        uses: docker/build-push-action@v3
-        with:
-          file: Dockerfile
-          build-args: |
-            VERSION=${{ env.TARGET_VERSION }}
-          context: .
-          load: true
-          tags: scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}}
-          platforms: linux/amd64
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Run preflight checks and submit results
         shell: bash
         run: |

@@ -118,7 +118,9 @@ jobs:
       - name: Run preflight checks and submit results
         shell: bash
         run: |
+          docker login -u unused scan.connect.redhat.com -p ${{ secrets.CASS_OPERATOR_CONNECT_SECRET }}
           preflight check container scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}} --certification-project-id=5ebee0e40e3deaf258b160d1 --pyxis-api-token=${{ secrets.PREFLIGHT_KEY }} --submit --docker-config=$HOME/.docker/config.json
+          docker login -u unused scan.connect.redhat.com -p ${{ secrets.SYSTEM_LOGGER_CONNECT_SECRET }}
           preflight check container scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}} --certification-project-id=6138f998fb33d420b79f0af9 --pyxis-api-token=${{ secrets.PREFLIGHT_KEY }} --submit --docker-config=$HOME/.docker/config.json
       - name: Create bundle
         shell: bash

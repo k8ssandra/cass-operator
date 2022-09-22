@@ -48,7 +48,7 @@ jobs:
           echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
           echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
           echo "TARGET_VERSION=$(echo ${GITHUB_REF#refs/tags/} | awk '{print substr($0,2)}')" >> $GITHUB_ENV
-      - name: Build and push system-logger
+      - name: Build system-logger
         id: docker_build_system-logger
         uses: docker/build-push-action@v3
         with:
@@ -57,12 +57,11 @@ jobs:
             VERSION=${{ env.TARGET_VERSION }}
           context: .
           load: true
-          push: ${{ !env.ACT }}
           tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Build and push cass-operator
+      - name: Build cass-operator
         id: docker_build_cass-operator
         uses: docker/build-push-action@v3
         with:
@@ -71,28 +70,33 @@ jobs:
             VERSION=${{ env.TARGET_VERSION }}
           context: .
           load: true
-          push: ${{ !env.ACT }}
           tags: k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Create bundle
-        shell: bash
-        if: ${{ !env.ACT }} # Act does not have yq
-        run: |
-          make IMG=k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}} VERSION=${{ env.TARGET_VERSION }} bundle
-      - name: Build and push cass-operator-bundle
-        id: docker_build_cass-operator_bundle
-        if: ${{ !env.ACT }}
+      - name: Push system-logger
+        id: docker_push_system-logger
         uses: docker/build-push-action@v3
         with:
-          file: bundle.Dockerfile
+          file: logger.Dockerfile
           build-args: |
             VERSION=${{ env.TARGET_VERSION }}
           context: .
-          load: true
           push: ${{ !env.ACT }}
-          tags: k8ssandra/cass-operator-bundle:${{ steps.vars.outputs.tag_name}}
+          tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+      - name: Push cass-operator
+        id: docker_push_cass-operator
+        uses: docker/build-push-action@v3
+        with:
+          file: Dockerfile
+          build-args: |
+            VERSION=${{ env.TARGET_VERSION }}
+          context: .
+          push: ${{ !env.ACT }}
+          tags: k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
@@ -123,3 +127,23 @@ jobs:
         run: |
           preflight check container scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}} --certification-project-id=5ebee0e40e3deaf258b160d1 --pyxis-api-token=${{ secrets.PREFLIGHT_KEY }} --submit --docker-config=$HOME/.docker/config.json
           preflight check container scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}} --certification-project-id=6138f998fb33d420b79f0af9 --pyxis-api-token=${{ secrets.PREFLIGHT_KEY }} --submit --docker-config=$HOME/.docker/config.json
+      - name: Create bundle
+        shell: bash
+        if: ${{ !env.ACT }} # Act does not have yq
+        run: |
+          make IMG=k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}} VERSION=${{ env.TARGET_VERSION }} bundle
+      - name: Build and push cass-operator-bundle
+        id: docker_build_cass-operator_bundle
+        if: ${{ !env.ACT }}
+        uses: docker/build-push-action@v3
+        with:
+          file: bundle.Dockerfile
+          build-args: |
+            VERSION=${{ env.TARGET_VERSION }}
+          context: .
+          load: true
+          push: ${{ !env.ACT }}
+          tags: k8ssandra/cass-operator-bundle:${{ steps.vars.outputs.tag_name}}
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache

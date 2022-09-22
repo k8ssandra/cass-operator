@@ -136,7 +136,6 @@ jobs:
           build-args: |
             VERSION=${{ env.TARGET_VERSION }}
           context: .
-          load: true
           push: ${{ !env.ACT }}
           tags: k8ssandra/cass-operator-bundle:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64

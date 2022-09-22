@@ -29,7 +29,8 @@ jobs:
           file: Dockerfile
           context: .
           push: false
-          tags: k8ssandra/cass-operator:latest
+          tags: |
+            artifacts.k8ssandra.io/k8ssandra/images/cass-operator:latest
           platforms: linux/amd64
           outputs: type=docker,dest=/tmp/k8ssandra-cass-operator.tar
           cache-from: type=local,src=/tmp/.buildx-cache
@@ -39,7 +40,8 @@ jobs:
         with:
           file: logger.Dockerfile
           push: false
-          tags: k8ssandra/system-logger:latest
+          tags: |
+            artifacts.k8ssandra.io/k8ssandra/images/system-logger:latest
           outputs: type=docker,dest=/tmp/k8ssandra-system-logger.tar
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
@@ -137,9 +139,9 @@ jobs:
         - "4.0.3"
         include:
           - version: 3.11.7
-            serverImage: k8ssandra/cass-management-api:3.11.7-v0.1.24 # k8ssandra 1.1
+            serverImage: artifacts.k8ssandra.io/k8ssandra/images/cass-management-api:3.11.7-v0.1.24 # k8ssandra 1.1
           - version: 4.0.0
-            serverImage: k8ssandra/cass-management-api:4.0.0-v0.1.28 # k8ssandra 1.3
+            serverImage: artifacts.k8ssandra.io/k8ssandra/images/cass-management-api:4.0.0-v0.1.28 # k8ssandra 1.3
       fail-fast: true
     runs-on: ubuntu-latest
     env:
@@ -157,6 +159,7 @@ jobs:
       - uses: ./.github/actions/run-integ-test
         with:
           integration_test: smoke_test_oss
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Archive k8s logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2

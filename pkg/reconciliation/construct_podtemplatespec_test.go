@@ -993,7 +993,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "cassandra",
 				serverVersion: "3.11.10",
 			},
-			want:      "k8ssandra/cass-management-api:3.11.10",
+			want:      "artifacts.k8ssandra.io/k8ssandra/images/cass-management-api:3.11.10",
 			errString: "",
 		},
 		{

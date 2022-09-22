@@ -36,7 +36,7 @@ func TestCassandraOverride(t *testing.T) {
 
 	cassImage, err := GetCassandraImage("cassandra", "4.0.0")
 	assert.NoError(err, "getting Cassandra image should succeed")
-	assert.Equal("k8ssandra/cass-management-api:4.0.0", cassImage)
+	assert.Equal("artifacts.k8ssandra.io/k8ssandra/images/cass-management-api:4.0.0", cassImage)
 
 	imageConfig.Images.CassandraVersions = map[string]string{
 		"4.0.0": customImageName,
@@ -56,10 +56,10 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 	// Verify some default values are set
 	assert.NotNil(GetImageConfig())
 	assert.NotNil(GetImageConfig().Images)
-	assert.True(strings.HasPrefix(GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
+	assert.True(strings.HasPrefix(GetImageConfig().Images.SystemLogger, "artifacts.k8ssandra.io/k8ssandra/images/system-logger:"))
 	assert.True(strings.HasPrefix(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
 
-	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.CassandraImageComponent.Repository)
+	assert.Equal("artifacts.k8ssandra.io/k8ssandra/images/cass-management-api", GetImageConfig().DefaultImages.CassandraImageComponent.Repository)
 	assert.Equal("datastax/dse-server", GetImageConfig().DefaultImages.DSEImageComponent.Repository)
 
 	path, err := GetCassandraImage("dse", "6.8.17")
@@ -76,10 +76,10 @@ func TestImageConfigParsing(t *testing.T) {
 	// Verify some default values are set
 	assert.NotNil(GetImageConfig())
 	assert.NotNil(GetImageConfig().Images)
-	assert.True(strings.HasPrefix(GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
+	assert.True(strings.HasPrefix(GetImageConfig().Images.SystemLogger, "artifacts.k8ssandra.io/k8ssandra/images/system-logger:"))
 	assert.True(strings.HasPrefix(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
 
-	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.CassandraImageComponent.Repository)
+	assert.Equal("artifacts.k8ssandra.io/k8ssandra/images/cass-management-api", GetImageConfig().DefaultImages.CassandraImageComponent.Repository)
 	assert.Equal("datastax/dse-server", GetImageConfig().DefaultImages.DSEImageComponent.Repository)
 
 	assert.Equal("localhost:5000", GetImageConfig().ImageRegistry)
@@ -106,7 +106,7 @@ func TestDefaultRepositories(t *testing.T) {
 
 	path, err := GetCassandraImage("cassandra", "4.0.1")
 	assert.NoError(err)
-	assert.Equal("k8ssandra/cass-management-api:4.0.1", path)
+	assert.Equal("artifacts.k8ssandra.io/k8ssandra/images/cass-management-api:4.0.1", path)
 
 	path, err = GetCassandraImage("dse", "6.8.17")
 	assert.NoError(err)

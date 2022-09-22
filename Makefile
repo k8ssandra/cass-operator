@@ -39,9 +39,9 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# cassandra.datastax.com/cass-oper-bundle:$VERSION and cassandra.datastax.com/cass-oper-catalog:$VERSION.
+# k8ssandra/cass-operator-bundle:$VERSION and k8ssandra/cass-operator-catalog:$VERSION.
 
-ORG ?= k8ssandra
+ORG ?= artifacts.k8ssandra.io/k8ssandra/images
 IMAGE_TAG_BASE ?= $(ORG)/cass-operator
 
 M_INTEG_DIR ?= all
@@ -161,7 +161,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	docker buildx build --build-arg VERSION=${VERSION} -t ${IMG} -t ${IMG_LATEST} . --load
+	docker buildx build --build-arg VERSION=${VERSION} -t ${IMG} -t k8ssandra/cass-operator:v${VERSION} -t ${IMG_LATEST} -t k8ssandra/cass-operator:latest . --load
 
 .PHONY: docker-kind
 docker-kind: docker-build ## Build docker image and load to kind cluster
@@ -172,15 +172,19 @@ docker-kind: docker-build ## Build docker image and load to kind cluster
 docker-push: ## Build and push docker image with the manager.
 	docker push ${IMG}
 	docker push ${IMG_LATEST}
+	docker push k8ssandra/cass-operator:v${VERSION}
+	docker push k8ssandra/cass-operator:latest
 
 .PHONY: docker-logger-build
 docker-logger-build: ## Build system-logger image.
-	docker buildx build -t ${LOG_IMG} -t ${LOG_IMG_LATEST} --build-arg VERSION=${VERSION} -f logger.Dockerfile . --load
+	docker buildx build -t ${LOG_IMG} -t ${LOG_IMG_LATEST} --build-arg VERSION=${VERSION} -t k8ssandra/system-logger:v${VERSION} -t k8ssandra/system-logger:latest -f logger.Dockerfile . --load
 
 .PHONY: docker-logger-push
 docker-logger-push: ## Push system-logger-image
 	docker push ${LOG_IMG}
 	docker push ${LOG_IMG_LATEST}
+	docker push k8ssandra/system-logger:v${VERSION}
+	docker push k8ssandra/system-logger:latest
 
 .PHONY: docker-logger-kind
 docker-logger-kind: docker-logger-build ## Build system-logger image and load to kind cluster
@@ -313,11 +317,12 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker buildx build -f bundle.Dockerfile -t $(BUNDLE_IMG) . --load
+	docker buildx build -f bundle.Dockerfile -t $(BUNDLE_IMG) -t k8ssandra/cass-operator-bundle:v$(VERSION) . --load
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	docker push $(BUNDLE_IMG)
+	docker push k8ssandra/cass-operator-bundle:v$(VERSION)
 
 .PHONY: opm
 OPM = ./bin/opm
@@ -354,8 +359,10 @@ endif
 .PHONY: catalog-build
 catalog-build: opm ## Build a catalog image.
 	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+	docker tag $(CATALOG_IMG) k8ssandra/cass-operator-catalog:v$(VERSION)
 
 # Push the catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	docker push $(CATALOG_IMG)
+	docker push k8ssandra/cass-operator-catalog:v$(VERSION)

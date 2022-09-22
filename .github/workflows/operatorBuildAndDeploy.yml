@@ -56,11 +56,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: testing
     if: github.ref == 'refs/heads/master'
+    # Add "id-token" with the intended permissions.
+    permissions:
+        contents: 'read'
+        id-token: 'write'
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v0'
+        with:
+            workload_identity_provider: 'projects/945064329182/locations/global/workloadIdentityPools/github-pool/providers/github'
+            service_account: 'gh-actions@k8ssandra.iam.gserviceaccount.com'
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v0'
       - name: Cache Docker layers
         uses: actions/cache@v2
         with:
@@ -73,20 +84,33 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      # Log in to Google Cloud Artifact Registry
+      - name: Login to GCP Artifact Registry
+        uses: 'docker/login-action@v1'
+        with:
+          registry: 'artifacts.k8ssandra.io'
+          username: 'oauth2accesstoken'
+          password: '${{ steps.auth.outputs.access_token }}'
       - name: Set git parsed values
         id: vars
         run: |
           echo ::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})
           echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
           echo ::set-output name=version::$(make version)
-      - name: Build and push
+      - name: Build and Push - Cass Operator
         id: docker_build_cass_operator
         uses: docker/build-push-action@v2
         with:
           file: Dockerfile
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: k8ssandra/cass-operator:${{ steps.vars.outputs.sha_short }}, k8ssandra/cass-operator:latest, k8ssandra/cass-operator:${{ steps.vars.outputs.version }}
+          tags: |
+            k8ssandra/cass-operator:${{ steps.vars.outputs.sha_short }}
+            k8ssandra/cass-operator:latest
+            k8ssandra/cass-operator:${{ steps.vars.outputs.version }}
+            artifacts.k8ssandra.io/k8ssandra/images/cass-operator:${{ steps.vars.outputs.sha_short }}
+            artifacts.k8ssandra.io/k8ssandra/images/cass-operator:latest
+            artifacts.k8ssandra.io/k8ssandra/images/cass-operator:${{ steps.vars.outputs.version }}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
@@ -96,13 +120,17 @@ jobs:
         with:
           file: logger.Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: k8ssandra/system-logger:${{ steps.vars.outputs.sha_short }}, k8ssandra/system-logger:latest
+          tags: |
+            k8ssandra/system-logger:${{ steps.vars.outputs.sha_short }}
+            k8ssandra/system-logger:latest
+            artifacts.k8ssandra.io/k8ssandra/images/system-logger:${{ steps.vars.outputs.sha_short }}
+            artifacts.k8ssandra.io/k8ssandra/images/system-logger:latest
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Create bundle
         run: |
-          make IMG=k8ssandra/cass-operator:${{ steps.vars.outputs.version }} VERSION=${{ steps.vars.outputs.version }} CHANNEL=dev bundle
+          make VERSION=${{ steps.vars.outputs.version }} CHANNEL=dev bundle
       - name: Build and push cass-operator-bundle
         id: docker_build_cass-operator_bundle
         uses: docker/build-push-action@v2
@@ -112,7 +140,9 @@ jobs:
             VERSION=${{ steps.vars.outputs.version }}
           context: .
           push: ${{ !env.ACT }}
-          tags: k8ssandra/cass-operator-bundle:v${{ steps.vars.outputs.version }}
+          tags: |
+            k8ssandra/cass-operator-bundle:v${{ steps.vars.outputs.version }}
+            artifacts.k8ssandra.io/k8ssandra/images/cass-operator-bundle:v${{ steps.vars.outputs.version }}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache

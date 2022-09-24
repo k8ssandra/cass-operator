@@ -1,7 +1,7 @@
 #!/bin/sh
 
 if [ "$#" -ne 2 ]; then
-    echo "Usage: scripts/release-certified-bundles.sh version sha256:<sha256>"
+    echo "Usage: scripts/release-certified-bundles.sh version sha256:<cass-operator-sha256> sha256:<system-logger-sha256>"
     echo "Script assumes you are in the correct branch / tag and that community-operators repository"
     echo "has been checked out to ../community-operators/"
     exit
@@ -9,9 +9,10 @@ fi
 
 VERSION=$1
 SHA=$2
+SYSTEM_LOGGER_SHA=$3
 # TODO Add certified-operators-marketplace
 TARGET_DIRS=(certified-operators)
-SYSTEM_LOGGER_SHA=sha256:33e75d0c78a277cdc37be24f2b116cade0d9b7dc7249610cdf9bf0705c8a040e
+# SYSTEM_LOGGER_SHA=sha256:33e75d0c78a277cdc37be24f2b116cade0d9b7dc7249610cdf9bf0705c8a040e
 
 # Checkout tag
 git checkout v$VERSION

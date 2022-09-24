@@ -34,6 +34,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: Login to GitHub Container Registry
+        if: ${{ !env.ACT }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set git parsed values
         id: vars
         shell: bash
@@ -50,7 +57,7 @@ jobs:
             VERSION=${{ env.TARGET_VERSION }}
           context: .
           load: true
-          tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
+          tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}, ghcr.io/k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
@@ -63,7 +70,7 @@ jobs:
             VERSION=${{ env.TARGET_VERSION }}
           context: .
           load: true
-          tags: k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}
+          tags: k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}, ghcr.io/k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
@@ -76,7 +83,7 @@ jobs:
             VERSION=${{ env.TARGET_VERSION }}
           context: .
           push: ${{ !env.ACT }}
-          tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
+          tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}, ghcr.io/k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
@@ -89,7 +96,7 @@ jobs:
             VERSION=${{ env.TARGET_VERSION }}
           context: .
           push: ${{ !env.ACT }}
-          tags: k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}
+          tags: k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}, ghcr.io/k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
@@ -136,7 +143,6 @@ jobs:
           build-args: |
             VERSION=${{ env.TARGET_VERSION }}
           context: .
-          load: true
           push: ${{ !env.ACT }}
           tags: k8ssandra/cass-operator-bundle:${{ steps.vars.outputs.tag_name}}
           platforms: linux/amd64

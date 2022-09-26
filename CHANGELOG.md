@@ -23,6 +23,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#381](https://github.com/k8ssandra/cass-operator/issues/381) Make bootstrap operations deterministic.
 * [BUGFIX] [#327](https://github.com/k8ssandra/cass-operator/issues/327) Replace node done through CassandraTask can replace a node that's stuck in the Starting state.
 * [BUGFIX] [#404](https://github.com/k8ssandra/cass-operator/issues/404) Filter unallowed values from the rackname when used in Kubernetes resources
+* [BUGFIX] [#415](https://github.com/k8ssandra/cass-operator/issues/415) Fix version override + imageRegistry issue where output would be invalid
 
 ## v1.12.0
 

@@ -67,7 +67,7 @@ func IsOssVersionSupported(version string) bool {
 func stripRegistry(image string) string {
 	comps := strings.Split(image, "/")
 
-	if len(comps) > 1 && strings.Contains(comps[0], ".") || strings.Contains(comps[0], ":") {
+	if len(comps) > 1 && (strings.Contains(comps[0], ".") || strings.Contains(comps[0], ":")) {
 		return strings.Join(comps[1:], "/")
 	} else {
 		return image

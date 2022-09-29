@@ -4,29 +4,34 @@
 package images
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 )
 
 func TestDefaultRegistryOverride(t *testing.T) {
+	assert := assert.New(t)
 	imageConfig = &configv1beta1.ImageConfig{}
 	imageConfig.ImageRegistry = "localhost:5000"
 	imageConfig.Images = &configv1beta1.Images{}
 	imageConfig.Images.ConfigBuilder = "k8ssandra/config-builder-temp:latest"
 
 	image := GetConfigBuilderImage()
-	assert.True(t, strings.HasPrefix(image, "localhost:5000/"))
+	assert.True(strings.HasPrefix(image, "localhost:5000"))
+
+	image, err := GetCassandraImage("cassandra", "4.0.6")
+	assert.NoError(err)
+	assert.Equal("localhost:5000/k8ssandra/cass-management-api:4.0.6", image)
 }
 
 func TestCassandraOverride(t *testing.T) {
-
 	assert := assert.New(t)
 
 	customImageName := "my-custom-image:4.0.0"
@@ -45,6 +50,20 @@ func TestCassandraOverride(t *testing.T) {
 	cassImage, err = GetCassandraImage("cassandra", "4.0.0")
 	assert.NoError(err, "getting Cassandra image with override should succeed")
 	assert.Equal(customImageName, cassImage)
+
+	imageConfig.ImageRegistry = "ghcr.io"
+	cassImage, err = GetCassandraImage("cassandra", "4.0.0")
+	assert.NoError(err, "getting Cassandra image with overrides should succeed")
+	assert.Equal(fmt.Sprintf("ghcr.io/%s", customImageName), cassImage)
+
+	customImageWithOrg := "k8ssandra/cass-management-api:4.0.0"
+	imageConfig.Images.CassandraVersions = map[string]string{
+		"4.0.0": fmt.Sprintf("us-docker.pkg.dev/%s", customImageWithOrg),
+	}
+
+	cassImage, err = GetCassandraImage("cassandra", "4.0.0")
+	assert.NoError(err, "getting Cassandra image with overrides should succeed")
+	assert.Equal(fmt.Sprintf("ghcr.io/%s", customImageWithOrg), cassImage)
 }
 
 func TestDefaultImageConfigParsing(t *testing.T) {
@@ -83,7 +102,7 @@ func TestImageConfigParsing(t *testing.T) {
 	assert.Equal("datastax/dse-server", GetImageConfig().DefaultImages.DSEImageComponent.Repository)
 
 	assert.Equal("localhost:5000", GetImageConfig().ImageRegistry)
-	assert.Equal(v1.PullAlways, GetImageConfig().ImagePullPolicy)
+	assert.Equal(corev1.PullAlways, GetImageConfig().ImagePullPolicy)
 	assert.Equal("my-secret-pull-registry", GetImageConfig().ImagePullSecret.Name)
 
 	path, err := GetCassandraImage("dse", "6.8.17")
@@ -120,4 +139,17 @@ func TestOssValidVersions(t *testing.T) {
 	assert.False(IsOssVersionSupported("4.0"))
 	assert.False(IsOssVersionSupported("4.1"))
 	assert.False(IsOssVersionSupported("6.8.0"))
+}
+
+func TestPullPolicyOverride(t *testing.T) {
+	assert := require.New(t)
+	imageConfigFile := filepath.Join("..", "..", "tests", "testdata", "image_config_parsing.yaml")
+	err := ParseImageConfig(imageConfigFile)
+	assert.NoError(err, "imageConfig parsing should succeed")
+
+	podSpec := &corev1.PodSpec{}
+	added := AddDefaultRegistryImagePullSecrets(podSpec)
+	assert.True(added)
+	assert.Equal(1, len(podSpec.ImagePullSecrets))
+	assert.Equal("my-secret-pull-registry", podSpec.ImagePullSecrets[0].Name)
 }

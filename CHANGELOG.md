@@ -21,6 +21,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#398](https://github.com/k8ssandra/cass-operator/issues/398) Update to go1.18 builds, update to use Kubernetes 1.24 envtest + dependencies, operator-sdk 1.23, controller-gen 0.9.2, Kustomize 4.5.7, controller-runtime 0.12.2
 * [ENHANCEMENT] [#383](https://github.com/k8ssandra/cass-operator/pull/383) Add UpgradeSSTables, Compaction and Scrub to management-api client. Improve CassandraTasks to have the ability to validate input parameters, filter target pods and do processing outside of pods.
 * [ENHANCEMENT] [#381](https://github.com/k8ssandra/cass-operator/issues/381) Make bootstrap operations deterministic.
+* [ENHANCEMENT] [#417](https://github.com/k8ssandra/cass-operator/issues/417) Allow loading imageConfig from byte array
 * [BUGFIX] [#327](https://github.com/k8ssandra/cass-operator/issues/327) Replace node done through CassandraTask can replace a node that's stuck in the Starting state.
 * [BUGFIX] [#404](https://github.com/k8ssandra/cass-operator/issues/404) Filter unallowed values from the rackname when used in Kubernetes resources
 * [BUGFIX] [#415](https://github.com/k8ssandra/cass-operator/issues/415) Fix version override + imageRegistry issue where output would be invalid

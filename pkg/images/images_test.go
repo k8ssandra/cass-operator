@@ -4,8 +4,10 @@
 package images
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -152,4 +154,37 @@ func TestPullPolicyOverride(t *testing.T) {
 	assert.True(added)
 	assert.Equal(1, len(podSpec.ImagePullSecrets))
 	assert.Equal("my-secret-pull-registry", podSpec.ImagePullSecrets[0].Name)
+}
+
+func TestImageConfigByteParsing(t *testing.T) {
+	require := require.New(t)
+	imageConfig := configv1beta1.ImageConfig{
+		Images: &configv1beta1.Images{
+			SystemLogger:  "k8ssandra/system-logger:next",
+			ConfigBuilder: "k8ssandra/config-builder:next",
+		},
+		DefaultImages: &configv1beta1.DefaultImages{
+			CassandraImageComponent: configv1beta1.ImageComponent{
+				Repository: "k8ssandra/management-api:next",
+			},
+		},
+		ImageRegistry: "localhost:5000",
+	}
+
+	b, err := json.Marshal(imageConfig)
+	require.NoError(err)
+	require.True(len(b) > 1)
+
+	parsedImageConfig, err := LoadImageConfig(b)
+	require.NoError(err)
+
+	// Some sanity checks
+	require.Equal("localhost:5000", parsedImageConfig.ImageRegistry)
+	require.Equal(imageConfig.Images.SystemLogger, parsedImageConfig.Images.SystemLogger)
+	require.Equal(imageConfig.Images.ConfigBuilder, parsedImageConfig.Images.ConfigBuilder)
+	require.Equal(imageConfig.DefaultImages.CassandraImageComponent.Repository, parsedImageConfig.DefaultImages.CassandraImageComponent.Repository)
+	require.Equal(imageConfig.ImageRegistry, parsedImageConfig.ImageRegistry)
+
+	// And now check that images.GetImageConfig() works also..
+	require.True(reflect.DeepEqual(parsedImageConfig, GetImageConfig()))
 }

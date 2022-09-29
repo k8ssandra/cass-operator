@@ -15,6 +15,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -34,24 +35,30 @@ func init() {
 }
 
 func ParseImageConfig(imageConfigFile string) error {
-	// Mostly from controller-runtime, modified here to avoid needing ControllerManagerConfigurationSpec in the ImageConfig
 	content, err := os.ReadFile(imageConfigFile)
 	if err != nil {
 		return fmt.Errorf("could not read file at %s", imageConfigFile)
 	}
 
-	codecs := serializer.NewCodecFactory(scheme)
-
-	// Regardless of if the bytes are of any external version,
-	// it will be read successfully and converted into the internal version
-	parsedImageConfig := configv1beta1.ImageConfig{}
-	if err = runtime.DecodeInto(codecs.UniversalDecoder(), content, &parsedImageConfig); err != nil {
-		return fmt.Errorf("could not decode file into runtime.Object: %v", err)
+	if _, err = LoadImageConfig(content); err != nil {
+		err = errors.Wrapf(err, "unable to load imageConfig from %s", imageConfigFile)
+		return err
 	}
 
-	imageConfig = &parsedImageConfig
-
 	return nil
+}
+
+func LoadImageConfig(content []byte) (*configv1beta1.ImageConfig, error) {
+	codecs := serializer.NewCodecFactory(scheme)
+
+	parsedImageConfig := &configv1beta1.ImageConfig{}
+	if err := runtime.DecodeInto(codecs.UniversalDecoder(), content, parsedImageConfig); err != nil {
+		return nil, fmt.Errorf("could not decode file into runtime.Object: %v", err)
+	}
+
+	imageConfig = parsedImageConfig
+
+	return parsedImageConfig, nil
 }
 
 func IsDseVersionSupported(version string) bool {

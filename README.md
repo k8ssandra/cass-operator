@@ -139,7 +139,7 @@ You can find more resources on how Kustomize works from their [documentation](ht
 
 ##### Using kustomize to modify the default registry that's used by cass-operator
 
-cass-operator's default image name patterns and repositories are defined in a [image_config.yaml](https://github.com/k8ssandra/cass-operator/blob/master/config/manager/image_config.yaml) file. The image_config.yaml will define only the deployed Cassandra / DSE and server-system-logger images, not the cass-operator itself. To modify imageConfig when deploying, we can create a kustomize component to replace this file in the deployment with our own one.
+cass-operator's default image name patterns and repositories are defined in a [image_config.yaml](https://github.com/k8ssandra/cass-operator/blob/master/config/manager/image_config.yaml) file. The image_config.yaml will define only the deployed Cassandra / DSE and server-system-logger images, not the cass-operator itself. To modify imageConfig when deploying, we can create a kustomize component to replace this file in the deployment with our own.
 
 In this example, create two directories, ``our_installation`` and ``private_config_component``. You can name these as you wish, just remember to replace the directory names in the yaml files.
 

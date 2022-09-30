@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.13.0
 
 * [CHANGE] [#395](https://github.com/k8ssandra/cass-operator/issues/395) Make CassandraTask job arguments strongly typed

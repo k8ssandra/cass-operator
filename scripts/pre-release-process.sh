@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 1 ]; then
     echo "Usage: scripts/pre-release-process.sh newTag"
     exit
 fi

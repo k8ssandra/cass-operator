@@ -18,6 +18,7 @@ LOG_IMG=k8ssandra/system-logger:latest yq eval -i '.images.system-logger = env(L
 NEXT_VERSION=$(gawk 'match($0, /^VERSION \?= /) { print substr($0, RLENGTH+1)}' Makefile)
 
 git add Makefile
+git add CHANGELOG.md
 git add config/manager/kustomization.yaml
 git add config/manager/image_config.yaml
 

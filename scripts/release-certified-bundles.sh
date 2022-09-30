@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 3 ]; then
     echo "Usage: scripts/release-certified-bundles.sh version sha256:<cass-operator-sha256> sha256:<system-logger-sha256>"
     echo "Script assumes you are in the correct branch / tag and that community-operators repository"
     echo "has been checked out to ../community-operators/"
@@ -10,13 +10,11 @@ fi
 VERSION=$1
 SHA=$2
 SYSTEM_LOGGER_SHA=$3
-# TODO Add certified-operators-marketplace
+# TODO Add certified-operators-marketplace ?
 TARGET_DIRS=(certified-operators)
-# SYSTEM_LOGGER_SHA=sha256:33e75d0c78a277cdc37be24f2b116cade0d9b7dc7249610cdf9bf0705c8a040e
 
 # Checkout tag
 git checkout v$VERSION
-go mod vendor
 
 yq -i '.images.system-logger = "registry.connect.redhat.com/datastax/system-logger@"' config/manager/image_config.yaml
 SYSTEM_LOGGER_SHA=$SYSTEM_LOGGER_SHA yq -i '.images.system-logger += env(SYSTEM_LOGGER_SHA)' config/manager/image_config.yaml

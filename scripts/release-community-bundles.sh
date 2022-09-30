@@ -12,7 +12,6 @@ TARGET_DIRS=(community-operators community-operators-prod)
 
 # Checkout tag
 git checkout v$VERSION
-go mod vendor
 
 # Create bundle
 make VERSION=$VERSION bundle
@@ -29,6 +28,6 @@ do
     cd $TARGET_DIR
     git checkout -b cass-operator-$VERSION main
     git add .
-    git commit -s -am "cass-operator-community v${VERSION}"
+    git commit -s -am "operator cass-operator-community (${VERSION})"
     cd -
 done

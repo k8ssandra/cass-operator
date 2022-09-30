@@ -5,6 +5,7 @@ These instructions apply to the current master, some branches might have older s
 After ensuring the work for the release is done and integration tests work:
 
 Run the following sequence, doing the small manual steps when required (until automated). There is no need to make a release branch as we want to maintain documentation in the master also.
+
 Ensure the post-release and pre-release scripts are correct if you've made any changes to the structure of the project since the last release.
 
 The steps required (assuming releasing v1.13.0), doing from master (replace git commands with correct target remote names):
@@ -80,7 +81,7 @@ Copy the SHA256 of the published images from the portal and run the following sc
 ``scripts/release-certified-bundles.sh version <cass-operator-sha256> <system-logger-sha256>``, version without ``v`` prefix and sha256s with the ``sha256:`` prefix (the copy button on the portal puts it automatically). For example:
 
 ```
-scripts/release-certified-bundles.sh 1.10.1 sha256:ae709b680dde2aa43c92d6b331af0554c9af92aa9fad673454892ca2b40bd3f7
+scripts/release-certified-bundles.sh 1.13.0 sha256:4f7262271839e23e20685762e2172ded0958d8235d49038814fd8cd3747b2690 sha256:43231f5e98cedad2620c71fb6db7e8e685cf825d2240f16aa615459dba241805
 ```
 
 When sending the PR, the PR must have title structured: ``operator cass-operator (v$VERSION)``, such as ``operator cass-operator (v1.10.1)``. Also, the user must be added to the accepted user list from the Red Hat's portal (project settings).

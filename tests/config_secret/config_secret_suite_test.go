@@ -8,7 +8,7 @@ import (
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	corev1 "k8s.io/api/core/v1"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"

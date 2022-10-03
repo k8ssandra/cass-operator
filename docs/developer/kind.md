@@ -7,13 +7,13 @@ For development purposes, the [Kind](https://kind.sigs.k8s.io/) cluster is the c
 Some Linux distributions provide kind from their package registry, but in case you have Go already installed, this command is enough to install newest kind version:
 
 ```console
-GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
+go get sigs.k8s.io/kind@v0.16.0
 ```
 
 Or to download a binary directly:
 
 ```console
-curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.11.1/kind-linux-amd64
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.16.0/kind-linux-amd64
 chmod +x ./kind
 ```
 

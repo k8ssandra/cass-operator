@@ -33,7 +33,7 @@ func TestLifecycle(t *testing.T) {
 	RunSpecs(t, testName)
 }
 
-func createTestFile(cassandraVersion, serverImage string) (string, error) {
+func createTestFile(cassandraVersion, serverImage, serverType string) (string, error) {
 	var data map[interface{}]interface{}
 
 	d, err := os.ReadFile(dcYaml)
@@ -53,6 +53,10 @@ func createTestFile(cassandraVersion, serverImage string) (string, error) {
 	}
 
 	spec["serverVersion"] = cassandraVersion
+
+	if serverType != "" {
+		spec["serverType"] = serverType
+	}
 
 	if strings.HasPrefix(cassandraVersion, "3.") {
 		config := spec["config"].(map[interface{}]interface{})
@@ -151,14 +155,17 @@ var _ = Describe(testName, func() {
 	type ServerDetails struct {
 		ServerVersion string
 		ServerImage   string
+		ServerType    string
 	}
 
 	Context("the operator can stand up a one node cluster", func() {
 		serverVersion := os.Getenv("M_SERVER_VERSION")
 		serverImage := os.Getenv("M_SERVER_IMAGE")
+		serverType := os.Getenv("M_SERVER_TYPE")
 		s := ServerDetails{
 			ServerVersion: serverVersion,
 			ServerImage:   serverImage,
+			ServerType:    serverType,
 		}
 		namespace = fmt.Sprintf("test-smoke-test-oss-%s", rand.String(6))
 
@@ -166,7 +173,7 @@ var _ = Describe(testName, func() {
 		Expect(err).ToNot(HaveOccurred())
 		ns = ginkgo_util.NewWrapper(testName, namespace)
 
-		inputFilepath, err = createTestFile(s.ServerVersion, s.ServerImage)
+		inputFilepath, err = createTestFile(s.ServerVersion, s.ServerImage, s.ServerType)
 		Expect(err).ToNot(HaveOccurred())
 
 		singleClusterVerify()

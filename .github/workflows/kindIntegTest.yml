@@ -54,92 +54,126 @@ jobs:
         with:
           name: system-logger
           path: /tmp/k8ssandra-system-logger.tar
-  kind_integration_tests:
-    needs: build_docker_images
-    strategy:
-      matrix:
-        integration_test:
-        # Single worker tests:
-        - additional_serviceoptions
-        - additional_volumes
-        # - delete_node_terminated_container # This does not test any operator behavior
-        - podspec_simple
-        # - smoke_test_oss # See next job
-        - smoke_test_dse
-        - terminate
-        - timeout_prestop_termination
-        - upgrade_operator
-        - webhook_validation
-        # Three worker tests:
-        - canary_upgrade
-        - config_change_condition
-        - cdc_successful
-        # - delete_node_lost_readiness # DSE specific behavior
-        - host_network
-        - internode-encryption-generated
-        #- no_infinite_reconcile # smoke_test_* should take care of this
-        - node_replace
-        - nodeport_service
-        - rolling_restart
-        - stop_resume
-        - superuser-secret-generated
-        - superuser-secret-provided
-        - test_bad_config_and_fix
-        - test_mtls_mgmt_api
-        # More than 3 workers tests:
-        - add_racks
-        - additional_seeds
-        - cluster_wide_install
-        - config_change
-        - config_secret
-        - multi_cluster_management
-        - oss_test_all_the_things
-        - scale_down
-        # - scale_down_not_enough_space # Not enough stable test
-        - scale_down_unbalanced_racks
-        - scale_up
-        - scale_up_stop_resume
-        - seed_selection
-        - config_fql
-        - decommission_dc
-        # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
-      # let other tests continue to run
-      # even if one fails
-      fail-fast: false
-    runs-on: ubuntu-latest
-    env:
-      CGO_ENABLED: 0
-      M_INTEG_DIR: ${{ matrix.integration_test }}
-    steps:
-      - uses: actions/checkout@v2
-        if: github.event_name == 'pull_request'
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v2
-        if: github.event_name != 'pull_request'
-      - uses: ./.github/actions/run-integ-test
-        with:
-          integration_test: ${{ matrix.integration_test }}
-      - name: Archive k8s logs
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v2
-        with:
-          name: k8s-logs-${{ matrix.integration_test }}
-          path: ./build/kubectl_dump
-  kind_smoke_tests:
+  # kind_integration_tests:
+  #   needs: build_docker_images
+  #   strategy:
+  #     matrix:
+  #       integration_test:
+  #       # Single worker tests:
+  #       - additional_serviceoptions
+  #       - additional_volumes
+  #       # - delete_node_terminated_container # This does not test any operator behavior
+  #       - podspec_simple
+  #       # - smoke_test_oss # See next job
+  #       - smoke_test_dse
+  #       - terminate
+  #       - timeout_prestop_termination
+  #       - upgrade_operator
+  #       - webhook_validation
+  #       # Three worker tests:
+  #       - canary_upgrade
+  #       - config_change_condition
+  #       - cdc_successful
+  #       # - delete_node_lost_readiness # DSE specific behavior
+  #       - host_network
+  #       - internode-encryption-generated
+  #       #- no_infinite_reconcile # smoke_test_* should take care of this
+  #       - node_replace
+  #       - nodeport_service
+  #       - rolling_restart
+  #       - stop_resume
+  #       - superuser-secret-generated
+  #       - superuser-secret-provided
+  #       - test_bad_config_and_fix
+  #       - test_mtls_mgmt_api
+  #       # More than 3 workers tests:
+  #       - add_racks
+  #       - additional_seeds
+  #       - cluster_wide_install
+  #       - config_change
+  #       - config_secret
+  #       - multi_cluster_management
+  #       - oss_test_all_the_things
+  #       - scale_down
+  #       # - scale_down_not_enough_space # Not enough stable test
+  #       - scale_down_unbalanced_racks
+  #       - scale_up
+  #       - scale_up_stop_resume
+  #       - seed_selection
+  #       - config_fql
+  #       - decommission_dc
+  #       # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
+  #     # let other tests continue to run
+  #     # even if one fails
+  #     fail-fast: false
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     CGO_ENABLED: 0
+  #     M_INTEG_DIR: ${{ matrix.integration_test }}
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #       if: github.event_name == 'pull_request'
+  #       with:
+  #         ref: ${{ github.event.pull_request.head.sha }}
+  #     - uses: actions/checkout@v2
+  #       if: github.event_name != 'pull_request'
+  #     - uses: ./.github/actions/run-integ-test
+  #       with:
+  #         integration_test: ${{ matrix.integration_test }}
+  #     - name: Archive k8s logs
+  #       if: ${{ failure() }}
+  #       uses: actions/upload-artifact@v2
+  #       with:
+  #         name: k8s-logs-${{ matrix.integration_test }}
+  #         path: ./build/kubectl_dump
+  # kind_smoke_tests:
+  #   needs: build_docker_images
+  #   strategy:
+  #     matrix:
+  #       version:
+  #       - "3.11.7"
+  #       - "3.11.11"
+  #       - "4.0.0"
+  #       - "4.0.3"
+  #       include:
+  #         - version: 3.11.7
+  #           serverImage: k8ssandra/cass-management-api:3.11.7-v0.1.24 # k8ssandra 1.1
+  #         - version: 4.0.0
+  #           serverImage: k8ssandra/cass-management-api:4.0.0-v0.1.28 # k8ssandra 1.3
+  #     fail-fast: true
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     CGO_ENABLED: 0
+  #     M_INTEG_DIR: smoke_test_oss
+  #     M_SERVER_VERSION: ${{ matrix.version }}
+  #     M_SERVER_IMAGE: ${{ matrix.serverImage }}
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #       if: github.event_name == 'pull_request'
+  #       with:
+  #         ref: ${{ github.event.pull_request.head.sha }}
+  #     - uses: actions/checkout@v2
+  #       if: github.event_name != 'pull_request'
+  #     - uses: ./.github/actions/run-integ-test
+  #       with:
+  #         integration_test: smoke_test_oss
+  #     - name: Archive k8s logs
+  #       if: ${{ failure() }}
+  #       uses: actions/upload-artifact@v2
+  #       with:
+  #         name: k8s-logs-smoke_test_oss-${{ matrix.version }}-${{ matrix.serverImage }}
+  #         path: ./build/kubectl_dump
+
+  kind_matrix_tests:
     needs: build_docker_images
     strategy:
       matrix:
         version:
-        - "3.11.7"
-        - "3.11.11"
-        - "4.0.0"
-        - "4.0.3"
+        - "4.0.6"
+        - "6.8.26"
         include:
-          - version: 3.11.7
-            serverImage: k8ssandra/cass-management-api:3.11.7-v0.1.24 # k8ssandra 1.1
-          - version: 4.0.0
-            serverImage: k8ssandra/cass-management-api:4.0.0-v0.1.28 # k8ssandra 1.3
+          - version: 6.8.26
+            serverImage: datastax/dse-mgmtapi-6_8:6.8-jdk8
       fail-fast: true
     runs-on: ubuntu-latest
     env:

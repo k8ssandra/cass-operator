@@ -72,7 +72,7 @@ func calculatePodAntiAffinity(allowMultipleNodesPerWorker bool, existingAntiAffi
 	if allowMultipleNodesPerWorker {
 		return existingAntiAffinity
 	}
-	return &corev1.PodAntiAffinity{
+	antiAffinity := &corev1.PodAntiAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
 			{
 				LabelSelector: &metav1.LabelSelector{
@@ -95,6 +95,17 @@ func calculatePodAntiAffinity(allowMultipleNodesPerWorker bool, existingAntiAffi
 			},
 		},
 	}
+
+	// Add PodTemplateSpec rules after our rules
+	if existingAntiAffinity != nil {
+		if len(existingAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) > 0 {
+			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, existingAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution...)
+		}
+		antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = existingAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+	}
+
+	existingAntiAffinity = antiAffinity
+	return antiAffinity
 }
 
 func selectorFromFieldPath(fieldPath string) *corev1.EnvVarSource {

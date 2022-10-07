@@ -36,7 +36,55 @@ func Test_calculatePodAntiAffinity(t *testing.T) {
 		}
 	})
 
+	t.Run("allow setting custom podAntiAffinity to exclude only the same datacenter", func(t *testing.T) {
+		paa := calculatePodAntiAffinity(true, &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      api.ClusterLabel,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"cluster1"},
+							},
+							{
+								Key:      api.DatacenterLabel,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"dc1"},
+							},
+						},
+					},
+				},
+			},
+		})
+		if paa == nil ||
+			len(paa.RequiredDuringSchedulingIgnoredDuringExecution) != 1 {
+			t.Errorf("calculatePodAntiAffinity() = %v, and we want one element in RequiredDuringSchedulingIgnoredDuringExecution", paa)
+		}
+	})
+
 	t.Run("check when we do not allow more than one server pod per node", func(t *testing.T) {
+		paa := calculatePodAntiAffinity(false, &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "my.heavy.other.application",
+								Operator: metav1.LabelSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+		})
+		if paa == nil ||
+			len(paa.RequiredDuringSchedulingIgnoredDuringExecution) != 2 {
+			t.Errorf("calculatePodAntiAffinity() = %v, and we want two elements in RequiredDuringSchedulingIgnoredDuringExecution", paa)
+		}
+	})
+
+	t.Run("check when allowMultipleWorkers is set to false that we merge antiAffinity rules", func(t *testing.T) {
 		paa := calculatePodAntiAffinity(false, nil)
 		if paa == nil ||
 			len(paa.RequiredDuringSchedulingIgnoredDuringExecution) != 1 {

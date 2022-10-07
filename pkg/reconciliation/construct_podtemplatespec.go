@@ -34,9 +34,9 @@ const (
 )
 
 // calculateNodeAffinity provides a way to decide where to schedule pods within a statefulset based on labels
-func calculateNodeAffinity(labels map[string]string) *corev1.NodeAffinity {
+func calculateNodeAffinity(labels map[string]string, existingNodeAffinity *corev1.NodeAffinity) *corev1.NodeAffinity {
 	if len(labels) == 0 {
-		return nil
+		return existingNodeAffinity
 	}
 
 	var nodeSelectors []corev1.NodeSelectorRequirement
@@ -56,7 +56,7 @@ func calculateNodeAffinity(labels map[string]string) *corev1.NodeAffinity {
 		nodeSelectors = append(nodeSelectors, selector)
 	}
 
-	return &corev1.NodeAffinity{
+	newNodeAffinity := &corev1.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
 			NodeSelectorTerms: []corev1.NodeSelectorTerm{
 				{
@@ -65,6 +65,18 @@ func calculateNodeAffinity(labels map[string]string) *corev1.NodeAffinity {
 			},
 		},
 	}
+
+	// Merge nodeSelectorTerms
+	if existingNodeAffinity != nil {
+		if existingNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil && len(existingNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) > 0 {
+			newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, existingNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms...)
+		}
+		if existingNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+			newNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = existingNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+	}
+
+	return newNodeAffinity
 }
 
 // calculatePodAntiAffinity provides a way to keep the db pods of a statefulset away from other db pods
@@ -667,7 +679,7 @@ func buildAffinity(affinity *corev1.Affinity, nodeAffinityLabels map[string]stri
 	if affinity == nil {
 		affinity = &corev1.Affinity{}
 	}
-	affinity.NodeAffinity = calculateNodeAffinity(nodeAffinityLabels)
+	affinity.NodeAffinity = calculateNodeAffinity(nodeAffinityLabels, affinity.NodeAffinity)
 	affinity.PodAntiAffinity = calculatePodAntiAffinity(allowMultipleWorkers, affinity.PodAntiAffinity)
 
 	return affinity

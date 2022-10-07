@@ -95,14 +95,14 @@ func Test_calculatePodAntiAffinity(t *testing.T) {
 
 func Test_calculateNodeAffinity(t *testing.T) {
 	t.Run("check when we dont have a zone we want to use", func(t *testing.T) {
-		na := calculateNodeAffinity(map[string]string{})
+		na := calculateNodeAffinity(map[string]string{}, nil)
 		if na != nil {
 			t.Errorf("calculateNodeAffinity() = %v, and we want nil", na)
 		}
 	})
 
 	t.Run("check when we do not allow more than one dse pod per node", func(t *testing.T) {
-		na := calculateNodeAffinity(map[string]string{"topology.kubernetes.io/zone": "thezone"})
+		na := calculateNodeAffinity(map[string]string{"topology.kubernetes.io/zone": "thezone"}, nil)
 		if na == nil ||
 			na.RequiredDuringSchedulingIgnoredDuringExecution == nil {
 			t.Errorf("calculateNodeAffinity() = %v, and we want a non-nil RequiredDuringSchedulingIgnoredDuringExecution", na)

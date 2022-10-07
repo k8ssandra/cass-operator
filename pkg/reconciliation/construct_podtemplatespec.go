@@ -68,9 +68,9 @@ func calculateNodeAffinity(labels map[string]string) *corev1.NodeAffinity {
 }
 
 // calculatePodAntiAffinity provides a way to keep the db pods of a statefulset away from other db pods
-func calculatePodAntiAffinity(allowMultipleNodesPerWorker bool) *corev1.PodAntiAffinity {
+func calculatePodAntiAffinity(allowMultipleNodesPerWorker bool, existingAntiAffinity *corev1.PodAntiAffinity) *corev1.PodAntiAffinity {
 	if allowMultipleNodesPerWorker {
-		return nil
+		return existingAntiAffinity
 	}
 	return &corev1.PodAntiAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
@@ -626,10 +626,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 
 	// Affinity
 
-	affinity := &corev1.Affinity{}
-	affinity.NodeAffinity = calculateNodeAffinity(nodeAffinityLabels)
-	affinity.PodAntiAffinity = calculatePodAntiAffinity(dc.Spec.AllowMultipleNodesPerWorker)
-	baseTemplate.Spec.Affinity = affinity
+	baseTemplate.Spec.Affinity = buildAffinity(baseTemplate.Spec.Affinity, nodeAffinityLabels, dc.Spec.AllowMultipleNodesPerWorker)
 
 	// Tolerations
 	baseTemplate.Spec.Tolerations = dc.Spec.Tolerations
@@ -653,4 +650,14 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 	}
 
 	return baseTemplate, nil
+}
+
+func buildAffinity(affinity *corev1.Affinity, nodeAffinityLabels map[string]string, allowMultipleWorkers bool) *corev1.Affinity {
+	if affinity == nil {
+		affinity = &corev1.Affinity{}
+	}
+	affinity.NodeAffinity = calculateNodeAffinity(nodeAffinityLabels)
+	affinity.PodAntiAffinity = calculatePodAntiAffinity(allowMultipleWorkers, affinity.PodAntiAffinity)
+
+	return affinity
 }

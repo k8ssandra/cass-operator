@@ -318,13 +318,10 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					},
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}},
 				},
 			},
@@ -348,13 +345,10 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					},
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}},
 				},
 			},
@@ -485,13 +479,10 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: CassandraDatacenterSpec{
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}},
 				},
 			},
@@ -502,10 +493,8 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: CassandraDatacenterSpec{
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}},
 				},
 			},
@@ -520,7 +509,6 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: CassandraDatacenterSpec{
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}},
 					Size: 6,
 				},
@@ -532,7 +520,6 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: CassandraDatacenterSpec{
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}},
 					Size: 3,
 				},
@@ -548,13 +535,10 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: CassandraDatacenterSpec{
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}},
 				},
 			},
@@ -565,55 +549,14 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: CassandraDatacenterSpec{
 					Racks: []Rack{{
 						Name: "rack0-changed",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}},
 				},
 			},
 			errString: "change rack name from 'rack0' to 'rack0-changed'",
-		},
-		{
-			name: "Changed a rack zone",
-			oldDc: &CassandraDatacenter{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "exampleDC",
-				},
-				Spec: CassandraDatacenterSpec{
-					Racks: []Rack{{
-						Name: "rack0",
-						Zone: "zone0",
-					}, {
-						Name: "rack1",
-						Zone: "zone1",
-					}, {
-						Name: "rack2",
-						Zone: "zone2",
-					}},
-				},
-			},
-			newDc: &CassandraDatacenter{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "exampleDC",
-				},
-				Spec: CassandraDatacenterSpec{
-					Racks: []Rack{{
-						Name: "rack0",
-						Zone: "zone0",
-					}, {
-						Name: "rack1",
-						Zone: "zone1",
-					}, {
-						Name: "rack2",
-						Zone: "zone2-changed",
-					}},
-				},
-			},
-			errString: "change rack zone from 'zone2' to 'zone2-changed'",
 		},
 		{
 			name: "Adding a rack is allowed if size increases",
@@ -625,13 +568,10 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					Size: 3,
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}},
 				},
 			},
@@ -643,16 +583,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					Size: 4,
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}, {
 						Name: "rack3",
-						Zone: "zone2",
 					}},
 				},
 			},
@@ -667,13 +603,10 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: CassandraDatacenterSpec{
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}},
 				},
 			},
@@ -684,16 +617,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: CassandraDatacenterSpec{
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}, {
 						Name: "rack3",
-						Zone: "zone2",
 					}},
 				},
 			},
@@ -709,10 +638,8 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					Size: 9,
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}},
 				},
 			},
@@ -724,13 +651,10 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					Size: 11,
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}},
 				},
 			},
@@ -746,10 +670,8 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					Size: 9,
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}},
 				},
 			},
@@ -761,16 +683,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					Size: 16,
 					Racks: []Rack{{
 						Name: "rack0",
-						Zone: "zone0",
 					}, {
 						Name: "rack1",
-						Zone: "zone1",
 					}, {
 						Name: "rack2",
-						Zone: "zone2",
 					}, {
 						Name: "rack3",
-						Zone: "zone3",
 					}},
 				},
 			},

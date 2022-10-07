@@ -191,11 +191,6 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 				oldRack.Name,
 				newRack.Name)
 		}
-		if oldRack.Zone != newRack.Zone {
-			return attemptedTo("change rack zone from '%s' to '%s'",
-				oldRack.Zone,
-				newRack.Zone)
-		}
 	}
 
 	return nil

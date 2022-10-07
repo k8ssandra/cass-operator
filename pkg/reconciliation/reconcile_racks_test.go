@@ -248,7 +248,7 @@ func TestCheckRackPodTemplate_SetControllerRefOnStatefulSet(t *testing.T) {
 	defer cleanupMockScr()
 
 	rc.Datacenter.Spec.Racks = []api.Rack{
-		{Name: "rack1", Zone: "zone-1"},
+		{Name: "rack1"},
 	}
 
 	if err := rc.CalculateRackInformation(); err != nil {

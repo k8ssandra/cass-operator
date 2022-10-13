@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/rand"

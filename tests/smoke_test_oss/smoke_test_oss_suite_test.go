@@ -5,15 +5,11 @@ package smoke_test_oss
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
@@ -31,49 +27,6 @@ var (
 func TestLifecycle(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, testName)
-}
-
-func createTestFile(cassandraVersion, serverImage string) (string, error) {
-	var data map[interface{}]interface{}
-
-	d, err := os.ReadFile(dcYaml)
-	if err != nil {
-		return "", err
-	}
-
-	if err = yaml.Unmarshal(d, &data); err != nil {
-		return "", err
-	}
-
-	// jvm-options <-> jvm-server-options
-
-	spec := data["spec"].(map[interface{}]interface{})
-	if serverImage != "" {
-		spec["serverImage"] = serverImage
-	}
-
-	spec["serverVersion"] = cassandraVersion
-
-	if strings.HasPrefix(cassandraVersion, "3.") {
-		config := spec["config"].(map[interface{}]interface{})
-		config["jvm-options"] = config["jvm-server-options"]
-		delete(config, "jvm-server-options")
-	}
-
-	// Marshal back to temp file and return it
-	testFilename := filepath.Join(os.TempDir(), "smoke-test-oss.yaml")
-	os.Remove(testFilename) // Ignore the error
-
-	updated, err := yaml.Marshal(data)
-	if err != nil {
-		return "", err
-	}
-
-	if err = os.WriteFile(testFilename, updated, os.ModePerm); err != nil {
-		return "", err
-	}
-
-	return testFilename, nil
 }
 
 var _ = Describe(testName, func() {
@@ -148,25 +101,14 @@ var _ = Describe(testName, func() {
 		}
 	})
 
-	type ServerDetails struct {
-		ServerVersion string
-		ServerImage   string
-	}
-
 	Context("the operator can stand up a one node cluster", func() {
-		serverVersion := os.Getenv("M_SERVER_VERSION")
-		serverImage := os.Getenv("M_SERVER_IMAGE")
-		s := ServerDetails{
-			ServerVersion: serverVersion,
-			ServerImage:   serverImage,
-		}
 		namespace = fmt.Sprintf("test-smoke-test-oss-%s", rand.String(6))
 
 		err := kustomize.Deploy(namespace)
 		Expect(err).ToNot(HaveOccurred())
 		ns = ginkgo_util.NewWrapper(testName, namespace)
 
-		inputFilepath, err = createTestFile(s.ServerVersion, s.ServerImage)
+		inputFilepath, err = ginkgo_util.CreateTestFile(dcYaml)
 		Expect(err).ToNot(HaveOccurred())
 
 		singleClusterVerify()

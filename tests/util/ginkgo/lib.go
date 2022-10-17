@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"gopkg.in/yaml.v2"
 
 	mageutil "github.com/k8ssandra/cass-operator/tests/util"
 	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
@@ -32,6 +34,75 @@ func duplicate(value string, count int) string {
 	}
 
 	return strings.Join(result, " ")
+}
+
+// Utility function to override the server config in a spec file.
+// This will copy the provided yaml spec to a temp file, replacing or
+// adding the supplied server overrides, to allow for running tests
+// against mutliple Cassandra/DSE versions.
+func CreateTestFile(dcYaml string) (string, error) {
+	var data map[interface{}]interface{}
+
+	fileInfo, err := os.Stat(dcYaml)
+	if err != nil {
+        return "", err
+	}
+
+	d, err := os.ReadFile(dcYaml)
+	if err != nil {
+		return "", err
+	}
+
+	if err = yaml.Unmarshal(d, &data); err != nil {
+		return "", err
+	}
+
+
+	spec := data["spec"].(map[interface{}]interface{})
+	serverImage := os.Getenv("M_SERVER_IMAGE")
+	if serverImage != "" {
+		spec["serverImage"] = serverImage
+	}
+
+	cassandraVersion := os.Getenv("M_SERVER_VERSION")
+	if cassandraVersion != "" {
+		spec["serverVersion"] = cassandraVersion
+	}
+
+	serverType := os.Getenv("M_SERVER_TYPE")
+	if serverType != "" {
+		spec["serverType"] = serverType
+	}
+
+	config := spec["config"].(map[interface{}]interface{})
+
+	// jvm-options <-> jvm-server-options
+	if strings.HasPrefix(cassandraVersion, "3.") {
+		if config["jvm-server-options"] != nil {
+			config["jvm-options"] = config["jvm-server-options"]
+			delete(config, "jvm-server-options")
+		}
+	} else if cassandraVersion != "" {
+		if config["jvm-options"] != nil {
+			config["jvm-server-options"] = config["jvm-options"]
+			delete(config, "jvm-options")
+		}
+	}
+
+	// Marshal back to temp file and return it
+	testFilename := filepath.Join(os.TempDir(), fileInfo.Name())
+	os.Remove(testFilename) // Ignore the error
+
+	updated, err := yaml.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+
+	if err = os.WriteFile(testFilename, updated, os.ModePerm); err != nil {
+		return "", err
+	}
+
+	return testFilename, nil
 }
 
 // Wrapper type to make it simpler to

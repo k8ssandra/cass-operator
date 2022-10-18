@@ -52,8 +52,9 @@ jobs:
     strategy:
       matrix:
         version:
-        - "3.11.13"
+        #- "3.11.13"
         - "4.0.6"
+        - "6.8.26"
         integration_test:
         # Single worker tests:
         - additional_serviceoptions

@@ -61,7 +61,10 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating first datacenter resource"
-			k := kubectl.ApplyFiles(dc1Yaml)
+			testFile, err := ginkgo_util.CreateTestFile(dc1Yaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dc1Name)

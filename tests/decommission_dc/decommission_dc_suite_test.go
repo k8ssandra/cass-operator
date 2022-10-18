@@ -72,7 +72,10 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating the first datacenter resource with 1 rack/1 node"
-			k := kubectl.ApplyFiles(dc1Yaml)
+			testFile1, err := ginkgo_util.CreateTestFile(dc1Yaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k := kubectl.ApplyFiles(testFile1)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dc1Name)
@@ -87,7 +90,10 @@ var _ = Describe(testName, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			step = "creating the second datacenter resource with 1 rack/1 node"
-			k = kubectl.ApplyFiles(dc2Yaml)
+			testFile2, err := ginkgo_util.CreateTestFile(dc2Yaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k = kubectl.ApplyFiles(testFile2)
 			ns.ExecAndLog(step, k)
 
 			// Add annotation to indicate we don't want the superuser created in dc2
@@ -124,7 +130,7 @@ var _ = Describe(testName, func() {
 
 			// Time to remove the dc2 and verify it has been correctly cleaned up
 			step = "deleting the dc2"
-			k = kubectl.DeleteFromFiles(dc2Yaml)
+			k = kubectl.DeleteFromFiles(testFile2)
 			ns.ExecAndLog(step, k)
 
 			step = "checking that the dc2 no longer exists"
@@ -142,7 +148,7 @@ var _ = Describe(testName, func() {
 
 			// Delete the remaining DC and expect it to finish correctly (it should not be decommissioned - that will hang the process and fail)
 			step = "deleting the dc1"
-			k = kubectl.DeleteFromFiles(dc1Yaml)
+			k = kubectl.DeleteFromFiles(testFile1)
 			ns.ExecAndLog(step, k)
 
 			step = "checking that the dc1 no longer exists"

@@ -17,7 +17,9 @@ COPY pkg/ pkg/
 
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
+# Default the GOARCH to amd64, but allow for overide to a different arch at build time
+ARG ARCH=amd64
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go build -a -o manager main.go
 
 # Build the UBI image
 FROM redhat/ubi8-micro:latest

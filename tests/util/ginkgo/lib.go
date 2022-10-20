@@ -74,18 +74,20 @@ func CreateTestFile(dcYaml string) (string, error) {
 		spec["serverType"] = serverType
 	}
 
-	config := spec["config"].(map[interface{}]interface{})
+	if spec["config"] != nil {
+		config := spec["config"].(map[interface{}]interface{})
 
-	// jvm-options <-> jvm-server-options
-	if strings.HasPrefix(cassandraVersion, "3.") {
-		if config["jvm-server-options"] != nil {
-			config["jvm-options"] = config["jvm-server-options"]
-			delete(config, "jvm-server-options")
-		}
-	} else if cassandraVersion != "" {
-		if config["jvm-options"] != nil {
-			config["jvm-server-options"] = config["jvm-options"]
-			delete(config, "jvm-options")
+		// jvm-options <-> jvm-server-options
+		if strings.HasPrefix(cassandraVersion, "3.") {
+			if config["jvm-server-options"] != nil {
+				config["jvm-options"] = config["jvm-server-options"]
+				delete(config, "jvm-server-options")
+			}
+		} else if cassandraVersion != "" {
+			if config["jvm-options"] != nil {
+				config["jvm-server-options"] = config["jvm-options"]
+				delete(config, "jvm-options")
+			}
 		}
 	}
 
@@ -103,6 +105,55 @@ func CreateTestFile(dcYaml string) (string, error) {
 	}
 
 	return testFilename, nil
+}
+
+func CreateTestSecretsConfig(configFile string) (string, error) {
+
+	fileInfo, err := os.Stat(configFile)
+	if err != nil {
+        return "", err
+	}
+
+	d, err := os.ReadFile(configFile)
+	if err != nil {
+		return "", err
+	}
+
+    configString := string(d)
+	cassandraVersion := os.Getenv("M_SERVER_VERSION")
+	// jvm-options <-> jvm-server-options
+	if strings.HasPrefix(cassandraVersion, "3.") {
+		configString = strings.Replace(configString, "jvm-server-options", "jvm-options", -1)
+	} else if cassandraVersion != "" {
+		configString = strings.Replace(configString, "jvm-options", "jvm-server-options", -1)
+	}
+
+	testConfigFilename := filepath.Join(os.TempDir(), fileInfo.Name())
+	os.Remove(testConfigFilename) // Ignore the error
+
+	if err = os.WriteFile(testConfigFilename, []byte(configString), os.ModePerm); err != nil {
+		return "", err
+	}
+
+	return testConfigFilename, nil
+}
+
+func CreateTestJson(jsonString string) string {
+	cassandraVersion := os.Getenv("M_SERVER_VERSION")
+	// jvm-options <-> jvm-server-options
+	if strings.HasPrefix(cassandraVersion, "3.") {
+		return strings.Replace(jsonString, "jvm-server-options", "jvm-options", -1)
+	} else if cassandraVersion != "" {
+		return strings.Replace(jsonString, "jvm-options", "jvm-server-options", -1)
+	}
+	return jsonString
+}
+
+func GetCassandraConfigYamlLocation() string {
+	if strings.EqualFold("dse", os.Getenv("M_SERVER_TYPE")) {
+		return "/opt/dse/resources/cassandra/conf/cassandra.yaml"
+	}
+	return "/etc/cassandra/cassandra.yaml"
 }
 
 // Wrapper type to make it simpler to

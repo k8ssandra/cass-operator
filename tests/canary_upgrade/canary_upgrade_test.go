@@ -59,10 +59,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating a datacenter"
-			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
-			Expect(err).ToNot(HaveOccurred())
-
-			k := kubectl.ApplyFiles(testFile)
+			k := kubectl.ApplyFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForSuperUserUpserted(dcName, 600)
@@ -104,7 +101,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)
 
 			step = "deleting the dc"
-			k = kubectl.DeleteFromFiles(testFile)
+			k = kubectl.DeleteFromFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
 			step = "checking that the dc no longer exists"

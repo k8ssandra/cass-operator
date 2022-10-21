@@ -76,10 +76,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating a datacenter resource with 3 racks/3 node"
-			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
-			Expect(err).ToNot(HaveOccurred())
-
-			k := kubectl.ApplyFiles(testFile)
+			k := kubectl.ApplyFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
@@ -136,7 +133,7 @@ var _ = Describe(testName, func() {
 
 			// Verify delete still works correctly and that we won't leave any resources behind
 			step = "deleting the dc"
-			k = kubectl.DeleteFromFiles(testFile)
+			k = kubectl.DeleteFromFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
 			step = "checking that the dc no longer exists"

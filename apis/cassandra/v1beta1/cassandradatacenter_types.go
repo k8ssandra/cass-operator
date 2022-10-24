@@ -10,8 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Jeffail/gabs"
-	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
+	gabs "github.com/Jeffail/gabs/v2"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,9 +77,7 @@ type CassandraUser struct {
 }
 
 // CassandraDatacenterSpec defines the desired state of a CassandraDatacenter
-// +k8s:openapi-gen=true
-// +kubebuilder:pruning:PreserveUnknownFields
-// +kubebuilder:validation:XPreserveUnknownFields
+// +kubebuilder:object:generate=true
 type CassandraDatacenterSpec struct {
 	// Desired number of Cassandra server nodes
 	// +kubebuilder:validation:Minimum=1
@@ -105,7 +102,6 @@ type CassandraDatacenterSpec struct {
 
 	// Config for the server, in YAML format
 	// +kubebuilder:pruning:PreserveUnknownFields
-	// +kubebuilder:validation:XPreserveUnknownFields
 	Config json.RawMessage `json:"config,omitempty"`
 
 	// ConfigSecret is the name of a secret that contains configuration for Cassandra. The
@@ -372,7 +368,7 @@ func NewDatacenterConditionWithReason(conditionType DatacenterConditionType, sta
 }
 
 // CassandraDatacenterStatus defines the observed state of CassandraDatacenter
-// +k8s:openapi-gen=true
+// +kubebuilder:object:generate=true
 type CassandraDatacenterStatus struct {
 	Conditions []DatacenterCondition `json:"conditions,omitempty"`
 
@@ -417,7 +413,7 @@ type CassandraDatacenterStatus struct {
 }
 
 // CassandraDatacenter is the Schema for the cassandradatacenters API
-// +k8s:openapi-gen=true
+// +kubebuilder:object:generate=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:path=cassandradatacenters,scope=Namespaced,shortName=cassdc;cassdcs
@@ -676,7 +672,7 @@ func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
 		internodeSSL = dc.Spec.Networking.NodePort.InternodeSSL
 	}
 
-	modelValues := serverconfig.GetModelValues(
+	modelValues := GetModelValues(
 		seeds,
 		dc.Spec.ClusterName,
 		dc.Name,
@@ -880,4 +876,52 @@ func SplitRacks(nodeCount, rackCount int) []int {
 	}
 
 	return topology
+}
+
+// +kubebuilder:object:generate=false
+type NodeConfig map[string]interface{}
+
+// GetModelValues will gather the cluster model values for cluster and datacenter
+func GetModelValues(
+	seeds []string,
+	clusterName string,
+	dcName string,
+	graphEnabled int,
+	solrEnabled int,
+	sparkEnabled int,
+	nativePort int,
+	nativeSSLPort int,
+	internodePort int,
+	internodeSSLPort int) NodeConfig {
+
+	seedsString := strings.Join(seeds, ",")
+
+	// Note: the operator does not currently support graph, solr, and spark
+	modelValues := NodeConfig{
+		"cluster-info": NodeConfig{
+			"name":  clusterName,
+			"seeds": seedsString,
+		},
+		"datacenter-info": NodeConfig{
+			"name":          dcName,
+			"graph-enabled": graphEnabled,
+			"solr-enabled":  solrEnabled,
+			"spark-enabled": sparkEnabled,
+		},
+		"cassandra-yaml": NodeConfig{},
+	}
+
+	if nativeSSLPort != 0 {
+		modelValues["cassandra-yaml"].(NodeConfig)["native_transport_port_ssl"] = nativeSSLPort
+	} else if nativePort != 0 {
+		modelValues["cassandra-yaml"].(NodeConfig)["native_transport_port"] = nativePort
+	}
+
+	if internodeSSLPort != 0 {
+		modelValues["cassandra-yaml"].(NodeConfig)["ssl_storage_port"] = internodeSSLPort
+	} else if internodePort != 0 {
+		modelValues["cassandra-yaml"].(NodeConfig)["storage_port"] = internodePort
+	}
+
+	return modelValues
 }

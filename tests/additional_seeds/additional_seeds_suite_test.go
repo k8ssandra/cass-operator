@@ -23,7 +23,7 @@ var (
 	testName                       = "Seed Selection"
 	namespace                      = "test-additional-seeds"
 	dcName                         = "dc1"
-	dcYaml                         = "../testdata/additional-seeds-two-rack-four-node-dc.yaml"
+	dcYaml                         = "../testdata/additional-seeds-three-rack-six-node-dc.yaml"
 	dcResource                     = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel                        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	additionalSeedServiceResource  = "services/cluster1-dc1-additional-seed-service"

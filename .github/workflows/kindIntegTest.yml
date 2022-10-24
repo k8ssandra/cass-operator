@@ -54,6 +54,7 @@ jobs:
         integration_test:
         - canary_upgrade
         - upgrade_operator
+        - cdc_successful
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
@@ -83,6 +84,7 @@ jobs:
         - "4.0.6"
         integration_test:
         - config_fql
+        - cdc_successful
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
@@ -105,36 +107,36 @@ jobs:
           name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
           path: ./build/kubectl_dump
 
-  # kind_dse_tests:
-  #   needs: build_docker_images
-  #   strategy:
-  #     matrix:
-  #       version:
-  #       - "6.8.26"
-  #       integration_test:
-  #       - additional_seeds
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     CGO_ENABLED: 0
-  #     M_INTEG_DIR: ${{ matrix.integration_test }}
-  #     M_SERVER_VERSION: ${{ matrix.version }}
-  #     M_SERVER_TYPE: dse
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #       if: github.event_name == 'pull_request'
-  #       with:
-  #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v2
-  #       if: github.event_name != 'pull_request'
-  #     - uses: ./.github/actions/run-integ-test
-  #       with:
-  #         integration_test: ${{ matrix.integration_test }}
-  #     - name: Archive k8s logs
-  #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v2
-  #       with:
-  #         name: k8s-logs-${{ matrix.integration_test }}-dse-${{ matrix.version }}
-  #         path: ./build/kubectl_dump
+  kind_dse_tests:
+    needs: build_docker_images
+    strategy:
+      matrix:
+        version:
+        - "6.8.26"
+        integration_test:
+        - delete_node_lost_readiness
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: ${{ matrix.version }}
+      M_SERVER_TYPE: dse
+    steps:
+      - uses: actions/checkout@v2
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v2
+        if: github.event_name != 'pull_request'
+      - uses: ./.github/actions/run-integ-test
+        with:
+          integration_test: ${{ matrix.integration_test }}
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: k8s-logs-${{ matrix.integration_test }}-dse-${{ matrix.version }}
+          path: ./build/kubectl_dump
 
   kind_integration_tests:
     needs: build_docker_images
@@ -159,8 +161,8 @@ jobs:
         # Three worker tests:
         # - canary_upgrade # See above job
         - config_change_condition
-        - cdc_successful
-        # - delete_node_lost_readiness # DSE specific behavior
+        # - cdc_successful # CDC is OSS only , see above jobs
+        # - delete_node_lost_readiness # DSE specific behavior see above job
         - host_network
         - internode-encryption-generated
         #- no_infinite_reconcile # smoke_test_* should take care of this

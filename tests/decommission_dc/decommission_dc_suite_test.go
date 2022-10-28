@@ -1,18 +1,5 @@
 package decommission_dc
 
-/*
-	Create DC1, wait for it
-
-	Create DC2 that starts with additional seeds set to the dc1's seed-service
-
-	Verify DC1<->DC2 see each other
-
-	Delete DC2, wait for it to complete
-
-	Check that DC1 has no longer any DC2 linkage (the DC was correctly decommissioned)
-
-	TODO Should we add scale up?
-*/
 import (
 	"fmt"
 	"regexp"
@@ -32,8 +19,8 @@ var (
 	namespace = "test-decommission-dc"
 	dc1Name   = "dc1"
 	dc2Name   = "dc2"
-	dc1Yaml   = "../testdata/default-single-rack-2-node-dc1.yaml"
-	dc2Yaml   = "../testdata/default-single-rack-2-node-dc.yaml"
+	dc1Yaml   = "../testdata/default-two-rack-two-node-dc1.yaml"
+	dc2Yaml   = "../testdata/default-two-rack-two-node-dc2.yaml"
 	dc1Label  = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dc1Name)
 	dc2Label  = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dc2Name)
 	seedLabel = "cassandra.datastax.com/seed-node=true"
@@ -170,65 +157,6 @@ var _ = Describe(testName, func() {
 			k = kubectl.Get("statefulsets").
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "[]", 300)
-
-			// Get seed-node Pod: "cassandra.datastax.com/seed-node"
-			// kubectl get pods -l cassandra.datastax.com/seed-node=true --output=jsonpath='{.items[*].status.podIP}'
-
-			/*
-				Parse the datacenter lines and verify there's two
-
-				➜  cass-operator git:(decommission_dc) ✗ kubectl exec -i -t -c cassandra cluster2-dc1-r1-sts-0 -- nodetool status
-				Datacenter: dc1
-				===============
-				Status=Up/Down
-				|/ State=Normal/Leaving/Joining/Moving
-				--  Address     Load       Owns (effective)  Host ID                               Token                 Rack
-				UN  10.244.2.3  97.09 KiB  100.0%            11e24d4a-a85f-4429-b701-3865c80bf887  3537893417023478360   r1
-
-				Datacenter: dc2
-				===============
-				Status=Up/Down
-				|/ State=Normal/Leaving/Joining/Moving
-				--  Address     Load       Owns (effective)  Host ID                               Token                 Rack
-				UN  10.244.6.3  68.72 KiB  100.0%            008e6938-3934-4ac2-9d03-2cd070f1cf1f  -8131327229031358013  r1
-
-				➜  cass-operator git:(decommission_dc) ✗
-
-				➜  cass-operator git:(decommission_dc) ✗ kubectl exec -i -t -c cassandra cluster2-dc2-r1-sts-0 -- nodetool decommission
-				nodetool: Unsupported operation: Not enough live nodes to maintain replication factor in keyspace system_distributed (RF = 3, N = 2). Perform a forceful decommission to ignore.
-			*/
-			/*
-							After decommission:
-				➜  cass-operator git:(decommission_dc) ✗ kubectl exec -i -t -c cassandra cluster2-dc1-r1-sts-0 -- nodetool status
-				Datacenter: dc1
-				===============
-				Status=Up/Down
-				|/ State=Normal/Leaving/Joining/Moving
-				--  Address     Load        Owns (effective)  Host ID                               Token                Rack
-				UN  10.244.2.3  107.68 KiB  100.0%            11e24d4a-a85f-4429-b701-3865c80bf887  3537893417023478360  r1
-
-				➜  cass-operator git:(decommission_dc) ✗
-			*/
-			/*
-				Incorrect deletion:
-
-				➜  cass-operator git:(decommission_dc) ✗ kubectl exec -i -t -c cassandra cluster2-dc1-r1-sts-0 -- nodetool status
-				Datacenter: dc1
-				===============
-				Status=Up/Down
-				|/ State=Normal/Leaving/Joining/Moving
-				--  Address     Load        Owns (effective)  Host ID                               Token                Rack
-				UN  10.244.2.3  112.79 KiB  100.0%            11e24d4a-a85f-4429-b701-3865c80bf887  3537893417023478360  r1
-
-				Datacenter: dc2
-				===============
-				Status=Up/Down
-				|/ State=Normal/Leaving/Joining/Moving
-				--  Address     Load        Owns (effective)  Host ID                               Token                Rack
-				DN  10.244.6.6  78.45 KiB   100.0%            fcdf813e-5861-4363-86f0-12e894b6e957  5934102370350368596  r1
-
-				➜  cass-operator git:(decommission_dc) ✗
-			*/
 		})
 	})
 })

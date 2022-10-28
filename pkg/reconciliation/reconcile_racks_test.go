@@ -7,12 +7,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"k8s.io/utils/pointer"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/utils/pointer"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
@@ -1725,6 +1726,15 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 			wantNotReady: true,
 			wantEvents:   []string{"Normal StartingCassandra Starting Cassandra for pod rack3-2"},
 		},
+		{
+			name: "unbalanced racks, part of decommission",
+			racks: racks{
+				"rack1": {},
+				"rack2": {true},
+				"rack3": {true},
+			},
+			wantNotReady: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1793,6 +1803,155 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 			}
 
 			mockClient.AssertExpectations(t)
+		})
+	}
+}
+
+func TestStartOneNodePerRack(t *testing.T) {
+	// A boolean representing the state of a pod (started or not).
+	type pod bool
+
+	// racks is a map of rack names to a list of pods in that rack.
+	type racks map[string][]pod
+
+	tests := []struct {
+		name         string
+		racks        racks
+		wantNotReady bool
+		seedCount    int
+	}{
+		{
+			name: "balanced racks, all nodes started",
+			racks: racks{
+				"rack1": {true, true, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, true},
+			},
+			wantNotReady: false,
+			seedCount:    3,
+		},
+		{
+			name: "balanced racks, missing nodes",
+			racks: racks{
+				"rack1": {true},
+				"rack2": {true},
+				"rack3": {false},
+			},
+			wantNotReady: true,
+			seedCount:    2,
+		},
+		{
+			name: "balanced racks, nothing started",
+			racks: racks{
+				"rack1": {false, false, false},
+				"rack2": {false, false, false},
+				"rack3": {false, false, false},
+			},
+			wantNotReady: true,
+			seedCount:    0,
+		},
+		{
+			name: "unbalanced racks, part of decommission",
+			racks: racks{
+				"rack1": {},
+				"rack2": {true},
+				"rack3": {true},
+			},
+			wantNotReady: false,
+			seedCount:    2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, _ := setupTest()
+			for rackName, rackPods := range tt.racks {
+				sts := &appsv1.StatefulSet{
+					ObjectMeta: metav1.ObjectMeta{Name: rackName},
+					Spec:       appsv1.StatefulSetSpec{Replicas: pointer.Int32(int32(len(rackPods)))},
+				}
+				rc.statefulSets = append(rc.statefulSets, sts)
+				for i, started := range rackPods {
+					p := &corev1.Pod{}
+					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
+					p.Labels = map[string]string{}
+					p.Status.ContainerStatuses = []corev1.ContainerStatus{
+						{
+							Name: "cassandra",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{
+									StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
+								},
+							},
+							Ready: bool(started),
+						},
+					}
+					if started {
+						p.Labels[api.CassNodeState] = stateStarted
+					} else {
+						p.Labels[api.CassNodeState] = stateReadyToStart
+					}
+					rc.dcPods = append(rc.dcPods, p)
+				}
+			}
+
+			mockClient := &mocks.Client{}
+			rc.Client = mockClient
+
+			// if tt.wantNotReady {
+			res := &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("OK")),
+			}
+
+			mockHttpClient := &mocks.HttpClient{}
+			mockHttpClient.On("Do",
+				mock.MatchedBy(
+					func(req *http.Request) bool {
+						return req != nil
+					})).
+				Return(res, nil).
+				Once()
+
+			client := httphelper.NodeMgmtClient{
+				Client:   mockHttpClient,
+				Log:      rc.ReqLogger,
+				Protocol: "http",
+			}
+
+			rc.NodeMgmtClient = client
+
+			// mock the calls in labelServerPodStarting:
+			// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
+			k8sMockClientPatch(mockClient, nil)
+			// get the status client
+			k8sMockClientStatus(mockClient, mockClient)
+			// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
+			k8sMockClientPatch(mockClient, nil)
+
+			k8sMockClientPatch(mockClient, nil)
+			k8sMockClientPatch(mockClient, nil)
+			k8sMockClientPatch(mockClient, nil)
+			k8sMockClientPatch(mockClient, nil)
+
+			// 3. GET - return completed task
+			k8sMockClientGet(rc.Client.(*mocks.Client), nil).
+				Run(func(args mock.Arguments) {
+					arg := args.Get(2).(*corev1.Endpoints)
+					arg.Subsets = []corev1.EndpointSubset{}
+					// return &corev1.Endpoints{}
+				}).Once()
+
+			k8sMockClientGet(mockClient, nil)
+			// }
+
+			epData := httphelper.CassMetadataEndpoints{
+				Entity: []httphelper.EndpointState{},
+			}
+
+			gotNotReady, err := rc.startOneNodePerRack(epData, tt.seedCount)
+
+			assert.NoError(t, err)
+			assert.Equalf(t, tt.wantNotReady, gotNotReady, "expected not ready to be %v", tt.wantNotReady)
 		})
 	}
 }

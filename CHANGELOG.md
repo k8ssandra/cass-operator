@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#291](https://github.com/k8ssandra/cass-operator/issues/291) Update Ginkgo to v2 (maintain current features, nothing additional from v2)
+* [BUGFIX] [#437](https://github.com/k8ssandra/cass-operator/issues/437) Fix startOneNodeRack to not loop forever in case of StS with size 0 (such as decommission of DC)
 
 ## v1.13.0
 

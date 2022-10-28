@@ -1817,7 +1817,9 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 	labelSeedBeforeStart := readySeeds == 0 && !rc.hasAdditionalSeeds()
 
 	for _, statefulSet := range rc.statefulSets {
-
+		if *statefulSet.Spec.Replicas < 1 {
+			continue
+		}
 		podName := getStatefulSetPodNameForIdx(statefulSet, 0)
 		pod := rc.getDCPodByName(podName)
 		notReady, err := rc.startNode(pod, labelSeedBeforeStart, endpointData)
@@ -1868,7 +1870,9 @@ func (rc *ReconciliationContext) hasAdditionalSeeds() bool {
 	}
 	additionalSeedEndpoints := 0
 	if additionalSeedEndpoint, err := rc.GetAdditionalSeedEndpoint(); err == nil {
-		additionalSeedEndpoints = len(additionalSeedEndpoint.Subsets[0].Addresses)
+		if len(additionalSeedEndpoint.Subsets) > 0 {
+			additionalSeedEndpoints = len(additionalSeedEndpoint.Subsets[0].Addresses)
+		}
 	}
 	return additionalSeedEndpoints > 0
 }
@@ -1884,7 +1888,6 @@ func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart
 
 			// this is the one exception to all seed labelling happening in labelSeedPods()
 			if labelSeedBeforeStart {
-
 				patch := client.MergeFrom(pod.DeepCopy())
 				pod.Labels[api.SeedNodeLabel] = "true"
 				if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
@@ -1893,9 +1896,6 @@ func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart
 
 				rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsSeed,
 					"Labeled pod a seed node %s", pod.Name)
-
-				// sleeping five seconds for DNS paranoia
-				time.Sleep(5 * time.Second)
 			}
 
 			err := rc.startCassandra(endpointData, pod)

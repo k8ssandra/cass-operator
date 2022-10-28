@@ -19,7 +19,7 @@ var (
 	namespace = "test-decommission-dc"
 	dc1Name   = "dc1"
 	dc2Name   = "dc2"
-	dc1Yaml   = "../testdata/default-two-rack-two-node-dc1.yaml"
+	dc1Yaml   = "../testdata/default-two-rack-two-node-dc.yaml"
 	dc2Yaml   = "../testdata/default-two-rack-two-node-dc2.yaml"
 	dc1Label  = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dc1Name)
 	dc2Label  = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dc2Name)

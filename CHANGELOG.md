@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#291](https://github.com/k8ssandra/cass-operator/issues/291) Update Ginkgo to v2 (maintain current features, nothing additional from v2)
+* [UPGRADE] Update cass-config-builder to 1.0.5.
 
 ## v1.13.0
 

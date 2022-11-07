@@ -522,7 +522,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				// Set StatefulSet properties here so that the task completes.. verify first that there's been a change (but only to r1)
 				_ = waitForTaskCompletion(taskKey)
-				Expect(task.Status.Succeeded).Should(Equal(sts.Status.Replicas)) // Ensure that Succeeded field is updated.
+				Expect(task.Status.Succeeded).Should(Equal(int(sts.Status.Replicas))) // Ensure that Succeeded field is updated.
 				// Verify other racks haven't been modified
 				var stsAll appsv1.StatefulSetList
 				Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())

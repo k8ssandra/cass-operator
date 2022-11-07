@@ -69,7 +69,7 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 			}
 		}
 	}
-	restartedPods := 0
+	restartedPods := make(map[string]int)
 	for _, st := range sts {
 		if st.Spec.Template.ObjectMeta.Annotations == nil {
 			st.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
@@ -84,14 +84,16 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 				status.ReadyReplicas == status.Replicas &&
 				status.ObservedGeneration == st.GetObjectMeta().GetGeneration() {
 				// This one has been updated, move on to the next one
-				// TODO Verify the revision has updated before doing this
 
-				restartedPods = int(status.UpdatedReplicas)
+				restartedPods[st.Name] = int(status.UpdatedReplicas)
 				continue
 			}
-			restartedPods += int(status.UpdatedReplicas)
-			taskConfig.Completed = restartedPods
-
+			restartedPods[st.Name] = int(status.UpdatedReplicas)
+			totalRestarted := 0
+			for _, v := range restartedPods {
+				totalRestarted += v
+			}
+			taskConfig.Completed = totalRestarted
 			// This is still restarting
 			return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
 		}

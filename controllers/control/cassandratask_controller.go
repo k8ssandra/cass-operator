@@ -101,6 +101,9 @@ type TaskConfiguration struct {
 	// Functions not targeting the pod
 	ValidateFunc   ValidatorFunc
 	PreProcessFunc ProcessFunc
+
+	// Status tracking
+	Completed int
 }
 
 func (t *TaskConfiguration) Validate() error {
@@ -285,6 +288,7 @@ JobDefinition:
 			if err != nil {
 				return ctrl.Result{}, err
 			}
+			completed = taskConfig.Completed
 			break JobDefinition
 		case api.CommandReplaceNode:
 			r.replace(taskConfig)

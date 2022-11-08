@@ -1,7 +1,7 @@
 // Copyright DataStax, Inc.
 // Please see the included license file for details.
 
-package serverconfig
+package v1beta1
 
 import (
 	"reflect"

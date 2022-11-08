@@ -8046,7 +8046,6 @@ spec:
             - size
             - storageConfig
             type: object
-            x-kubernetes-preserve-unknown-fields: true
           status:
             description: CassandraDatacenterStatus defines the observed state of CassandraDatacenter
             properties:

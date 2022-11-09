@@ -152,7 +152,7 @@ metadata:
   name: image-config
 images:
   system-logger: "k8ssandra/system-logger:v1.13.0"
-  config-builder: "datastax/cass-config-builder:1.0.4-ubi7"
+  config-builder: "datastax/cass-config-builder:1.0.5-ubi7"
   imageRegistry: "localhost:5000"
 defaults:
   cassandra:

@@ -1,7 +1,7 @@
 apiVersion: cassandra.datastax.com/v1beta1
 kind: CassandraDatacenter
 metadata:
-  name: dc1
+  name: dc2
 spec:
   clusterName: cluster1
   serverType: cassandra
@@ -25,5 +25,5 @@ spec:
       initial_heap_size: "512m"
       max_heap_size: "512m"
       additional-jvm-opts:
-        - "-Dcassandra.system_distributed_replication_dc_names=dc1"
+        - "-Dcassandra.system_distributed_replication_dc_names=dc2"
         - "-Dcassandra.system_distributed_replication_per_dc=1"

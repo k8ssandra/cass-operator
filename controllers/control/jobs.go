@@ -86,6 +86,7 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 				// This one has been updated, move on to the next one
 
 				restartedPods += int(status.UpdatedReplicas)
+				taskConfig.Completed = restartedPods
 				continue
 			}
 			restartedPods += int(status.UpdatedReplicas)

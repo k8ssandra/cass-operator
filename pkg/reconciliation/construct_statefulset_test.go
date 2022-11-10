@@ -5,13 +5,14 @@ package reconciliation
 
 import (
 	"fmt"
+	"reflect"
+	"testing"
+
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
-	"testing"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -277,7 +278,7 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 		assert.Equal(t, "/var/log/cassandra", got.Spec.Template.Spec.InitContainers[0].VolumeMounts[0].MountPath)
 
 		assert.Equal(t, "server-config-init", got.Spec.Template.Spec.InitContainers[1].Name)
-		assert.Equal(t, "datastax/cass-config-builder:1.0.4-ubi7", got.Spec.Template.Spec.InitContainers[1].Image)
+		assert.Equal(t, "datastax/cass-config-builder:1.0.5-ubi7", got.Spec.Template.Spec.InitContainers[1].Image)
 		assert.Equal(t, 1, len(got.Spec.Template.Spec.InitContainers[1].VolumeMounts))
 		assert.Equal(t, "server-config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].Name)
 		assert.Equal(t, "/config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].MountPath)

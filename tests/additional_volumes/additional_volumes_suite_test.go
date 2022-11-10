@@ -5,6 +5,7 @@ package additional_volumes
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -59,12 +60,25 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 120)
 
+			// Verify the volumes are actually there
+			step = "retrieve the persistent volume claim"
+			json := "jsonpath={.spec.volumes[?(.name=='cassandra-commitlogs')].persistentVolumeClaim.claimName}"
+			k = kubectl.Get("pod", "cluster2-dc2-r1-sts-0").FormatOutput(json)
+			pvcName := ns.OutputAndLog(step, k)
+			Expect(strings.Contains(pvcName, "cassandra-commitlogs")).To(BeTrue())
+
+			step = "find PVC volume"
+			json = "jsonpath={.spec.volumeName}"
+			k = kubectl.Get("pvc", pvcName).FormatOutput(json)
+			pvName := ns.OutputAndLog(step, k)
+			Expect(len(pvName) > 1).To(BeTrue())
+
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
 			step = "checking that the dc no longer exists"
-			json := "jsonpath={.items}"
+			json = "jsonpath={.items}"
 			k = kubectl.Get("CassandraDatacenter").
 				WithLabel(dcLabel).
 				FormatOutput(json)

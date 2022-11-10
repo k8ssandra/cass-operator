@@ -75,9 +75,6 @@ func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[s
 }
 
 // Create a statefulset object for the Datacenter.
-// We have to account for the fact that they might use the old managed-by label value
-// (oplabels.ManagedByLabelDefunctValue) for CassandraDatacenters originally
-// created in version 1.1.0 or earlier. Set useDefunctManagedByForPvc to true to use old ones.
 func newStatefulSetForCassandraDatacenter(
 	sts *appsv1.StatefulSet,
 	rackName string,
@@ -131,7 +128,7 @@ func newStatefulSetForCassandraDatacenter(
 
 	nsName := newNamespacedNameForStatefulSet(dc, rackName)
 
-	template, err := buildPodTemplateSpec(dc, nodeAffinityLabels, rackName)
+	template, err := buildPodTemplateSpec(dc, nodeAffinityLabels, rackName, legacyInternodeMount(sts))
 	if err != nil {
 		return nil, err
 	}
@@ -174,4 +171,16 @@ func newStatefulSetForCassandraDatacenter(
 	utils.AddHashAnnotation(result)
 
 	return result, nil
+}
+
+func legacyInternodeMount(sts *appsv1.StatefulSet) bool {
+	if sts != nil {
+		for _, vol := range sts.Spec.Template.Spec.Volumes {
+			if vol.Name == "encryption-cred-storage" {
+				return true
+			}
+		}
+	}
+
+	return false
 }

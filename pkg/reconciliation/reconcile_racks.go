@@ -117,6 +117,10 @@ func (rc *ReconciliationContext) CheckSuperuserSecretCreation() result.Reconcile
 func (rc *ReconciliationContext) CheckInternodeCredentialCreation() result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckInternodeCredentialCreation")
 
+	if !rc.Datacenter.LegacyInternodeEnabled() {
+		return result.Continue()
+	}
+
 	_, err := rc.retrieveInternodeCredentialSecretOrCreateDefault()
 	if err != nil {
 		rc.ReqLogger.Error(err, "error retrieving InternodeCredential for CassandraDatacenter.")
@@ -1774,7 +1778,7 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 		if hostId != "" {
 			replaceAddress, err = FindIpForHostId(endpointData, hostId)
 			if err != nil {
-				return fmt.Errorf("Failed to start replace of cassandra node %s for pod %s due to error: %w", hostId, pod.Name, err)
+				return fmt.Errorf("failed to start replace of cassandra node %s for pod %s due to error: %w", hostId, pod.Name, err)
 			}
 		}
 	}
@@ -2287,7 +2291,7 @@ func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileRe
 func (rc *ReconciliationContext) CheckForInvalidState() result.ReconcileResult {
 	cond, isSet := rc.Datacenter.GetCondition(api.DatacenterValid)
 	if isSet && cond.Status == corev1.ConditionFalse {
-		err := fmt.Errorf("Datacenter %s is not in a valid state: %s", rc.Datacenter.Name, cond.Message)
+		err := fmt.Errorf("datacenter %s is not in a valid state: %s", rc.Datacenter.Name, cond.Message)
 		return result.Error(err)
 	}
 

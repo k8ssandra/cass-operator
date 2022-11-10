@@ -23,6 +23,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] [#431](https://github.com/k8ssandra/cass-operator/issues/431) Fix a bug where the restartTask would not provide success counts for restarted pods.
 * [BUGFIX] [#444](https://github.com/k8ssandra/cass-operator/issues/444) Update cass-config-builder to 1.0.5. Update the target tag of cass-config-builder to :1.0 to allow future updates in 1.0.x without rolling restarts.
 * [BUGFIX] [#437](https://github.com/k8ssandra/cass-operator/issues/437) Fix startOneNodeRack to not loop forever in case of StS with size 0 (such as decommission of DC)
+* [CHANGE] [#442](https://github.com/k8ssandra/cass-operator/issues/442) Do not mount encryption-cred-storage or create internode CAs if not needed. Recommended approach is to use cert-manager instead of this old legacy method.
 
 ## v1.13.0
 

@@ -3,7 +3,6 @@ module github.com/k8ssandra/cass-operator
 go 1.19
 
 require (
-	github.com/Jeffail/gabs v1.4.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-logr/logr v1.2.3
 	github.com/google/uuid v1.1.2
@@ -22,6 +21,7 @@ require (
 )
 
 require (
+	github.com/Jeffail/gabs/v2 v2.6.1
 	github.com/onsi/ginkgo/v2 v2.2.0
 	go.uber.org/zap v1.21.0
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed

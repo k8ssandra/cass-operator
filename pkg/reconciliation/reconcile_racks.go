@@ -624,7 +624,7 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 		return result.Error(err)
 	}
 
-	if !clusterHealthy {
+	if !clusterHealthy && !(rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionTrue) {
 		rc.ReqLogger.Info(
 			"cluster isn't healthy",
 		)

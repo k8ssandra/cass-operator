@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [BUGFIX] [#444](https://github.com/k8ssandra/cass-operator/issues/444) Update cass-config-builder to 1.0.5.
+
 ## v1.10.5
 
 * [CHANGE] [#370](https://github.com/k8ssandra/cass-operator/issues/370) If Cassandra start call fails, delete the pod

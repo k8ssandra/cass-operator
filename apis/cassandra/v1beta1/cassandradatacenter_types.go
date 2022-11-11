@@ -878,17 +878,16 @@ func (dc *CassandraDatacenter) LegacyInternodeEnabled() bool {
 		}
 
 		if keystorePath, found := gobContainer["keystore"]; found {
-			if strings.HasPrefix(keystorePath.Data().(string), "/etc/encryption") {
+			if strings.TrimSpace(keystorePath.Data().(string)) == "/etc/encryption/node-keystore.jks" {
 				return true
 			}
 		}
 		return false
 	}
 
-	if config.Exists("cassandra-yaml.client_encryption_options") || config.Exists("cassandra-yaml.server_encryption_options") {
-		// Now verify the mount is correct also..
+	if config.Exists("cassandra-yaml", "client_encryption_options") || config.Exists("cassandra-yaml", "server_encryption_options") {
 		serverContainer := config.Path("cassandra-yaml.server_encryption_options").ChildrenMap()
-		clientContainer := config.Path("cassandra-yaml.server_encryption_options").ChildrenMap()
+		clientContainer := config.Path("cassandra-yaml.client_encryption_options").ChildrenMap()
 
 		if hasOldKeyStore(clientContainer) || hasOldKeyStore(serverContainer) {
 			return true

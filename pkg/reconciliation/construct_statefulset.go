@@ -128,7 +128,7 @@ func newStatefulSetForCassandraDatacenter(
 
 	nsName := newNamespacedNameForStatefulSet(dc, rackName)
 
-	template, err := buildPodTemplateSpec(dc, nodeAffinityLabels, rackName, legacyInternodeMount(sts))
+	template, err := buildPodTemplateSpec(dc, nodeAffinityLabels, rackName, legacyInternodeMount(dc, sts))
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,11 @@ func newStatefulSetForCassandraDatacenter(
 	return result, nil
 }
 
-func legacyInternodeMount(sts *appsv1.StatefulSet) bool {
+func legacyInternodeMount(dc *api.CassandraDatacenter, sts *appsv1.StatefulSet) bool {
+	if dc.LegacyInternodeEnabled() {
+		return true
+	}
+
 	if sts != nil {
 		for _, vol := range sts.Spec.Template.Spec.Volumes {
 			if vol.Name == "encryption-cred-storage" {

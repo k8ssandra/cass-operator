@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.13.1
 
 * [CHANGE] [#291](https://github.com/k8ssandra/cass-operator/issues/291) Update Ginkgo to v2 (maintain current features, nothing additional from v2)

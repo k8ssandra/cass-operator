@@ -14,7 +14,8 @@ var featuresReply = `{
 	"features": [
 		"async_sstable_tasks",
 		"rebuild",
-		"async_upgrade_sstable_task"
+		"async_upgrade_sstable_task",
+		"async_move_task"
 	]
 	}`
 
@@ -65,7 +66,7 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 			w.WriteHeader(http.StatusOK)
 			jobId := query.Get("job_id")
 			_, err = w.Write([]byte(fmt.Sprintf(jobDetailsCompleted, jobId)))
-		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild" || r.URL.Path == "/api/v1/ops/tables/sstables/upgrade") {
+		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild" || r.URL.Path == "/api/v1/ops/tables/sstables/upgrade" || r.URL.Path == "/api/v0/ops/node/move") {
 			w.WriteHeader(http.StatusOK)
 			// Write jobId
 			jobId++
@@ -99,7 +100,7 @@ func FakeExecutorServerWithDetailsFails(callDetails *CallDetails) (*httptest.Ser
 			w.WriteHeader(http.StatusOK)
 			jobId := query.Get("job_id")
 			_, err = w.Write([]byte(fmt.Sprintf(jobDetailsFailed, jobId)))
-		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild" || r.URL.Path == "/api/v1/ops/tables/sstables/upgrade") {
+		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild" || r.URL.Path == "/api/v1/ops/tables/sstables/upgrade" || r.URL.Path == "/api/v0/ops/node/move") {
 			w.WriteHeader(http.StatusOK)
 			// Write jobId
 			jobId++

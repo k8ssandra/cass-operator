@@ -71,6 +71,7 @@ const (
 	CommandReplaceNode     CassandraCommand = "replacenode"
 	CommandCompaction      CassandraCommand = "compact"
 	CommandScrub           CassandraCommand = "scrub"
+	CommandMove            CassandraCommand = "move"
 )
 
 type CassandraJob struct {
@@ -89,7 +90,10 @@ type JobArguments struct {
 	PodName          string `json:"pod_name,omitempty"`
 	RackName         string `json:"rack,omitempty"`
 
-	// Add compaction arguments
+	// NewTokens is a map of pod names to their newly-assigned tokens. Required for the move
+	// command, ignored otherwise. Pods referenced in this map must exist; any existing pod not
+	// referenced in this map will not be moved.
+	NewTokens map[string]string `json:"new_tokens,omitempty"`
 }
 
 // CassandraTaskStatus defines the observed state of CassandraJob

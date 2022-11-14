@@ -211,6 +211,51 @@ func (r *CassandraTaskReconciler) replace(taskConfig *TaskConfiguration) {
 	taskConfig.PreProcessFunc = r.replacePreProcess
 }
 
+// Move functionality
+
+func callMove(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
+	newToken, found := taskConfig.Arguments.NewTokens[pod.Name]
+	if !found {
+		return "", nil
+	}
+	return nodeMgmtClient.CallMove(pod, newToken)
+}
+
+func moveFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
+	_, found := taskConfig.Arguments.NewTokens[pod.Name]
+	return found
+}
+
+func (r *CassandraTaskReconciler) moveValidator(taskConfig *TaskConfiguration) error {
+	if len(taskConfig.Arguments.NewTokens) == 0 {
+		return fmt.Errorf("missing required new_tokens argument")
+	}
+	pods, err := r.getDatacenterPods(taskConfig.Context, taskConfig.Datacenter)
+	if err != nil {
+		return err
+	}
+	for podName := range taskConfig.Arguments.NewTokens {
+		found := false
+		for _, pod := range pods {
+			if pod.Name == podName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("invalid new_tokens argument: pod doesn't exist: %s", podName)
+		}
+	}
+	return nil
+}
+
+func (r *CassandraTaskReconciler) move(taskConfig *TaskConfiguration) {
+	taskConfig.AsyncFeature = httphelper.Move
+	taskConfig.AsyncFunc = callMove
+	taskConfig.PodFilter = moveFilter
+	taskConfig.ValidateFunc = r.moveValidator
+}
+
 // Common functions
 
 func isCassandraUp(pod *corev1.Pod) bool {

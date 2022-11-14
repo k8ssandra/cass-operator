@@ -11,7 +11,7 @@ When leveraging a single endpoint ingress / load balancer we naturally remove th
    # Import images from the local Docker daemon
    k3d i datastax/cass-operator:1.2.0
    k3d i datastax/cassandra:3.11.6-ubi7
-   k3d i datastax/cass-config-builder:1.0.0-ubi7
+   k3d i datastax/cass-config-builder:1.0-ubi7
    ```
 
 1. Install Traefik with Helm

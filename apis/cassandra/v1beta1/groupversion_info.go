@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package v1beta1 contains API Schema definitions for the cassandra.datastax.com v1beta1 API group
-//+kubebuilder:object:generate=true
-//+groupName=cassandra.datastax.com
+// +kubebuilder:object:generate=true
+// +groupName=cassandra.datastax.com
 package v1beta1
 
 import (

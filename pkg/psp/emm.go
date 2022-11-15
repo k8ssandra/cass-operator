@@ -113,9 +113,7 @@ type EMMService interface {
 	getLogger() logr.Logger
 }
 
-//
 // Util
-//
 func getPodsRackNameSet(pods []*corev1.Pod) utils.StringSet {
 	names := utils.StringSet{}
 	for _, pod := range pods {
@@ -128,9 +126,7 @@ func filterPodsByRackName(pods []*corev1.Pod, rackName string) []*corev1.Pod {
 	return utils.FilterPodsWithLabel(pods, api.RackLabel, rackName)
 }
 
-//
 // EMMOperations impl
-//
 type EMMServiceImpl struct {
 	EMMSPI
 }
@@ -386,9 +382,7 @@ func (impl *EMMServiceImpl) getLogger() logr.Logger {
 	return impl.GetLogger()
 }
 
-//
 // EMMChecks impl
-//
 func (impl *EMMServiceImpl) getPodNameSetWithVolumeHealthInaccessiblePVC(rackName string) (utils.StringSet, error) {
 	pods := impl.GetDCPods()
 	result := []*corev1.Pod{}
@@ -434,9 +428,7 @@ func (impl *EMMServiceImpl) getInProgressNodeReplacements() []string {
 	return impl.GetInProgressNodeReplacements()
 }
 
-//
 // Helper methods
-//
 func (impl *EMMServiceImpl) getNodesWithTaintKeyValueEffect(taintKey, value string, effect corev1.TaintEffect) ([]*corev1.Node, error) {
 	nodes, err := impl.GetAllNodesInDC()
 	if err != nil {

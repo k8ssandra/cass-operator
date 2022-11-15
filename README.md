@@ -441,7 +441,7 @@ For other means of contacting, check [k8ssandra community](https://k8ssandra.io/
 
 Almost every build, test, or development task requires the following pre-requisites...
 
-* Golang 1.18 or newer
+* Golang 1.19 or newer
 * Docker, either the docker.io packages on Ubuntu, Docker Desktop for Mac,
   or your preferred docker distribution. Other container engines such as podman should work also.
 * Kind or similar Kubernetes distribution for testing (Docker Desktop / Minikube will work if correct StorageClass is added)

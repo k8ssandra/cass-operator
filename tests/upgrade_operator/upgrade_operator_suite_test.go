@@ -46,13 +46,11 @@ func TestLifecycle(t *testing.T) {
 	RunSpecs(t, testName)
 }
 
-// InstallOldOperator installs the oldest supported upgrade path (this is the first k8ssandra/cass-operator release)
+// InstallOldOperator installs the oldest supported upgrade path (for Kubernetes 1.25)
 func InstallOldOperator() {
-	step := "install cass-operator 1.8.0"
+	step := "install cass-operator 1.12.0"
 	By(step)
 
-	// kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.7.1/docs/user/cass-operator-manifests.yaml
-	// kubectl apply -k "github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.8.0"
 	err := kustomize.DeployDir(namespace, "upgrade_operator")
 	Expect(err).ToNot(HaveOccurred())
 }
@@ -123,7 +121,7 @@ var _ = Describe(testName, func() {
 
 			// Update Cassandra version to ensure we can still do changes
 			step = "perform cassandra upgrade"
-			json = "{\"spec\": {\"serverVersion\": \"3.11.12\"}}"
+			json = "{\"spec\": {\"serverVersion\": \"3.11.14\"}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 

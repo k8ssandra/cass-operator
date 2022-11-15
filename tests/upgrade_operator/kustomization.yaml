@@ -4,4 +4,4 @@ namespace: test-upgrade-operator
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.8.0
+- github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.12.0

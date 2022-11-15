@@ -103,14 +103,15 @@ jobs:
       - name: Tag and push images for Red Hat certification
         shell: bash
         if: ${{ !env.ACT }}
-        # The double docker login is a workaround for RH's odd login issues
         run: |
-          docker tag k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}} scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}}
-          docker tag k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}} scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}}
-          docker login -u unused scan.connect.redhat.com -p ${{ secrets.CASS_OPERATOR_CONNECT_SECRET }}
-          docker push scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}}
-          docker login -u unused scan.connect.redhat.com -p ${{ secrets.SYSTEM_LOGGER_CONNECT_SECRET }}
-          docker push scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}}
+          docker tag k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}} quay.io/redhat-isv-containers/5ebee0e40e3deaf258b160d1:${{ steps.vars.outputs.tag_name}}
+          docker tag k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}} quay.io/redhat-isv-containers/6138f998fb33d420b79f0af9:${{ steps.vars.outputs.tag_name}}
+
+          docker login -u redhat-isv-containers+5ebee0e40e3deaf258b160d1-robot quay.io -p ${{ secrets.CASS_OPERATOR_CONNECT_SECRET }}
+          docker push quay.io/redhat-isv-containers/5ebee0e40e3deaf258b160d1:${{ steps.vars.outputs.tag_name}}
+
+          docker login -u redhat-isv-containers+6138f998fb33d420b79f0af9-robot quay.io -p ${{ secrets.SYSTEM_LOGGER_CONNECT_SECRET }}
+          docker push quay.io/redhat-isv-containers/6138f998fb33d420b79f0af9:${{ steps.vars.outputs.tag_name}}
       - name: Install CLI tools from OpenShift Mirror
         uses: redhat-actions/openshift-tools-installer@v1
         with:
@@ -125,10 +126,11 @@ jobs:
       - name: Run preflight checks and submit results
         shell: bash
         run: |
-          docker login -u unused scan.connect.redhat.com -p ${{ secrets.CASS_OPERATOR_CONNECT_SECRET }}
-          preflight check container scan.connect.redhat.com/ospid-18783bca-8f79-459c-aa0b-bda4e71c6ec3/cass-operator:${{ steps.vars.outputs.tag_name}} --certification-project-id=5ebee0e40e3deaf258b160d1 --pyxis-api-token=${{ secrets.PREFLIGHT_KEY }} --submit --docker-config=$HOME/.docker/config.json
-          docker login -u unused scan.connect.redhat.com -p ${{ secrets.SYSTEM_LOGGER_CONNECT_SECRET }}
-          preflight check container scan.connect.redhat.com/ospid-6138f998fb33d420b79f0af9/system-logger:${{ steps.vars.outputs.tag_name}} --certification-project-id=6138f998fb33d420b79f0af9 --pyxis-api-token=${{ secrets.PREFLIGHT_KEY }} --submit --docker-config=$HOME/.docker/config.json
+          docker login -u redhat-isv-containers+5ebee0e40e3deaf258b160d1-robot quay.io -p ${{ secrets.CASS_OPERATOR_CONNECT_SECRET }}
+          preflight check container quay.io/redhat-isv-containers/5ebee0e40e3deaf258b160d1:${{ steps.vars.outputs.tag_name}} --certification-project-id=5ebee0e40e3deaf258b160d1 --pyxis-api-token=${{ secrets.PREFLIGHT_KEY }} --submit --docker-config=$HOME/.docker/config.json
+
+          docker login -u redhat-isv-containers+6138f998fb33d420b79f0af9-robot quay.io -p ${{ secrets.SYSTEM_LOGGER_CONNECT_SECRET }}
+          preflight check container quay.io/redhat-isv-containers/6138f998fb33d420b79f0af9:${{ steps.vars.outputs.tag_name}} --certification-project-id=6138f998fb33d420b79f0af9 --pyxis-api-token=${{ secrets.PREFLIGHT_KEY }} --submit --docker-config=$HOME/.docker/config.json
       - name: Create bundle
         shell: bash
         if: ${{ !env.ACT }} # Act does not have yq

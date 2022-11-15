@@ -11,6 +11,6 @@ spec:
       command: move
       args:
         new_tokens:
-            cluster1-dc1-r1-sts-0: "-9223372036854775708"
-            cluster1-dc1-r2-sts-0: "-3074457345618258603"
-            cluster1-dc1-r3-sts-0: "3074457345618258602"
+          cluster1-dc1-r1-sts-0: "-9223372036854775708"
+          cluster1-dc1-r2-sts-0: "-3074457345618258603"
+          cluster1-dc1-r3-sts-0: "3074457345618258602"

@@ -214,10 +214,7 @@ func (r *CassandraTaskReconciler) replace(taskConfig *TaskConfiguration) {
 // Move functionality
 
 func callMove(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
-	newToken, found := taskConfig.Arguments.NewTokens[pod.Name]
-	if !found {
-		return "", nil
-	}
+	newToken := taskConfig.Arguments.NewTokens[pod.Name]
 	return nodeMgmtClient.CallMove(pod, newToken)
 }
 

@@ -261,7 +261,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				})
 			})
 			It("Runs a UpgradeSSTables task against the datacenter pods", func() {
-				By("Creating a task for rebuild")
+				By("Creating a task for upgradesstables")
 				taskKey := createTask(api.CommandUpgradeSSTables, testNamespaceName)
 
 				completedTask := waitForTaskCompletion(taskKey)
@@ -272,6 +272,28 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
+			It("Runs a node move task against the datacenter pods", func() {
+				By("Creating a task for move")
+
+				taskKey, task := buildTask(api.CommandMove, testNamespaceName)
+				pod1 := fmt.Sprintf("%s-%s-r0-sts-0", clusterName, testDatacenterName)
+				pod2 := fmt.Sprintf("%s-%s-r1-sts-0", clusterName, testDatacenterName)
+				pod3 := fmt.Sprintf("%s-%s-r2-sts-0", clusterName, testDatacenterName)
+				task.Spec.Jobs[0].Arguments.NewTokens = map[string]string{
+					pod1: "-123",
+					pod2: "0",
+					pod3: "123",
+				}
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v0/ops/node/move"]).To(Equal(3))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
+
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 3))
 			})
 			When("Running cleanup twice in the same datacenter", func() {
 				It("Runs a cleanup task against the datacenter pods", func() {

@@ -136,6 +136,7 @@ const (
 	AsyncScrubTask          Feature = "async_scrub_task"
 	FullQuerySupport        Feature = "full_query_logging"
 	Rebuild                 Feature = "rebuild"
+	Move                    Feature = "async_move_task"
 )
 
 func (f *FeatureSet) UnmarshalJSON(b []byte) error {
@@ -1054,6 +1055,35 @@ func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDet
 	}
 
 	return job, nil
+}
+
+// CallMove invokes the node move endpoint and returns the job id of the move job.
+func (client *NodeMgmtClient) CallMove(pod *corev1.Pod, newToken string) (string, error) {
+	client.Log.Info(
+		"calling Management API node move - POST /api/v0/ops/node/move",
+		"pod", pod.Name,
+		"newToken", newToken,
+	)
+
+	podHost, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return "", err
+	}
+
+	queryUrl := fmt.Sprintf("/api/v0/ops/node/move?newToken=%s", newToken)
+
+	req := nodeMgmtRequest{
+		endpoint: queryUrl,
+		host:     podHost,
+		method:   http.MethodPost,
+		timeout:  60 * time.Second,
+	}
+	jobId, err := callNodeMgmtEndpoint(client, req, "")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jobId), nil
 }
 
 func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, contentType string) ([]byte, error) {

@@ -300,6 +300,8 @@ JobDefinition:
 			// res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, scrub(taskConfigProto))
 		case api.CommandCompaction:
 			// res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, compact(taskConfigProto, job.Arguments))
+		case api.CommandMove:
+			r.move(taskConfig)
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err

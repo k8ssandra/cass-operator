@@ -128,7 +128,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	cooldownTime := time.Until(lastNodeStart.Add(cooldownPeriod))
 
 	if cooldownTime > 0 {
-		logger.Info("Ending reconciliation early because a server node was recently started")
+		logger.Error("Ending reconciliation early because a server node was recently started")
 		secs := time.Duration(1 + int(cooldownTime.Seconds()))
 		return ctrl.Result{RequeueAfter: secs * time.Second}, nil
 	}

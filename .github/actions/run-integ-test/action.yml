@@ -21,16 +21,11 @@ runs:
       run: |
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /usr/share/dotnet
-    - name: Set up Go 1.19
+    - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19
-    - uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+        go-version-file: 'go.mod'
+        cache: true
     - name: Cache Docker layers
       uses: actions/cache@v3
       with:

@@ -134,7 +134,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	}
 
 	if rc.Datacenter.Status.QuietPeriod.After(time.Now()) {
-		logger.Info("Ending reconciliation early because the datacenter is in a quiet period")
+		logger.Error("Ending reconciliation early because the datacenter is in a quiet period")
 		cooldownTime = time.Until(rc.Datacenter.Status.QuietPeriod.Time)
 		secs := time.Duration(1 + int(cooldownTime.Seconds()))
 		return ctrl.Result{RequeueAfter: secs * time.Second}, nil

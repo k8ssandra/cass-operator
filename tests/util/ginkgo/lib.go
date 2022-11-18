@@ -45,7 +45,7 @@ func CreateTestFile(dcYaml string) (string, error) {
 
 	fileInfo, err := os.Stat(dcYaml)
 	if err != nil {
-        return "", err
+		return "", err
 	}
 
 	d, err := os.ReadFile(dcYaml)
@@ -56,7 +56,6 @@ func CreateTestFile(dcYaml string) (string, error) {
 	if err = yaml.Unmarshal(d, &data); err != nil {
 		return "", err
 	}
-
 
 	spec := data["spec"].(map[interface{}]interface{})
 	serverImage := os.Getenv("M_SERVER_IMAGE")
@@ -111,7 +110,7 @@ func CreateTestSecretsConfig(configFile string) (string, error) {
 
 	fileInfo, err := os.Stat(configFile)
 	if err != nil {
-        return "", err
+		return "", err
 	}
 
 	d, err := os.ReadFile(configFile)
@@ -119,7 +118,7 @@ func CreateTestSecretsConfig(configFile string) (string, error) {
 		return "", err
 	}
 
-    configString := string(d)
+	configString := string(d)
 	cassandraVersion := os.Getenv("M_SERVER_VERSION")
 	// jvm-options <-> jvm-server-options
 	if strings.HasPrefix(cassandraVersion, "3.") {

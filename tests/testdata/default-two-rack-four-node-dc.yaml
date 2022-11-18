@@ -22,8 +22,11 @@ spec:
     - name: r2
   config:
     jvm-options:
-      initial_heap_size: "768m"
-      max_heap_size: "768m"
+      initial_heap_size: "512m"
+      max_heap_size: "512m"
       additional-jvm-opts:
         - "-Ddse.system_distributed_replication_dc_names=dc1"
         - "-Ddse.system_distributed_replication_per_dc=1"
+        - "-Dcassandra.system_distributed_replication_dc_names=dc1"
+        - "-Dcassandra.system_distributed_replication_per_dc=1"
+        # - "-Dcassandra.ring_delay_ms=0"

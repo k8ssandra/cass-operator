@@ -67,7 +67,7 @@ IMG_LATEST ?= $(IMAGE_TAG_BASE):latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:generateEmbeddedObjectMeta=true"
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.24.2
+ENVTEST_K8S_VERSION = 1.25.x
 
 # Logger image
 LOG_IMG_BASE ?= $(ORG)/system-logger
@@ -134,7 +134,7 @@ test: manifests generate fmt vet lint envtest ## Run tests.
 	# Old unit tests first - these use mocked client / fakeclient
 	go test ./pkg/... -coverprofile cover-pkg.out
 	# Then the envtest ones
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v ./apis/... ./controllers/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./apis/... ./controllers/... -coverprofile cover.out
 
 .PHONY: integ-test
 integ-test: kustomize cert-manager helm ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
@@ -237,11 +237,18 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
+OPSDK ?= $(LOCALBIN)/operator-sdk
+HELM ?= $(LOCALBIN)/helm
+OPM ?= $(LOCALBIN)/opm
 
 ## Tool Versions
 CERT_MANAGER_VERSION ?= v1.9.1
 KUSTOMIZE_VERSION ?= v4.5.7
-CONTROLLER_TOOLS_VERSION ?= v0.9.2
+CONTROLLER_TOOLS_VERSION ?= v0.10.0
+OPERATOR_SDK_VERSION ?= 1.25.1
+HELM_VERSION ?= 3.10.2
+OPM_VERSION ?= 1.26.2
+GOLINT_VERSION ?= 1.50.1
 
 .PHONY: cert-manager
 cert-manager: ## Install cert-manager to the cluster
@@ -253,30 +260,29 @@ KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/k
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
-	test -s $(LOCALBIN)/kustomize || { curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }
+	test -s $(KUSTOMIZE) || { curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | sed -e 's/arm64)/arm64 | aarch64)/g' | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)
-	test -s $(LOCALBIN)/controller-gen || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+	test -s $(CONTROLLER_GEN) || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	test -s $(ENVTEST) || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
 OS=$(shell go env GOOS)
 ARCH=$(shell go env GOARCH)
 
 .PHONY: helm
-HELM = ./bin/helm
-HELMTARNAME = helm-v3.9.4-${OS}-${ARCH}.tar.gz
+HELMTARNAME = helm-v$(HELM_VERSION)-${OS}-${ARCH}.tar.gz
 helm: ## Download helm locally if necessary.
 ifeq (,$(wildcard $(HELM)))
 ifeq (,$(shell which helm 2>/dev/null))
 	@{ \
 	set -e ;\
-	mkdir -p $(dir $(HELM)) ;\
+	# mkdir -p $(dir $(HELM)) ;\
 	curl -sSLo bin/${HELMTARNAME} https://get.helm.sh/${HELMTARNAME} ;\
 	tar -zxf bin/${HELMTARNAME} -C bin/;\
 	mv bin/${OS}-${ARCH}/helm ${HELM} ;\
@@ -289,14 +295,14 @@ endif
 endif
 
 .PHONY: operator-sdk
-OPSDK = ./bin/operator-sdk
+# OPSDK = ./bin/operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary
 ifeq (,$(wildcard $(OPSDK)))
 ifeq (,$(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
-	mkdir -p $(dir $(OPSDK)) ;\
-	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.23.0/operator-sdk_${OS}_${ARCH} ;\
+	# mkdir -p $(dir $(OPSDK)) ;\
+	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v$(OPERATOR_SDK_VERSION)/operator-sdk_${OS}_${ARCH} ;\
 	chmod +x $(OPSDK) ;\
 	}
 else
@@ -321,7 +327,7 @@ bundle-push: ## Push the bundle image.
 	docker push $(BUNDLE_IMG)
 
 .PHONY: opm
-OPM = ./bin/opm
+# OPM = ./bin/opm
 opm: ## Download opm locally if necessary.
 ifeq (,$(wildcard $(OPM)))
 ifeq (,$(shell which opm 2>/dev/null))
@@ -329,7 +335,7 @@ ifeq (,$(shell which opm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v$(OPM_VERSION)/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
 else
@@ -363,4 +369,4 @@ catalog-push: ## Push a catalog image.
 
 .PHONY: golangci-lint
 golangci-lint:
-	test -s $(LOCALBIN)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.49.0
+	test -s $(LOCALBIN)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v$(GOLINT_VERSION)

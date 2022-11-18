@@ -12,19 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      - name: Cache Docker layers
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-integ-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-integ-
+        uses: docker/setup-buildx-action@v2
       - name: Build and push
         id: docker_build
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           file: Dockerfile
           context: .
@@ -35,7 +28,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           file: logger.Dockerfile
           push: false
@@ -45,12 +38,12 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Upload cass-operator image
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: cass-operator
           path: /tmp/k8ssandra-cass-operator.tar
       - name: Upload system-logger image
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: system-logger
           path: /tmp/k8ssandra-system-logger.tar
@@ -111,18 +104,18 @@ jobs:
       CGO_ENABLED: 0
       M_INTEG_DIR: ${{ matrix.integration_test }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
           integration_test: ${{ matrix.integration_test }}
       - name: Archive k8s logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: k8s-logs-${{ matrix.integration_test }}
           path: ./build/kubectl_dump
@@ -131,10 +124,8 @@ jobs:
     strategy:
       matrix:
         version:
-        - "3.11.7"
-        - "3.11.11"
-        - "4.0.0"
-        - "4.0.3"
+        - "3.11.14"
+        - "4.0.7"
         include:
           - version: 3.11.7
             serverImage: k8ssandra/cass-management-api:3.11.7-v0.1.24 # k8ssandra 1.1
@@ -148,18 +139,18 @@ jobs:
       M_SERVER_VERSION: ${{ matrix.version }}
       M_SERVER_IMAGE: ${{ matrix.serverImage }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
           integration_test: smoke_test_oss
       - name: Archive k8s logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: k8s-logs-smoke_test_oss-${{ matrix.version }}-${{ matrix.serverImage }}
           path: ./build/kubectl_dump

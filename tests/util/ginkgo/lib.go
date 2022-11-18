@@ -129,11 +129,11 @@ func (ns NsWrapper) Terminate() {
 	Expect(dcErr).ToNot(HaveOccurred())
 }
 
-//===================================
+// ===================================
 // Logging functions for the NsWrapper
 // that execute the Kcmd and then dump
 // k8s logs for that namespace
-//====================================
+// ====================================
 func sanitizeForLogDirs(s string) string {
 	reg, err := regexp.Compile(`[\s\\\/\-\.,]`)
 	mageutil.PanicOnError(err)

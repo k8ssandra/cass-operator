@@ -258,6 +258,16 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 					// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 					Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+
+					Expect(len(completedTask.Status.Conditions)).To(Equal(2))
+					for _, cond := range completedTask.Status.Conditions {
+						switch cond.Type {
+						case api.JobComplete:
+							Expect(cond.Status).To(Equal(corev1.ConditionTrue))
+						case api.JobRunning:
+							Expect(cond.Status).To(Equal(corev1.ConditionFalse))
+						}
+					}
 				})
 			})
 			It("Runs a UpgradeSSTables task against the datacenter pods", func() {

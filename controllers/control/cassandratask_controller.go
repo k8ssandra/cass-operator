@@ -248,6 +248,8 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		cassTask.Status.Active = 0
 		cassTask.Status.CompletionTime = &timeNow
+		SetCondition(&cassTask, api.JobComplete, corev1.ConditionTrue)
+		SetCondition(&cassTask, api.JobRunning, corev1.ConditionFalse)
 
 		// Requeue for deletion later
 		deletionTime := calculateDeletionTime(&cassTask)
@@ -273,6 +275,44 @@ func (r *CassandraTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.CassandraTask{}).
 		Complete(r)
+}
+
+func (r *CassandraTaskReconciler) HasCondition(task api.CassandraTask, condition api.JobConditionType, status corev1.ConditionStatus) bool {
+	for _, cond := range task.Status.Conditions {
+		if cond.Type == condition {
+			return cond.Status == status
+		}
+	}
+	return false
+}
+
+func SetCondition(task *api.CassandraTask, condition api.JobConditionType, status corev1.ConditionStatus) bool {
+	existing := false
+	for i := 0; i < len(task.Status.Conditions); i++ {
+		cond := task.Status.Conditions[i]
+		if cond.Type == condition {
+			if cond.Status == status {
+				// Already correct status
+				return false
+			}
+			cond.Status = status
+			cond.LastTransitionTime = metav1.Now()
+			existing = true
+			task.Status.Conditions[i] = cond
+			break
+		}
+	}
+
+	if !existing {
+		cond := api.JobCondition{
+			Type:               condition,
+			Status:             status,
+			LastTransitionTime: metav1.Now(),
+		}
+		task.Status.Conditions = append(task.Status.Conditions, cond)
+	}
+
+	return true
 }
 
 func setDefaults(cassTask *api.CassandraTask) {
@@ -309,9 +349,13 @@ func (r *CassandraTaskReconciler) activeTasks(ctx context.Context, dc *cassapi.C
 	return taskList.Items, nil
 }
 
-/**
+/*
+*
+
 	Jobs executing something on every pod in the datacenter
-**/
+
+*
+*/
 const (
 	// PodJobAnnotationPrefix defines the prefix key for a job data (json serialized) in the annotations of the pod
 	PodJobAnnotationPrefix = "control.k8ssandra.io/job"

@@ -15,6 +15,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] [#415](https://github.com/k8ssandra/cass-operator/issues/415) Fix version override + imageRegistry issue where output would be invalid
 * [BUGFIX] [#437](https://github.com/k8ssandra/cass-operator/issues/437) Ignore cluster healthy check on Datacenter decommission. Rest of #437 fix is not applied since this version does not have that bug.
 * [BUGFIX] [#404](https://github.com/k8ssandra/cass-operator/issues/404) Filter unallowed values from the rackname when used in Kubernetes resources
+* [BUGFIX] [#455](https://github.com/k8ssandra/cass-operator/issues/455) After task had completed, the running state would still say true
 
 ## v1.10.5
 

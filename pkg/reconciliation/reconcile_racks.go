@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"net"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -927,7 +928,7 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 
 func findHostIdForIpFromEndpointsData(endpointsData []httphelper.EndpointState, ip string) string {
 	for _, data := range endpointsData {
-		if data.GetRpcAddress() == ip {
+		if net.ParseIP(data.GetRpcAddress()).Equal(net.ParseIP(ip)) {
 			return data.HostID
 		}
 	}

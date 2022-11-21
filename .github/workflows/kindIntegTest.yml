@@ -120,7 +120,7 @@ jobs:
         version:
         - "6.8.29"
         integration_test:
-        - delete_node_lost_readiness
+        #- delete_node_lost_readiness #TODO: Fix in MC-356
         - additional_seeds
         include:
           - version: "6.8.29"

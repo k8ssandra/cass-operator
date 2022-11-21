@@ -15,6 +15,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#448](https://github.com/k8ssandra/cass-operator/issues/448) Update to operator-sdk 1.25.1, update to go 1.19, update to Kubernetes 1.25, remove amd64 restriction on local builds (cass-operator and system-logger will be built for aarch64 also)
 * [FEATURE] [#441](https://github.com/k8ssandra/cass-operator/issues/441) Implement a CassandraTask for moving single-token nodes
 * [BUGFIX] [#410](https://github.com/k8ssandra/cass-operator/issues/410) Fix installation in IPv6 only environment
+* [BUGFIX] [#455](https://github.com/k8ssandra/cass-operator/issues/455) After task had completed, the running state would still say true
 
 ## v1.13.1
 

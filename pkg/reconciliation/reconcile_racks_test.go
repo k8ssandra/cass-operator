@@ -1958,18 +1958,18 @@ func TestStartOneNodePerRack(t *testing.T) {
 
 func TestFindHostIdForIpFromEndpointsData(t *testing.T) {
 	endpoints := []httphelper.EndpointState{
-			{
-					HostID:     "1",
-					RpcAddress: "127.0.0.1",
-			},
-			{
-					HostID:     "2",
-					RpcAddress: "::1",
-			},
-			{
-					HostID:     "3",
-					RpcAddress: "2001:0DB8:0:0:8:800:200C:417A",
-			},
+		{
+			HostID:     "1",
+			RpcAddress: "127.0.0.1",
+		},
+		{
+			HostID:     "2",
+			RpcAddress: "::1",
+		},
+		{
+			HostID:     "3",
+			RpcAddress: "2001:0DB8:0:0:8:800:200C:417A",
+		},
 	}
 
 	assert.Equal(t, "1", findHostIdForIpFromEndpointsData(endpoints, "127.0.0.1"))

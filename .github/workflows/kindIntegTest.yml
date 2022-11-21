@@ -156,7 +156,7 @@ jobs:
         version:
         - "3.11.14"
         - "4.0.7"
-        - "6.8.26"
+        - "6.8.29"
         integration_test:
         # Single worker tests:
         - additional_serviceoptions

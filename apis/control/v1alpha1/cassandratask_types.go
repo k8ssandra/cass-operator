@@ -29,6 +29,16 @@ const (
 // CassandraTaskSpec defines the desired state of CassandraTask
 type CassandraTaskSpec struct {
 
+	// Which datacenter this task is targetting. Note, this must be a datacenter which the current cass-operator
+	// can access
+	Datacenter corev1.ObjectReference `json:"datacenter,omitempty"`
+
+	CassandraTaskTemplate `json:",inline"`
+}
+
+// CassandraTaskTemplate defines the execution attributes of a CassandraTaskSpec.
+type CassandraTaskTemplate struct {
+
 	// ScheduledTime indicates the earliest possible time this task is executed. This does not necessarily
 	// equal to the time it is actually executed (if other tasks are blocking for example). If not set,
 	// the task will be executed immediately.
@@ -36,10 +46,6 @@ type CassandraTaskSpec struct {
 	ScheduledTime *metav1.Time `json:"scheduledTime,omitempty"`
 
 	// TODO BackOffLimit for RetryPolicy and maxMissedSeconds deadline for ScheduledTime?
-
-	// Which datacenter this task is targetting. Note, this must be a datacenter which the current cass-operator
-	// can access
-	Datacenter corev1.ObjectReference `json:"datacenter,omitempty"`
 
 	// Jobs defines the jobs this task will execute (and their order)
 	Jobs []CassandraJob `json:"jobs,omitempty"`

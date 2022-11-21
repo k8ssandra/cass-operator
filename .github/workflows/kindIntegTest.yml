@@ -149,7 +149,7 @@ jobs:
           name: k8s-logs-${{ matrix.integration_test }}-dse-${{ matrix.version }}
           path: ./build/kubectl_dump
 
-  kind_integration_tests:
+  kind_int_tests:
     needs: build_docker_images
     strategy:
       matrix:

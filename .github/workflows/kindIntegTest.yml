@@ -59,6 +59,7 @@ jobs:
         - scale_down_unbalanced_racks
         - config_secret
         - rolling_restart
+        - decommission_dc
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
@@ -91,6 +92,7 @@ jobs:
         - cdc_successful
         - config_secret
         - rolling_restart
+        - decommission_dc
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
@@ -200,7 +202,7 @@ jobs:
         - scale_up_stop_resume
         - seed_selection
         # - config_fql # OSS only, see above job
-        - decommission_dc
+        #- decommission_dc #TODO: Fix in MC-356
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
         include:
           - version: "6.8.29"

@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -59,7 +58,7 @@ func Test_newStatefulSetForCassandraDatacenter(t *testing.T) {
 
 func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 	dc := &api.CassandraDatacenter{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "dc1",
 		},
 		Spec: api.CassandraDatacenterSpec{
@@ -258,18 +257,16 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 		assert.Equal(t, "cassandra-commitlogs", got.Spec.VolumeClaimTemplates[2].Name)
 		assert.Equal(t, customCassandraCommitLogsStorageClass, *got.Spec.VolumeClaimTemplates[2].Spec.StorageClassName)
 
-		assert.Equal(t, 2, len(got.Spec.Template.Spec.Volumes))
+		assert.Equal(t, 1, len(got.Spec.Template.Spec.Volumes))
 		assert.Equal(t, "server-config", got.Spec.Template.Spec.Volumes[0].Name)
-		assert.Equal(t, "encryption-cred-storage", got.Spec.Template.Spec.Volumes[1].Name)
 
 		assert.Equal(t, 2, len(got.Spec.Template.Spec.Containers))
 
-		assert.Equal(t, 5, len(got.Spec.Template.Spec.Containers[0].VolumeMounts))
+		assert.Equal(t, 4, len(got.Spec.Template.Spec.Containers[0].VolumeMounts))
 		assert.Equal(t, "server-logs", got.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
 		assert.Equal(t, "cassandra-commitlogs", got.Spec.Template.Spec.Containers[0].VolumeMounts[1].Name)
 		assert.Equal(t, "server-data", got.Spec.Template.Spec.Containers[0].VolumeMounts[2].Name)
-		assert.Equal(t, "encryption-cred-storage", got.Spec.Template.Spec.Containers[0].VolumeMounts[3].Name)
-		assert.Equal(t, "server-config", got.Spec.Template.Spec.Containers[0].VolumeMounts[4].Name)
+		assert.Equal(t, "server-config", got.Spec.Template.Spec.Containers[0].VolumeMounts[3].Name)
 
 		assert.Equal(t, 2, len(got.Spec.Template.Spec.Containers[1].VolumeMounts))
 		assert.Equal(t, 2, len(got.Spec.Template.Spec.InitContainers))

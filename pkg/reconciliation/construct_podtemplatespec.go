@@ -214,7 +214,7 @@ func generateStorageConfigEmptyVolumes(cc *api.CassandraDatacenter) []corev1.Vol
 	return volumes
 }
 
-func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpec) {
+func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpec, addLegacyInternodeMount bool) {
 	vServerConfig := corev1.Volume{
 		Name: "server-config",
 		VolumeSource: corev1.VolumeSource{
@@ -229,16 +229,20 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 		},
 	}
 
-	vServerEncryption := corev1.Volume{
-		Name: "encryption-cred-storage",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: fmt.Sprintf("%s-keystore", dc.Name),
-			},
-		},
-	}
+	volumeDefaults := []corev1.Volume{vServerConfig, vServerLogs}
 
-	volumeDefaults := []corev1.Volume{vServerConfig, vServerLogs, vServerEncryption}
+	if addLegacyInternodeMount {
+		vServerEncryption := corev1.Volume{
+			Name: "encryption-cred-storage",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: fmt.Sprintf("%s-keystore", dc.Name),
+				},
+			},
+		}
+
+		volumeDefaults = append(volumeDefaults, vServerEncryption)
+	}
 
 	volumeDefaults = combineVolumeSlices(
 		volumeDefaults, baseTemplate.Spec.Volumes)
@@ -501,11 +505,17 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 				Name:      PvcName,
 				MountPath: "/var/lib/cassandra",
 			},
-			{
+		})
+
+	for _, vol := range baseTemplate.Spec.Volumes {
+		if vol.Name == "encryption-cred-storage" {
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
 				Name:      "encryption-cred-storage",
 				MountPath: "/etc/encryption/",
-			},
-		})
+			})
+			break
+		}
+	}
 
 	volumeMounts = combineVolumeMountSlices(volumeMounts, cassContainer.VolumeMounts)
 	cassContainer.VolumeMounts = combineVolumeMountSlices(volumeMounts, generateStorageConfigVolumesMount(dc))
@@ -549,7 +559,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 }
 
 func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[string]string,
-	rackName string) (*corev1.PodTemplateSpec, error) {
+	rackName string, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {
 
 	baseTemplate := dc.Spec.PodTemplateSpec.DeepCopy()
 
@@ -626,7 +636,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 
 	// Volumes
 
-	addVolumes(dc, baseTemplate)
+	addVolumes(dc, baseTemplate, addLegacyInternodeMount)
 
 	// Init Containers
 

@@ -7,16 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-/*
-   cassandra-yaml:
-     server_encryption_options:
-       internode_encryption: all
-       keystore: /etc/encryption/node-keystore.jks
-       keystore_password: dc2
-       truststore: /etc/encryption/node-keystore.jks
-       truststore_password: dc2
-*/
-
 var internodeEnabledAll = `
 {
 	"cassandra-yaml": {

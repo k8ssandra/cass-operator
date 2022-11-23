@@ -2195,10 +2195,12 @@ func (rc *ReconciliationContext) createTask(command taskapi.CassandraCommand) er
 				Name:      rc.Datacenter.Name,
 				Namespace: rc.Datacenter.Namespace,
 			},
-			Jobs: []taskapi.CassandraJob{
-				{
-					Name:    fmt.Sprintf("%s-%s", command, rc.Datacenter.Name),
-					Command: command,
+			CassandraTaskTemplate: taskapi.CassandraTaskTemplate{
+				Jobs: []taskapi.CassandraJob{
+					{
+						Name:    fmt.Sprintf("%s-%s", command, rc.Datacenter.Name),
+						Command: command,
+					},
 				},
 			},
 		},

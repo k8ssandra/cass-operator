@@ -191,10 +191,12 @@ func buildTask(command api.CassandraCommand, namespace string) (types.Namespaced
 				Name:      testDatacenterName,
 				Namespace: namespace,
 			},
-			Jobs: []api.CassandraJob{
-				{
-					Name:    fmt.Sprintf("%s-dc1", command),
-					Command: command,
+			CassandraTaskTemplate: api.CassandraTaskTemplate{
+				Jobs: []api.CassandraJob{
+					{
+						Name:    fmt.Sprintf("%s-dc1", command),
+						Command: command,
+					},
 				},
 			},
 		},

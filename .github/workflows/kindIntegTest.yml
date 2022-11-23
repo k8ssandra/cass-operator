@@ -272,5 +272,5 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: k8s-logs-smoke_test-${{ matrix.version }}-${{ matrix.serverImage }}
+          name: k8s-logs-smoke_test-${{ matrix.version }}
           path: ./build/kubectl_dump

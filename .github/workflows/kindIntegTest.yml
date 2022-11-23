@@ -65,11 +65,11 @@ jobs:
       CGO_ENABLED: 0
       M_INTEG_DIR: ${{ matrix.integration_test }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
@@ -99,11 +99,11 @@ jobs:
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_SERVER_VERSION: ${{ matrix.version }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
@@ -122,7 +122,7 @@ jobs:
         version:
         - "6.8.29"
         integration_test:
-        #- delete_node_lost_readiness #TODO: Fix in MC-356
+        #- delete_node_lost_readiness #TODO: fix in https://github.com/k8ssandra/cass-operator/issues/459
         - additional_seeds
         include:
           - version: "6.8.29"
@@ -135,11 +135,11 @@ jobs:
       M_SERVER_VERSION: ${{ matrix.version }}
       M_SERVER_TYPE: dse
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
@@ -165,23 +165,23 @@ jobs:
         - additional_volumes
         # - delete_node_terminated_container # This does not test any operator behavior
         - podspec_simple
-        # - smoke_test_oss # See next job
-        # - smoke_test_dse # See next job
+        # - smoke_test_oss # Converted to test_all_the_things, see below job
+        # - smoke_test_dse # Converted to test_all_the_things, see below job
         - terminate
         - timeout_prestop_termination
-        # - upgrade_operator # See above job
+        # - upgrade_operator # See kind_311_tests job
         - webhook_validation
         # Three worker tests:
-        # - canary_upgrade # See above job
+        # - canary_upgrade # See kind_311_tests job
         - config_change_condition
-        # - cdc_successful # CDC is OSS only , see above jobs
-        # - delete_node_lost_readiness # DSE specific behavior see above job
+        # - cdc_successful # CDC is OSS only , see kind_311_tests and kind_40_tests jobs
+        # - delete_node_lost_readiness # DSE specific behavior see kind_dse_tests job
         - host_network
         - internode-encryption-generated
         #- no_infinite_reconcile # smoke_test_* should take care of this
         - node_replace
         - nodeport_service
-        #- rolling_restart #TODO: Fix in MC-356
+        #- rolling_restart #TODO: Fails against DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
         - stop_resume
         - superuser-secret-generated
         - superuser-secret-provided
@@ -189,20 +189,20 @@ jobs:
         - test_mtls_mgmt_api
         # More than 3 workers tests:
         - add_racks
-        #- additional_seeds #TODO: Fix in MC-356
+        #- additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
         - cluster_wide_install
         - config_change
-        #- config_secret #TODO: Fix in MC-356
+        #- config_secret #TODO: Fails against DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
         - multi_cluster_management
         - oss_test_all_the_things
         - scale_down
         # - scale_down_not_enough_space # Not enough stable test
-        #- scale_down_unbalanced_racks #TODO: Fix in MC-356
+        #- scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
         - scale_up
         - scale_up_stop_resume
         - seed_selection
         # - config_fql # OSS only, see above job
-        #- decommission_dc #TODO: Fix in MC-356
+        #- decommission_dc #TODO: Fails against DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
         include:
           - version: "6.8.29"
@@ -254,7 +254,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
-      M_INTEG_DIR: smoke_test_oss
+      M_INTEG_DIR: test_all_the_things
       M_SERVER_VERSION: ${{ matrix.version }}
       M_SERVER_IMAGE: ${{ matrix.serverImage }}
       M_SERVER_TYPE: ${{ matrix.serverType }}
@@ -267,10 +267,10 @@ jobs:
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
-          integration_test: smoke_test_oss
+          integration_test: test_all_the_things
       - name: Archive k8s logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: k8s-logs-smoke_test_oss-${{ matrix.version }}-${{ matrix.serverImage }}
+          name: k8s-logs-smoke_test-${{ matrix.version }}-${{ matrix.serverImage }}
           path: ./build/kubectl_dump

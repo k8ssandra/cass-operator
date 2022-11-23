@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	testName   = "OSS test all the things"
-	namespace  = "test-oss-test-all-the-things"
+	testName   = "Test all the things"
+	namespace  = "test-test-all-the-things"
 	dcName     = "dc1"
 	dcYaml     = "../testdata/oss-three-rack-three-node-dc.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)

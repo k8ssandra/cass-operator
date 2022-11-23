@@ -194,7 +194,7 @@ jobs:
         - config_change
         #- config_secret #TODO: Fails against DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
         - multi_cluster_management
-        - oss_test_all_the_things
+        #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
         - scale_down
         # - scale_down_not_enough_space # Not enough stable test
         #- scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459

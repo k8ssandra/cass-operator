@@ -160,7 +160,8 @@ jobs:
         version:
         - "3.11.14"
         - "4.0.7"
-        - "6.8.29"
+        integration_test:
+        - test_all_the_things
         include:
           - version: 3.11.7
             serverImage: k8ssandra/cass-management-api:3.11.7-v0.1.24 # k8ssandra 1.1
@@ -169,11 +170,12 @@ jobs:
           - version: 6.8.29
             serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
             serverType: dse
+            integration_test: smoke_test_dse
       fail-fast: true
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
-      M_INTEG_DIR: test_all_the_things
+      M_INTEG_DIR: ${{ matrix.integration_test }}
       M_SERVER_VERSION: ${{ matrix.version }}
       M_SERVER_IMAGE: ${{ matrix.serverImage }}
       M_SERVER_TYPE: ${{ matrix.serverType }}
@@ -186,7 +188,7 @@ jobs:
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
-          integration_test: test_all_the_things
+          integration_test: ${{ matrix.integration_test }}
       - name: Archive k8s logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3

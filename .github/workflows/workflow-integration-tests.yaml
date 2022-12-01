@@ -1,4 +1,4 @@
-name: Run Integration tests against specific server versons (Cassandra 3.11, Cassandra 4.0 and DSE 6.8)
+name: Workflow Integration Tests
 
 on:
   workflow_dispatch:
@@ -215,10 +215,21 @@ jobs:
         # - config_fql # OSS only, see above job
         #- decommission_dc #TODO: Fails against DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
-        include:
-          - version: "6.8.29"
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8
-            serverType: dse
+        workflowVersion:
+        - ${{ inputs.version }}
+        exclude:
+        - version: "3.11.14"
+          workflowVersion: "4.0"
+        - version: "3.11.14"
+          workflowVersion: "6.8"
+        - version: "4.0.7"
+          workflowVersion: "3.11"
+        - version: "4.0.7"
+          workflowVersion: "6.8"
+        - version: "6.8.29"
+          workflowVersion: "3.11"
+        - version: "6.8.29"
+          workflowVersion: "4.0"
       # let other tests continue to run
       # even if one fails
       fail-fast: false
@@ -227,8 +238,6 @@ jobs:
       CGO_ENABLED: 0
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_SERVER_VERSION: ${{ matrix.version }}
-      M_SERVER_IMAGE: ${{ matrix.serverImage }}
-      M_SERVER_TYPE: ${{ matrix.serverType }}
     steps:
       - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
@@ -236,8 +245,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/checkout@v3
         if: github.event_name != 'pull_request'
+      - name: set environment for DSE
+        if: ${{ startsWith( matrix.version, '6.8' ) }}
+        run: |
+          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:6.8.29-jdk8" >> $GITHUB_ENV
+          echo "M_SERVER_TYPE=dse" >> $GITHUB_ENV
       - uses: ./.github/actions/run-integ-test
-        if: ${{ inputs.version == 'ALL' || startsWith( matrix.version, inputs.version ) }}
         with:
           integration_test: ${{ matrix.integration_test }}
       - name: Archive k8s logs
@@ -254,22 +267,27 @@ jobs:
         - "3.11.14"
         - "4.0.7"
         - "6.8.29"
-        include:
-          - version: 3.11.7
-            serverImage: k8ssandra/cass-management-api:3.11.7-v0.1.24 # k8ssandra 1.1
-          - version: 4.0.0
-            serverImage: k8ssandra/cass-management-api:4.0.0-v0.1.28 # k8ssandra 1.3
-          - version: 6.8.29
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
-            serverType: dse
+        workflowVersion:
+        - ${{ inputs.version }}
+        exclude:
+        - version: "3.11.14"
+          workflowVersion: "4.0"
+        - version: "3.11.14"
+          workflowVersion: "6.8"
+        - version: "4.0.7"
+          workflowVersion: "3.11"
+        - version: "4.0.7"
+          workflowVersion: "6.8"
+        - version: "6.8.29"
+          workflowVersion: "3.11"
+        - version: "6.8.29"
+          workflowVersion: "4.0"
       fail-fast: true
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
       M_INTEG_DIR: test_all_the_things
       M_SERVER_VERSION: ${{ matrix.version }}
-      M_SERVER_IMAGE: ${{ matrix.serverImage }}
-      M_SERVER_TYPE: ${{ matrix.serverType }}
     steps:
       - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
@@ -277,8 +295,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/checkout@v3
         if: github.event_name != 'pull_request'
+      - name: set environment for DSE
+        if: ${{ startsWith( matrix.version, '6.8' ) }}
+        run: |
+          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:6.8.29-jdk8" >> $GITHUB_ENV
+          echo "M_SERVER_TYPE=dse" >> $GITHUB_ENV
       - uses: ./.github/actions/run-integ-test
-        if: ${{ inputs.version == 'ALL' || startsWith( matrix.version, inputs.version ) }}
         with:
           integration_test: test_all_the_things
       - name: Archive k8s logs

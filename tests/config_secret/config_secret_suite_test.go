@@ -56,27 +56,34 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating config secret"
-			k := kubectl.ApplyFiles(secretYaml)
+			testSecretFile, err := ginkgo_util.CreateTestSecretsConfig(secretYaml)
+			Expect(err).ToNot(HaveOccurred())
+			k := kubectl.ApplyFiles(testSecretFile)
 			ns.ExecAndLog(step, k)
 
 			step = "creating datacenter"
-			k = kubectl.ApplyFiles(dcYaml)
+			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k = kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 420, 30)
 
 			step = "update config secret"
-			k = kubectl.ApplyFiles(updatedSecretYaml)
+			testUpdatedSecretFile, err := ginkgo_util.CreateTestSecretsConfig(updatedSecretYaml)
+			Expect(err).ToNot(HaveOccurred())
+			k = kubectl.ApplyFiles(testUpdatedSecretFile)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterConditionWithTimeout(dcName, string(api.DatacenterReady), string(corev1.ConditionTrue), 450)
 
 			step = "checking cassandra.yaml"
-			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", "/etc/cassandra/cassandra.yaml")
+			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
 			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 10000", 60)
 
 			step = "stop using config secret"
-			json := `[{"op": "remove", "path": "/spec/configSecret"}, {"op": "add", "path": "/spec/config", "value": {"cassandra-yaml": {"read_request_timeout_in_ms": 25000}, "jvm-options": {"initial_heap_size": "512M", "max_heap_size": "512M"}}}]`
+			json := ginkgo_util.CreateTestJson(`[{"op": "remove", "path": "/spec/configSecret"}, {"op": "add", "path": "/spec/config", "value": {"cassandra-yaml": {"read_request_timeout_in_ms": 25000}, "jvm-options": {"initial_heap_size": "512M", "max_heap_size": "512M"}}}]`)
 			k = kubectl.PatchJson(dcResource, json)
 			ns.ExecAndLog(step, k)
 
@@ -84,7 +91,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterConditionWithTimeout(dcName, string(api.DatacenterReady), string(corev1.ConditionTrue), 450)
 
 			step = "checking cassandra.yaml"
-			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", "/etc/cassandra/cassandra.yaml")
+			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
 			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 25000", 120)
 
 			step = "use config secret again"
@@ -96,7 +103,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterConditionWithTimeout(dcName, string(api.DatacenterReady), string(corev1.ConditionTrue), 450)
 
 			step = "checking cassandra.yaml"
-			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", "/etc/cassandra/cassandra.yaml")
+			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
 			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 10000", 120)
 		})
 	})

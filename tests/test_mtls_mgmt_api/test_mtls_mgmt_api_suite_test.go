@@ -63,7 +63,10 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			step = "creating a datacenter resource with 1 rack/1 node"
-			k = kubectl.ApplyFiles(dcYaml)
+			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k = kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
 			// This takes a while sometimes in my dev environment
@@ -93,7 +96,7 @@ var _ = Describe(testName, func() {
 			// }()
 
 			step = "deleting the dc"
-			k = kubectl.DeleteFromFiles(dcYaml)
+			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
 
 			// TODO FIXME: re-enable this when the following issue is fixed:

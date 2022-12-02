@@ -93,7 +93,10 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating a datacenter resource with 1 rack/2 node"
-			k := kubectl.ApplyFiles(dcYaml)
+			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)

@@ -54,7 +54,10 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating a datacenter resource with 1 rack/1 node"
-			k := kubectl.ApplyFiles(dcYaml)
+			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 120)
@@ -64,7 +67,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "localhost", 300)
 
 			step = "deleting the dc"
-			k = kubectl.DeleteFromFiles(dcYaml)
+			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
 
 			step = "checking that the dc no longer exists"

@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	testName   = "OSS test all the things"
-	namespace  = "test-oss-test-all-the-things"
+	testName   = "Test all the things"
+	namespace  = "test-test-all-the-things"
 	dcName     = "dc1"
 	dcYaml     = "../testdata/oss-three-rack-three-node-dc.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
@@ -57,7 +57,10 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating a datacenter resource with 3 racks/3 nodes"
-			k := kubectl.ApplyFiles(dcYaml)
+			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForSuperUserUpserted(dcName, 600)
@@ -110,7 +113,7 @@ var _ = Describe(testName, func() {
 			ns.ExpectDoneReconciling(dcName)
 
 			step = "deleting the dc"
-			k = kubectl.DeleteFromFiles(dcYaml)
+			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
 
 			step = "checking that the dc no longer exists"

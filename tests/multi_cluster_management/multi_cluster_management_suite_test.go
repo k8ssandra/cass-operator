@@ -67,11 +67,17 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "true", 120)
 
 			step = "creating a datacenter resource with 3 racks/3 nodes"
-			k = kubectl.ApplyFiles(dcYamls[0])
+			testFile1, err := ginkgo_util.CreateTestFile(dcYamls[0])
+			Expect(err).ToNot(HaveOccurred())
+
+			k = kubectl.ApplyFiles(testFile1)
 			ns.ExecAndLog(step, k)
 
 			step = "creating another datacenter resource with 1 rack/1 node"
-			k = kubectl.ApplyFiles(dcYamls[1])
+			testFile2, err := ginkgo_util.CreateTestFile(dcYamls[1])
+			Expect(err).ToNot(HaveOccurred())
+
+			k = kubectl.ApplyFiles(testFile2)
 			ns.ExecAndLog(step, k)
 
 			step = "waiting for the node to become ready"
@@ -103,7 +109,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "Ready", 30)
 
 			step = "deleting the first dc"
-			k = kubectl.DeleteFromFiles(dcYamls[0])
+			k = kubectl.DeleteFromFiles(testFile1)
 			ns.ExecAndLog(step, k)
 
 			step = "checking that the dc no longer exists"
@@ -121,7 +127,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "[]", 300)
 
 			step = "deleting the second dc"
-			k = kubectl.DeleteFromFiles(dcYamls[1])
+			k = kubectl.DeleteFromFiles(testFile2)
 			ns.ExecAndLog(step, k)
 
 			step = "checking that the dc no longer exists"

@@ -53,7 +53,10 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating a datacenter resource with solr"
-			k := kubectl.ApplyFiles(dcYaml)
+			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
 			// solr takes 10 minutes to come up on my machine

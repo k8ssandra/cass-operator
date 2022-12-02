@@ -56,13 +56,16 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating a datacenter resource with 1 racks/2 nodes"
-			k := kubectl.ApplyFiles(dcYaml)
+			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
 
 			step = "change the config"
-			json := "{\"spec\": {\"config\": {\"cassandra-yaml\": {\"roles_validity_in_ms\": 256000}, \"jvm-server-options\": {\"garbage_collector\": \"CMS\"}}}}"
+			json := ginkgo_util.CreateTestJson("{\"spec\": {\"config\": {\"cassandra-yaml\": {\"roles_validity_in_ms\": 256000}, \"jvm-server-options\": {\"garbage_collector\": \"CMS\"}}}}")
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 

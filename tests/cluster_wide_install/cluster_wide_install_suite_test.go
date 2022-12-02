@@ -83,11 +83,17 @@ var _ = Describe(testName, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			step := "creating first datacenter resource"
-			k := kubectl.ApplyFiles(dc1Yaml)
+			testFile1, err := ginkgo_util.CreateTestFile(dc1Yaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k := kubectl.ApplyFiles(testFile1)
 			ns1.ExecAndLog(step, k)
 
 			step = "creating second datacenter resource"
-			k = kubectl.ApplyFiles(dc2Yaml)
+			testFile2, err := ginkgo_util.CreateTestFile(dc2Yaml)
+			Expect(err).ToNot(HaveOccurred())
+
+			k = kubectl.ApplyFiles(testFile2)
 			ns2.ExecAndLog(step, k)
 
 			ns1.WaitForDatacenterReady(dc1Name)

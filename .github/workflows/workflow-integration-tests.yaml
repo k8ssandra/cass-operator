@@ -60,6 +60,8 @@ jobs:
     needs: build_docker_images
     strategy:
       matrix:
+        version:
+        - "3.11.14"
         integration_test:
         - canary_upgrade
         - upgrade_operator
@@ -73,6 +75,7 @@ jobs:
     env:
       CGO_ENABLED: 0
       M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: ${{ matrix.version }}
     steps:
       - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'

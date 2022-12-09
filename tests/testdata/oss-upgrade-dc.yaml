@@ -7,7 +7,7 @@ spec:
   serverType: cassandra
   # Do not change serverVersion. This cassdc is intended for testing a canary
   # upgrade specifically from this version.
-  serverVersion: "3.11.7"
+  serverVersion: "4.0.1"
   managementApiAuth:
     insecure: {}
   size: 3
@@ -22,6 +22,6 @@ spec:
   racks:
     - name: r1
   config:
-    jvm-options:
+    jvm-server-options:
       initial_heap_size: "512m"
       max_heap_size: "512m"

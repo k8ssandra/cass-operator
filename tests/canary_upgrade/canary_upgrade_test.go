@@ -78,7 +78,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			step = "perform canary upgrade"
-			json = "{\"spec\": {\"serverVersion\": \"3.11.10\"}}"
+			json = "{\"spec\": {\"serverVersion\": \"4.0.7\"}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
@@ -89,8 +89,8 @@ var _ = Describe(testName, func() {
 			err = images.ParseImageConfig(imageConfigFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			old, _ := images.GetCassandraImage("cassandra", "3.11.7")
-			updated, _ := images.GetCassandraImage("cassandra", "3.11.10")
+			old, _ := images.GetCassandraImage("cassandra", "4.0.1")
+			updated, _ := images.GetCassandraImage("cassandra", "4.0.7")
 
 			images := []string{
 				old,

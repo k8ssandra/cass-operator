@@ -63,12 +63,10 @@ jobs:
         version:
         - "3.11.14"
         integration_test:
-        - canary_upgrade
         - upgrade_operator
         - cdc_successful
         - additional_seeds
         - scale_down_unbalanced_racks
-        - config_secret
         - rolling_restart
         - decommission_dc
     runs-on: ubuntu-latest
@@ -101,9 +99,9 @@ jobs:
         version:
         - "4.0.7"
         integration_test:
+        - canary_upgrade
         - config_fql
         - cdc_successful
-        - config_secret
         - rolling_restart
         - decommission_dc
     runs-on: ubuntu-latest
@@ -182,11 +180,11 @@ jobs:
         # - smoke_test_oss # Converted to test_all_the_things, see below job
         # - smoke_test_dse # Converted to test_all_the_things, see below job
         - terminate
-        - timeout_prestop_termination
+        # - timeout_prestop_termination # This is testing a Kubernetes behavior, not interesting to us
         # - upgrade_operator # See kind_311_tests job
         - webhook_validation
         # Three worker tests:
-        # - canary_upgrade # See kind_311_tests job
+        # - canary_upgrade # See kind_40_tests job
         - config_change_condition
         # - cdc_successful # CDC is OSS only , see kind_311_tests and kind_40_tests jobs
         # - delete_node_lost_readiness # DSE specific behavior see kind_dse_tests job
@@ -195,7 +193,7 @@ jobs:
         #- no_infinite_reconcile # smoke_test_* should take care of this
         - node_replace
         - nodeport_service
-        #- rolling_restart #TODO: Fails against DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
+        - rolling_restart
         - stop_resume
         - superuser-secret-generated
         - superuser-secret-provided
@@ -206,8 +204,8 @@ jobs:
         #- additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
         - cluster_wide_install
         - config_change
-        #- config_secret #TODO: Fails against DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
-        - multi_cluster_management
+        - config_secret
+        #- multi_cluster_management # cluster_wide_install verifies the same thing
         #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
         - scale_down
         # - scale_down_not_enough_space # Not enough stable test
@@ -301,7 +299,7 @@ jobs:
       - name: set environment for DSE
         if: ${{ startsWith( matrix.version, '6.8' ) }}
         run: |
-          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:6.8.29-jdk8" >> $GITHUB_ENV
+          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:${{ matrix.version }}-jdk8" >> $GITHUB_ENV
           echo "M_SERVER_TYPE=dse" >> $GITHUB_ENV
       - uses: ./.github/actions/run-integ-test
         with:

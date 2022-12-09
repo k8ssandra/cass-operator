@@ -179,7 +179,7 @@ jobs:
         - podspec_simple
         # - smoke_test_oss # Converted to test_all_the_things, see below job
         # - smoke_test_dse # Converted to test_all_the_things, see below job
-        - terminate
+        # - terminate # test_all_things
         # - timeout_prestop_termination # This is testing a Kubernetes behavior, not interesting to us
         # - upgrade_operator # See kind_311_tests job
         - webhook_validation

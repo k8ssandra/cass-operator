@@ -5,6 +5,8 @@ package oss_test_all_the_things
 
 import (
 	"fmt"
+	"regexp"
+	"sync"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -110,9 +112,26 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReady(dcName)
 			ns.ExpectDoneReconciling(dcName)
 
+			logOutput := ""
+			wg := &sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				k = kubectl.Logs("-f").
+					WithLabel("statefulset.kubernetes.io/pod-name=cluster1-dc1-r1-sts-0").
+					WithFlag("container", "cassandra")
+				output, err := ns.Output(k)
+				Expect(err).ToNot(HaveOccurred())
+				logOutput = output
+				defer wg.Done()
+			}()
+
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
+			wg.Wait()
+
+			// Check the log contains node/drain..
+			Expect(regexp.MatchString("node/drain status=200 OK", logOutput)).To(BeTrue())
 
 			step = "checking that the dc no longer exists"
 			json = "jsonpath={.items}"

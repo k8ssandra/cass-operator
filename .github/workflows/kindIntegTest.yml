@@ -92,8 +92,8 @@ jobs:
         - podspec_simple
         # - smoke_test_oss # Converted to test_all_the_things, see below job
         # - smoke_test_dse # Converted to test_all_the_things, see below job
-        - terminate
-        - timeout_prestop_termination
+        # - terminate
+        # - timeout_prestop_termination
         # - upgrade_operator # See kind_311_tests job, Only works for 3.11 right now
         - webhook_validation
         # Three worker tests:
@@ -118,7 +118,7 @@ jobs:
         - cluster_wide_install
         - config_change
         - config_secret
-        - multi_cluster_management
+        # - multi_cluster_management
         #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
         - scale_down
         # - scale_down_not_enough_space # Not enough stable test
@@ -166,7 +166,6 @@ jobs:
           - version: 6.8.29
             serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
             serverType: dse
-            integration_test: smoke_test_dse
       fail-fast: true
     runs-on: ubuntu-latest
     env:

@@ -96,6 +96,10 @@ var _ = Describe(testName, func() {
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
+			// Ensure conditions set correctly for stopped
+			ns.WaitForDatacenterCondition(dcName, "Stopped", string(corev1.ConditionTrue))
+			ns.WaitForDatacenterCondition(dcName, "Ready", string(corev1.ConditionFalse))
+
 			step = "checking the spec size hasn't changed"
 			json = "jsonpath={.spec.size}"
 			k = kubectl.Get(dcResource).
@@ -108,6 +112,10 @@ var _ = Describe(testName, func() {
 			json = "{\"spec\": {\"stopped\": false}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
+
+			// Ensure conditions set correctly for resuming
+			ns.WaitForDatacenterCondition(dcName, "Stopped", string(corev1.ConditionFalse))
+			ns.WaitForDatacenterCondition(dcName, "Resuming", string(corev1.ConditionTrue))
 
 			ns.WaitForDatacenterReady(dcName)
 			ns.ExpectDoneReconciling(dcName)

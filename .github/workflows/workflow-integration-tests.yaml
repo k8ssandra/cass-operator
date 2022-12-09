@@ -194,7 +194,7 @@ jobs:
         - node_replace
         - nodeport_service
         - rolling_restart
-        - stop_resume
+        # - stop_resume
         - superuser-secret-generated
         - superuser-secret-provided
         - test_bad_config_and_fix

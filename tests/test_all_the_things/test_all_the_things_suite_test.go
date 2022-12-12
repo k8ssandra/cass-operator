@@ -77,16 +77,16 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "Initialized", string(corev1.ConditionTrue))
 			ns.ExpectDoneReconciling(dcName)
 
-			step = "scale up to 3 nodes"
-			json := "{\"spec\": {\"size\": 3}}"
+			step = "scale up to 4 nodes"
+			json := "{\"spec\": {\"size\": 4}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
-			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
+			ns.WaitForDatacenterConditionWithTimeout(dcName, "ScalingUp", string(corev1.ConditionFalse), 1200)
 			// Ensure that when 'ScaleUp' becomes 'false' that our pods are in fact up and running
-			Expect(len(ns.GetDatacenterReadyPodNames(dcName))).To(Equal(3))
+			Expect(len(ns.GetDatacenterReadyPodNames(dcName))).To(Equal(4))
 
 			ns.ExpectDoneReconciling(dcName)
 			ns.WaitForDatacenterReady(dcName)
@@ -104,7 +104,7 @@ var _ = Describe(testName, func() {
 			json = "jsonpath={.spec.size}"
 			k = kubectl.Get(dcResource).
 				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "3", 20)
+			ns.WaitForOutputAndLog(step, k, "4", 20)
 
 			ns.WaitForDatacenterToHaveNoPods(dcName)
 

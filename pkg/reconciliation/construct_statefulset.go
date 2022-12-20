@@ -152,7 +152,7 @@ func newStatefulSetForCassandraDatacenter(
 			},
 			Replicas:             &replicaCountInt32,
 			ServiceName:          dc.GetAllPodsServiceName(),
-			PodManagementPolicy:  appsv1.ParallelPodManagement,
+			PodManagementPolicy:  appsv1.OrderedReadyPodManagement,
 			Template:             *template,
 			VolumeClaimTemplates: volumeClaimTemplates,
 		},

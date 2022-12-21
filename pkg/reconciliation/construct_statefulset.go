@@ -13,12 +13,15 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/psp"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
 
 func newNamespacedNameForStatefulSet(
 	dc *api.CassandraDatacenter,
@@ -49,11 +52,22 @@ func shouldDefineSecurityContext(dc *api.CassandraDatacenter) bool {
 
 func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[string]string, error) {
 	var nodeAffinityLabels map[string]string
+	var log = logf.Log.WithName("construct_statefulset")
 	racks := dc.GetRacks()
 	for _, rack := range racks {
 		if rack.Name == rackName {
 			nodeAffinityLabels = utils.MergeMap(emptyMapIfNil(dc.Spec.NodeAffinityLabels),
 				emptyMapIfNil(rack.NodeAffinityLabels))
+			if rack.Zone != "" {
+				if _, found := nodeAffinityLabels[zoneLabel]; found {
+					log.Error(nil,
+						"Deprecated parameter Zone is used and also defined in NodeAffinityLabels. "+
+							"You should only define it in NodeAffinityLabels")
+				}
+				nodeAffinityLabels = utils.MergeMap(
+					emptyMapIfNil(nodeAffinityLabels), map[string]string{zoneLabel: rack.Zone},
+				)
+			}
 			break
 		}
 	}

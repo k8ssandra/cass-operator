@@ -7551,6 +7551,10 @@ spec:
                       description: NodeAffinityLabels to pin the rack, using node
                         affinity
                       type: object
+                    zone:
+                      description: Deprecated. Use nodeAffinityLabels instead. Zone
+                        name to pin the rack, using node affinity
+                      type: string
                   required:
                   - name
                   type: object

@@ -312,6 +312,9 @@ type Rack struct {
 	// +kubebuilder:validation:MinLength=2
 	Name string `json:"name"`
 
+	// Deprecated. Use nodeAffinityLabels instead. Zone name to pin the rack, using node affinity
+	Zone string `json:"zone,omitempty"`
+
 	// NodeAffinityLabels to pin the rack, using node affinity
 	NodeAffinityLabels map[string]string `json:"nodeAffinityLabels,omitempty"`
 }

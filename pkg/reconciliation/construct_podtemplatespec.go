@@ -34,11 +34,7 @@ const (
 )
 
 // calculateNodeAffinity provides a way to decide where to schedule pods within a statefulset based on labels
-func calculateNodeAffinity(labels map[string]string, existingNodeAffinity *corev1.NodeAffinity) *corev1.NodeAffinity {
-	if len(labels) == 0 {
-		return existingNodeAffinity
-	}
-
+func calculateNodeAffinity(labels map[string]string, existingNodeAffinity *corev1.NodeAffinity, rackNodeAffinity *corev1.NodeAffinity) *corev1.NodeAffinity {
 	var nodeSelectors []corev1.NodeSelectorRequirement
 
 	//we make a new map in order to sort because a map is random by design
@@ -56,67 +52,120 @@ func calculateNodeAffinity(labels map[string]string, existingNodeAffinity *corev
 		nodeSelectors = append(nodeSelectors, selector)
 	}
 
-	newNodeAffinity := &corev1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+	newNodeAffinity := &corev1.NodeAffinity{}
+
+	if len(nodeSelectors) > 0 {
+		newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{
 			NodeSelectorTerms: []corev1.NodeSelectorTerm{
 				{
 					MatchExpressions: nodeSelectors,
 				},
 			},
-		},
+		}
 	}
 
 	// Merge nodeSelectorTerms
 	if existingNodeAffinity != nil {
-		if existingNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil && len(existingNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) > 0 {
+		if newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = existingNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		} else if existingNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil && len(existingNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) > 0 {
 			newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, existingNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms...)
 		}
+
 		if existingNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
 			newNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = existingNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution
 		}
+	}
+
+	if rackNodeAffinity != nil {
+		if newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = rackNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		} else if rackNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil && len(rackNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) > 0 {
+			newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, rackNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms...)
+		}
+
+		if rackNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+			if newNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+				newNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(newNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, rackNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
+			} else {
+				newNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = rackNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+			}
+		}
+	}
+
+	// This is to preserve old behavior
+	if len(newNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution) < 1 && newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		return nil
 	}
 
 	return newNodeAffinity
 }
 
 // calculatePodAntiAffinity provides a way to keep the db pods of a statefulset away from other db pods
-func calculatePodAntiAffinity(allowMultipleNodesPerWorker bool, existingAntiAffinity *corev1.PodAntiAffinity) *corev1.PodAntiAffinity {
-	if allowMultipleNodesPerWorker {
-		return existingAntiAffinity
-	}
-	antiAffinity := &corev1.PodAntiAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      api.ClusterLabel,
-							Operator: metav1.LabelSelectorOpExists,
-						},
-						{
-							Key:      api.DatacenterLabel,
-							Operator: metav1.LabelSelectorOpExists,
-						},
-						{
-							Key:      api.RackLabel,
-							Operator: metav1.LabelSelectorOpExists,
+func calculatePodAntiAffinity(allowMultipleNodesPerWorker bool, existingAntiAffinity *corev1.PodAntiAffinity, rackAntiAffinity *corev1.PodAntiAffinity) *corev1.PodAntiAffinity {
+	antiAffinity := &corev1.PodAntiAffinity{}
+	if !allowMultipleNodesPerWorker {
+		antiAffinity = &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      api.ClusterLabel,
+								Operator: metav1.LabelSelectorOpExists,
+							},
+							{
+								Key:      api.DatacenterLabel,
+								Operator: metav1.LabelSelectorOpExists,
+							},
+							{
+								Key:      api.RackLabel,
+								Operator: metav1.LabelSelectorOpExists,
+							},
 						},
 					},
+					TopologyKey: "kubernetes.io/hostname",
 				},
-				TopologyKey: "kubernetes.io/hostname",
 			},
-		},
+		}
 	}
 
-	// Add PodTemplateSpec rules after our rules
+	// Preserve old behavior
+	if allowMultipleNodesPerWorker && (existingAntiAffinity == nil && rackAntiAffinity == nil) {
+		return nil
+	}
+
+	// Add PodTemplateSpec rules first
 	if existingAntiAffinity != nil {
-		if len(existingAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) > 0 {
-			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, existingAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution...)
+		if antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = existingAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		} else {
+			if len(existingAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) > 0 {
+				antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, existingAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution...)
+			}
 		}
 		antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = existingAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
 	}
 
-	existingAntiAffinity = antiAffinity
+	// Then rack.Affinity
+	if rackAntiAffinity != nil {
+		if antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = rackAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		} else {
+			if len(rackAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) > 0 {
+				antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, rackAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution...)
+			}
+		}
+
+		if antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution == nil {
+			antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = rackAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+		} else {
+			if len(rackAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
+				antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, rackAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
+			}
+		}
+	}
+
 	return antiAffinity
 }
 
@@ -581,8 +630,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	return nil
 }
 
-func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[string]string,
-	rackName string, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {
+func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {
 
 	baseTemplate := dc.Spec.PodTemplateSpec.DeepCopy()
 
@@ -629,7 +677,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 
 	// Labels
 
-	podLabels := dc.GetRackLabels(rackName)
+	podLabels := dc.GetRackLabels(rack.Name)
 	oplabels.AddOperatorLabels(podLabels, dc)
 	podLabels[api.CassNodeState] = stateReadyToStart
 
@@ -648,8 +696,14 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 	baseTemplate.Annotations = utils.MergeMap(baseTemplate.Annotations, podAnnotations)
 
 	// Affinity
+	nodeAffinityLabels, nodeAffinityLabelsConfigurationError := rackNodeAffinitylabels(dc, rack.Name)
+	if nodeAffinityLabelsConfigurationError != nil {
+		return nil, nodeAffinityLabelsConfigurationError
+	}
 
-	baseTemplate.Spec.Affinity = buildAffinity(baseTemplate.Spec.Affinity, nodeAffinityLabels, dc.Spec.AllowMultipleNodesPerWorker)
+	rackAffinities := rack.Affinity
+
+	baseTemplate.Spec.Affinity = buildAffinity(baseTemplate.Spec.Affinity, rackAffinities, nodeAffinityLabels, dc.Spec.AllowMultipleNodesPerWorker)
 
 	// Tolerations
 	baseTemplate.Spec.Tolerations = dc.Spec.Tolerations
@@ -660,7 +714,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 
 	// Init Containers
 
-	err := buildInitContainers(dc, rackName, baseTemplate)
+	err := buildInitContainers(dc, rack.Name, baseTemplate)
 	if err != nil {
 		return nil, err
 	}
@@ -675,12 +729,18 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, nodeAffinityLabels map[st
 	return baseTemplate, nil
 }
 
-func buildAffinity(affinity *corev1.Affinity, nodeAffinityLabels map[string]string, allowMultipleWorkers bool) *corev1.Affinity {
+func buildAffinity(affinity *corev1.Affinity, rackAffinity *corev1.Affinity, nodeAffinityLabels map[string]string, allowMultipleWorkers bool) *corev1.Affinity {
 	if affinity == nil {
 		affinity = &corev1.Affinity{}
 	}
-	affinity.NodeAffinity = calculateNodeAffinity(nodeAffinityLabels, affinity.NodeAffinity)
-	affinity.PodAntiAffinity = calculatePodAntiAffinity(allowMultipleWorkers, affinity.PodAntiAffinity)
+	var rackPodAntiAffinity *corev1.PodAntiAffinity
+	var rackNodeAffinity *corev1.NodeAffinity
+	if rackAffinity != nil {
+		rackPodAntiAffinity = rackAffinity.PodAntiAffinity
+		rackNodeAffinity = rackAffinity.NodeAffinity
+	}
+	affinity.NodeAffinity = calculateNodeAffinity(nodeAffinityLabels, affinity.NodeAffinity, rackNodeAffinity)
+	affinity.PodAntiAffinity = calculatePodAntiAffinity(allowMultipleWorkers, affinity.PodAntiAffinity, rackPodAntiAffinity)
 
 	return affinity
 }

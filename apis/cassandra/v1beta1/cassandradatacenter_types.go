@@ -175,9 +175,9 @@ type CassandraDatacenterSpec struct {
 	// either 0 or greater than the rack size, then all nodes in the rack will get updated.
 	CanaryUpgradeCount int32 `json:"canaryUpgradeCount,omitempty"`
 
-	// Turning this option on allows multiple server pods to be created on a k8s worker node.
-	// By default the operator creates just one server pod per k8s worker node using k8s
-	// podAntiAffinity and requiredDuringSchedulingIgnoredDuringExecution.
+	// Turning this option on allows multiple server pods to be created on a k8s worker node, by removing the default pod anti affinity rules.
+	// By default the operator creates just one server pod per k8s worker node. Using custom affinity rules might require turning this
+	// option on in which case the defaults are not set.
 	AllowMultipleNodesPerWorker bool `json:"allowMultipleNodesPerWorker,omitempty"`
 
 	// This secret defines the username and password for the Cassandra server superuser.
@@ -291,6 +291,16 @@ func (dc *CassandraDatacenter) GetRacks() []Rack {
 	}}
 }
 
+func (dc *CassandraDatacenter) GetRack(rackName string) Rack {
+	for _, rack := range dc.Spec.Racks {
+		if rack.Name == rackName {
+			return rack
+		}
+	}
+
+	return Rack{}
+}
+
 // ServiceConfig defines additional service configurations.
 type ServiceConfig struct {
 	DatacenterService     ServiceConfigAdditions `json:"dcService,omitempty"`
@@ -317,6 +327,10 @@ type Rack struct {
 
 	// NodeAffinityLabels to pin the rack, using node affinity
 	NodeAffinityLabels map[string]string `json:"nodeAffinityLabels,omitempty"`
+
+	// Affinity rules to set for this rack only. Merged with values from PodTemplateSpec Affinity as well as NodeAffinityLabels. If you wish to override all the default
+	// PodAntiAffinity rules, set allowMultipleWorkers to true, otherwise defaults are applied and then these Affinity settings are merged.
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
 type CassandraNodeStatus struct {

@@ -19,6 +19,11 @@ jobs:
     name: Build Docker Images
     runs-on: ubuntu-latest
     steps:
+      - name: Setup .netrc for Github API
+        shell: bash
+        run: |
+          echo "machine api.github.com login ${{ secrets.GITHUB_TOKEN }} password x-oauth-basic" > $HOME/.netrc
+          chmod 600 $HOME/.netrc
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
       - name: Set up Docker Buildx
@@ -77,6 +82,11 @@ jobs:
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_SERVER_VERSION: ${{ matrix.version }}
     steps:
+      - name: Setup .netrc for Github API
+        shell: bash
+        run: |
+          echo "machine api.github.com login ${{ secrets.GITHUB_TOKEN }} password x-oauth-basic" > $HOME/.netrc
+          chmod 600 $HOME/.netrc
       - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
         with:
@@ -112,6 +122,11 @@ jobs:
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_SERVER_VERSION: ${{ matrix.version }}
     steps:
+      - name: Setup .netrc for Github API
+        shell: bash
+        run: |
+          echo "machine api.github.com login ${{ secrets.GITHUB_TOKEN }} password x-oauth-basic" > $HOME/.netrc
+          chmod 600 $HOME/.netrc
       - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
         with:
@@ -149,6 +164,11 @@ jobs:
       M_SERVER_VERSION: ${{ matrix.version }}
       M_SERVER_TYPE: dse
     steps:
+      - name: Setup .netrc for Github API
+        shell: bash
+        run: |
+          echo "machine api.github.com login ${{ secrets.GITHUB_TOKEN }} password x-oauth-basic" > $HOME/.netrc
+          chmod 600 $HOME/.netrc
       - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
         with:
@@ -242,6 +262,11 @@ jobs:
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_SERVER_VERSION: ${{ matrix.version }}
     steps:
+      - name: Setup .netrc for Github API
+        shell: bash
+        run: |
+          echo "machine api.github.com login ${{ secrets.GITHUB_TOKEN }} password x-oauth-basic" > $HOME/.netrc
+          chmod 600 $HOME/.netrc
       - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
         with:
@@ -292,6 +317,11 @@ jobs:
       M_INTEG_DIR: test_all_the_things
       M_SERVER_VERSION: ${{ matrix.version }}
     steps:
+      - name: Setup .netrc for Github API
+        shell: bash
+        run: |
+          echo "machine api.github.com login ${{ secrets.GITHUB_TOKEN }} password x-oauth-basic" > $HOME/.netrc
+          chmod 600 $HOME/.netrc
       - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'
         with:

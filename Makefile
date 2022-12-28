@@ -194,36 +194,36 @@ ifndef ignore-not-found
 endif
 
 .PHONY: install
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply --force-conflicts --server-side -f -
+install: manifests ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+	kubectl apply --force-conflicts --server-side -k config/crd
 
 .PHONY: uninstall
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+uninstall: manifests ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
+	kubectl delete --ignore-not-found=$(ignore-not-found) -k config/crd
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/deployments/default | kubectl apply --force-conflicts --server-side -f -
+	kubectl apply --force-conflicts --server-side -k config/deployments/default
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/deployments/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	kubectl delete --ignore-not-found=$(ignore-not-found) -k config/deployments/default
 
 .PHONY: deploy-test
-deploy-test:
+deploy-test: kustomize
 ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build tests/$(TEST_DIR) | kubectl apply --force-conflicts --server-side -f -
+	kubectl apply --force-conflicts --server-side -k tests/$(TEST_DIR)
 
 .PHONY: undeploy-test
-undeploy-test:
+undeploy-test: kustomize
 ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
-	$(KUSTOMIZE) build tests/$(TEST_DIR) | kubectl delete -f -
+	kubectl delete -k tests/$(TEST_DIR)
 
 ##@ Tools / Dependencies
 

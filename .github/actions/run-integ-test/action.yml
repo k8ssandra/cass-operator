@@ -34,11 +34,12 @@ runs:
         node_image: kindest/node:v1.25.3
         cluster_name: kind
         config: tests/testdata/kind/kind_config_6_workers.yaml
-    - name: Install Helm
-      uses: azure/setup-helm@v3
-      with:
-        version: 3.10.2
-      id: install_helm
+    # The runners already have the latest versions of tools, no need to reinstall them
+    - name: Link tools
+      shell: bash
+      run: |
+        mkdir bin
+        ln -s /usr/local/bin/kustomize bin/kustomize
     - name: Download cass-operator image
       uses: actions/download-artifact@v3
       with:

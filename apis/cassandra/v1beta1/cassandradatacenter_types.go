@@ -298,7 +298,9 @@ func (dc *CassandraDatacenter) GetRack(rackName string) Rack {
 		}
 	}
 
-	return Rack{}
+	return Rack{
+		Name: "default",
+	}
 }
 
 // ServiceConfig defines additional service configurations.

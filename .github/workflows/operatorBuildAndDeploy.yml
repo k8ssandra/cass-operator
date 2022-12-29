@@ -86,9 +86,18 @@ jobs:
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Create bundle
+      # The runners already have the latest versions of tools, no need to reinstall them
+      - name: Link tools
+        shell: bash
+        run: |
+          mkdir bin
+          ln -s /usr/local/bin/kustomize bin/kustomize
+      - name: Create bundle and validate
         run: |
           make IMG=k8ssandra/cass-operator:${{ steps.vars.outputs.version }} VERSION=${{ steps.vars.outputs.version }} CHANNEL=dev bundle
+          bin/operator-sdk bundle validate ./bundle --select-optional suite=operatorframework
+          bin/operator-sdk bundle validate ./bundle --select-optional name=operatorhub
+          bin/operator-sdk bundle validate ./bundle --select-optional name=good-practices
       - name: Build and push cass-operator-bundle
         id: docker_build_cass-operator_bundle
         uses: docker/build-push-action@v3

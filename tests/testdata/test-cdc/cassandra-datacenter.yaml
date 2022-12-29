@@ -7,7 +7,6 @@ spec:
   # The number of server nodes.
   size: 1
   cdc:
-    enabled: true
     pulsarServiceUrl: pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650
     topicPrefix: persistent://public/default/events-
     cdcWorkingDir: /var/lib/cassandra/cdc
@@ -20,5 +19,5 @@ spec:
         requests:
           storage: 1Gi
   # Which server version to use. Required.
-  serverVersion: "4.0.4"
+  serverVersion: "4.0.7"
   serverType: "cassandra"

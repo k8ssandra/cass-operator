@@ -83,7 +83,7 @@ func CreateTestFile(dcYaml string) (string, error) {
 				delete(config, "jvm-server-options")
 			}
 			if config["cassandra-yaml"] != nil {
-				if cassYaml, ok := config["cassandra-yaml"].(map[string]interface{}); ok {
+				if cassYaml, ok := config["cassandra-yaml"].(map[interface{}]interface{}); ok {
 					if cassYaml["allocate_tokens_for_local_replication_factor"] != nil {
 						delete(cassYaml, "allocate_tokens_for_local_replication_factor")
 						config["cassandra-yaml"] = cassYaml

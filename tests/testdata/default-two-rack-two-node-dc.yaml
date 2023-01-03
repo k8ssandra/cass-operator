@@ -5,7 +5,7 @@ metadata:
 spec:
   clusterName: cluster1
   serverType: cassandra
-  serverVersion: "4.0.6"
+  serverVersion: "4.0.7"
   managementApiAuth:
     insecure: {}
   size: 2
@@ -21,6 +21,8 @@ spec:
     - name: r1
     - name: r2
   config:
+    cassandra-yaml:
+      allocate_tokens_for_local_replication_factor: 2
     jvm-server-options:
       initial_heap_size: "512m"
       max_heap_size: "512m"

@@ -48,10 +48,15 @@ func TestLifecycle(t *testing.T) {
 	RunSpecs(t, testName)
 }
 
-func findDatacenters(nodeName string) []string {
-	re := regexp.MustCompile(`Datacenter:.*`)
+func execStatus(nodeName string) string {
 	k := kubectl.ExecOnPod(nodeName, "-c", "cassandra", "--", "nodetool", "status")
 	output := ns.OutputPanic(k)
+	return output
+}
+
+func findDatacenters(nodeName string) []string {
+	re := regexp.MustCompile(`Datacenter:.*`)
+	output := execStatus(nodeName)
 	dcLines := re.FindAllString(output, -1)
 	dcs := make([]string, 0, len(dcLines))
 	for _, dcLine := range dcLines {
@@ -142,6 +147,12 @@ var _ = Describe(testName, func() {
 
 			// Verify nodetool status has only a single Datacenter
 			podNames = ns.GetDatacenterReadyPodNames(dc1Name)
+
+			if len(podNames) != 2 {
+				// This is to catch why the test sometimes fails on the check (string parsing? or real issue?)
+				fmt.Println(execStatus(podNames[0]))
+			}
+
 			Expect(len(podNames)).To(Equal(2))
 			dcs = findDatacenters(podNames[0])
 			Expect(len(dcs)).To(Equal(1))

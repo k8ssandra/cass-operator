@@ -86,14 +86,14 @@ var _ = Describe(testName, func() {
 			// k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
 			// createdPodUID := ns.OutputAndLog(step, k)
 
-			step = "get name of 1.8.0 operator pod"
+			step = "get name of 1.12.0 operator pod"
 			json := "jsonpath={.items[].metadata.name}"
 			k = kubectl.Get("pods").WithFlag("selector", "name=cass-operator").FormatOutput(json)
 			oldOperatorName := ns.OutputAndLog(step, k)
 
 			UpgradeOperator()
 
-			step = "wait for 1.8.0 operator pod to be removed"
+			step = "wait for 1.12.0 operator pod to be removed"
 			k = kubectl.Get("pods").WithFlag("field-selector", fmt.Sprintf("metadata.name=%s", oldOperatorName))
 			ns.WaitForOutputAndLog(step, k, "", 60)
 

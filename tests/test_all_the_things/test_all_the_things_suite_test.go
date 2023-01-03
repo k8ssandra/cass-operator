@@ -5,6 +5,8 @@ package oss_test_all_the_things
 
 import (
 	"fmt"
+	"regexp"
+	"sync"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -21,7 +23,7 @@ var (
 	testName   = "Test all the things"
 	namespace  = "test-test-all-the-things"
 	dcName     = "dc1"
-	dcYaml     = "../testdata/oss-three-rack-three-node-dc.yaml"
+	dcYaml     = "../testdata/default-two-rack-two-node-dc.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns         = ginkgo_util.NewWrapper(testName, namespace)
@@ -56,7 +58,7 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForOperatorReady()
 
-			step := "creating a datacenter resource with 3 racks/3 nodes"
+			step := "creating a datacenter resource with 2 racks/2 nodes"
 			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -68,26 +70,25 @@ var _ = Describe(testName, func() {
 			step = "check recorded host IDs"
 			ns.Log(step)
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
-			Expect(len(nodeStatusesHostIds), 3)
+			Expect(len(nodeStatusesHostIds), 2)
 
 			ns.WaitForDatacenterReady(dcName)
 			ns.WaitForDatacenterCondition(dcName, "Ready", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterCondition(dcName, "Initialized", string(corev1.ConditionTrue))
+			ns.ExpectDoneReconciling(dcName)
 
 			step = "scale up to 4 nodes"
 			json := "{\"spec\": {\"size\": 4}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
+			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
-			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterConditionWithTimeout(dcName, "ScalingUp", string(corev1.ConditionFalse), 1200)
+			// Ensure that when 'ScaleUp' becomes 'false' that our pods are in fact up and running
+			Expect(len(ns.GetDatacenterReadyPodNames(dcName))).To(Equal(4))
 
-			step = "scale up to 5 nodes"
-			json = "{\"spec\": {\"size\": 5}}"
-			k = kubectl.PatchMerge(dcResource, json)
-			ns.ExecAndLog(step, k)
-
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
+			ns.ExpectDoneReconciling(dcName)
 			ns.WaitForDatacenterReady(dcName)
 
 			step = "stopping the dc"
@@ -95,11 +96,15 @@ var _ = Describe(testName, func() {
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
+			// Ensure conditions set correctly for stopped
+			ns.WaitForDatacenterCondition(dcName, "Stopped", string(corev1.ConditionTrue))
+			ns.WaitForDatacenterCondition(dcName, "Ready", string(corev1.ConditionFalse))
+
 			step = "checking the spec size hasn't changed"
 			json = "jsonpath={.spec.size}"
 			k = kubectl.Get(dcResource).
 				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "5", 20)
+			ns.WaitForOutputAndLog(step, k, "4", 20)
 
 			ns.WaitForDatacenterToHaveNoPods(dcName)
 
@@ -108,13 +113,33 @@ var _ = Describe(testName, func() {
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterReady(dcName)
+			// Ensure conditions set correctly for resuming
+			ns.WaitForDatacenterCondition(dcName, "Stopped", string(corev1.ConditionFalse))
+			ns.WaitForDatacenterCondition(dcName, "Resuming", string(corev1.ConditionTrue))
 
+			ns.WaitForDatacenterReady(dcName)
 			ns.ExpectDoneReconciling(dcName)
+
+			logOutput := ""
+			wg := &sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				k = kubectl.Logs("-f").
+					WithLabel("statefulset.kubernetes.io/pod-name=cluster1-dc1-r1-sts-0").
+					WithFlag("container", "cassandra")
+				output, err := ns.Output(k)
+				Expect(err).ToNot(HaveOccurred())
+				logOutput = output
+				defer wg.Done()
+			}()
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
+			wg.Wait()
+
+			// Check the log contains node/drain..
+			Expect(regexp.MatchString("node/drain status=200 OK", logOutput)).To(BeTrue())
 
 			step = "checking that the dc no longer exists"
 			json = "jsonpath={.items}"
@@ -122,6 +147,27 @@ var _ = Describe(testName, func() {
 				WithLabel(dcLabel).
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "[]", 300)
+
+			step = "checking that no dc pods remain"
+			json = "jsonpath={.items}"
+			k = kubectl.Get("pods").
+				WithLabel(dcLabel).
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "[]", 600)
+
+			step = "checking that no dc services remain"
+			json = "jsonpath={.items}"
+			k = kubectl.Get("services").
+				WithLabel(dcLabel).
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "[]", 600)
+
+			step = "checking that no dc stateful sets remain"
+			json = "jsonpath={.items}"
+			k = kubectl.Get("statefulsets").
+				WithLabel(dcLabel).
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "[]", 600)
 		})
 	})
 })

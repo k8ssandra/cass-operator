@@ -281,9 +281,6 @@ var _ = Describe(testName, func() {
 			checkSeedConstraints()
 
 			checkAdditionalSeedService()
-
-			// TODO provision a DC in another namespace and connect it to the first one
-			// with additional seeds, and test that's working
 		})
 	})
 })

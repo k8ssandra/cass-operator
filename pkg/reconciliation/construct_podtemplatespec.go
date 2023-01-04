@@ -473,6 +473,25 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 			corev1.EnvVar{Name: "JVM_EXTRA_OPTS", Value: getJvmExtraOpts(dc)})
 	}
 
+	// Add env variables that allow the pod to know its name (not hostname!) and Kubernetes' nodename
+	envDefaults = append(envDefaults, corev1.EnvVar{
+		Name: "POD_NAME",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "metadata.name",
+			},
+		},
+	})
+
+	envDefaults = append(envDefaults, corev1.EnvVar{
+		Name: "NODE_NAME",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "spec.nodeName",
+			},
+		},
+	})
+
 	cassContainer.Env = combineEnvSlices(envDefaults, cassContainer.Env)
 
 	// Combine ports

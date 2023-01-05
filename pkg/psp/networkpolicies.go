@@ -33,7 +33,7 @@ func newNetworkPolicyForCassandraDatacenter(dc *api.CassandraDatacenter) *networ
 	ingressRule := networkingv1.NetworkPolicyIngressRule{}
 
 	policy := &networkingv1.NetworkPolicy{}
-	policy.ObjectMeta.Name = fmt.Sprintf("%s-management-api-ingress", dc.Name)
+	policy.ObjectMeta.Name = fmt.Sprintf("%s-management-api-ingress", dc.SanitizedName())
 	policy.ObjectMeta.Namespace = dc.Namespace
 	policy.ObjectMeta.Labels = labels
 	policy.Spec.PodSelector.MatchLabels = selector

@@ -24,7 +24,7 @@ func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.
 	selectorLabels := dc.GetDatacenterLabels()
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        dc.Name + "-pdb",
+			Name:        dc.SanitizedName() + "-pdb",
 			Namespace:   dc.Namespace,
 			Labels:      labels,
 			Annotations: map[string]string{},

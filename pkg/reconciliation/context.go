@@ -106,7 +106,7 @@ func CreateReconciliationContext(
 	}
 
 	rc.ReqLogger = rc.ReqLogger.
-		WithValues("datacenterName", dc.Name).
+		WithValues("datacenterName", dc.SanitizedName()).
 		WithValues("clusterName", dc.Spec.ClusterName)
 
 	log.IntoContext(ctx, rc.ReqLogger)

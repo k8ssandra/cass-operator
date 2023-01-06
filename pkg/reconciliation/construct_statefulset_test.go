@@ -486,6 +486,66 @@ func TestValidSubdomainNames(t *testing.T) {
 	}
 }
 
+func Test_newStatefulSetForCassandraDatacenter_dcNameOverride(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:     "piclem",
+			DatacenterName:  "My Super DC",
+			ServerType:      "cassandra",
+			ServerVersion:   "4.0.1",
+			PodTemplateSpec: &corev1.PodTemplateSpec{},
+			StorageConfig: api.StorageConfig{
+				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+			},
+			Racks: []api.Rack{
+				{
+					Name: "rack1",
+					Zone: "z1",
+				},
+			},
+		},
+	}
+
+	expectedStatefulsetLabels := map[string]string{
+		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
+		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
+		oplabels.VersionLabel:   "4.0.1",
+		api.DatacenterLabel:     "mysuperdc",
+		api.ClusterLabel:        "piclem",
+		api.RackLabel:           dc.Spec.Racks[0].Name,
+	}
+
+	expectedPodTemplateLabels := map[string]string{
+		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, dc.Spec.ClusterName),
+		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
+		oplabels.VersionLabel:   "4.0.1",
+		api.DatacenterLabel:     "mysuperdc",
+		api.ClusterLabel:        "piclem",
+		api.RackLabel:           dc.Spec.Racks[0].Name,
+		api.CassNodeState:       stateReadyToStart,
+	}
+
+	statefulset, newStatefulSetForCassandraDatacenterError := newStatefulSetForCassandraDatacenter(nil,
+		"rack1", dc, 1)
+
+	assert.NoError(t, newStatefulSetForCassandraDatacenterError,
+		"should not have gotten error when creating the new statefulset")
+
+	assert.Equal(t, expectedStatefulsetLabels, statefulset.Labels)
+	assert.Equal(t, expectedPodTemplateLabels, statefulset.Spec.Template.Labels)
+
+	for _, volumeClaim := range statefulset.Spec.VolumeClaimTemplates {
+		assert.Equal(t, expectedStatefulsetLabels, volumeClaim.Labels)
+	}
+}
+
 func int64Ptr(n int64) *int64 {
 	return &n
 }

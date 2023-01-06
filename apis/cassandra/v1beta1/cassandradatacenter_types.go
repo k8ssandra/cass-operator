@@ -547,7 +547,7 @@ func (dc *CassandraDatacenter) SetCondition(condition DatacenterCondition) {
 // GetDatacenterLabels ...
 func (dc *CassandraDatacenter) GetDatacenterLabels() map[string]string {
 	labels := dc.GetClusterLabels()
-	labels[DatacenterLabel] = CleanLabelValue(dc.CassDcName())
+	labels[DatacenterLabel] = dc.SanitizedName()
 	return labels
 }
 

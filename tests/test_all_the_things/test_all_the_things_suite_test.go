@@ -25,7 +25,7 @@ var (
 	testName       = "Test all the things"
 	namespace      = "test-test-all-the-things"
 	dcName         = "dc1"
-	dcNameOverride = "My Super DC"
+	dcNameOverride = "my_super_dc"
 	dcYaml         = "../testdata/default-two-rack-two-node-dc.yaml"
 	dcResource     = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dcNameOverride))
@@ -75,7 +75,7 @@ var _ = Describe(testName, func() {
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
 			Expect(len(nodeStatusesHostIds), 2)
 
-			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterReadyWithOverride(dcName, dcNameOverride)
 			ns.WaitForDatacenterCondition(dcName, "Ready", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterCondition(dcName, "Initialized", string(corev1.ConditionTrue))
 			ns.ExpectDoneReconciling(dcName)
@@ -92,7 +92,7 @@ var _ = Describe(testName, func() {
 			Expect(len(ns.GetDatacenterReadyPodNames(api.CleanupForKubernetes(dcNameOverride)))).To(Equal(4))
 
 			ns.ExpectDoneReconciling(dcName)
-			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterReadyWithOverride(dcName, dcNameOverride)
 
 			step = "stopping the dc"
 			json = "{\"spec\": {\"stopped\": true}}"
@@ -120,7 +120,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "Stopped", string(corev1.ConditionFalse))
 			ns.WaitForDatacenterCondition(dcName, "Resuming", string(corev1.ConditionTrue))
 
-			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterReadyWithOverride(dcName, dcNameOverride)
 			ns.ExpectDoneReconciling(dcName)
 
 			logOutput := ""

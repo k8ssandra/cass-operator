@@ -60,7 +60,7 @@ var _ = Describe(testName, func() {
 			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 120)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, dcName, 600, 120)
 
 			step = "verify service has additional label and annotation"
 			k = kubectl.Get("svc").WithLabel("test=additional-serviceoptions").FormatOutput(`jsonpath={.items[0].metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}`)

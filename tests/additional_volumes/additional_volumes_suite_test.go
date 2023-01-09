@@ -61,7 +61,7 @@ var _ = Describe(testName, func() {
 			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 120)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, dcName, 600, 120)
 
 			// Verify the volumes are actually there
 			step = "retrieve the persistent volume claim"

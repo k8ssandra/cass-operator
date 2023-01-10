@@ -9,6 +9,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
@@ -78,7 +79,9 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
+			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1800)
+			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionFalse))
 
 			step = "checking that the init container got the updated config roles_validity_in_ms=256000"
 			json = "jsonpath={.spec.initContainers[0].env[7].value}"

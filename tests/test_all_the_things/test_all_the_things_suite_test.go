@@ -25,7 +25,7 @@ var (
 	testName       = "Test all the things"
 	namespace      = "test-test-all-the-things"
 	dcName         = "dc1"
-	dcNameOverride = "my_super_dc"
+	dcNameOverride = "My_Super_Dc"
 	dcYaml         = "../testdata/default-two-rack-two-node-dc.yaml"
 	dcResource     = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dcNameOverride))
@@ -128,7 +128,7 @@ var _ = Describe(testName, func() {
 			wg.Add(1)
 			go func() {
 				k = kubectl.Logs("-f").
-					WithLabel("statefulset.kubernetes.io/pod-name=cluster1-mysuperdc-r1-sts-0").
+					WithLabel(fmt.Sprintf("statefulset.kubernetes.io/pod-name=cluster1-%s-r1-sts-0", api.CleanupForKubernetes(dcNameOverride))).
 					WithFlag("container", "cassandra")
 				output, err := ns.Output(k)
 				Expect(err).ToNot(HaveOccurred())

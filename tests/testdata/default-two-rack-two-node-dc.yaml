@@ -4,7 +4,7 @@ metadata:
   name: dc1
 spec:
   clusterName: cluster1
-  datacenterName: my_super_dc
+  datacenterName: My_Super_Dc
   serverType: cassandra
   serverVersion: "4.0.7"
   managementApiAuth:
@@ -28,5 +28,5 @@ spec:
       initial_heap_size: "512m"
       max_heap_size: "512m"
       additional-jvm-opts:
-        - "-Dcassandra.system_distributed_replication_dc_names=my_super_dc"
+        - "-Dcassandra.system_distributed_replication_dc_names=My_Super_Dc"
         - "-Dcassandra.system_distributed_replication_per_dc=1"

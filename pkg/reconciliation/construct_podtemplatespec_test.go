@@ -17,6 +17,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -347,6 +348,34 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 			t.Errorf("%s: failed to build init containers: %s", tt.name, err)
 		}
 	}
+}
+
+func TestCassandraContainerEnvVars(t *testing.T) {
+	podNameEnvVar := corev1.EnvVar{Name: "POD_NAME", ValueFrom: selectorFromFieldPath("metadata.name")}
+	nodeNameEnvVar := corev1.EnvVar{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")}
+
+	templateSpec := &corev1.PodTemplateSpec{}
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "test",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "test",
+			ServerType:    "cassandra",
+			ServerVersion: "4.0.7",
+		},
+	}
+
+	err := buildContainers(dc, templateSpec)
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(templateSpec.Spec.Containers), "expected to find 2 containers, cassandra and server-system-logger")
+
+	cassContainer := templateSpec.Spec.Containers[0]
+	assert.Equal(t, CassandraContainerName, cassContainer.Name)
+
+	assert.True(t, envVarsContains(cassContainer.Env, podNameEnvVar))
+	assert.True(t, envVarsContains(cassContainer.Env, nodeNameEnvVar))
 }
 
 func TestCassandraDatacenter_buildContainers_override_other_containers(t *testing.T) {

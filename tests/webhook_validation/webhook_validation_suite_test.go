@@ -86,11 +86,17 @@ var _ = Describe(testName, func() {
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLogAndExpectErrorString(step, k,
 				`spec.serverVersion: Invalid value: "6.7.0": spec.serverVersion in body should match '(6\.8\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)'`)
-			step = "attempt to change the dc name"
+			step = "attempt to change the cluster name"
 			json = "{\"spec\": {\"clusterName\": \"NewName\"}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLogAndExpectErrorString(step, k,
 				"change clusterName")
+
+			step = "attempt to change the DC name"
+			json = "{\"spec\": {\"datacenterName\": \"NewName\"}}"
+			k = kubectl.PatchMerge(dcResource, json)
+			ns.ExecAndLogAndExpectErrorString(step, k,
+				"change datacenterName")
 
 			step = "attempt to add rack without increasing size"
 			json = `{"spec": {"racks": [{"name": "r1"}, {"name": "r2"}]}}`

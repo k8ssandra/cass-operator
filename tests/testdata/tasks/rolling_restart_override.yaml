@@ -1,0 +1,11 @@
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: CassandraTask
+metadata:
+  name: rolling-restart
+spec:
+  datacenter:
+    name: dc1
+    namespace: test-override-with-rolling-restart
+  jobs:
+    - name: restart-run
+      command: restart

@@ -381,6 +381,26 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 			errString: "change clusterName",
 		},
 		{
+			name: "DatacenterName changed",
+			oldDc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: CassandraDatacenterSpec{
+					DatacenterName: "oldname",
+				},
+			},
+			newDc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: CassandraDatacenterSpec{
+					DatacenterName: "newname",
+				},
+			},
+			errString: "change datacenterName",
+		},
+		{
 			name: "AllowMultipleNodesPerWorker changed",
 			oldDc: &CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{

@@ -200,6 +200,25 @@ cass-operator. Within a single Kubernetes namespace:
 For this guide, we define a single-datacenter cluster. The cluster is named
 `cluster1` with the datacenter named `dc1`.
 
+## Datacenter name
+
+By default, datacenters will be named after the `metadata.name` of the CassandraDatacenter object. This can be overridden by setting the `spec.datacenterName` field. This is useful when you want to use a different name for the datacenter than the name of the object.
+
+```yaml
+apiVersion: cassandra.datastax.com/v1beta1
+kind: CassandraDatacenter
+metadata:
+  name: cluster1-dc1
+spec:
+  clusterName: cluster1
+  datacenterName: dc1
+  serverType: cassandra
+  serverVersion: 3.11.7
+  ...
+```
+
+Objects such as statefulsets, pods, secrets will be named and labeled after the `spec.datacenterName` value. This value can contain characters which aren't compliant with Kubernetes naming rules (such as capital letters or underscores) and will be sanitized when used in object names/labels. For example, `Datacenter_1` will be sanitized to `datacenter-1`.
+
 ## Racks
 
 Cassandra defines nodes in a logical topology of datacenters and racks. Much like physical server racks in a datacenter, racks in Cassandra define fault domains. Cassandra will place replicas on separate racks to handle a scenario where an entire rack goes offline. Should this occur multiple replicas remain available. In cloud deployments racks align with availability zones. In this guide we will use `r1`, `r2`, and `r3`.

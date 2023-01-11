@@ -459,6 +459,8 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	// Combine env vars
 
 	envDefaults := []corev1.EnvVar{
+		{Name: "POD_NAME", ValueFrom: selectorFromFieldPath("metadata.name")},
+		{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")},
 		{Name: "DS_LICENSE", Value: "accept"},
 		{Name: "DSE_AUTO_CONF_OFF", Value: "all"},
 		{Name: "USE_MGMT_API", Value: "true"},

@@ -94,6 +94,8 @@ var _ = Describe(testName, func() {
 			ns.ExpectDoneReconciling(dcName)
 			ns.WaitForDatacenterReadyWithOverride(dcName, dcNameOverride)
 
+			ns.ExpectDatacenterNameStatusUpdated(dcName, dcNameOverride)
+
 			step = "stopping the dc"
 			json = "{\"spec\": {\"stopped\": true}}"
 			k = kubectl.PatchMerge(dcResource, json)

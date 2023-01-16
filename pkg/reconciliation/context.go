@@ -5,6 +5,7 @@ package reconciliation
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -147,4 +149,40 @@ func (rc *ReconciliationContext) SetDatacenterAsOwner(controlled metav1.Object) 
 
 func (rc *ReconciliationContext) GetContext() context.Context {
 	return rc.Ctx
+}
+
+func (rc *ReconciliationContext) validateDatacenterNameConflicts() []error {
+	dc := rc.Datacenter
+	var errs []error
+
+	// Check if our CassandraDatacenter sanitized name conflicts with another CassandraDatacenter in the same namespace
+	cassandraDatacenters := &api.CassandraDatacenterList{}
+	err := rc.Client.List(rc.Ctx, cassandraDatacenters, &client.ListOptions{Namespace: dc.Namespace})
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to list CassandraDatacenters in namespace %s: %w", dc.Namespace, err))
+	} else {
+		for _, existingDc := range cassandraDatacenters.Items {
+			if existingDc.SanitizedName() == dc.SanitizedName() && existingDc.Name != dc.Name {
+				errs = append(errs, fmt.Errorf("datacenter name/override %s/%s is already in use by CassandraDatacenter %s/%s", dc.Name, dc.SanitizedName(), existingDc.Name, existingDc.SanitizedName()))
+			}
+		}
+	}
+
+	return errs
+}
+
+func (rc *ReconciliationContext) validateDatacenterNameOverride() []error {
+	dc := rc.Datacenter
+	var errs []error
+
+	if dc.Status.DatacenterName == nil {
+		// We didn't have a full reconcile yet, we can proceed with the override
+		return errs
+	} else {
+		if *dc.Status.DatacenterName != dc.Spec.DatacenterName {
+			errs = append(errs, fmt.Errorf("datacenter %s name override '%s' cannot be changed after creation to '%s'.", dc.Name, dc.Spec.DatacenterName, *dc.Status.DatacenterName))
+		}
+	}
+
+	return errs
 }

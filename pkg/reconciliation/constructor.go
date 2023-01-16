@@ -55,6 +55,9 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 	// TODO there may be a better place to push status.observedGeneration in the reconcile loop
 	if newState == api.ProgressReady {
 		rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
+		if rc.Datacenter.Status.DatacenterName == nil {
+			rc.Datacenter.Status.DatacenterName = &rc.Datacenter.Spec.DatacenterName
+		}
 	}
 	if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
 		rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")

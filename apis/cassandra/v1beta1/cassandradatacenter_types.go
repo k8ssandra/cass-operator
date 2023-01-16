@@ -421,6 +421,11 @@ type CassandraDatacenterStatus struct {
 	// TrackedTasks tracks the tasks for completion that were created by the cass-operator
 	// +optional
 	TrackedTasks []corev1.ObjectReference `json:"trackedTasks,omitempty"`
+
+	// DatacenterName is the name of the override used for the CassandraDatacenter
+	// This field is used to perform validation checks preventing a user from changing the override
+	// +optional
+	DatacenterName *string `json:"datacenterName,omitempty"`
 }
 
 // CassandraDatacenter is the Schema for the cassandradatacenters API

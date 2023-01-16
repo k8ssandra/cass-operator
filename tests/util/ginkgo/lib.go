@@ -674,3 +674,12 @@ func (ns *NsWrapper) WaitForCompleteTask(taskName string) {
 
 	ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, 360)
 }
+
+func (ns *NsWrapper) ExpectDatacenterNameStatusUpdated(dcName, dcNameOverride string) {
+	step := "checking that CassandraDatacenter status has been updated with the correct name"
+	json := "jsonpath={.status.datacenterName}"
+	k := kubectl.Get("CassandraDatacenter", dcName).
+		FormatOutput(json)
+
+	ns.WaitForOutputAndLog(step, k, dcNameOverride, 120)
+}

@@ -7,8 +7,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"unicode/utf8"
+
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

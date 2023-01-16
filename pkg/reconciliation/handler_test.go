@@ -13,6 +13,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -201,6 +202,84 @@ func TestAddFinalizer(t *testing.T) {
 	err = rc.addFinalizer()
 	assert.NoError(err)
 	assert.False(controllerutil.ContainsFinalizer(rc.Datacenter, api.Finalizer))
+}
+
+func TestConflictingDcNameOverride(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	mockClient := &mocks.Client{}
+	rc.Client = mockClient
+
+	k8sMockClientList(mockClient, nil).
+		Run(func(args mock.Arguments) {
+			arg := args.Get(1).(*api.CassandraDatacenterList)
+			arg.Items = []api.CassandraDatacenter{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "dc1",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:    "cluster1",
+					DatacenterName: "CassandraDatacenter_example",
+				}}}
+		})
+
+	errs := rc.validateDatacenterNameConflicts()
+	assert.NotEmpty(errs, "validateDatacenterNameConflicts should return an error as the datacenter name is already in use")
+}
+
+func TestChangeDcNameFailure1(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	rc.Datacenter.Status = api.CassandraDatacenterStatus{
+		DatacenterName: pointer.String("test"),
+	}
+
+	errs := rc.validateDatacenterNameOverride()
+	assert.NotEmpty(errs, "validateDatacenterNameOverride should return an error as the datacenter name is being modified")
+}
+
+func TestChangeDcNameFailure2(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	rc.Datacenter.Spec.DatacenterName = "test"
+	rc.Datacenter.Status = api.CassandraDatacenterStatus{
+		DatacenterName: pointer.String(""),
+	}
+
+	errs := rc.validateDatacenterNameOverride()
+	assert.NotEmpty(errs, "validateDatacenterNameOverride should return an error as the datacenter name is being modified")
+}
+
+func TestChangeDcNameNotModified1(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	rc.Datacenter.Spec.DatacenterName = "test"
+	rc.Datacenter.Status = api.CassandraDatacenterStatus{
+		DatacenterName: pointer.String("test"),
+	}
+
+	errs := rc.validateDatacenterNameOverride()
+	assert.Empty(errs, "validateDatacenterNameOverride should return an error as the datacenter name is being modified")
+}
+
+func TestChangeDcNameNotModified2(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	rc.Datacenter.Spec.DatacenterName = "test"
+	rc.Datacenter.Status = api.CassandraDatacenterStatus{
+		DatacenterName: nil,
+	}
+
+	errs := rc.validateDatacenterNameOverride()
+	assert.Empty(errs, "validateDatacenterNameOverride should return an error as the datacenter name is being modified")
 }
 
 // func TestReconcile(t *testing.T) {

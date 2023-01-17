@@ -70,7 +70,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			// This takes a while sometimes in my dev environment
-			ns.WaitForDatacenterReadyWithTimeouts(dcName, dcName, 600, 120)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 120)
 
 			step = "scale up to 2 nodes"
 			json := "{\"spec\": {\"size\": 2}}"

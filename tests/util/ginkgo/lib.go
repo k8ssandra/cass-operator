@@ -397,25 +397,31 @@ func (ns *NsWrapper) WaitForDatacenterReadyPodCountWithTimeout(dcName string, co
 }
 
 func (ns *NsWrapper) WaitForDatacenterReady(dcName string) {
-	ns.WaitForDatacenterReadyWithTimeouts(dcName, dcName, 1200, 1200)
-}
-
-func (ns *NsWrapper) WaitForDatacenterReadyWithOverride(dcName, dcNameOverride string) {
-	ns.WaitForDatacenterReadyWithTimeouts(dcName, dcNameOverride, 1200, 1200)
+	ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 1200)
 }
 
 func (ns *NsWrapper) Log(step string) {
 	ginkgo.By(step)
 }
 
-func (ns *NsWrapper) WaitForDatacenterReadyWithTimeouts(dcName string, dcNameOverride string, podCountTimeout int, dcReadyTimeout int) {
+func (ns *NsWrapper) getDcNameWithOverride(dcName string) string {
+	json := "jsonpath={.spec.datacenterName}"
+	k := kubectl.Get("CassandraDatacenter", dcName).FormatOutput(json)
+	dcNameOverride := ns.OutputPanic(k)
+	if dcNameOverride == "" {
+		return dcName
+	}
+	return dcNameOverride
+}
+
+func (ns *NsWrapper) WaitForDatacenterReadyWithTimeouts(dcName string, podCountTimeout int, dcReadyTimeout int) {
 	json := "jsonpath={.spec.size}"
 	k := kubectl.Get("CassandraDatacenter", dcName).FormatOutput(json)
 	sizeString := ns.OutputPanic(k)
 	size, err := strconv.Atoi(sizeString)
 	Expect(err).ToNot(HaveOccurred())
 
-	ns.WaitForDatacenterReadyPodCountWithTimeout(dcNameOverride, size, podCountTimeout)
+	ns.WaitForDatacenterReadyPodCountWithTimeout(ns.getDcNameWithOverride(dcName), size, podCountTimeout)
 	ns.WaitForDatacenterOperatorProgress(dcName, "Ready", dcReadyTimeout)
 }
 

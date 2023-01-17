@@ -86,7 +86,7 @@ var _ = Describe(testName, func() {
 			k := kubectl.ApplyFiles(testFile1)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterReadyWithOverride(dc1Name, dc1OverrideName)
+			ns.WaitForDatacenterReady(dc1Name)
 
 			By("get seed node IP address")
 			json := "jsonpath={.items[0].status.podIP}"

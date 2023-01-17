@@ -75,7 +75,7 @@ var _ = Describe(testName, func() {
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
 			Expect(len(nodeStatusesHostIds), 2)
 
-			ns.WaitForDatacenterReadyWithOverride(dcName, dcNameOverride)
+			ns.WaitForDatacenterReady(dcName)
 			ns.WaitForDatacenterCondition(dcName, "Ready", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterCondition(dcName, "Initialized", string(corev1.ConditionTrue))
 			ns.ExpectDoneReconciling(dcName)
@@ -92,7 +92,7 @@ var _ = Describe(testName, func() {
 			Expect(len(ns.GetDatacenterReadyPodNames(api.CleanupForKubernetes(dcNameOverride)))).To(Equal(4))
 
 			ns.ExpectDoneReconciling(dcName)
-			ns.WaitForDatacenterReadyWithOverride(dcName, dcNameOverride)
+			ns.WaitForDatacenterReady(dcName)
 
 			ns.ExpectDatacenterNameStatusUpdated(dcName, dcNameOverride)
 
@@ -122,7 +122,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "Stopped", string(corev1.ConditionFalse))
 			ns.WaitForDatacenterCondition(dcName, "Resuming", string(corev1.ConditionTrue))
 
-			ns.WaitForDatacenterReadyWithOverride(dcName, dcNameOverride)
+			ns.WaitForDatacenterReady(dcName)
 			ns.ExpectDoneReconciling(dcName)
 
 			logOutput := ""

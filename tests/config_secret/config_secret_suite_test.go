@@ -67,7 +67,7 @@ var _ = Describe(testName, func() {
 
 			k = kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
-			ns.WaitForDatacenterReadyWithTimeouts(dcName, dcName, 420, 30)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, 420, 30)
 
 			step = "update config secret"
 			testUpdatedSecretFile, err := ginkgo_util.CreateTestSecretsConfig(updatedSecretYaml)

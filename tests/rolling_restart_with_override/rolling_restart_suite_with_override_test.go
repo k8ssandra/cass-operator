@@ -66,7 +66,7 @@ var _ = Describe(testName, func() {
 			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterReadyWithOverride(dcName, dcNameOverride)
+			ns.WaitForDatacenterReady(dcName)
 
 		})
 		Specify("the operator can perform a rolling restart with rollingRestartRequested spec change", func() {
@@ -92,7 +92,7 @@ var _ = Describe(testName, func() {
 
 			Expect(ns.OutputAndLog(step, k)).To(Equal("true true"))
 
-			ns.WaitForDatacenterReadyWithOverride(dcName, dcNameOverride)
+			ns.WaitForDatacenterReady(dcName)
 		})
 		Specify("cassandratask can be used to do rolling restart of the cluster", func() {
 			step := "creating a cassandra task to do rolling restart"

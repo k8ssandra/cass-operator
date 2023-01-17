@@ -60,7 +60,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			// solr takes 10 minutes to come up on my machine
-			ns.WaitForDatacenterReadyWithTimeouts(dcName, dcName, 1000, 30)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1000, 30)
 		})
 	})
 })

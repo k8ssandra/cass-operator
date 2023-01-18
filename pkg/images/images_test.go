@@ -81,7 +81,7 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 	assert.True(strings.HasPrefix(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
 
 	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.CassandraImageComponent.Repository)
-	assert.Equal("datastax/dse-server", GetImageConfig().DefaultImages.DSEImageComponent.Repository)
+	assert.Equal("datastax/dse-mgmtapi-6_8", GetImageConfig().DefaultImages.DSEImageComponent.Repository)
 
 	path, err := GetCassandraImage("dse", "6.8.17")
 	assert.NoError(err)

@@ -5,7 +5,7 @@ on:
       - master
       - 1.10.x
   pull_request:
-    branches: [ master ]
+    branches: [master]
 jobs:
   build_docker_images:
     name: Build Docker Images
@@ -53,9 +53,9 @@ jobs:
     strategy:
       matrix:
         integration_test:
-        - upgrade_operator # Test is not setup to run against 4.0
-        - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
-        - scale_down_unbalanced_racks  #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - upgrade_operator # Test is not setup to run against 4.0
+          - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
@@ -82,52 +82,53 @@ jobs:
     strategy:
       matrix:
         version:
-        - "4.0.7"
+          - "4.0.7"
         integration_test:
-        # Single worker tests:
-        - additional_serviceoptions
-        - additional_volumes
-        # - delete_node_terminated_container # This does not test any operator behavior
-        - podspec_simple
-        # - smoke_test_oss # Converted to test_all_the_things, see below job
-        # - smoke_test_dse # Converted to test_all_the_things, see below job
-        # - terminate
-        # - timeout_prestop_termination
-        # - upgrade_operator # See kind_311_tests job, Only works for 3.11 right now
-        - webhook_validation
-        # Three worker tests:
-        - canary_upgrade
-        # - config_change_condition # config_change takes care of testing the same
-        - cdc_successful # OSS only
-        # - delete_node_lost_readiness # DSE specific behavior
-        - host_network
-        - internode-encryption-generated
-        #- no_infinite_reconcile # smoke_test_* should take care of this
-        - node_replace
-        - nodeport_service
-        - rolling_restart
-        - rolling_restart_with_override
-        # - stop_resume
-        - superuser-secret-generated
-        - superuser-secret-provided
-        - test_bad_config_and_fix
-        - test_mtls_mgmt_api
-        # More than 3 workers tests:
-        - add_racks
-        #- additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
-        - cluster_wide_install
-        - config_change
-        - config_secret
-        # - multi_cluster_management
-        #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
-        - scale_down
-        # - scale_down_not_enough_space # Not enough stable test
-        #- scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
-        - scale_up
-        - scale_up_stop_resume
-        - seed_selection
-        - config_fql # OSS only
-        - decommission_dc
+          # Single worker tests:
+          - additional_serviceoptions
+          - additional_volumes
+          # - delete_node_terminated_container # This does not test any operator behavior
+          - podspec_simple
+          # - smoke_test_oss # Converted to test_all_the_things, see below job
+          # - smoke_test_dse # Converted to test_all_the_things, see below job
+          # - terminate
+          # - timeout_prestop_termination
+          # - upgrade_operator # See kind_311_tests job, Only works for 3.11 right now
+          - webhook_validation
+          # Three worker tests:
+          - canary_upgrade
+          # - config_change_condition # config_change takes care of testing the same
+          - cdc_successful_c # OSS only
+          - cdc_successful_dse # OSS only
+          # - delete_node_lost_readiness # DSE specific behavior
+          - host_network
+          - internode-encryption-generated
+          #- no_infinite_reconcile # smoke_test_* should take care of this
+          - node_replace
+          - nodeport_service
+          - rolling_restart
+          - rolling_restart_with_override
+          # - stop_resume
+          - superuser-secret-generated
+          - superuser-secret-provided
+          - test_bad_config_and_fix
+          - test_mtls_mgmt_api
+          # More than 3 workers tests:
+          - add_racks
+          #- additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - cluster_wide_install
+          - config_change
+          - config_secret
+          # - multi_cluster_management
+          #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
+          - scale_down
+          # - scale_down_not_enough_space # Not enough stable test
+          #- scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - scale_up
+          - scale_up_stop_resume
+          - seed_selection
+          - config_fql # OSS only
+          - decommission_dc
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
       # let other tests continue to run
       # even if one fails
@@ -158,11 +159,11 @@ jobs:
     strategy:
       matrix:
         version:
-        - "3.11.14"
-        - "4.0.7"
-        - "6.8.29"
+          - "3.11.14"
+          - "4.0.7"
+          - "6.8.29"
         integration_test:
-        - test_all_the_things
+          - test_all_the_things
         include:
           - version: 6.8.29
             serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29

@@ -1,7 +1,7 @@
 // Copyright DataStax, Inc.
 // Please see the included license file for details.
 
-package cdc_successful
+package cdc_successful_dse
 
 import (
 	"fmt"
@@ -18,10 +18,10 @@ import (
 )
 
 var (
-	testName            = "OSS CDC flows work"
+	testName            = "DSE CDC flows work"
 	namespace           = "test-cdc"
 	dcName              = "dc1"
-	dcYaml              = "../testdata/test-cdc/cassandra-datacenter.yaml"
+	dcYaml              = "../testdata/test-cdc/dse-datacenter.yaml"
 	pulsarValues        = "../testdata/test-cdc/dev-values.yaml"
 	testUtilsDeployment = "../testdata/test-cdc/testutils-deployment.yaml"
 	ns                  = ginkgo_util.NewWrapper(testName, namespace)
@@ -87,7 +87,7 @@ var _ = Describe(testName, func() {
 			err = kubectl.WaitForOutputContains(readyGetter, "True", 1800)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 1200)
 
 			step = "Creating a testutils deployment"
 			k = kubectl.ApplyFiles(testUtilsDeployment)

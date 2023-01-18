@@ -14,7 +14,7 @@ When leveraging a single endpoint ingress / load balancer we lose the ability to
     k3d load image --cluster k3s-default \
       datastax/cass-operator:1.3.0 \
       datastax/cass-config-builder:1.0-ubi7 \
-      datastax/dse-server:6.8.4-ubi7 \
+      datastax/dse-mgmtapi-6_8:6.8.4-ubi7 \
       datastax/cassandra:3.11.6-ubi7
     ```
 
@@ -56,7 +56,7 @@ When leveraging a single endpoint ingress / load balancer we lose the ability to
     ```
 
 1. Patch the Kong deployment to listen on the ingress port (9042 in our example)
-   
+
     ```bash
     kubectl patch deployment kong-kong --patch '
     spec:
@@ -95,7 +95,7 @@ When leveraging a single endpoint ingress / load balancer we lose the ability to
     ```
 
 1. Check out the [sample application](../../sample-java-application) to validate your deployment
-    
+
     ```bash
     Discovered Nodes
     sample-dc:sample-rack:bbbf5a34-2240-4efb-ac06-c7974a2ec3dd

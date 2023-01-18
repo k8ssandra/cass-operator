@@ -158,7 +158,7 @@ defaults:
   cassandra:
     repository: "k8ssandra/cass-management-api"
   dse:
-    repository: "datastax/dse-server"
+    repository: "datastax/dse-mgmtapi-6_8"
     suffix: "-ubi7"
 ```
 
@@ -335,7 +335,7 @@ cluster1-superuser@cqlsh> select * from system.peers;
 
 ### Installing cluster via Helm
 
-To install a cluster with optional integrated backup/restore and repair utilities, check the [k8ssandra/k8ssandra](https://github.com/k8ssandra/k8ssandra) helm charts project. 
+To install a cluster with optional integrated backup/restore and repair utilities, check the [k8ssandra/k8ssandra](https://github.com/k8ssandra/k8ssandra) helm charts project.
 
 If you wish to install only the cass-operator, you can run the following command:
 
@@ -429,7 +429,7 @@ spec:
 
 ## Requirements
 
-- Kubernetes cluster, 1.21 or newer. For Openshift, version 4.9 or newer. If you're using older versions, please install from [1.10.x branch](https://github.com/k8ssandra/cass-operator/tree/1.10.x), which supports Openshift 4.7 and Kubernetes 1.19. 
+- Kubernetes cluster, 1.21 or newer. For Openshift, version 4.9 or newer. If you're using older versions, please install from [1.10.x branch](https://github.com/k8ssandra/cass-operator/tree/1.10.x), which supports Openshift 4.7 and Kubernetes 1.19.
 
 ## Contributing
 
@@ -448,7 +448,7 @@ Almost every build, test, or development task requires the following pre-requisi
 
 ### Building
 
-The operator uses Makefiles for its build process. 
+The operator uses Makefiles for its build process.
 
 #### Build the Operator Container Image
 This build task will create the operator container image, building or rebuilding the binary from golang sources if necessary:
@@ -514,7 +514,7 @@ If you used the ``make deploy`` to deploy the operator, replace it with ``make u
 
 ## Contacts
 
-For questions, please reach out on [k8ssandra Community](https://k8ssandra.io/community/) channels. For development questions, we are active on our Discord channel #k8ssandra-dev. Or you can open an issue. 
+For questions, please reach out on [k8ssandra Community](https://k8ssandra.io/community/) channels. For development questions, we are active on our Discord channel #k8ssandra-dev. Or you can open an issue.
 
 ## License
 

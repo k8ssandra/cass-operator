@@ -27,7 +27,7 @@ const (
 	ValidDseVersionRegexp      = "6\\.8\\.\\d+"
 	ValidOssVersionRegexp      = "(3\\.11\\.\\d+)|(4\\.\\d+\\.\\d+)"
 	DefaultCassandraRepository = "k8ssandra/cass-management-api"
-	DefaultDSERepository       = "datastax/dse-server"
+	DefaultDSERepository       = "datastax/dse-mgmtapi-6_8"
 )
 
 func init() {

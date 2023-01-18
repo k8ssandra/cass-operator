@@ -8,7 +8,7 @@ images:
   # cassandra:
   #   "4.0.0": "k8ssandra/cassandra-ubi:latest"
   # dse:
-  #   "6.8.999": "datastax/dse-server-prototype:latest"
+  #   "6.8.999": "datastax/dse-mgmtapi-6_8-prototype:latest"
 # imageRegistry: "localhost:5000"
 # imagePullPolicy: Always
 # imagePullSecret:

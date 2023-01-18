@@ -96,7 +96,7 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 		out = append(out, "-javaagent:/opt/metrics-collector/lib/datastax-mcac-agent.jar")
 	}
 	out = append(out, // We need to add these two elements to the slice first, because the management agent must start before the CDC agent.
-		"-javaagent:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar",
+		"-javaagent:/opt/management-api/datastax-mgmtapi-agent.jar",
 	)
 	return append(out, CDCOpt), nil
 }

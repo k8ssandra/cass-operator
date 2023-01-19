@@ -158,7 +158,7 @@ defaults:
   cassandra:
     repository: "k8ssandra/cass-management-api"
   dse:
-    repository: "datastax/dse-mgmtapi-6_8"
+    repository: "datastax/dse-server"
     suffix: "-ubi7"
 ```
 

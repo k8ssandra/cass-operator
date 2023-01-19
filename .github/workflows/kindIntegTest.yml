@@ -91,7 +91,7 @@ jobs:
           - cdc_successful
         include:
           - version: 6.8.29
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
+            serverImage: datastax/dse-server:6.8.29-jdk8 # DSE 6.8.29
             serverType: dse
             integration_test: "cdc_successful"
       fail-fast: true
@@ -211,7 +211,7 @@ jobs:
           - test_all_the_things
         include:
           - version: 6.8.29
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
+            serverImage: datastax/dse-server:6.8.29-jdk8 # DSE 6.8.29
             serverType: dse
             integration_test: "test_all_the_things"
       fail-fast: true

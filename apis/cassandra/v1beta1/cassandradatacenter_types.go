@@ -80,10 +80,12 @@ type CassandraUser struct {
 type UserInfo struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 	// MountPath tells the script where to read the user information. Required if annotation injection is used, otherwise optional
-	MountPath  string                  `json:"mountpath,omitempty"`
+	MountPath  string                  `json:"mountPath,omitempty"`
 	CSI        *corev1.CSIVolumeSource `json:"csi,omitempty"`
 	SecretName string                  `json:"secretName,omitempty"`
-	// ServiceAccount string            `json:"serviceAccountName,omitempty"`
+
+	// ServiceAccountName override job ServiceAccount, otherwise Spec.ServiceAccount (the one used to create the server pods) is used
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 	// TODO Add CSI information here
 	/*
 		TODO Testing:

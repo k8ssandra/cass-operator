@@ -40,6 +40,12 @@ vault write auth/kubernetes/role/internal-app \
     ttl=24h
 ```
 
+vault write auth/kubernetes/role/internal-app \
+    bound_service_account_names=cass-operator-controller-manager \
+    bound_service_account_namespaces=test-external-secrets \
+    policies=internal-app \
+    ttl=24h
+
 ## Install CSI driver:
 
 Remember to enable CSI in the Install Vault step.

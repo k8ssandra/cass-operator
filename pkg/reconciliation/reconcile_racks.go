@@ -901,14 +901,17 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 
 	rc.ReqLogger.Info("reconcile_racks::CreateUsers")
 
+	// TODO We should check if we've already created this ..
 	// TODO This should be cleaned up after a while (TTL)
 	if dc.Spec.UserInfo != nil {
 		// Create the job
 		ttl := int32(86400)
 
+		// TODO Instead of this, I should probably have a "SecretRef" generic structure. That way we could use it for all Secrets (like mgmt-api auth), supporting
+		// 		both legacy as well as new structure
+
 		// How to get this as input?
 		filePath := dc.Spec.UserInfo.MountPath
-		// filePath := "/vault/secrets/database-config.txt"
 
 		// We want to mount it as a directory and read the files as usernames
 		if dc.Spec.UserInfo.CSI != nil || dc.Spec.UserInfo.SecretName != "" {
@@ -916,6 +919,7 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 		}
 
 		// TODO wait for it to complete before we continue..
+
 		job := batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: dc.Namespace,
@@ -924,33 +928,26 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 			Spec: batchv1.JobSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
-						// TODO Add volumes here if CSI was used
 						Containers: []corev1.Container{
 							{
 								Name:            "client",
-								Image:           "burmanm/k8ssandra-client:latest", // k8ssandra/k8ssandra-client does not have this feature
+								Image:           "k8ssandra/k8ssandra-client:latest",
 								ImagePullPolicy: corev1.PullIfNotPresent,
-								Args:            []string{"users", "add", "--path", filePath, "--dc", dc.Name}, // TODO This path must be configurable
+								Args:            []string{"users", "add", "--path", filePath, "--dc", dc.Name},
 							},
 						},
 						RestartPolicy: corev1.RestartPolicyNever,
 					},
-					// Create the k8ssandra-client add users job here?
 				},
 				TTLSecondsAfterFinished: &ttl,
 			},
 		}
 
-		// job.Spec.Template.Spec.Volumes
-
 		if len(dc.Spec.UserInfo.Annotations) > 0 {
-			job.ObjectMeta.Annotations = dc.Spec.UserInfo.Annotations
+			job.Spec.Template.ObjectMeta.Annotations = dc.Spec.UserInfo.Annotations
 		}
 
 		// TODO Add verification that we can't have dual injection (CSI + annotations)
-
-		// TODO If Secret name is set, mount it just like the CSI
-
 		if dc.Spec.UserInfo.SecretName != "" || dc.Spec.UserInfo.CSI != nil {
 			vol := corev1.Volume{
 				Name: "user-source",
@@ -979,9 +976,8 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 			}
 		}
 
-		labels := dc.GetDatacenterLabels()
-		oplabels.AddOperatorLabels(labels, dc)
-		job.ObjectMeta.Labels = labels
+		// labels := dc.GetDatacenterLabels()
+		// oplabels.AddOperatorLabels(labels, dc)
 
 		// Set CassandraDatacenter dc as the owner and controller
 		err := setControllerReference(dc, &job, rc.Scheme)
@@ -989,13 +985,19 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 			return result.Error(err)
 		}
 
-		// TODO Do I have this value somewhere..?
-		job.Spec.Template.Spec.ServiceAccountName = "cass-operator-controller-manager"
+		if dc.Spec.UserInfo.ServiceAccountName != "" {
+			job.Spec.Template.Spec.ServiceAccountName = dc.Spec.UserInfo.ServiceAccountName
+		} else {
+			job.Spec.Template.Spec.ServiceAccountName = dc.Spec.ServiceAccount
+		}
 
 		if err := rc.Client.Create(rc.Ctx, &job); err != nil {
+			if errors.IsAlreadyExists(err) {
+				return result.Continue()
+			}
 			return result.Error(err)
 		}
-		return result.Continue()
+		return result.RequeueSoon(5)
 	}
 
 	err := rc.UpdateSecretWatches()

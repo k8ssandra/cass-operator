@@ -8084,18 +8084,18 @@ spec:
                       managed by an external CSI driver
                     properties:
                       driver:
-                        description: Driver is the name of the CSI driver that handles
+                        description: driver is the name of the CSI driver that handles
                           this volume. Consult with your admin for the correct name
                           as registered in the cluster.
                         type: string
                       fsType:
-                        description: Filesystem type to mount. Ex. "ext4", "xfs",
-                          "ntfs". If not provided, the empty value is passed to the
-                          associated CSI driver which will determine the default filesystem
-                          to apply.
+                        description: fsType to mount. Ex. "ext4", "xfs", "ntfs". If
+                          not provided, the empty value is passed to the associated
+                          CSI driver which will determine the default filesystem to
+                          apply.
                         type: string
                       nodePublishSecretRef:
-                        description: NodePublishSecretRef is a reference to the secret
+                        description: nodePublishSecretRef is a reference to the secret
                           object containing sensitive information to pass to the CSI
                           driver to complete the CSI NodePublishVolume and NodeUnpublishVolume
                           calls. This field is optional, and  may be empty if no secret
@@ -8107,26 +8107,32 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       readOnly:
-                        description: Specifies a read-only configuration for the volume.
-                          Defaults to false (read/write).
+                        description: readOnly specifies a read-only configuration
+                          for the volume. Defaults to false (read/write).
                         type: boolean
                       volumeAttributes:
                         additionalProperties:
                           type: string
-                        description: VolumeAttributes stores driver-specific properties
+                        description: volumeAttributes stores driver-specific properties
                           that are passed to the CSI driver. Consult your driver's
                           documentation for supported values.
                         type: object
                     required:
                     - driver
                     type: object
-                  mountpath:
+                  mountPath:
                     description: MountPath tells the script where to read the user
                       information. Required if annotation injection is used, otherwise
                       optional
                     type: string
                   secretName:
+                    type: string
+                  serviceAccountName:
+                    description: ServiceAccountName override job ServiceAccount, otherwise
+                      Spec.ServiceAccount (the one used to create the server pods)
+                      is used
                     type: string
                 type: object
               users:

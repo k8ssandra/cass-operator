@@ -5,7 +5,7 @@ metadata:
 spec:
   clusterName: cluster2
   serverType: cassandra
-  serverVersion: "4.0.4"
+  serverVersion: "4.0.7"
   userInfo:
     annotations:
         vault.hashicorp.com/agent-inject: 'true'
@@ -19,11 +19,12 @@ spec:
           {{- end -}}
         vault.hashicorp.com/agent-pre-populate-only: 'true'
     mountPath: /vault/secrets/database-config.txt
-    csi:
-      driver: secrets-store.csi.k8s.io
-      readOnly: true
-      volumeAttributes:
-        secretProviderClass: "vault-database"
+    serviceAccountName: cass-operator-controller-manager
+    # csi:
+    #   driver: secrets-store.csi.k8s.io
+    #   readOnly: true
+    #   volumeAttributes:
+    #     secretProviderClass: "vault-database"
   managementApiAuth:
     insecure: {}
   size: 1
@@ -41,3 +42,7 @@ spec:
     jvm-server-options:
       initial_heap_size: "512m"
       max_heap_size: "512m"
+    cassandra-yaml:
+      authenticator: PasswordAuthenticator
+      authorizer: CassandraAuthorizer
+      role_manager: CassandraRoleManager

@@ -6,6 +6,7 @@ on:
       - 1.10.x
   pull_request:
     branches: [master]
+    branches: [master]
 jobs:
   build_docker_images:
     name: Build Docker Images
@@ -56,6 +57,9 @@ jobs:
           - upgrade_operator # Test is not setup to run against 4.0
           - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
           - scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - upgrade_operator # Test is not setup to run against 4.0
+          - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
@@ -75,6 +79,44 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: k8s-logs-${{ matrix.integration_test }}
+          path: ./build/kubectl_dump
+
+  kind_dse_tests:
+    needs: build_docker_images
+    strategy:
+      matrix:
+        version:
+          - "6.8.29"
+        integration_test:
+          - cdc_successful
+        include:
+          - version: 6.8.29
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
+            serverType: dse
+            integration_test: "cdc_successful"
+      fail-fast: true
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: ${{ matrix.version }}
+      M_SERVER_IMAGE: ${{ matrix.serverImage }}
+      M_SERVER_TYPE: ${{ matrix.serverType }}
+    steps:
+      - uses: actions/checkout@v3
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v3
+        if: github.event_name != 'pull_request'
+      - uses: ./.github/actions/run-integ-test
+        with:
+          integration_test: ${{ matrix.integration_test }}
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: k8s-logs-smoke_test-${{ matrix.version }}
           path: ./build/kubectl_dump
 
   kind_int_tests:
@@ -161,7 +203,11 @@ jobs:
           - "3.11.14"
           - "4.0.7"
           - "6.8.29"
+          - "3.11.14"
+          - "4.0.7"
+          - "6.8.29"
         integration_test:
+          - test_all_the_things
           - test_all_the_things
         include:
           - version: 6.8.29

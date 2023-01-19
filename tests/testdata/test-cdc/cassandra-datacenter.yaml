@@ -6,6 +6,10 @@ spec:
   clusterName: test-cluster
   # The number of server nodes.
   size: 1
+  config:
+    cassandra-yaml:
+      authenticator: AllowAllAuthenticator
+      authorizer: AllowAllAuthorizer
   cdc:
     pulsarServiceUrl: pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650
     topicPrefix: persistent://public/default/events-

@@ -196,9 +196,22 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 				newRack.Name)
 		}
 		if oldRack.Zone != newRack.Zone {
-			return attemptedTo("change rack zone from '%s' to '%s'",
-				oldRack.Zone,
-				newRack.Zone)
+			if newRack.Zone != "" {
+				return attemptedTo("change rack zone from '%s' to '%s'",
+					oldRack.Zone,
+					newRack.Zone)
+			}
+		}
+	}
+
+	return nil
+}
+
+// ValidateDeprecatedFieldUsage prevents adding fields that are deprecated
+func ValidateDeprecatedFieldUsage(dc CassandraDatacenter) error {
+	for _, rack := range dc.GetRacks() {
+		if rack.Zone != "" {
+			return attemptedTo("use deprecated parameter Zone, use NodeAffinityLabels instead.")
 		}
 	}
 
@@ -211,12 +224,11 @@ var _ webhook.Validator = &CassandraDatacenter{}
 
 func (dc *CassandraDatacenter) ValidateCreate() error {
 	log.Info("Validating webhook called for create")
-	err := ValidateSingleDatacenter(*dc)
-	if err != nil {
+	if err := ValidateSingleDatacenter(*dc); err != nil {
 		return err
 	}
 
-	return nil
+	return ValidateDeprecatedFieldUsage(*dc)
 }
 
 func (dc *CassandraDatacenter) ValidateUpdate(old runtime.Object) error {
@@ -226,8 +238,7 @@ func (dc *CassandraDatacenter) ValidateUpdate(old runtime.Object) error {
 		return errors.New("old object in ValidateUpdate cannot be cast to CassandraDatacenter")
 	}
 
-	err := ValidateSingleDatacenter(*dc)
-	if err != nil {
+	if err := ValidateSingleDatacenter(*dc); err != nil {
 		return err
 	}
 

@@ -73,7 +73,6 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 			Racks: []api.Rack{
 				{
 					Name:               "rack1",
-					Zone:               "z1",
 					NodeAffinityLabels: map[string]string{"label2": "rack1", "label3": "rack1"},
 				},
 			},
@@ -134,7 +133,6 @@ func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing
 			Racks: []api.Rack{
 				{
 					Name:               "rack1",
-					Zone:               "z1",
 					NodeAffinityLabels: map[string]string{"label2": "rack1", "label3": "rack1"},
 				},
 			},
@@ -149,10 +147,9 @@ func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing
 		"should not have gotten error when getting NodeAffinitylabels of rack rack1")
 
 	expected := map[string]string{
-		"label1":  "dc",
-		"label2":  "rack1",
-		"label3":  "rack1",
-		zoneLabel: "z1",
+		"label1": "dc",
+		"label2": "rack1",
+		"label3": "rack1",
 	}
 
 	assert.Equal(t, expected, nodeAffinityLabels)

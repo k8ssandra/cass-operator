@@ -30,15 +30,100 @@ func init() {
 }
 
 func Test_calculatePodAntiAffinity(t *testing.T) {
+	assert := assert.New(t)
 	t.Run("check when we allow more than one server pod per node", func(t *testing.T) {
-		paa := calculatePodAntiAffinity(true)
+		paa := calculatePodAntiAffinity(true, nil, nil)
 		if paa != nil {
 			t.Errorf("calculatePodAntiAffinity() = %v, and we want nil", paa)
 		}
 	})
 
+	t.Run("allow setting custom podAntiAffinity to exclude only the same datacenter", func(t *testing.T) {
+		paa := calculatePodAntiAffinity(true, &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      api.ClusterLabel,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"cluster1"},
+							},
+							{
+								Key:      api.DatacenterLabel,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"dc1"},
+							},
+						},
+					},
+				},
+			},
+		}, nil)
+		if paa == nil ||
+			len(paa.RequiredDuringSchedulingIgnoredDuringExecution) != 1 {
+			t.Errorf("calculatePodAntiAffinity() = %v, and we want one element in RequiredDuringSchedulingIgnoredDuringExecution", paa)
+		}
+		assert.Equal(api.ClusterLabel, paa.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchExpressions[0].Key)
+		assert.Equal("cluster1", paa.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchExpressions[0].Values[0])
+	})
+
+	t.Run("allow setting custom podAntiAffinity to run entire rack on one worker node", func(t *testing.T) {
+		paa := calculatePodAntiAffinity(true, nil, &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      api.ClusterLabel,
+								Operator: metav1.LabelSelectorOpExists,
+							},
+							{
+								Key:      api.DatacenterLabel,
+								Operator: metav1.LabelSelectorOpExists,
+							},
+							{
+								Key:      api.RackLabel,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"rack1"},
+							},
+						},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		})
+		if paa == nil ||
+			len(paa.RequiredDuringSchedulingIgnoredDuringExecution) != 1 {
+			t.Errorf("calculatePodAntiAffinity() = %v, and we want one element in RequiredDuringSchedulingIgnoredDuringExecution", paa)
+		}
+		assert.Equal(api.RackLabel, paa.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchExpressions[2].Key)
+		assert.Equal("rack1", paa.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchExpressions[2].Values[0])
+		assert.Equal("kubernetes.io/hostname", paa.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey)
+	})
+
 	t.Run("check when we do not allow more than one server pod per node", func(t *testing.T) {
-		paa := calculatePodAntiAffinity(false)
+		paa := calculatePodAntiAffinity(false, &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "my.heavy.other.application",
+								Operator: metav1.LabelSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+		}, nil)
+		if paa == nil ||
+			len(paa.RequiredDuringSchedulingIgnoredDuringExecution) != 2 {
+			t.Errorf("calculatePodAntiAffinity() = %v, and we want two elements in RequiredDuringSchedulingIgnoredDuringExecution", paa)
+		}
+	})
+
+	t.Run("check when allowMultipleWorkers is set to false that default rules are set", func(t *testing.T) {
+		paa := calculatePodAntiAffinity(false, nil, nil)
 		if paa == nil ||
 			len(paa.RequiredDuringSchedulingIgnoredDuringExecution) != 1 {
 			t.Errorf("calculatePodAntiAffinity() = %v, and we want one element in RequiredDuringSchedulingIgnoredDuringExecution", paa)
@@ -48,14 +133,14 @@ func Test_calculatePodAntiAffinity(t *testing.T) {
 
 func Test_calculateNodeAffinity(t *testing.T) {
 	t.Run("check when we dont have a zone we want to use", func(t *testing.T) {
-		na := calculateNodeAffinity(map[string]string{})
+		na := calculateNodeAffinity(map[string]string{}, nil, nil)
 		if na != nil {
 			t.Errorf("calculateNodeAffinity() = %v, and we want nil", na)
 		}
 	})
 
 	t.Run("check when we do not allow more than one dse pod per node", func(t *testing.T) {
-		na := calculateNodeAffinity(map[string]string{zoneLabel: "thezone"})
+		na := calculateNodeAffinity(map[string]string{"topology.kubernetes.io/zone": "thezone"}, nil, nil)
 		if na == nil ||
 			na.RequiredDuringSchedulingIgnoredDuringExecution == nil {
 			t.Errorf("calculateNodeAffinity() = %v, and we want a non-nil RequiredDuringSchedulingIgnoredDuringExecution", na)
@@ -438,13 +523,18 @@ func TestCassandraDatacenter_buildPodTemplateSpec_containers_merge(t *testing.T)
 			ClusterName:   "bob",
 			ServerType:    "cassandra",
 			ServerVersion: "3.11.7",
+			Racks: []api.Rack{
+				{
+					Name: "testrack",
+				},
+			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{testContainer}},
 			},
 		},
 	}
-	got, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack", false)
+	got, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 	assert.Equal(t, 3, len(got.Spec.Containers))
@@ -466,6 +556,11 @@ func TestCassandraDatacenter_buildPodTemplateSpec_initcontainers_merge(t *testin
 			ClusterName:   "bob",
 			ServerType:    "cassandra",
 			ServerVersion: "3.11.7",
+			Racks: []api.Rack{
+				{
+					Name: "testrack",
+				},
+			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{testContainer}},
@@ -473,7 +568,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_initcontainers_merge(t *testin
 			ConfigBuilderResources: testContainer.Resources,
 		},
 	}
-	got, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack", false)
+	got, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 	assert.Equal(t, 2, len(got.Spec.InitContainers))
@@ -498,6 +593,11 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_after_config
 			ClusterName:   "bob",
 			ServerType:    "cassandra",
 			ServerVersion: "3.11.7",
+			Racks: []api.Rack{
+				{
+					Name: "testrack",
+				},
+			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
@@ -511,7 +611,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_after_config
 		},
 	}
 
-	podTemplateSpec, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack", false)
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
@@ -532,6 +632,11 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes
 			ClusterName:   "bob",
 			ServerType:    "cassandra",
 			ServerVersion: "3.11.7",
+			Racks: []api.Rack{
+				{
+					Name: "testrack",
+				},
+			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
@@ -567,7 +672,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes
 		},
 	}
 
-	podTemplateSpec, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack", true)
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], true)
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
@@ -627,6 +732,11 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 			ClusterName:   "bob",
 			ServerType:    "cassandra",
 			ServerVersion: "3.11.7",
+			Racks: []api.Rack{
+				{
+					Name: "testrack",
+				},
+			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -671,7 +781,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 		},
 	}
 
-	podTemplateSpec, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack", true)
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], true)
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
@@ -724,7 +834,10 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 	assert.True(t, volumeMountsContains(loggerVolumeMounts, volumeMountNameMatcher("server-logs")))
 
 	// Test the non-Legacy mode also (for new datacenters)
-	podTemplateSpec, err = buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack", false)
+	testZoneRack := dc.Spec.Racks[0]
+	testZoneRack.NodeAffinityLabels = map[string]string{zoneLabel: "testzone"}
+	dc.Spec.Racks[0] = testZoneRack
+	podTemplateSpec, err = buildPodTemplateSpec(dc, testZoneRack, false)
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
 	volumes = podTemplateSpec.Spec.Volumes
@@ -811,15 +924,20 @@ func findContainer(containers []corev1.Container, name string) *corev1.Container
 func TestCassandraDatacenter_buildPodTemplateSpec_labels_merge(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName:     "bob",
-			ServerType:      "cassandra",
-			ServerVersion:   "3.11.7",
+			ClusterName:   "bob",
+			ServerType:    "cassandra",
+			ServerVersion: "3.11.7",
+			Racks: []api.Rack{
+				{
+					Name: "testrack",
+				},
+			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{},
 		},
 	}
 	dc.Spec.PodTemplateSpec.Labels = map[string]string{"abc": "123"}
 
-	spec, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack", false)
+	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 	got := spec.Labels
 
 	expected := dc.GetRackLabels("testrack")
@@ -837,9 +955,14 @@ func TestCassandraDatacenter_buildPodTemplateSpec_labels_merge(t *testing.T) {
 func TestCassandraDatacenter_buildContainers_additional_labels(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		Spec: api.CassandraDatacenterSpec{
-			ClusterName:     "bob",
-			ServerType:      "cassandra",
-			ServerVersion:   "3.11.7",
+			ClusterName:   "bob",
+			ServerType:    "cassandra",
+			ServerVersion: "3.11.7",
+			Racks: []api.Rack{
+				{
+					Name: "testrack",
+				},
+			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{},
 			AdditionalLabels: map[string]string{
 				"Add": "Label",
@@ -848,7 +971,7 @@ func TestCassandraDatacenter_buildContainers_additional_labels(t *testing.T) {
 	}
 	dc.Spec.PodTemplateSpec.Labels = map[string]string{"abc": "123"}
 
-	spec, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack", false)
+	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 	got := spec.Labels
 
 	expected := dc.GetRackLabels("testrack")
@@ -873,6 +996,11 @@ func TestCassandraDatacenter_buildPodTemplateSpec_overrideSecurityContext(t *tes
 			ClusterName:   "test",
 			ServerType:    "cassandra",
 			ServerVersion: "3.11.7",
+			Racks: []api.Rack{
+				{
+					Name: "rack1",
+				},
+			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					SecurityContext: &corev1.PodSecurityContext{
@@ -884,7 +1012,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_overrideSecurityContext(t *tes
 		},
 	}
 
-	spec, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "rack1", false)
+	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "should not have gotten an error when building podTemplateSpec")
 	assert.NotNil(t, spec)
@@ -905,6 +1033,11 @@ func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *te
 			ClusterName:   "bob",
 			ServerType:    "cassandra",
 			ServerVersion: "3.11.7",
+			Racks: []api.Rack{
+				{
+					Name: "testrack",
+				},
+			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
@@ -931,7 +1064,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *te
 		},
 	}
 
-	spec, err := buildPodTemplateSpec(dc, map[string]string{zoneLabel: "testzone"}, "testrack", true)
+	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], true)
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
 	initContainers := spec.Spec.InitContainers
@@ -1145,11 +1278,16 @@ func TestTolerations(t *testing.T) {
 			ClusterName:   "test",
 			ServerType:    "cassandra",
 			ServerVersion: "3.11.10",
-			Tolerations:   tolerations,
+			Racks: []api.Rack{
+				{
+					Name: "rack1",
+				},
+			},
+			Tolerations: tolerations,
 		},
 	}
 
-	spec, err := buildPodTemplateSpec(dc, nil, "rack1", false)
+	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "failed to build PodTemplateSpec")
 	// using ElementsMatch instead of Equal because we do not really care about ordering.
@@ -1166,6 +1304,11 @@ func TestTolerations(t *testing.T) {
 			ServerType:    "cassandra",
 			ServerVersion: "3.11.10",
 			Tolerations:   tolerations,
+			Racks: []api.Rack{
+				{
+					Name: "rack1",
+				},
+			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Tolerations: []corev1.Toleration{
@@ -1181,7 +1324,7 @@ func TestTolerations(t *testing.T) {
 		},
 	}
 
-	spec, err = buildPodTemplateSpec(dc, nil, "rack1", false)
+	spec, err = buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "failed to build PodTemplateSpec")
 	// using ElementsMatch instead of Equal because we do not really care about ordering.

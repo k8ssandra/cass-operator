@@ -18,6 +18,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#442](https://github.com/k8ssandra/cass-operator/issues/442) Deprecate old internode-encryption storage mounts and cert generation. If old path /etc/encryption/node.jks is no longer present, then the storage mount is no longer created. For certificates with internode-encryption, we recommend using cert-manager.
 * [ENHANCEMENT] [#472](https://github.com/k8ssandra/cass-operator/issues/472) Add POD_NAME and NODE_NAME env variables that match metadata.name and spec.nodeName information
 * [FEATURE] [#441](https://github.com/k8ssandra/cass-operator/issues/441) Implement a CassandraTask for moving single-token nodes
+* [ENHANCEMENT] [#315](https://github.com/k8ssandra/cass-operator/issues/351) PodTemplateSpec allows setting Affinities, which are merged with the current rules. PodAntiAffinity behavior has changed, if allowMultipleWorkers is set to true the PodTemplateSpec antiAffinity rules are copied as is, otherwise merged with current restrictions. Prevent usage of deprecated rack.Zone (use topology.kubernetes.io/zone label instead), but allow removal of Zone.
 * [BUGFIX] [#410](https://github.com/k8ssandra/cass-operator/issues/410) Fix installation in IPv6 only environment
 * [BUGFIX] [#455](https://github.com/k8ssandra/cass-operator/issues/455) After task had completed, the running state would still say true
 

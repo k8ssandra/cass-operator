@@ -198,7 +198,7 @@ func createInstanceHealth(dc api.CassandraDatacenter) InstanceHealth {
 	}
 
 	health := InstanceHealth{
-		Instance:  dc.Name,
+		Instance:  dc.SanitizedName(),
 		Namespace: dc.Namespace,
 		Health:    status,
 	}
@@ -211,7 +211,7 @@ func updateHealth(health *Health, dc api.CassandraDatacenter) {
 	instanceHealths := health.Status.InstanceHealth
 	index := -1
 	for i := range instanceHealths {
-		if instanceHealths[i].Instance == dc.Name && instanceHealths[i].Namespace == dc.Namespace {
+		if instanceHealths[i].Instance == dc.SanitizedName() && instanceHealths[i].Namespace == dc.Namespace {
 			index = i
 			break
 		}

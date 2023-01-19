@@ -43,11 +43,11 @@ func GetExtensionID() string {
 func AddStatefulSetChanges(dc *api.CassandraDatacenter, statefulSet *appsv1.StatefulSet) *appsv1.StatefulSet {
 	for i := range statefulSet.Spec.VolumeClaimTemplates {
 		cvt := &statefulSet.Spec.VolumeClaimTemplates[i]
-		addLabels(dc.Name, cvt)
+		addLabels(dc.SanitizedName(), cvt)
 	}
 
 	podTemplate := &statefulSet.Spec.Template
-	addLabels(dc.Name, podTemplate)
+	addLabels(dc.SanitizedName(), podTemplate)
 	addAnnotations(podTemplate)
 
 	return statefulSet

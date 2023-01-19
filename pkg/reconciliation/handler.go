@@ -212,6 +212,13 @@ func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
 
 	// Validate Management API config
 	errs = append(errs, httphelper.ValidateManagementApiConfig(dc, rc.Client, rc.Ctx)...)
+
+	// Check that the datacenter name override hasn't been changed
+	errs = append(errs, rc.validateDatacenterNameOverride()...)
+
+	// Validate that the DC sanitized name doesn't conflict with another DC in the same namespace
+	errs = append(errs, rc.validateDatacenterNameConflicts()...)
+
 	if len(errs) > 0 {
 		return errs[0]
 	}

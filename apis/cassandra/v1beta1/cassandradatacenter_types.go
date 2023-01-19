@@ -231,6 +231,13 @@ type CassandraDatacenterSpec struct {
 
 	// CDC allows configuration of the change data capture agent which can run within the Management API container. Use it to send data to Pulsar.
 	CDC *CDCConfiguration `json:"cdc,omitempty"`
+
+	// DatacenterName allows to override the name of the Cassandra datacenter. Kubernetes objects will be named after a sanitized version of it if set, and if not metadata.name. In Cassandra the DC name will be overridden by this value.
+	// It may generate some confusion as objects created for the DC will have a different name than the CasandraDatacenter object itself.
+	// This setting can create conflicts if multiple DCs coexist in the same namespace if metadata.name for a DC with no override is set to the same value as the override name of another DC.
+	// Use cautiously.
+	// +optional
+	DatacenterName string `json:"datacenterName,omitempty"`
 }
 
 type NetworkingConfig struct {
@@ -414,6 +421,11 @@ type CassandraDatacenterStatus struct {
 	// TrackedTasks tracks the tasks for completion that were created by the cass-operator
 	// +optional
 	TrackedTasks []corev1.ObjectReference `json:"trackedTasks,omitempty"`
+
+	// DatacenterName is the name of the override used for the CassandraDatacenter
+	// This field is used to perform validation checks preventing a user from changing the override
+	// +optional
+	DatacenterName *string `json:"datacenterName,omitempty"`
 }
 
 // CassandraDatacenter is the Schema for the cassandradatacenters API
@@ -544,7 +556,7 @@ func (dc *CassandraDatacenter) SetCondition(condition DatacenterCondition) {
 // GetDatacenterLabels ...
 func (dc *CassandraDatacenter) GetDatacenterLabels() map[string]string {
 	labels := dc.GetClusterLabels()
-	labels[DatacenterLabel] = CleanLabelValue(dc.Name)
+	labels[DatacenterLabel] = dc.SanitizedName()
 	return labels
 }
 
@@ -609,19 +621,19 @@ func (dc *CassandraDatacenter) GetSeedServiceName() string {
 }
 
 func (dc *CassandraDatacenter) GetAdditionalSeedsServiceName() string {
-	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-additional-seed-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.SanitizedName() + "-additional-seed-service"
 }
 
 func (dc *CassandraDatacenter) GetAllPodsServiceName() string {
-	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-all-pods-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.SanitizedName() + "-all-pods-service"
 }
 
 func (dc *CassandraDatacenter) GetDatacenterServiceName() string {
-	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.SanitizedName() + "-service"
 }
 
 func (dc *CassandraDatacenter) GetNodePortServiceName() string {
-	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.Name + "-node-port-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.SanitizedName() + "-node-port-service"
 }
 
 func (dc *CassandraDatacenter) ShouldGenerateSuperuserSecret() bool {
@@ -679,7 +691,7 @@ func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
 	modelValues := serverconfig.GetModelValues(
 		seeds,
 		dc.Spec.ClusterName,
-		dc.Name,
+		dc.CassDcName(),
 		graphEnabled,
 		solrEnabled,
 		sparkEnabled,
@@ -911,4 +923,18 @@ func SplitRacks(nodeCount, rackCount int) []int {
 	}
 
 	return topology
+}
+
+// SanitizedName returns a sanitized version of the name returned by CassDcName()
+func (in *CassandraDatacenter) SanitizedName() string {
+	return CleanupForKubernetes(in.CassDcName())
+}
+
+// CassDcName returns the Cassandra DC name override if it exists,
+// otherwise the cassdc object name.
+func (in *CassandraDatacenter) CassDcName() string {
+	if in.Spec.DatacenterName != "" {
+		return in.Spec.DatacenterName
+	}
+	return in.Name
 }

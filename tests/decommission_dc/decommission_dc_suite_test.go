@@ -12,18 +12,21 @@ import (
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
 	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
+
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
 
 var (
-	testName  = "Delete DC and verify it is correctly decommissioned in multi-dc cluster"
-	namespace = "test-decommission-dc"
-	dc1Name   = "dc1"
-	dc2Name   = "dc2"
-	dc1Yaml   = "../testdata/default-two-rack-two-node-dc.yaml"
-	dc2Yaml   = "../testdata/default-two-rack-two-node-dc2.yaml"
-	dc1Label  = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dc1Name)
-	dc2Label  = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dc2Name)
-	seedLabel = "cassandra.datastax.com/seed-node=true"
+	testName        = "Delete DC and verify it is correctly decommissioned in multi-dc cluster"
+	namespace       = "test-decommission-dc"
+	dc1Name         = "dc1"
+	dc1OverrideName = "My_Super_Dc"
+	dc2Name         = "dc2"
+	dc1Yaml         = "../testdata/default-two-rack-two-node-dc.yaml"
+	dc2Yaml         = "../testdata/default-two-rack-two-node-dc2.yaml"
+	dc1Label        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dc1OverrideName))
+	dc2Label        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dc2Name)
+	seedLabel       = "cassandra.datastax.com/seed-node=true"
 	// dcLabel   = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns = ginkgo_util.NewWrapper(testName, namespace)
 )
@@ -124,10 +127,11 @@ var _ = Describe(testName, func() {
 			ns.ExpectDoneReconciling(dc1Name)
 			ns.ExpectDoneReconciling(dc2Name)
 
-			podNames := ns.GetDatacenterReadyPodNames(dc1Name)
+			podNames := ns.GetDatacenterReadyPodNames(dc1OverrideName)
 			Expect(len(podNames)).To(Equal(2))
 			dcs := findDatacenters(podNames[0])
-			Expect(len(dcs)).To(Equal(2))
+
+			Expect(len(dcs)).To(Equal(2), fmt.Sprintf("Expected to find 2 datacenters in nodetool status but found %v", dcs))
 
 			step = "annotate dc2 to do decommission on delete"
 			k = kubectl.Annotate("cassdc", dc2Name, "cassandra.datastax.com/decommission-on-delete", "true")
@@ -146,7 +150,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "[]", 300)
 
 			// Verify nodetool status has only a single Datacenter
-			podNames = ns.GetDatacenterReadyPodNames(dc1Name)
+			podNames = ns.GetDatacenterReadyPodNames(dc1OverrideName)
 
 			if len(podNames) != 2 {
 				// This is to catch why the test sometimes fails on the check (string parsing? or real issue?)
@@ -155,7 +159,7 @@ var _ = Describe(testName, func() {
 
 			Expect(len(podNames)).To(Equal(2))
 			dcs = findDatacenters(podNames[0])
-			Expect(len(dcs)).To(Equal(1))
+			Expect(len(dcs)).To(Equal(1), fmt.Sprintf("Expected to find 1 datacenter in nodetool status but found %v", dcs))
 
 			// Delete the remaining DC and expect it to finish correctly (it should not be decommissioned - that will hang the process and fail)
 			step = "deleting the dc1"

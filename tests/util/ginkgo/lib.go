@@ -18,6 +18,7 @@ import (
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v2"
 
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	mageutil "github.com/k8ssandra/cass-operator/tests/util"
 	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
 )
@@ -389,7 +390,7 @@ func (ns *NsWrapper) WaitForDatacenterReadyPodCountWithTimeout(dcName string, co
 	step := "waiting for the node to become ready"
 	json := "jsonpath={.items[*].status.containerStatuses[0].ready}"
 	k := kubectl.Get("pods").
-		WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)).
+		WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dcName))).
 		WithFlag("field-selector", "status.phase=Running").
 		FormatOutput(json)
 	ns.WaitForOutputAndLog(step, k, duplicate("true", count), timeout)
@@ -403,6 +404,16 @@ func (ns *NsWrapper) Log(step string) {
 	ginkgo.By(step)
 }
 
+func (ns *NsWrapper) getDcNameWithOverride(dcName string) string {
+	json := "jsonpath={.spec.datacenterName}"
+	k := kubectl.Get("CassandraDatacenter", dcName).FormatOutput(json)
+	dcNameOverride := ns.OutputPanic(k)
+	if dcNameOverride == "" {
+		return dcName
+	}
+	return dcNameOverride
+}
+
 func (ns *NsWrapper) WaitForDatacenterReadyWithTimeouts(dcName string, podCountTimeout int, dcReadyTimeout int) {
 	json := "jsonpath={.spec.size}"
 	k := kubectl.Get("CassandraDatacenter", dcName).FormatOutput(json)
@@ -410,7 +421,7 @@ func (ns *NsWrapper) WaitForDatacenterReadyWithTimeouts(dcName string, podCountT
 	size, err := strconv.Atoi(sizeString)
 	Expect(err).ToNot(HaveOccurred())
 
-	ns.WaitForDatacenterReadyPodCountWithTimeout(dcName, size, podCountTimeout)
+	ns.WaitForDatacenterReadyPodCountWithTimeout(ns.getDcNameWithOverride(dcName), size, podCountTimeout)
 	ns.WaitForDatacenterOperatorProgress(dcName, "Ready", dcReadyTimeout)
 }
 
@@ -486,7 +497,7 @@ func (ns *NsWrapper) GetDatacenterPodNames(dcName string) []string {
 func (ns *NsWrapper) GetDatacenterReadyPodNames(dcName string) []string {
 	json := "jsonpath={.items[?(@.status.containerStatuses[0].ready==true)].metadata.name}"
 	k := kubectl.Get("pods").
-		WithFlag("selector", fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)).
+		WithFlag("selector", fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dcName))).
 		FormatOutput(json)
 
 	output := ns.OutputPanic(k)
@@ -668,4 +679,13 @@ func (ns *NsWrapper) WaitForCompleteTask(taskName string) {
 		FormatOutput(json)
 
 	ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, 360)
+}
+
+func (ns *NsWrapper) ExpectDatacenterNameStatusUpdated(dcName, dcNameOverride string) {
+	step := "checking that CassandraDatacenter status has been updated with the correct name"
+	json := "jsonpath={.status.datacenterName}"
+	k := kubectl.Get("CassandraDatacenter", dcName).
+		FormatOutput(json)
+
+	ns.WaitForOutputAndLog(step, k, dcNameOverride, 120)
 }

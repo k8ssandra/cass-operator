@@ -134,6 +134,10 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 		return attemptedTo("change clusterName")
 	}
 
+	if oldDc.Spec.DatacenterName != newDc.Spec.DatacenterName {
+		return attemptedTo("change datacenterName")
+	}
+
 	if oldDc.Spec.AllowMultipleNodesPerWorker != newDc.Spec.AllowMultipleNodesPerWorker {
 		return attemptedTo("change allowMultipleNodesPerWorker")
 	}

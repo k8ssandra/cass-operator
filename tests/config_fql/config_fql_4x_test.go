@@ -62,7 +62,7 @@ var _ = Describe(testName, func() {
 			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 1200)
+			ns.WaitForDatacenterReady(dcName)
 			lsCmd := kubectl.KCmd{
 				Command: "exec",
 				Args:    []string{"cluster1-dc1-default-sts-0", "--", "ls", "/var/log/cassandra/fql"},

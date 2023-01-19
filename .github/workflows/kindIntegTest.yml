@@ -106,6 +106,7 @@ jobs:
         - node_replace
         - nodeport_service
         - rolling_restart
+        - rolling_restart_with_override
         # - stop_resume
         - superuser-secret-generated
         - superuser-secret-provided

@@ -87,7 +87,7 @@ var _ = Describe(testName, func() {
 			err = kubectl.WaitForOutputContains(readyGetter, "True", 1800)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1200, 1200)
+			ns.WaitForDatacenterReady(dcName)
 
 			step = "Creating a testutils deployment"
 			k = kubectl.ApplyFiles(testUtilsDeployment)

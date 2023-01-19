@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#457](https://github.com/k8ssandra/cass-operator/issues/362) Allow overriding the datacenter name
 * [CHANGE] [#457](https://github.com/k8ssandra/cass-operator/issues/457) Extract task execution attributes into CassandraTaskTemplate
 * [CHANGE] [#447](https://github.com/k8ssandra/cass-operator/issues/447) Update Github actions to remove all deprecated features (set-outputs, node v12 actions)
 * [CHANGE] [#448](https://github.com/k8ssandra/cass-operator/issues/448) Update to operator-sdk 1.25.1, update to go 1.19, update to Kubernetes 1.25, remove amd64 restriction on local builds (cass-operator and system-logger will be built for aarch64 also)

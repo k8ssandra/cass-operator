@@ -56,9 +56,6 @@ jobs:
           - upgrade_operator # Test is not setup to run against 4.0
           - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
           - scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
-          - upgrade_operator # Test is not setup to run against 4.0
-          - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
-          - scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
@@ -90,7 +87,7 @@ jobs:
           - cdc_successful
         include:
           - version: 6.8.29
-            serverImage: datastax/dse-server:6.8.29-jdk8 # DSE 6.8.29
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
             serverType: dse
             integration_test: "cdc_successful"
       fail-fast: true
@@ -202,15 +199,12 @@ jobs:
           - "3.11.14"
           - "4.0.7"
           - "6.8.29"
-          - "3.11.14"
-          - "4.0.7"
-          - "6.8.29"
         integration_test:
           - test_all_the_things
           - test_all_the_things
         include:
           - version: 6.8.29
-            serverImage: datastax/dse-server:6.8.29-jdk8 # DSE 6.8.29
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
             serverType: dse
             integration_test: "test_all_the_things"
       fail-fast: true

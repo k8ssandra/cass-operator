@@ -6,7 +6,6 @@ on:
       - 1.10.x
   pull_request:
     branches: [master]
-    branches: [master]
 jobs:
   build_docker_images:
     name: Build Docker Images

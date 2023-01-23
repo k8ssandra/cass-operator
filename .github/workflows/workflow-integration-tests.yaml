@@ -138,7 +138,7 @@ jobs:
           - additional_seeds
         include:
           - version: "6.8.29"
-            serverImage: datastax/dse-server:6.8.29-jdk8
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
             serverType: dse
     runs-on: ubuntu-latest
     env:
@@ -249,7 +249,7 @@ jobs:
       - name: set environment for DSE
         if: ${{ startsWith( matrix.version, '6.8' ) }}
         run: |
-          echo "M_SERVER_IMAGE=datastax/dse-server:6.8.29-jdk8" >> $GITHUB_ENV
+          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:6.8.29-jdk8" >> $GITHUB_ENV
           echo "M_SERVER_TYPE=dse" >> $GITHUB_ENV
       - uses: ./.github/actions/run-integ-test
         with:
@@ -299,7 +299,7 @@ jobs:
       - name: set environment for DSE
         if: ${{ startsWith( matrix.version, '6.8' ) }}
         run: |
-          echo "M_SERVER_IMAGE=datastax/dse-server:${{ matrix.version }}-jdk8" >> $GITHUB_ENV
+          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:6.8.29-jdk8" >> $GITHUB_ENV
           echo "M_SERVER_TYPE=dse" >> $GITHUB_ENV
       - uses: ./.github/actions/run-integ-test
         with:

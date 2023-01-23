@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#457](https://github.com/k8ssandra/cass-operator/issues/362) Allow overriding the datacenter name
+* [CHANGE] [#476](https://github.com/k8ssandra/cass-operator/issues/476) Enable CDC for DSE deployments.
 * [CHANGE] [#457](https://github.com/k8ssandra/cass-operator/issues/457) Extract task execution attributes into CassandraTaskTemplate
 * [CHANGE] [#447](https://github.com/k8ssandra/cass-operator/issues/447) Update Github actions to remove all deprecated features (set-outputs, node v12 actions)
 * [CHANGE] [#448](https://github.com/k8ssandra/cass-operator/issues/448) Update to operator-sdk 1.25.1, update to go 1.19, update to Kubernetes 1.25, remove amd64 restriction on local builds (cass-operator and system-logger will be built for aarch64 also)
@@ -54,7 +55,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#360](https://github.com/k8ssandra/cass-operator/pull/360) If Datacenter quorum reports unhealthy state, change Status Condition DatacenterHealthy to False (DBPE-2283)
 * [ENHANCEMENT] [#317](https://github.com/k8ssandra/cass-operator/issues/317) Add ability for users to define CDC settings which will cause an agent to start within the Cassandra JVM and pass mutation events from Cassandra back to a Pulsar broker. (Tested on OSS Cassandra 4.x only.)
 * [ENHANCEMENT] [#369](https://github.com/k8ssandra/cass-operator/issues/369) Add configurable timeout for liveness / readiness and drain when mutual auth is used and a default timeout for all wget execs (required with mutual auth)
-* [BUGFIX] [#335](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars. Include app.kubernetes.io/created-by label. 
+* [BUGFIX] [#335](https://github.com/k8ssandra/cass-operator/issues/335) Cleanse label values derived from cluster name, which can contain illegal chars. Include app.kubernetes.io/created-by label.
 * [BUGFIX] [#330](https://github.com/k8ssandra/cass-operator/issues/330) Apply correct updates to Service labels and annotations through additionalServiceConfig (they are now validated and don't allow reserved prefixes).
 * [BUGFIX] [#368](https://github.com/k8ssandra/cass-operator/issues/368) Do not fetch endpointStatus from pods that have not started
 * [BUGFIX] [#364](https://github.com/k8ssandra/cass-operator/issues/364) Do not log any errors if we fail to get endpoint states from nodes.
@@ -73,7 +74,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#183](https://github.com/k8ssandra/cass-operator/issues/183) Move from PodDisruptionBudget v1beta1 to v1 (changes min. required Kubernetes version to 1.21)
 * [ENHANCEMENT] [#325](https://github.com/k8ssandra/cass-operator/issues/325) Enable static checking (golangci-lint) in the repository and fix all the found issues.
-* [ENHANCEMENT] [#292](https://github.com/k8ssandra/cass-operator/issues/292) Update to Go 1.17 with updates to dependencies: Kube 1.23.4 and controller-runtime 0.11.1 
+* [ENHANCEMENT] [#292](https://github.com/k8ssandra/cass-operator/issues/292) Update to Go 1.17 with updates to dependencies: Kube 1.23.4 and controller-runtime 0.11.1
 
 ## v1.10.4
 
@@ -86,7 +87,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [FEATURE] [#309](https://github.com/k8ssandra/cass-operator/pull/309) If StatefulSets are modified in a way that they can't be updated directly, recreate them with new specs
 * [ENHANCEMENT] [#312](https://github.com/k8ssandra/cass-operator/issues/312) Integration tests now output CassandraDatacenter and CassandraTask CRD outputs to build directory
-* [BUGFIX] [#298](https://github.com/k8ssandra/cass-operator/issues/298) EndpointState has incorrect json key 
+* [BUGFIX] [#298](https://github.com/k8ssandra/cass-operator/issues/298) EndpointState has incorrect json key
 * [BUGFIX] [#304](https://github.com/k8ssandra/cass-operator/issues/304) Hostname lookups on Cassandra pods fail
 * [BUGFIX] [#311](https://github.com/k8ssandra/cass-operator/issues/311) Fix cleanup retry reconcile bug
 

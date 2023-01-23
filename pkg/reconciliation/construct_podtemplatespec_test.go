@@ -1217,13 +1217,13 @@ func Test_makeImage(t *testing.T) {
 			errString: "",
 		},
 		{
-			name: "test 6.8.4",
+			name: "test 6.8.26",
 			args: args{
 				serverImage:   "",
 				serverType:    "dse",
-				serverVersion: "6.8.4",
+				serverVersion: "6.8.26",
 			},
-			want:      "datastax/dse-server:6.8.4-ubi7",
+			want:      "datastax/dse-server:6.8.26-ubi7",
 			errString: "",
 		},
 	}

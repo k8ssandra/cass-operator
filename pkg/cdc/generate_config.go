@@ -30,7 +30,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	}
 	updateCassandraYaml(&c, cassDC.Spec.CDC) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
 	// Figure out what to do and reconcile config.CassEnvSh.AddtnlJVMOptions back to desired state per CDCConfig.
-	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, cassDC.Spec.CDC)
+	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, cassDC.Spec.CDC, cassDC)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 }
 
 // updateAdditionalJVMOpts adds CDC related entries to additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
-func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfiguration) ([]string, error) {
+func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfiguration, cassDC cassdcapi.CassandraDatacenter) ([]string, error) {
 	out := removeEntryFromSlice(optsSlice, "pulsarServiceUrl")
 	//Next, create an additional options entry that instantiates the settings we want.
 	reflectedCDCConfig := reflect.ValueOf(*CDCConfig)
@@ -91,9 +91,12 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 		}
 	}
 	CDCOpt := fmt.Sprintf("-javaagent:%s=%s", "/opt/cdc_agent/cdc-agent.jar", strings.Join(optsSlice, ","))
+	// We want to disable MCAC when the server being deployed is DSE
+	if cassDC.Spec.ServerType == "cassandra" {
+		out = append(out, "-javaagent:/opt/metrics-collector/lib/datastax-mcac-agent.jar")
+	}
 	out = append(out, // We need to add these two elements to the slice first, because the management agent must start before the CDC agent.
-		"-javaagent:/opt/metrics-collector/lib/datastax-mcac-agent.jar",
-		"-javaagent:/opt/management-api/datastax-mgmtapi-agent-0.1.0-SNAPSHOT.jar",
+		"-javaagent:/opt/management-api/datastax-mgmtapi-agent.jar",
 	)
 	return append(out, CDCOpt), nil
 }

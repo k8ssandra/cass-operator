@@ -1330,3 +1330,94 @@ func TestTolerations(t *testing.T) {
 	// using ElementsMatch instead of Equal because we do not really care about ordering.
 	assert.ElementsMatch(t, tolerations, spec.Spec.Tolerations, "tolerations do not match")
 }
+
+func TestPorts(t *testing.T) {
+	assert := assert.New(t)
+
+	tests := []struct {
+		dc        *api.CassandraDatacenter
+		openPorts []int32
+		notOpen   []int32
+	}{
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "3.11.14",
+				},
+			},
+			openPorts: []int32{8080, 9000, 9042, 9103, 9142, 9160},
+			notOpen:   []int32{8609},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+				},
+			},
+			openPorts: []int32{8080, 9000, 9042, 9103, 9142},
+			notOpen:   []int32{8609, 9160},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "dse",
+					ServerVersion: "6.8.31",
+				},
+			},
+			openPorts: []int32{8080, 8609, 9000, 9042, 9103, 9142, 9160},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{
+											Name:          "metrics",
+											ContainerPort: 9004,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			openPorts: []int32{8080, 9004, 9042, 9103, 9142},
+			notOpen:   []int32{8609, 9000, 9160},
+		},
+	}
+
+	for _, test := range tests {
+		podTemplateSpec := test.dc.Spec.PodTemplateSpec.DeepCopy()
+		if podTemplateSpec == nil {
+			podTemplateSpec = &corev1.PodTemplateSpec{}
+		}
+		assert.NoError(buildContainers(test.dc, podTemplateSpec))
+		cassandraContainer := findContainer(podTemplateSpec.Spec.Containers, CassandraContainerName)
+		assert.NotNil(cassandraContainer)
+		containerPorts := make([]int32, len(cassandraContainer.Ports))
+		for i := 0; i < len(cassandraContainer.Ports); i++ {
+			containerPorts[i] = cassandraContainer.Ports[i].ContainerPort
+		}
+
+		for _, port := range test.openPorts {
+			assert.Containsf(containerPorts, port, "missing port %d", port)
+		}
+
+		for _, port := range test.notOpen {
+			assert.NotContainsf(containerPorts, port, "unwanted port %d", port)
+		}
+	}
+}

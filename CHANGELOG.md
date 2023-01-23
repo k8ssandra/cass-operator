@@ -11,13 +11,15 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
-* [CHANGE] [#457](https://github.com/k8ssandra/cass-operator/issues/362) Allow overriding the datacenter name
 * [CHANGE] [#457](https://github.com/k8ssandra/cass-operator/issues/457) Extract task execution attributes into CassandraTaskTemplate
 * [CHANGE] [#447](https://github.com/k8ssandra/cass-operator/issues/447) Update Github actions to remove all deprecated features (set-outputs, node v12 actions)
 * [CHANGE] [#448](https://github.com/k8ssandra/cass-operator/issues/448) Update to operator-sdk 1.25.1, update to go 1.19, update to Kubernetes 1.25, remove amd64 restriction on local builds (cass-operator and system-logger will be built for aarch64 also)
 * [CHANGE] [#442](https://github.com/k8ssandra/cass-operator/issues/442) Deprecate old internode-encryption storage mounts and cert generation. If old path /etc/encryption/node.jks is no longer present, then the storage mount is no longer created. For certificates with internode-encryption, we recommend using cert-manager.
-* [ENHANCEMENT] [#472](https://github.com/k8ssandra/cass-operator/issues/472) Add POD_NAME and NODE_NAME env variables that match metadata.name and spec.nodeName information
+* [CHANGE] [#329](https://github.com/k8ssandra/cass-operator/issues/329) Thrift port is no longer open for Cassandra 4.x installations
 * [FEATURE] [#441](https://github.com/k8ssandra/cass-operator/issues/441) Implement a CassandraTask for moving single-token nodes
+* [ENHANCEMENT] [#467](https://github.com/k8ssandra/cass-operator/issues/467) Add new metrics endpoint port (9000) to Cassandra container. This is used by the new mgmt-api /metrics endpoint. 
+* [ENHANCEMENT] [#472](https://github.com/k8ssandra/cass-operator/issues/472) Add POD_NAME and NODE_NAME env variables that match metadata.name and spec.nodeName information
+* [ENHANCEMENT] [#457](https://github.com/k8ssandra/cass-operator/issues/362) Allow overriding the datacenter name
 * [ENHANCEMENT] [#315](https://github.com/k8ssandra/cass-operator/issues/351) PodTemplateSpec allows setting Affinities, which are merged with the current rules. PodAntiAffinity behavior has changed, if allowMultipleWorkers is set to true the PodTemplateSpec antiAffinity rules are copied as is, otherwise merged with current restrictions. Prevent usage of deprecated rack.Zone (use topology.kubernetes.io/zone label instead), but allow removal of Zone.
 * [BUGFIX] [#410](https://github.com/k8ssandra/cass-operator/issues/410) Fix installation in IPv6 only environment
 * [BUGFIX] [#455](https://github.com/k8ssandra/cass-operator/issues/455) After task had completed, the running state would still say true

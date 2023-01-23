@@ -801,7 +801,12 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 		namedPort("jmx", 7199),
 		namedPort("mgmt-api-http", 8080),
 		namedPort("prometheus", 9103),
-		namedPort("thrift", 9160),
+		namedPort("metrics", 9000),
+	}
+
+	if strings.HasPrefix(dc.Spec.ServerVersion, "3.") || dc.Spec.ServerType == "dse" {
+		ports = append(ports,
+			namedPort("thrift", 9160))
 	}
 
 	if dc.Spec.ServerType == "dse" {

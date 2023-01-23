@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Select the Cassandra or DSE version to run tests against'
+        description: "Select the Cassandra or DSE version to run tests against"
         required: true
-        default: '4.0'
+        default: "4.0"
         type: choice
         options:
-          - '3.11'
-          - '4.0'
-          - '6.8'
-          - 'ALL'
+          - "3.11"
+          - "4.0"
+          - "6.8"
+          - "ALL"
 
 jobs:
   build_docker_images:
@@ -61,14 +61,14 @@ jobs:
     strategy:
       matrix:
         version:
-        - "3.11.14"
+          - "3.11.14"
         integration_test:
-        - upgrade_operator
-        - cdc_successful
-        - additional_seeds
-        - scale_down_unbalanced_racks
-        - rolling_restart
-        - decommission_dc
+          - upgrade_operator
+          - cdc_successful
+          - additional_seeds
+          - scale_down_unbalanced_racks
+          - rolling_restart
+          - decommission_dc
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
@@ -97,13 +97,13 @@ jobs:
     strategy:
       matrix:
         version:
-        - "4.0.7"
+          - "4.0.7"
         integration_test:
-        - canary_upgrade
-        - config_fql
-        - cdc_successful
-        - rolling_restart
-        - decommission_dc
+          - canary_upgrade
+          - config_fql
+          - cdc_successful
+          - rolling_restart
+          - decommission_dc
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
@@ -132,13 +132,13 @@ jobs:
     strategy:
       matrix:
         version:
-        - "6.8.29"
+          - "6.8.29"
         integration_test:
-        #- delete_node_lost_readiness #TODO: fix in https://github.com/k8ssandra/cass-operator/issues/459
-        - additional_seeds
+          #- delete_node_lost_readiness #TODO: fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - additional_seeds
         include:
           - version: "6.8.29"
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
             serverType: dse
     runs-on: ubuntu-latest
     env:
@@ -168,69 +168,69 @@ jobs:
     strategy:
       matrix:
         version:
-        - "3.11.14"
-        - "4.0.7"
-        - "6.8.29"
+          - "3.11.14"
+          - "4.0.7"
+          - "6.8.29"
         integration_test:
-        # Single worker tests:
-        - additional_serviceoptions
-        - additional_volumes
-        # - delete_node_terminated_container # This does not test any operator behavior
-        - podspec_simple
-        # - smoke_test_oss # Converted to test_all_the_things, see below job
-        # - smoke_test_dse # Converted to test_all_the_things, see below job
-        # - terminate # test_all_things
-        # - timeout_prestop_termination # This is testing a Kubernetes behavior, not interesting to us
-        # - upgrade_operator # See kind_311_tests job
-        - webhook_validation
-        # Three worker tests:
-        # - canary_upgrade # See kind_40_tests job
-        # - config_change_condition # config_change takes care of the same testing
-        # - cdc_successful # CDC is OSS only , see kind_311_tests and kind_40_tests jobs
-        # - delete_node_lost_readiness # DSE specific behavior see kind_dse_tests job
-        - host_network
-        - internode-encryption-generated
-        #- no_infinite_reconcile # smoke_test_* should take care of this
-        - node_replace
-        - nodeport_service
-        - rolling_restart
-        # - stop_resume
-        - superuser-secret-generated
-        - superuser-secret-provided
-        - test_bad_config_and_fix
-        - test_mtls_mgmt_api
-        # More than 3 workers tests:
-        - add_racks
-        #- additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
-        - cluster_wide_install
-        - config_change
-        - config_secret
-        #- multi_cluster_management # cluster_wide_install verifies the same thing
-        #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
-        - scale_down
-        # - scale_down_not_enough_space # Not enough stable test
-        #- scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
-        - scale_up
-        - scale_up_stop_resume
-        - seed_selection
+          # Single worker tests:
+          - additional_serviceoptions
+          - additional_volumes
+          # - delete_node_terminated_container # This does not test any operator behavior
+          - podspec_simple
+          # - smoke_test_oss # Converted to test_all_the_things, see below job
+          # - smoke_test_dse # Converted to test_all_the_things, see below job
+          # - terminate # test_all_things
+          # - timeout_prestop_termination # This is testing a Kubernetes behavior, not interesting to us
+          # - upgrade_operator # See kind_311_tests job
+          - webhook_validation
+          # Three worker tests:
+          # - canary_upgrade # See kind_40_tests job
+          # - config_change_condition # config_change takes care of the same testing
+          # - cdc_successful # CDC is OSS only , see kind_311_tests and kind_40_tests jobs
+          # - delete_node_lost_readiness # DSE specific behavior see kind_dse_tests job
+          - host_network
+          - internode-encryption-generated
+          #- no_infinite_reconcile # smoke_test_* should take care of this
+          - node_replace
+          - nodeport_service
+          - rolling_restart
+          # - stop_resume
+          - superuser-secret-generated
+          - superuser-secret-provided
+          - test_bad_config_and_fix
+          - test_mtls_mgmt_api
+          # More than 3 workers tests:
+          - add_racks
+          #- additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - cluster_wide_install
+          - config_change
+          - config_secret
+          #- multi_cluster_management # cluster_wide_install verifies the same thing
+          #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
+          - scale_down
+          # - scale_down_not_enough_space # Not enough stable test
+          #- scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - scale_up
+          - scale_up_stop_resume
+          - seed_selection
         # - config_fql # OSS only, see above job
         #- decommission_dc #TODO: Fails against DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
         workflowVersion:
-        - ${{ inputs.version }}
+          - ${{ inputs.version }}
         exclude:
-        - version: "3.11.14"
-          workflowVersion: "4.0"
-        - version: "3.11.14"
-          workflowVersion: "6.8"
-        - version: "4.0.7"
-          workflowVersion: "3.11"
-        - version: "4.0.7"
-          workflowVersion: "6.8"
-        - version: "6.8.29"
-          workflowVersion: "3.11"
-        - version: "6.8.29"
-          workflowVersion: "4.0"
+          - version: "3.11.14"
+            workflowVersion: "4.0"
+          - version: "3.11.14"
+            workflowVersion: "6.8"
+          - version: "4.0.7"
+            workflowVersion: "3.11"
+          - version: "4.0.7"
+            workflowVersion: "6.8"
+          - version: "6.8.29"
+            workflowVersion: "3.11"
+          - version: "6.8.29"
+            workflowVersion: "4.0"
       # let other tests continue to run
       # even if one fails
       fail-fast: false
@@ -265,24 +265,24 @@ jobs:
     strategy:
       matrix:
         version:
-        - "3.11.14"
-        - "4.0.7"
-        - "6.8.29"
+          - "3.11.14"
+          - "4.0.7"
+          - "6.8.29"
         workflowVersion:
-        - ${{ inputs.version }}
+          - ${{ inputs.version }}
         exclude:
-        - version: "3.11.14"
-          workflowVersion: "4.0"
-        - version: "3.11.14"
-          workflowVersion: "6.8"
-        - version: "4.0.7"
-          workflowVersion: "3.11"
-        - version: "4.0.7"
-          workflowVersion: "6.8"
-        - version: "6.8.29"
-          workflowVersion: "3.11"
-        - version: "6.8.29"
-          workflowVersion: "4.0"
+          - version: "3.11.14"
+            workflowVersion: "4.0"
+          - version: "3.11.14"
+            workflowVersion: "6.8"
+          - version: "4.0.7"
+            workflowVersion: "3.11"
+          - version: "4.0.7"
+            workflowVersion: "6.8"
+          - version: "6.8.29"
+            workflowVersion: "3.11"
+          - version: "6.8.29"
+            workflowVersion: "4.0"
       fail-fast: true
     runs-on: ubuntu-latest
     env:
@@ -299,7 +299,7 @@ jobs:
       - name: set environment for DSE
         if: ${{ startsWith( matrix.version, '6.8' ) }}
         run: |
-          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:${{ matrix.version }}-jdk8" >> $GITHUB_ENV
+          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:6.8.29-jdk8" >> $GITHUB_ENV
           echo "M_SERVER_TYPE=dse" >> $GITHUB_ENV
       - uses: ./.github/actions/run-integ-test
         with:

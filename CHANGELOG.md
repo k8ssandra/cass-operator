@@ -16,7 +16,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#448](https://github.com/k8ssandra/cass-operator/issues/448) Update to operator-sdk 1.25.1, update to go 1.19, update to Kubernetes 1.25, remove amd64 restriction on local builds (cass-operator and system-logger will be built for aarch64 also)
 * [CHANGE] [#442](https://github.com/k8ssandra/cass-operator/issues/442) Deprecate old internode-encryption storage mounts and cert generation. If old path /etc/encryption/node.jks is no longer present, then the storage mount is no longer created. For certificates with internode-encryption, we recommend using cert-manager.
 * [CHANGE] [#329](https://github.com/k8ssandra/cass-operator/issues/329) Thrift port is no longer open for Cassandra 4.x installations
+* [CHANGE] [#487](https://github.com/k8ssandra/cass-operator/pull/487) The AdditionalVolumes.PVCSpec is now a pointer. Also, webhook will allow modifying AdditionalVolumes. 
 * [FEATURE] [#441](https://github.com/k8ssandra/cass-operator/issues/441) Implement a CassandraTask for moving single-token nodes
+* [ENHANCEMENT] [#486](https://github.com/k8ssandra/cass-operator/issues/486) AdditionalVolumes accepts VolumeSource as the data also, allowing ConfigMap/Secret/etc to be mounted to cassandra container.
 * [ENHANCEMENT] [#467](https://github.com/k8ssandra/cass-operator/issues/467) Add new metrics endpoint port (9000) to Cassandra container. This is used by the new mgmt-api /metrics endpoint. 
 * [ENHANCEMENT] [#457](https://github.com/k8ssandra/cass-operator/issues/362) Allow overriding the datacenter name
 * [ENHANCEMENT] [#476](https://github.com/k8ssandra/cass-operator/issues/476) Enable CDC for DSE deployments.

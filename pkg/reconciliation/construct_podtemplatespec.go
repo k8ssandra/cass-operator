@@ -281,7 +281,9 @@ func generateStorageConfigVolumesMount(cc *api.CassandraDatacenter) []corev1.Vol
 func generateStorageConfigEmptyVolumes(cc *api.CassandraDatacenter) []corev1.Volume {
 	var volumes []corev1.Volume
 	for _, storage := range cc.Spec.StorageConfig.AdditionalVolumes {
-		volumes = append(volumes, corev1.Volume{Name: storage.Name})
+		if storage.VolumeSource == nil {
+			volumes = append(volumes, corev1.Volume{Name: storage.Name})
+		}
 	}
 	return volumes
 }
@@ -314,6 +316,16 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 		}
 
 		volumeDefaults = append(volumeDefaults, vServerEncryption)
+	}
+
+	for _, storage := range dc.Spec.StorageConfig.AdditionalVolumes {
+		if storage.VolumeSource != nil {
+			vol := corev1.Volume{
+				Name:         storage.Name,
+				VolumeSource: *storage.VolumeSource,
+			}
+			volumeDefaults = append(volumeDefaults, vol)
+		}
 	}
 
 	volumeDefaults = combineVolumeSlices(
@@ -570,6 +582,15 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	cassServerLogsMount := corev1.VolumeMount{
 		Name:      "server-logs",
 		MountPath: "/var/log/cassandra",
+	}
+
+	for _, vol := range dc.Spec.StorageConfig.AdditionalVolumes {
+		if vol.VolumeSource != nil {
+			volumeDefaults = append(volumeDefaults, corev1.VolumeMount{
+				Name:      vol.Name,
+				MountPath: vol.MountPath,
+			})
+		}
 	}
 
 	volumeMounts := combineVolumeMountSlices(volumeDefaults,

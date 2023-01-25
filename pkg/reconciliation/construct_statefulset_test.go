@@ -191,11 +191,11 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 				AdditionalVolumes: api.AdditionalVolumesSlice{
 					api.AdditionalVolumes{
 						MountPath: "/configs/metrics",
-						Name:      "metrics-config-map",
+						Name:      "metrics-config",
 						VolumeSource: &corev1.VolumeSource{
 							ConfigMap: &corev1.ConfigMapVolumeSource{
 								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "metrics-config",
+									Name: "metrics-config-map",
 								},
 							},
 						},
@@ -211,14 +211,15 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 	assert.Equal(3, len(sts.Spec.Template.Spec.Volumes))
 	assert.Equal("server-config", sts.Spec.Template.Spec.Volumes[0].Name)
 	assert.Equal("server-logs", sts.Spec.Template.Spec.Volumes[1].Name)
-	assert.Equal("metrics-config-map", sts.Spec.Template.Spec.Volumes[2].Name)
+	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[2].Name)
 	assert.NotNil(sts.Spec.Template.Spec.Volumes[2].ConfigMap)
-	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[2].ConfigMap.Name)
+	assert.Equal("metrics-config-map", sts.Spec.Template.Spec.Volumes[2].ConfigMap.Name)
 
 	cassandraContainer := findContainer(sts.Spec.Template.Spec.Containers, CassandraContainerName)
 	assert.NotNil(cassandraContainer)
 
 	cassandraVolumeMounts := cassandraContainer.VolumeMounts
+
 	assert.Equal(4, len(cassandraVolumeMounts))
 	assert.True(volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-config")))
 	assert.True(volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-logs")))

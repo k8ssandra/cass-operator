@@ -155,8 +155,15 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 	}
 
 	// CassandraDataVolumeClaimSpec changes are disallowed
+
 	if !reflect.DeepEqual(oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec, newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec) {
 		return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec")
+	}
+
+	if oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec != nil {
+		if !reflect.DeepEqual(*oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec, *newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec) {
+			return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec")
+		}
 	}
 
 	// Topology changes - Racks

@@ -488,7 +488,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					},
 				},
 			},
-			errString: "change storageConfig",
+			errString: "change storageConfig.CassandraDataVolumeClaimSpec",
 		},
 		{
 			name: "Removing a rack",

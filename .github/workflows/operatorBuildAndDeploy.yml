@@ -39,6 +39,7 @@ jobs:
       - name: Verify manifests and dirty state
         run: |
           make manifests generate
+          git update-index -q --really-refresh
           git diff-files --quiet
       - name: Unit Tests
         run: |

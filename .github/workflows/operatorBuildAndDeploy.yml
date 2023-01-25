@@ -36,6 +36,11 @@ jobs:
           only-new-issues: ${{ github.event_name == 'pull_request' }}
           skip-pkg-cache: true
           skip-build-cache: true
+      - name: Verify manifests and dirty state
+        run: |
+          make manifests generate
+          git update-index -q --really-refresh
+          git diff-files --quiet
       - name: Unit Tests
         run: |
           make test

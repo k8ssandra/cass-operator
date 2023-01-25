@@ -123,6 +123,10 @@ func ValidateSingleDatacenter(dc CassandraDatacenter) error {
 		return err
 	}
 
+	if err := ValidateAdditionalVolumes(dc); err != nil {
+		return err
+	}
+
 	return ValidateFQLConfig(dc)
 }
 
@@ -150,9 +154,9 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 		return attemptedTo("change serviceAccount")
 	}
 
-	// StorageConfig changes are disallowed
-	if !reflect.DeepEqual(oldDc.Spec.StorageConfig, newDc.Spec.StorageConfig) {
-		return attemptedTo("change storageConfig")
+	// CassandraDataVolumeClaimSpec changes are disallowed
+	if !reflect.DeepEqual(oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec, newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec) {
+		return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec")
 	}
 
 	// Topology changes - Racks
@@ -212,6 +216,20 @@ func ValidateDeprecatedFieldUsage(dc CassandraDatacenter) error {
 	for _, rack := range dc.GetRacks() {
 		if rack.Zone != "" {
 			return attemptedTo("use deprecated parameter Zone, use NodeAffinityLabels instead.")
+		}
+	}
+
+	return nil
+}
+
+func ValidateAdditionalVolumes(dc CassandraDatacenter) error {
+	for _, volume := range dc.Spec.StorageConfig.AdditionalVolumes {
+		if volume.PVCSpec != nil && volume.VolumeSource != nil {
+			return attemptedTo("create a volume with both PVCSpec and VolumeSource")
+		}
+
+		if volume.PVCSpec == nil && volume.VolumeSource == nil {
+			return attemptedTo("create AdditionalVolume without PVCSpec or VolumeSource")
 		}
 	}
 

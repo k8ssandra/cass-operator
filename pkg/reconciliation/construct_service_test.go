@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -405,5 +406,101 @@ func TestAddingAdditionalLabels(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = %v, want %v", service.Labels, expected)
+	}
+}
+
+func TestServicePorts(t *testing.T) {
+	tests := []struct {
+		name                string
+		dc                  *api.CassandraDatacenter
+		dcServicePorts      []int32
+		allPodsServicePorts []int32
+	}{
+		{
+			name: "Cassandra 3.11.14",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "3.11.14",
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "Cassandra 4.0.7",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "DSE 6.8.31",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "dse",
+					ServerVersion: "6.8.31",
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "Cassandra 4.0.7 with custom ports",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{
+											Name:          "metrics",
+											ContainerPort: 9004,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			// FIXME: 9004 should be in the list of open ports
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var getServicePorts = func(svc *corev1.Service) []int32 {
+				servicePorts := make([]int32, len(svc.Spec.Ports))
+				for i := 0; i < len(svc.Spec.Ports); i++ {
+					servicePorts[i] = svc.Spec.Ports[i].Port
+				}
+				return servicePorts
+			}
+			t.Run("dc service", func(t *testing.T) {
+				svc := newServiceForCassandraDatacenter(test.dc)
+				servicePorts := getServicePorts(svc)
+				assert.ElementsMatch(t, servicePorts, test.dcServicePorts)
+			})
+			t.Run("all pods service", func(t *testing.T) {
+				svc := newAllPodsServiceForCassandraDatacenter(test.dc)
+				servicePorts := getServicePorts(svc)
+				assert.ElementsMatch(t, servicePorts, test.allPodsServicePorts)
+			})
+		})
 	}
 }

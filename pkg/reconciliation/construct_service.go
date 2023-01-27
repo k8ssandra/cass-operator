@@ -6,6 +6,7 @@ package reconciliation
 // This file defines constructors for k8s service-related objects
 import (
 	"net"
+	"strings"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
@@ -32,7 +33,12 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 		namedServicePort("tls-native", 9142, 9142),
 		namedServicePort("mgmt-api", 8080, 8080),
 		namedServicePort("prometheus", 9103, 9103),
-		namedServicePort("thrift", 9160, 9160),
+		namedServicePort("metrics", 9000, 9000),
+	}
+
+	if strings.HasPrefix(dc.Spec.ServerVersion, "3.") || dc.Spec.ServerType == "dse" {
+		ports = append(ports,
+			namedServicePort("thrift", 9160, 9160))
 	}
 
 	if dc.Spec.DseWorkloads != nil {
@@ -257,6 +263,9 @@ func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev
 		},
 		{
 			Name: "prometheus", Port: 9103, TargetPort: intstr.FromInt(9103),
+		},
+		{
+			Name: "metrics", Port: 9000, TargetPort: intstr.FromInt(9000),
 		},
 	}
 

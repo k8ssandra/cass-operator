@@ -24,6 +24,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#315](https://github.com/k8ssandra/cass-operator/issues/351) PodTemplateSpec allows setting Affinities, which are merged with the current rules. PodAntiAffinity behavior has changed, if allowMultipleWorkers is set to true the PodTemplateSpec antiAffinity rules are copied as is, otherwise merged with current restrictions. Prevent usage of deprecated rack.Zone (use topology.kubernetes.io/zone label instead), but allow removal of Zone.
 * [BUGFIX] [#410](https://github.com/k8ssandra/cass-operator/issues/410) Fix installation in IPv6 only environment
 * [BUGFIX] [#455](https://github.com/k8ssandra/cass-operator/issues/455) After task had completed, the running state would still say true
+* [BUGFIX] [#488](https://github.com/k8ssandra/cass-operator/issues/488) Expose the new metrics port in services
 
 ## v1.13.1
 

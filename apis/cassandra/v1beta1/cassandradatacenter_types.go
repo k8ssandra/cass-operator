@@ -272,11 +272,16 @@ type DseWorkloads struct {
 type AdditionalVolumes struct {
 	// Mount path into cassandra container
 	MountPath string `json:"mountPath"`
-	// Name of the pvc
+
+	// Name of the pvc / volume
 	// +kubebuilder:validation:Pattern=[a-z0-9]([-a-z0-9]*[a-z0-9])?
 	Name string `json:"name"`
-	// Persistent volume claim spec
-	PVCSpec corev1.PersistentVolumeClaimSpec `json:"pvcSpec"`
+
+	// PVCSpec is a persistent volume claim spec. Either this or VolumeSource is required.
+	PVCSpec *corev1.PersistentVolumeClaimSpec `json:"pvcSpec,omitempty"`
+
+	// VolumeSource to mount the volume from (such as ConfigMap / Secret). This or PVCSpec is required.
+	VolumeSource *corev1.VolumeSource `json:"volumeSource,omitempty"`
 }
 
 type AdditionalVolumesSlice []AdditionalVolumes

@@ -34,4 +34,4 @@ git add config/manager/kustomization.yaml
 git add config/manager/image_config.yaml
 
 git commit -m "Release $TAG"
-git tag $TAG -m "Release $TAG"
+git tag -a $TAG -m "Release $TAG"

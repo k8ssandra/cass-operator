@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.14.0
 
 * [CHANGE] [#457](https://github.com/k8ssandra/cass-operator/issues/457) Extract task execution attributes into CassandraTaskTemplate

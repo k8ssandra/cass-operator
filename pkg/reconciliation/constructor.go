@@ -44,6 +44,7 @@ func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.
 }
 
 func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressState) error {
+	rc.ReqLogger.Info("reconcile_racks::setOperatorProgressStatus")
 	currentState := rc.Datacenter.Status.CassandraOperatorProgress
 	if currentState == newState {
 		// early return, no need to ping k8s

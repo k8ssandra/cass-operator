@@ -5,7 +5,7 @@ package reconciliation
 
 import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/k8ssandra/cass-operator/pkg/internal/result"
+	"github.com/k8ssandra/cass-operator/internal/result"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"

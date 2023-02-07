@@ -227,8 +227,8 @@ func waitForTaskCompletion(taskKey types.NamespacedName) *api.CassandraTask {
 
 var _ = Describe("CassandraTask controller tests", func() {
 	Describe("Execute jobs against all pods", func() {
-		jobRunningRequeue = time.Duration(1 * time.Millisecond)
-		taskRunningRequeue = time.Duration(1 * time.Millisecond)
+		JobRunningRequeue = time.Duration(1 * time.Millisecond)
+		TaskRunningRequeue = time.Duration(1 * time.Millisecond)
 		Context("Async jobs", func() {
 			var testNamespaceName string
 			BeforeEach(func() {

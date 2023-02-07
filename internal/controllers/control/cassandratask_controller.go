@@ -54,8 +54,8 @@ const (
 
 // These are vars to allow modifications for testing
 var (
-	jobRunningRequeue  = 10 * time.Second
-	taskRunningRequeue = time.Duration(5 * time.Second)
+	JobRunningRequeue  = 10 * time.Second
+	TaskRunningRequeue = time.Duration(5 * time.Second)
 )
 
 // CassandraTaskReconciler reconciles a CassandraJob object
@@ -219,12 +219,12 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if len(activeTasks) > 0 {
 			if cassTask.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 				logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
-				return ctrl.Result{RequeueAfter: taskRunningRequeue}, nil
+				return ctrl.Result{RequeueAfter: TaskRunningRequeue}, nil
 			}
 			for _, task := range activeTasks {
 				if task.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 					logger.V(1).Info("this job isn't allowed to run due to ConcurrencyPolicy restrictions", "activeTasks", len(activeTasks))
-					return ctrl.Result{RequeueAfter: taskRunningRequeue}, nil
+					return ctrl.Result{RequeueAfter: TaskRunningRequeue}, nil
 				}
 			}
 		}
@@ -666,12 +666,12 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					continue
 				} else if details.Status == podJobWaiting {
 					// Job is still running or waiting
-					return ctrl.Result{RequeueAfter: jobRunningRequeue}, failed, completed, nil
+					return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, nil
 				}
 			} else {
 				if len(jobRunner) > 0 {
 					// Something is still holding the worker
-					return ctrl.Result{RequeueAfter: jobRunningRequeue}, failed, completed, nil
+					return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, nil
 				}
 
 				// Nothing is holding the job, this pod has finished
@@ -761,7 +761,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 		}
 
 		// We have a job going on, return back later to check the status
-		return ctrl.Result{RequeueAfter: jobRunningRequeue}, failed, completed, nil
+		return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, nil
 	}
 	return ctrl.Result{}, failed, completed, nil
 }

@@ -9,6 +9,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+var DurationFunc func(int) time.Duration = func(secs int) time.Duration { return time.Duration(secs) * time.Second }
+
 type ReconcileResult interface {
 	Completed() bool
 	Output() (ctrl.Result, error)
@@ -40,7 +42,7 @@ func (c callBackSoon) Completed() bool {
 	return true
 }
 func (c callBackSoon) Output() (ctrl.Result, error) {
-	t := time.Duration(c.secs) * time.Second
+	t := DurationFunc(c.secs)
 	return ctrl.Result{Requeue: true, RequeueAfter: t}, nil
 }
 

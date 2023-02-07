@@ -47,6 +47,11 @@ import (
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 )
 
+var (
+	cooldownPeriod     = 20 * time.Second
+	minimumRequeueTime = 500 * time.Millisecond
+)
+
 // datastax.com groups
 //+kubebuilder:rbac:groups=cassandra.datastax.com,namespace=cass-operator,resources=cassandradatacenters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cassandra.datastax.com,namespace=cass-operator,resources=cassandradatacenters/status,verbs=get;update;patch
@@ -117,7 +122,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 		// Error reading the object
 		logger.Error(err, "Failed to get CassandraDatacenter.")
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
+		return ctrl.Result{}, err
 	}
 
 	if err := rc.IsValid(rc.Datacenter); err != nil {
@@ -127,7 +132,6 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	}
 
 	// TODO fold this into the quiet period
-	cooldownPeriod := time.Second * 20
 	lastNodeStart := rc.Datacenter.Status.LastServerNodeStarted
 	cooldownTime := time.Until(lastNodeStart.Add(cooldownPeriod))
 
@@ -152,8 +156,8 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 	// Prevent immediate requeue
 	if res.Requeue {
-		if res.RequeueAfter.Milliseconds() < 500 {
-			res.RequeueAfter = time.Duration(500 * time.Millisecond)
+		if res.RequeueAfter < minimumRequeueTime {
+			res.RequeueAfter = minimumRequeueTime
 		}
 	}
 	return res, err

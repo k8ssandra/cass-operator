@@ -1,0 +1,31 @@
+apiVersion: cassandra.datastax.com/v1beta1
+kind: CassandraDatacenter
+metadata:
+  name: dc2
+spec:
+  clusterName: cluster2
+  serverType: cassandra
+  serverVersion: "4.0.7"
+  managementApiAuth:
+    insecure: {}
+  size: 1
+  storageConfig:
+    cassandraDataVolumeClaimSpec: &storageclass_server_storage
+      storageClassName: standard
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+    additionalVolumes:
+      - name: metric-config
+        mountPath: /opt/management-api/configs
+        volumeSource:
+          configMap:
+            name: "my-metrics-config"
+  racks:
+    - name: r1
+  config:
+    jvm-server-options:
+      initial_heap_size: "512m"
+      max_heap_size: "512m"

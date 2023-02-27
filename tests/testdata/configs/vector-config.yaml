@@ -1,0 +1,20 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: vector-config
+  namespace: cass-operator
+data:
+  vector.toml: |
+    [sources.systemlog]
+    type = "file"
+    include = [ "/var/log/cassandra/*.log" ]
+    read_from = "end"
+
+    [sources.vector_logs]
+    type = "internal_logs"
+
+    [sinks.console]
+    type = "console"
+    inputs = ["systemlog", "vector_logs"]
+    target = "stdout"
+    encoding.codec = "text"

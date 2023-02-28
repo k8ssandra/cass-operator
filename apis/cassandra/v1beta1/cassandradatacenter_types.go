@@ -712,7 +712,7 @@ func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
 	modelValues := serverconfig.GetModelValues(
 		seeds,
 		dc.Spec.ClusterName,
-		dc.CassDcName(),
+		dc.DatacenterName(),
 		graphEnabled,
 		solrEnabled,
 		sparkEnabled,
@@ -951,16 +951,16 @@ func SplitRacks(nodeCount, rackCount int) []int {
 	return topology
 }
 
-// SanitizedName returns a sanitized version of the name returned by CassDcName()
-func (in *CassandraDatacenter) SanitizedName() string {
-	return CleanupForKubernetes(in.CassDcName())
+// SanitizedName returns a sanitized version of the name returned by DatacenterName()
+func (dc *CassandraDatacenter) SanitizedName() string {
+	return CleanupForKubernetes(dc.DatacenterName())
 }
 
-// CassDcName returns the Cassandra DC name override if it exists,
+// DatacenterName returns the Cassandra DC name override if it exists,
 // otherwise the cassdc object name.
-func (in *CassandraDatacenter) CassDcName() string {
-	if in.Spec.DatacenterName != "" {
-		return in.Spec.DatacenterName
+func (dc *CassandraDatacenter) DatacenterName() string {
+	if dc.Spec.DatacenterName != "" {
+		return dc.Spec.DatacenterName
 	}
-	return in.Name
+	return dc.Name
 }

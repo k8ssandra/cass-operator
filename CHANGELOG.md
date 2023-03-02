@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#501](https://github.com/k8ssandra/cass-operator/issues/501) Replaced server-system-logger with a Vector based implementation. Also, examples are added how the Cassandra system.log can be parsed to a more structured format.
+
 ## v1.14.0
 
 * [CHANGE] [#457](https://github.com/k8ssandra/cass-operator/issues/457) Extract task execution attributes into CassandraTaskTemplate

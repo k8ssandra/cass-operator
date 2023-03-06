@@ -91,8 +91,6 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 			optsSlice = append(optsSlice, nameTag+"="+fmt.Sprintf("%s", reflectedValue))
 		}
 	}
-	// We need to add these two elements to the slice first, because the management agent must start before the CDC agent.
-	// If MCAC is disabled, we need to avoid adding it to startup.
 	CDCOpt := fmt.Sprintf("-javaagent:%s=%s", "/opt/cdc_agent/cdc-agent.jar", strings.Join(optsSlice, ","))
 	// We want to disable MCAC when the server being deployed is DSE
 	if cassDC.Spec.ServerType == "cassandra" && mcacEnabled {
@@ -100,7 +98,7 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 			"-javaagent:/opt/metrics-collector/lib/datastax-mcac-agent.jar",
 		)
 	}
-	out = append(out, // We need to add these two elements to the slice first, because the management agent must start before the CDC agent.
+	out = append(out,
 		"-javaagent:/opt/management-api/datastax-mgmtapi-agent.jar",
 	)
 	return append(out, CDCOpt), nil

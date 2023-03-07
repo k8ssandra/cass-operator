@@ -20,8 +20,8 @@ data:
     [transforms.parse_cassandra_log]
     type = "remap"
     inputs = [ "systemlog" ]
-    .del(source_type)
     source = '''
+    del(.source_type)
     . |= parse_groks!(.message, patterns: [
       "%{LOGLEVEL:loglevel}\\s+\\[(?<thread>((.+)))\\]\\s+%{TIMESTAMP_ISO8601:timestamp}\\s+%{JAVACLASS:class}:%{NUMBER:line}\\s+-\\s+(?<message>(.+\\n?)+)",
       ]

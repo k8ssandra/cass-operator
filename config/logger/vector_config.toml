@@ -1,0 +1,12 @@
+[sources.systemlog]
+type = "file"
+include = [ "/var/log/cassandra/system.log" ]
+read_from = "end"
+
+[sinks.console]
+type = "console"
+inputs = ["systemlog"]
+target = "stdout"
+
+[sinks.console.encoding]
+codec = "text"

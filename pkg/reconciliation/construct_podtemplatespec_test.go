@@ -456,11 +456,47 @@ func TestCassandraContainerEnvVars(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(templateSpec.Spec.Containers), "expected to find 2 containers, cassandra and server-system-logger")
 
-	cassContainer := templateSpec.Spec.Containers[0]
+	cassContainer := findContainer(templateSpec.Spec.Containers, CassandraContainerName)
 	assert.Equal(t, CassandraContainerName, cassContainer.Name)
 
 	assert.True(t, envVarsContains(cassContainer.Env, podNameEnvVar))
 	assert.True(t, envVarsContains(cassContainer.Env, nodeNameEnvVar))
+}
+
+func TestLoggerContainerEnvVars(t *testing.T) {
+	assert := assert.New(t)
+
+	podNameEnvVar := corev1.EnvVar{Name: "POD_NAME", ValueFrom: selectorFromFieldPath("metadata.name")}
+	nodeNameEnvVar := corev1.EnvVar{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")}
+	rackNameEnvVar := corev1.EnvVar{Name: "RACK_NAME", ValueFrom: selectorFromFieldPath("metadata.labels['cassandra.datastax.com/rack']")}
+
+	templateSpec := &corev1.PodTemplateSpec{}
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "test",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "test",
+			ServerType:    "cassandra",
+			ServerVersion: "4.0.7",
+		},
+	}
+
+	err := buildContainers(dc, templateSpec)
+	require.NoError(t, err)
+	assert.Equal(2, len(templateSpec.Spec.Containers), "expected to find 2 containers, cassandra and server-system-logger")
+
+	loggerContainer := findContainer(templateSpec.Spec.Containers, SystemLoggerContainerName)
+	assert.Equal(SystemLoggerContainerName, loggerContainer.Name)
+
+	assert.Equal(5, len(loggerContainer.Env))
+
+	assert.True(envVarsContains(loggerContainer.Env, podNameEnvVar))
+	assert.True(envVarsContains(loggerContainer.Env, nodeNameEnvVar))
+	assert.True(envVarsContains(loggerContainer.Env, rackNameEnvVar))
+	assert.True(envVarsContains(loggerContainer.Env, corev1.EnvVar{Name: "CLUSTER_NAME", Value: dc.Spec.ClusterName}))
+	assert.True(envVarsContains(loggerContainer.Env, corev1.EnvVar{Name: "DATACENTER_NAME", Value: dc.DatacenterName()}))
 }
 
 func TestCassandraDatacenter_buildContainers_override_other_containers(t *testing.T) {

@@ -18,11 +18,16 @@ spec:
         requests:
           storage: 1Gi
     additionalVolumes:
-      - name: metric-config
+      - name: metrics-config
         mountPath: /opt/management-api/configs
         volumeSource:
           configMap:
             name: "my-metrics-config"
+      - name: vector-config
+        mountPath: /etc/vector
+        volumeSource:
+          configMap:
+            name: "vector-config"
   racks:
     - name: r1
   config:

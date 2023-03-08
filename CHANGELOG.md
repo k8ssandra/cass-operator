@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#501](https://github.com/k8ssandra/cass-operator/issues/501) Replaced server-system-logger with a Vector based implementation. Also, examples are added how the Cassandra system.log can be parsed to a more structured format.
+* [ENHANCEMENT] [#500](https://github.com/k8ssandra/cass-operator/issues/500) Allow the /start command to run for a longer period of time (up to 10 minutes), before killing the pod if no response is received. This is intermediate solution until we can correctly detect from the pod that the start is not proceeding correctly.
 
 ## v1.14.0
 

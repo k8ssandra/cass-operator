@@ -80,7 +80,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReady(dcName)
 
 			// Ensure we have a single CassandraTask created which is a cleanup (and it succeeded)
-			ns.CheckForCompletedCassandraTasks(dcName, "cleanup", 1)
+			ns.WaitForCompletedCassandraTasks(dcName, "cleanup", 1)
 
 			step = "scale up to 4 nodes"
 			json = "{\"spec\": {\"size\": 4}}"
@@ -93,7 +93,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
 
 			// Ensure we have two CassandraTasks created which are cleanup (and they succeeded)
-			ns.CheckForCompletedCassandraTasks(dcName, "cleanup", 2)
+			ns.WaitForCompletedCassandraTasks(dcName, "cleanup", 2)
 
 			step = "scale up to 5 nodes"
 			json = "{\"spec\": {\"size\": 5}}"
@@ -106,7 +106,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
 
 			// Ensure we have three CassandraTasks created which are cleanup (and they succeeded)
-			ns.CheckForCompletedCassandraTasks(dcName, "cleanup", 3)
+			ns.WaitForCompletedCassandraTasks(dcName, "cleanup", 3)
 
 			// Also verify that we have exactly 3 tasks, no more
 			ns.CheckForCassandraTasks(dcName, "cleanup", false, 3)

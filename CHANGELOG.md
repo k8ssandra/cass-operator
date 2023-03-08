@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#501](https://github.com/k8ssandra/cass-operator/issues/501) Replaced server-system-logger with a Vector based implementation. Also, examples are added how the Cassandra system.log can be parsed to a more structured format.
+* [CHANGE] []() ScalingUp is no longer tied to the lifecycle of the cleanup job. The cleanup job is created after the ScaleUp has finished, but to track its progress one should check the status of the CassandraTask and not the CassandraDatacenter's status. Also, added a new annotation to the Datacenter "cassandra.datastax.com/no-cleanup", which if set prevents from the creation of the CassandraTask.
 
 ## v1.14.0
 

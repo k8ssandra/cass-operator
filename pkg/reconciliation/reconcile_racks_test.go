@@ -1636,7 +1636,13 @@ func TestFailedStart(t *testing.T) {
 	mockClient := &mocks.Client{}
 	rc.Client = mockClient
 
-	k8sMockClientDelete(mockClient, nil).Times(1)
+	done := make(chan struct{})
+	k8sMockClientDelete(mockClient, nil).Once().Run(func(mock.Arguments) { close(done) })
+
+	// Patch labelStarting, lastNodeStarted..
+	k8sMockClientPatch(mockClient, nil).Once()
+	k8sMockClientStatus(mockClient, mockClient).Once()
+	k8sMockClientPatch(mockClient, nil).Once()
 
 	res := &http.Response{
 		StatusCode: http.StatusInternalServerError,
@@ -1670,7 +1676,14 @@ func TestFailedStart(t *testing.T) {
 	rc.Recorder = fakeRecorder
 
 	err := rc.startCassandra(epData, pod)
-	assert.Error(t, err)
+	// The start is async method, so the error is not returned here
+	assert.Nil(t, err)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		assert.Fail(t, "No pod delete occurred")
+	}
 
 	close(fakeRecorder.Events)
 	// Should have 2 events, one to indicate Cassandra is starting, one to indicate it failed to start

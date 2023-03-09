@@ -708,7 +708,7 @@ func (client *NodeMgmtClient) CallLifecycleStartEndpointWithReplaceIp(pod *corev
 		endpoint: endpoint,
 		host:     podIP,
 		method:   http.MethodPost,
-		timeout:  10 * time.Second,
+		timeout:  10 * time.Minute,
 	}
 
 	_, err := callNodeMgmtEndpoint(client, request, "")

@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#500](https://github.com/k8ssandra/cass-operator/issues/500) Allow the /start command to run for a longer period of time (up to 10 minutes), before killing the pod if no response is received. This is intermediate solution until we can correctly detect from the pod that the start is not proceeding correctly.
 * [BUGFIX] [#444](https://github.com/k8ssandra/cass-operator/issues/444) Update cass-config-builder to 1.0.5.
 * [BUGFIX] [#415](https://github.com/k8ssandra/cass-operator/issues/415) Fix version override + imageRegistry issue where output would be invalid
 * [BUGFIX] [#437](https://github.com/k8ssandra/cass-operator/issues/437) Ignore cluster healthy check on Datacenter decommission. Rest of #437 fix is not applied since this version does not have that bug.

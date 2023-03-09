@@ -1758,7 +1758,6 @@ func (rc *ReconciliationContext) findStartedNotReadyNodes() (bool, error) {
 
 func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMetadataEndpoints, pod *corev1.Pod) error {
 	dc := rc.Datacenter
-	mgmtClient := rc.NodeMgmtClient
 
 	// Are we replacing this node?
 	shouldReplacePod := utils.IndexOfString(dc.Status.NodeReplacements, pod.Name) > -1
@@ -1783,33 +1782,34 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 		}
 	}
 
-	var err error
-
-	if shouldReplacePod && replaceAddress != "" {
-		// If we have a replace address that means the cassandra node did
-		// join the ring previously and is marked for replacement, so we
-		// start it accordingly
-		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.StartingCassandraAndReplacingNode,
-			"Starting Cassandra for pod %s to replace Cassandra node with address %s", pod.Name, replaceAddress)
-		err = mgmtClient.CallLifecycleStartEndpointWithReplaceIp(pod, replaceAddress)
-	} else {
-		// Either we are not replacing this pod or the relevant cassandra node
-		// never joined the ring in the first place and can be started normally
-		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.StartingCassandra,
-			"Starting Cassandra for pod %s", pod.Name)
-		err = mgmtClient.CallLifecycleStartEndpoint(pod)
-	}
-
-	if err != nil {
-		// Pod was unable to start. Most likely this is not a recoverable error, so lets kill the pod and
-		// try again.
-		if deleteErr := rc.Client.Delete(rc.Ctx, pod); deleteErr != nil {
-			return deleteErr
+	go func(pod *corev1.Pod) {
+		var err error
+		if shouldReplacePod && replaceAddress != "" {
+			// If we have a replace address that means the cassandra node did
+			// join the ring previously and is marked for replacement, so we
+			// start it accordingly
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.StartingCassandraAndReplacingNode,
+				"Starting Cassandra for pod %s to replace Cassandra node with address %s", pod.Name, replaceAddress)
+			err = rc.NodeMgmtClient.CallLifecycleStartEndpointWithReplaceIp(pod, replaceAddress)
+		} else {
+			// Either we are not replacing this pod or the relevant cassandra node
+			// never joined the ring in the first place and can be started normally
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.StartingCassandra,
+				"Starting Cassandra for pod %s", pod.Name)
+			err = rc.NodeMgmtClient.CallLifecycleStartEndpoint(pod)
 		}
-		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.StartingCassandra,
-			"Failed to start pod %s, deleting it", pod.Name)
-		return err
-	}
+
+		if err != nil {
+			// Pod was unable to start. Most likely this is not a recoverable error, so lets kill the pod and
+			// try again.
+			if deleteErr := rc.Client.Delete(rc.Ctx, pod); deleteErr != nil {
+				rc.ReqLogger.Error(err, "Unable to delete the pod, pod has failed to start", "Pod", pod.Name)
+			}
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.StartingCassandra,
+				"Failed to start pod %s, deleting it", pod.Name)
+		}
+	}(pod)
+
 	return rc.labelServerPodStarting(pod)
 }
 

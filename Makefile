@@ -243,12 +243,12 @@ OPM ?= $(LOCALBIN)/opm
 
 ## Tool Versions
 CERT_MANAGER_VERSION ?= v1.10.1
-KUSTOMIZE_VERSION ?= v4.5.7
+KUSTOMIZE_VERSION ?= v5.0.0
 CONTROLLER_TOOLS_VERSION ?= v0.10.0
 OPERATOR_SDK_VERSION ?= 1.25.1
 HELM_VERSION ?= 3.10.2
 OPM_VERSION ?= 1.26.2
-GOLINT_VERSION ?= 1.50.1
+GOLINT_VERSION ?= 1.51.2
 
 .PHONY: cert-manager
 cert-manager: ## Install cert-manager to the cluster
@@ -372,4 +372,8 @@ catalog-push: ## Push a catalog image.
 
 .PHONY: golangci-lint
 golangci-lint:
+	@if test -x $(LOCALBIN)/golangci-lint && ! $(LOCALBIN)/golangci-lint version | grep -q $(GOLINT_VERSION); then \
+		echo "$(LOCALBIN)/golangci-lint version is not expected $(GOLINT_VERSION). Removing it before installing."; \
+		rm -rf $(LOCALBIN)/golangci-lint; \
+	fi
 	test -s $(LOCALBIN)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v$(GOLINT_VERSION)

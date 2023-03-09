@@ -129,11 +129,11 @@ func (ns NsWrapper) Terminate() {
 	Expect(dcErr).ToNot(HaveOccurred())
 }
 
-//===================================
+// ===================================
 // Logging functions for the NsWrapper
 // that execute the Kcmd and then dump
 // k8s logs for that namespace
-//====================================
+// ====================================
 func sanitizeForLogDirs(s string) string {
 	reg, err := regexp.Compile(`[\s\\\/\-\.,]`)
 	mageutil.PanicOnError(err)
@@ -530,4 +530,26 @@ func (ns *NsWrapper) CheckForCompletedCassandraTasks(dcName, command string, cou
 		WithLabel("control.k8ssandra.io/status=completed").
 		FormatOutput(json)
 	ns.WaitForOutputAndLog(step, k, duplicate(command, count), 120)
+}
+
+func (ns *NsWrapper) WaitForCompletedCassandraTasks(dcName, command string, count int) {
+	ns.CheckForCompletedCassandraTasks(dcName, command, count)
+}
+
+func (ns *NsWrapper) WaitForCompleteTask(taskName string) {
+	step := "checking that cassandratask status CompletionTime has a value"
+	json := "jsonpath={.status.completionTime}"
+	k := kubectl.Get("cassandratask", taskName).
+		FormatOutput(json)
+
+	ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, 360)
+}
+
+func (ns *NsWrapper) ExpectDatacenterNameStatusUpdated(dcName, dcNameOverride string) {
+	step := "checking that CassandraDatacenter status has been updated with the correct name"
+	json := "jsonpath={.status.datacenterName}"
+	k := kubectl.Get("CassandraDatacenter", dcName).
+		FormatOutput(json)
+
+	ns.WaitForOutputAndLog(step, k, dcNameOverride, 120)
 }

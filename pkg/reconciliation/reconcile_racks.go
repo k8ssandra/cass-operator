@@ -2168,59 +2168,14 @@ func (rc *ReconciliationContext) CheckCassandraNodeStatuses() result.ReconcileRe
 }
 
 func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
-	// Verify if the cleanup task has completed before moving on the with ScalingUp finished
-	task, err := rc.findActiveTask("cleanup")
-	if err != nil {
-		return result.Error(err)
-	}
-
-	if task != nil {
-		return rc.activeTaskCompleted(task)
-	}
-
-	// Create the cleanup task
-	err = rc.createTask("cleanup")
-	if err != nil {
-		return result.Error(err)
-	}
-
-	return result.RequeueSoon(10)
-}
-
-func (rc *ReconciliationContext) activeTaskCompleted(task *taskapi.CassandraTask) result.ReconcileResult {
-	if task.Status.CompletionTime != nil {
-		// Job was completed, remove it from followed task
-		dc := rc.Datacenter
-		dcPatch := client.MergeFrom(dc.DeepCopy())
-
-		rc.Datacenter.Status.RemoveTrackedTask(task.ObjectMeta)
-
-		if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
+	if !metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.NoAutomatedCleanupAnnotation) {
+		// Create the cleanup task
+		if err := rc.createTask(string(taskapi.CommandCleanup)); err != nil {
 			return result.Error(err)
 		}
-
-		return result.Continue()
 	}
-	return result.RequeueSoon(10)
-}
 
-func (rc *ReconciliationContext) findActiveTask(command taskapi.CassandraCommand) (*taskapi.CassandraTask, error) {
-	if len(rc.Datacenter.Status.TrackedTasks) > 0 {
-		for _, taskMeta := range rc.Datacenter.Status.TrackedTasks {
-			taskKey := types.NamespacedName{Name: taskMeta.Name, Namespace: taskMeta.Namespace}
-			task := &taskapi.CassandraTask{}
-			if err := rc.Client.Get(rc.Ctx, taskKey, task); err != nil {
-				return nil, err
-			}
-
-			for _, job := range task.Spec.Jobs {
-				if job.Command == command {
-					return task, nil
-				}
-			}
-		}
-	}
-	return nil, nil
+	return result.Continue()
 }
 
 func (rc *ReconciliationContext) createTask(command string) error {
@@ -2282,7 +2237,7 @@ func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileRe
 
 	// Explicitly handle scaling up here because we want to run a cleanup afterwards
 	if dc.GetConditionStatus(api.DatacenterScalingUp) == corev1.ConditionTrue {
-		// Call the first node with cleanup, wait until it has finished and then move on to the next pod..
+		// Spawn a cleanup task before continuing
 		if res := rc.cleanupAfterScaling(); res.Completed() {
 			return res
 		}

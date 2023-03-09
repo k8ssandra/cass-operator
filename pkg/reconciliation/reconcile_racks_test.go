@@ -1525,23 +1525,8 @@ func TestCleanupAfterScaling(t *testing.T) {
 	k8sMockClientPatch(mockClient, nil).Once()
 
 	r := rc.cleanupAfterScaling()
-	assert.Equal(result.RequeueSoon(10), r, "expected result of result.RequeueSoon(10)")
-	assert.Equal(1, len(rc.Datacenter.Status.TrackedTasks))
-
-	// 3. GET - return completed task
-	k8sMockClientGet(rc.Client.(*mocks.Client), nil).
-		Run(func(args mock.Arguments) {
-			arg := args.Get(2).(*taskapi.CassandraTask)
-			task.DeepCopyInto(arg)
-			timeNow := metav1.Now()
-			arg.Status.CompletionTime = &timeNow
-		}).Once()
-	// 4. Patch to datacenter status
-	k8sMockClientPatch(mockClient, nil).Once()
-
-	r = rc.cleanupAfterScaling()
 	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
-	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
+	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
 }
 
 func TestStripPassword(t *testing.T) {

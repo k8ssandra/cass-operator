@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#496](https://github.com/k8ssandra/cass-operator/issues/496) ScalingUp is no longer tied to the lifecycle of the cleanup job. The cleanup job is created after the ScaleUp has finished, but to track its progress one should check the status of the CassandraTask and not the CassandraDatacenter's status. Also, added a new annotation to the Datacenter "cassandra.datastax.com/no-cleanup", which if set prevents from the creation of the CassandraTask.
 * [ENHANCEMENT] [#500](https://github.com/k8ssandra/cass-operator/issues/500) Allow the /start command to run for a longer period of time (up to 10 minutes), before killing the pod if no response is received. This is intermediate solution until we can correctly detect from the pod that the start is not proceeding correctly.
 * [BUGFIX] [#444](https://github.com/k8ssandra/cass-operator/issues/444) Update cass-config-builder to 1.0.5.
 * [BUGFIX] [#415](https://github.com/k8ssandra/cass-operator/issues/415) Fix version override + imageRegistry issue where output would be invalid

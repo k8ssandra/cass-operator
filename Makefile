@@ -248,7 +248,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.10.0
 OPERATOR_SDK_VERSION ?= 1.25.1
 HELM_VERSION ?= 3.10.2
 OPM_VERSION ?= 1.26.2
-GOLINT_VERSION ?= 1.50.1
+GOLINT_VERSION ?= 1.51.2
 
 .PHONY: cert-manager
 cert-manager: ## Install cert-manager to the cluster

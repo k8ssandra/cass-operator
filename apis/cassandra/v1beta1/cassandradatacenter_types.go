@@ -60,6 +60,10 @@ const (
 	// If no finalizer is set, the cass-operator ProcessDeletion() is not run
 	Finalizer = "finalizer.cassandra.datastax.com"
 
+	// NoAutomatedCleanUpAnnotation prevents the cass-operator from creating a CassandraTask to do cleanup after the
+	// cluster has gone through scale up operation.
+	NoAutomatedCleanupAnnotation = "cassandra.datastax.com/no-cleanup"
+
 	CassNodeState = "cassandra.datastax.com/node-state"
 
 	ProgressUpdating ProgressState = "Updating"

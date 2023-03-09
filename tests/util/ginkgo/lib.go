@@ -668,7 +668,7 @@ func (ns *NsWrapper) CheckForCassandraTasks(dcName, command string, completed bo
 	ns.WaitForOutputAndLog(step, k, duplicate(command, count), 120)
 }
 
-func (ns *NsWrapper) CheckForCompletedCassandraTasks(dcName, command string, count int) {
+func (ns *NsWrapper) WaitForCompletedCassandraTasks(dcName, command string, count int) {
 	ns.CheckForCassandraTasks(dcName, command, true, count)
 }
 

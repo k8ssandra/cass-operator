@@ -1665,11 +1665,11 @@ func TestFailedStart(t *testing.T) {
 		assert.Fail(t, "No pod delete occurred")
 	}
 
+	mockClient.AssertExpectations(t)
+
 	close(fakeRecorder.Events)
 	// Should have 2 events, one to indicate Cassandra is starting, one to indicate it failed to start
 	assert.Equal(t, 2, len(fakeRecorder.Events))
-
-	mockClient.AssertExpectations(t)
 }
 
 func TestReconciliationContext_startAllNodes(t *testing.T) {
@@ -1771,6 +1771,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 			mockClient := &mocks.Client{}
 			rc.Client = mockClient
 
+			done := make(chan struct{})
 			if tt.wantNotReady {
 				// mock the calls in labelServerPodStarting:
 				// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
@@ -1778,7 +1779,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				// get the status client
 				k8sMockClientStatus(mockClient, mockClient)
 				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
-				k8sMockClientPatch(mockClient, nil)
+				k8sMockClientPatch(mockClient, nil).Run(func(mock.Arguments) { close(done) })
 			}
 
 			epData := httphelper.CassMetadataEndpoints{
@@ -1789,6 +1790,14 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equalf(t, tt.wantNotReady, gotNotReady, "expected not ready to be %v", tt.wantNotReady)
+
+			if tt.wantNotReady {
+				select {
+				case <-done:
+				case <-time.After(2 * time.Second):
+					assert.Fail(t, "No pod start occurred")
+				}
+			}
 
 			fakeRecorder := rc.Recorder.(*record.FakeRecorder)
 			close(fakeRecorder.Events)
@@ -1917,19 +1926,19 @@ func TestStartOneNodePerRack(t *testing.T) {
 			}
 
 			rc.NodeMgmtClient = client
+			done := make(chan struct{})
 
 			// mock the calls in labelServerPodStarting:
 			// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
-			k8sMockClientPatch(mockClient, nil)
+			k8sMockClientPatch(mockClient, nil).Once()
 			// get the status client
-			k8sMockClientStatus(mockClient, mockClient)
-			// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
-			k8sMockClientPatch(mockClient, nil)
+			k8sMockClientStatus(mockClient, mockClient).Once()
+			if tt.wantNotReady {
+				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
+				k8sMockClientPatch(mockClient, nil).Run(func(mock.Arguments) { close(done) })
+			}
 
-			k8sMockClientPatch(mockClient, nil)
-			k8sMockClientPatch(mockClient, nil)
-			k8sMockClientPatch(mockClient, nil)
-			k8sMockClientPatch(mockClient, nil)
+			k8sMockClientPatch(mockClient, nil).Times(4)
 
 			// 3. GET - return completed task
 			k8sMockClientGet(rc.Client.(*mocks.Client), nil).
@@ -1939,15 +1948,22 @@ func TestStartOneNodePerRack(t *testing.T) {
 					// return &corev1.Endpoints{}
 				}).Once()
 
-			k8sMockClientGet(mockClient, nil)
-			// }
-
 			epData := httphelper.CassMetadataEndpoints{
 				Entity: []httphelper.EndpointState{},
 			}
 
 			gotNotReady, err := rc.startOneNodePerRack(epData, tt.seedCount)
 
+			if tt.wantNotReady {
+				select {
+				case <-done:
+				case <-time.After(2 * time.Second):
+					assert.Fail(t, "No pod start occurred")
+				}
+			}
+
+			// TODO This test isn't working correctly for REST call checking
+			// mockClient.AssertExpectations(t)
 			assert.NoError(t, err)
 			assert.Equalf(t, tt.wantNotReady, gotNotReady, "expected not ready to be %v", tt.wantNotReady)
 		})

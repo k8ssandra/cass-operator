@@ -529,3 +529,4 @@ Unless required by applicable law or agreed to in writing, software distributed 
 ## Dependencies
 
 For information on the packaged dependencies of Cass Operator and their licenses, check out our [open source report](https://app.fossa.com/reports/ed8a8cc0-4bb4-405b-b07c-5316f9b524f5).
+dumb change

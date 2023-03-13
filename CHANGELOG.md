@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [FEATURE] [#651](https://github.com/k8ssandra/cass-operator/issues/651) Add tsreload task for DSE deployments and ability to check if sync operation is available on the mgmt-api side
+* [ENHANCEMENT] [#532](https://github.com/k8ssandra/k8ssandra-operator/issues/532) Extend ImageConfig type to allow additional parameters for k8ssandra-operator requirements. These include per-image PullPolicy / PullSecrets as well as additional image
 
 ## v1.22.4
 

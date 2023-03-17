@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest an idea for this project
+labels: [enhancement]
+body:
+  - type: textarea
+    id: feature
+    attributes:
+      label: What is missing?
+      description: |
+        Please describe the improvement you would like to see in the project. This could be an enhancement to an existing feature as well as new a feature. If you have any references,
+        please add them also for context.
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why is this needed?
+    validations:
+      required: true

@@ -1,0 +1,57 @@
+name: 🐞 Bug report
+description: Report a bug to help us improve
+labels: [bug]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: |
+        Please provide as much info as possible. If you have questions, you can also visit our Discord server: https://discord.gg/Fgep3hwm
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: false
+  - type: textarea
+    id: repro
+    attributes:
+      label: How can we reproduce it (as minimally and precisely as possible)?
+    validations:
+      required: true
+  - type: input
+    id: cass-operator-version
+    attributes:
+      label: cass-operator version
+      description: The release version or the used container image
+    validations:
+      required: true
+  - type: input
+    id: kube-version
+    attributes:
+      label: Kubernetes version
+      description: kubectl version output
+    validations:
+      required: true
+  - type: input
+    id: install-type
+    attributes:
+      label: Method of installation
+      description: How was cass-operator deployed? Kustomize, Helm, Argo etc
+      placeholder: Kustomize
+    validations:
+      required: false
+  - type: textarea
+    id: additional
+    attributes:
+      label: Anything else we need to know?
+      description: |
+        If there are relevant cass-operator logs, add them here.
+        If this is installation issue, let us also know the version of used tool (such as Helm / Kustomize).
+        If there's a reference to this issue (Discord link, K8ssandra forums, etc) add it here.
+    validations:
+      required: false
+  

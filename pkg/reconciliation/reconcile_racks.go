@@ -28,7 +28,6 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
-	"github.com/k8ssandra/cass-operator/pkg/psp"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
@@ -2363,16 +2362,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 
 	if recResult := rc.CheckRackForceUpgrade(); recResult.Completed() {
 		return recResult.Output()
-	}
-
-	if utils.IsPSPEnabled() {
-		if recResult := psp.CheckEMM(rc); recResult.Completed() {
-			return recResult.Output()
-		}
-
-		// if recResult := psp.CheckPVCHealth(rc); recResult.Completed() {
-		// 	return recResult.Output()
-		// }
 	}
 
 	if recResult := rc.CheckRackScale(); recResult.Completed() {

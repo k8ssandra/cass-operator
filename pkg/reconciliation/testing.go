@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/k8ssandra/cass-operator/pkg/psp"
 	mock "github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -130,8 +129,6 @@ func CreateMockReconciliationContext(
 		Return(res, nil)
 
 	rc.NodeMgmtClient = httphelper.NodeMgmtClient{Client: mockHttpClient, Log: reqLogger, Protocol: "http"}
-
-	rc.PSPHealthUpdater = &psp.NoOpUpdater{}
 
 	return rc
 }

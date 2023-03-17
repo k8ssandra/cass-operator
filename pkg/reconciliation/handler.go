@@ -20,7 +20,6 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
-	"github.com/k8ssandra/cass-operator/pkg/psp"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
@@ -147,25 +146,11 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 		return result.Output()
 	}
 
-	if utils.IsPSPEnabled() {
-		if result := psp.CheckNetworkPolicies(rc); result.Completed() {
-			return result.Output()
-		}
-	}
-
 	if err := rc.CalculateRackInformation(); err != nil {
 		return result.Error(err).Output()
 	}
 
 	result, err := rc.ReconcileAllRacks()
-
-	if err == nil {
-		// Update PSP status
-		// Always sync the datacenter status with the PSP health status
-		if err := rc.PSPHealthUpdater.Update(*rc.Datacenter); err != nil {
-			return reconcile.Result{}, err
-		}
-	}
 
 	return result, err
 }

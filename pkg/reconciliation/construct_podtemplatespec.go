@@ -408,8 +408,6 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		{Name: "RACK_NAME", Value: rackName},
 		{Name: "PRODUCT_VERSION", Value: serverVersion},
 		{Name: "PRODUCT_NAME", Value: dc.Spec.ServerType},
-		// TODO remove this post 1.0
-		{Name: "DSE_VERSION", Value: serverVersion},
 	}
 
 	envDefaults = append(envDefaults, configEnvVar...)

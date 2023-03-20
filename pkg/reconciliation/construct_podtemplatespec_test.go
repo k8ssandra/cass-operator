@@ -361,11 +361,7 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 				{
 					Name:  "PRODUCT_NAME",
 					Value: "cassandra",
-				},
-				{
-					Name:  "DSE_VERSION",
-					Value: "3.11.10",
-				},
+				}
 			},
 		},
 		{
@@ -392,11 +388,7 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 				{
 					Name:  "PRODUCT_NAME",
 					Value: "cassandra",
-				},
-				{
-					Name:  "DSE_VERSION",
-					Value: "3.11.10",
-				},
+				}
 			},
 		},
 	}

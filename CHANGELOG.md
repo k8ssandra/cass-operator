@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#532](https://github.com/k8ssandra/k8ssandra-operator/issues/532) Extend ImageConfig type to allow additional parameters for k8ssandra-operator requirements. These include per-image PullPolicy / PullSecrets as well as additional image definitions.
+
 ## v1.15.0
 
 * [CHANGE] [#501](https://github.com/k8ssandra/cass-operator/issues/501) Replaced server-system-logger with a Vector based implementation. Also, examples are added how the Cassandra system.log can be parsed to a more structured format.

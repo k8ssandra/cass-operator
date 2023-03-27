@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"encoding/json"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -35,6 +37,10 @@ type ImageConfig struct {
 
 	DefaultImages *DefaultImages `json:"defaults,omitempty"`
 
+	ImagePolicy
+}
+
+type ImagePolicy struct {
 	ImageRegistry string `json:"imageRegistry,omitempty"`
 
 	ImagePullSecret corev1.LocalObjectReference `json:"imagePullSecret,omitempty"`
@@ -52,22 +58,81 @@ type Images struct {
 
 	DSEVersions map[string]string `json:"dse,omitempty"`
 
-	SystemLogger string `json:"system-logger"`
+	SystemLogger string `json:"system-logger,omitempty"`
 
-	ConfigBuilder string `json:"config-builder"`
+	ConfigBuilder string `json:"config-builder,omitempty"`
+
+	Others map[string]string `json:",inline,omitempty"`
 }
 
+type _Images Images
+
+func (i *Images) UnmarshalJSON(b []byte) error {
+	var imagesTemp _Images
+	if err := json.Unmarshal(b, &imagesTemp); err != nil {
+		return err
+	}
+	*i = Images(imagesTemp)
+
+	var otherFields map[string]interface{}
+	if err := json.Unmarshal(b, &otherFields); err != nil {
+		return err
+	}
+
+	delete(otherFields, CassandraImageComponent)
+	delete(otherFields, DSEImageComponent)
+	delete(otherFields, SystemLoggerImageComponent)
+	delete(otherFields, ConfigBuilderImageComponent)
+
+	others := make(map[string]string, len(otherFields))
+	for k, v := range otherFields {
+		others[k] = v.(string)
+	}
+
+	i.Others = others
+	return nil
+}
+
+const (
+	CassandraImageComponent     string = "cassandra"
+	DSEImageComponent           string = "dse"
+	SystemLoggerImageComponent  string = "system-logger"
+	ConfigBuilderImageComponent string = "config-builder"
+)
+
+type ImageComponents map[string]ImageComponent
+
 type DefaultImages struct {
-	metav1.TypeMeta `json:",inline"`
+	ImageComponents
+}
 
-	CassandraImageComponent ImageComponent `json:"cassandra,omitempty"`
+func (d *DefaultImages) MarshalJSON() ([]byte, error) {
+	// This shouldn't be required, just like it's not with ImagePolicy, but this is Go..
+	return json.Marshal(d.ImageComponents)
+}
 
-	DSEImageComponent ImageComponent `json:"dse,omitempty"`
+func (d *DefaultImages) UnmarshalJSON(b []byte) error {
+	d.ImageComponents = make(map[string]ImageComponent)
+	var input map[string]json.RawMessage
+	if err := json.Unmarshal(b, &input); err != nil {
+		return err
+	}
+
+	for k, v := range input {
+		var component ImageComponent
+		if err := json.Unmarshal(v, &component); err != nil {
+			return err
+		}
+		d.ImageComponents[k] = component
+	}
+
+	return nil
 }
 
 type ImageComponent struct {
 	Repository string `json:"repository,omitempty"`
 	Suffix     string `json:"suffix,omitempty"`
+	ImagePolicy
 }
 
 func init() {

@@ -11,6 +11,16 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+## v1.10.6
+
+* [CHANGE] [#496](https://github.com/k8ssandra/cass-operator/issues/496) ScalingUp is no longer tied to the lifecycle of the cleanup job. The cleanup job is created after the ScaleUp has finished, but to track its progress one should check the status of the CassandraTask and not the CassandraDatacenter's status. Also, added a new annotation to the Datacenter "cassandra.datastax.com/no-cleanup", which if set prevents from the creation of the CassandraTask.
+* [ENHANCEMENT] [#500](https://github.com/k8ssandra/cass-operator/issues/500) Allow the /start command to run for a longer period of time (up to 10 minutes), before killing the pod if no response is received. This is intermediate solution until we can correctly detect from the pod that the start is not proceeding correctly.
+* [BUGFIX] [#444](https://github.com/k8ssandra/cass-operator/issues/444) Update cass-config-builder to 1.0.5.
+* [BUGFIX] [#415](https://github.com/k8ssandra/cass-operator/issues/415) Fix version override + imageRegistry issue where output would be invalid
+* [BUGFIX] [#437](https://github.com/k8ssandra/cass-operator/issues/437) Ignore cluster healthy check on Datacenter decommission. Rest of #437 fix is not applied since this version does not have that bug.
+* [BUGFIX] [#404](https://github.com/k8ssandra/cass-operator/issues/404) Filter unallowed values from the rackname when used in Kubernetes resources
+* [BUGFIX] [#455](https://github.com/k8ssandra/cass-operator/issues/455) After task had completed, the running state would still say true
+
 ## v1.15.0
 
 * [CHANGE] [#501](https://github.com/k8ssandra/cass-operator/issues/501) Replaced server-system-logger with a Vector based implementation. Also, examples are added how the Cassandra system.log can be parsed to a more structured format.

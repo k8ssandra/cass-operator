@@ -6,17 +6,22 @@ import (
 )
 
 // Builds the resource requirements given the default values for cpu and memory.
-func buildResourceRequirements(cpuMillis int64, memoryMB int64) corev1.ResourceRequirements {
-	return corev1.ResourceRequirements{
+func buildResourceRequirements(cpuMillis, memoryMB, cpuLimits, memoryLimits int64) corev1.ResourceRequirements {
+	req := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			"cpu":    *resource.NewMilliQuantity(cpuMillis, resource.DecimalSI),
 			"memory": *resource.NewScaledQuantity(memoryMB, resource.Mega),
 		},
 		Limits: corev1.ResourceList{
-			"cpu":    *resource.NewMilliQuantity(cpuMillis, resource.DecimalSI),
-			"memory": *resource.NewScaledQuantity(memoryMB, resource.Mega),
+			"memory": *resource.NewScaledQuantity(memoryLimits, resource.Mega),
 		},
 	}
+
+	if cpuLimits > int64(0) {
+		req.Limits["cpu"] = *resource.NewMilliQuantity(cpuLimits, resource.DecimalSI)
+	}
+
+	return req
 }
 
 // Determines if the given resource requirements are specified or not.

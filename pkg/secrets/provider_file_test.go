@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -63,7 +64,7 @@ func TestSecretReading(t *testing.T) {
 
 	f := NewFileProvider(tempDir, false)
 
-	s2, err := f.RetrieveSecret(types.NamespacedName{Name: s.Name, Namespace: s.Namespace})
+	s2, err := f.RetrieveSecret(context.TODO(), types.NamespacedName{Name: s.Name, Namespace: s.Namespace})
 	require.NoError(err)
 
 	require.Equal(s.Name, s2.Name)

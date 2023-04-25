@@ -1,6 +1,8 @@
 package secrets
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -9,8 +11,8 @@ import (
 )
 
 type SecretProvider interface {
-	RetrieveSecret(types.NamespacedName) (*corev1.Secret, error)
-	StoreOrUpdateSecret(*corev1.Secret) error
+	RetrieveSecret(context.Context, types.NamespacedName) (*corev1.Secret, error)
+	StoreOrUpdateSecret(context.Context, *corev1.Secret) error
 }
 
 // Common methods that could be used by multiple implementations

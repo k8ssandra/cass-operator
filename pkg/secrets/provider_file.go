@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 
@@ -22,13 +23,14 @@ func NewFileProvider(directoryPath string, namespacePrefix bool) *FileProvider {
 
 // SecretProvider interface
 
-func (f *FileProvider) RetrieveSecret(name types.NamespacedName) (*corev1.Secret, error) {
+func (f *FileProvider) RetrieveSecret(ctx context.Context, name types.NamespacedName) (*corev1.Secret, error) {
 	filename := f.secretPath(name)
 	return readSecret(filename)
 }
 
-func (f *FileProvider) StoreOrUpdateSecret(secret *corev1.Secret) error {
-	// This provider does not store updates to the disk
+func (f *FileProvider) StoreOrUpdateSecret(ctx context.Context, secret *corev1.Secret) error {
+	// This provider does not store updates to the disk. This is intended for use-cases where the secrets are externally
+	// applied to operator's volume
 	return nil
 }
 

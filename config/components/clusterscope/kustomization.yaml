@@ -1,7 +1,7 @@
 # Set WATCH_NAMESPACE to "" in the deployment to provide cluster-wide install
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
-patchesJson6902:
+patches:
 - target:
     group: apps
     version: v1

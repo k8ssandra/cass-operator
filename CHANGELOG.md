@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#516](https://github.com/k8ssandra/cass-operator/issues/516) Modify sidecar default CPU and memory limits.
+
 ## v1.10.6
 
 * [CHANGE] [#496](https://github.com/k8ssandra/cass-operator/issues/496) ScalingUp is no longer tied to the lifecycle of the cleanup job. The cleanup job is created after the ScaleUp has finished, but to track its progress one should check the status of the CassandraTask and not the CassandraDatacenter's status. Also, added a new annotation to the Datacenter "cassandra.datastax.com/no-cleanup", which if set prevents from the creation of the CassandraTask.

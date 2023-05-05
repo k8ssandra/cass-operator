@@ -1930,23 +1930,12 @@ func TestStartOneNodePerRack(t *testing.T) {
 				// get the status client
 				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
 				k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Run(func(mock.Arguments) { close(done) })
-				// k8sMockClientPatch(mockClient, nil).Times(4)
 
 				if tt.seedCount < 1 {
 					// There's additional checks here, for fetching the possible additional-seeds (the GET) and pre-adding a seed label
 					k8sMockClientGet(mockClient, nil)
 					k8sMockClientPatch(mockClient, nil)
 				}
-
-				// 3. GET - return completed task
-				/*
-					k8sMockClientGet(rc.Client.(*mocks.Client), nil).
-						Run(func(args mock.Arguments) {
-							arg := args.Get(2).(*corev1.Endpoints)
-							arg.Subsets = []corev1.EndpointSubset{}
-							// return &corev1.Endpoints{}
-						})
-				*/
 			}
 
 			epData := httphelper.CassMetadataEndpoints{

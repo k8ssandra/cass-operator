@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
@@ -34,10 +35,10 @@ var fullQueryIsSupported string = `{"cassandra_version": "4.0.1",
 var httpResponseFullQueryEnabled string = `{"entity": true}`
 var httpResponseFullQueryDisabled string = `{"entity": false}`
 
-func setupPodList(rc *ReconciliationContext) {
+func setupPodList(t *testing.T, rc *ReconciliationContext) {
 	podIP := "192.168.101.11"
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 
 	pods := []corev1.Pod{{
 		ObjectMeta: metav1.ObjectMeta{
@@ -119,16 +120,16 @@ func mockFullQueryLoggingRequestToFalse(mockHttpClient *mocks.HttpClient) {
 		Twice()
 }
 
-func setupTestEnv() (*ReconciliationContext, func()) {
+func setupTestEnv(t *testing.T) (*ReconciliationContext, func()) {
 	rc, _, cleanupMockScr := setupTest()
-	setupPodList(rc)
+	setupPodList(t, rc)
 	rc.Datacenter.Spec.ServerType = "cassandra"
 	rc.Datacenter.Spec.ServerVersion = "4.0.1"
 	return rc, cleanupMockScr
 }
 
 func TestCheckFullQueryLoggingNoChangeEnabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
 	mockHttpClient := &mocks.HttpClient{}
@@ -155,7 +156,7 @@ func TestCheckFullQueryLoggingNoChangeEnabled(t *testing.T) {
 }
 
 func TestCheckFullQueryLoggingNoChangeDisabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
 	mockHttpClient := &mocks.HttpClient{}
@@ -182,7 +183,7 @@ func TestCheckFullQueryLoggingNoChangeDisabled(t *testing.T) {
 }
 
 func TestCheckFullQueryNotSupported(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
 	mockHttpClient := &mocks.HttpClient{}
@@ -203,7 +204,7 @@ func TestCheckFullQueryNotSupported(t *testing.T) {
 }
 
 func TestCheckFullQueryLoggingChangeToEnabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
 	mockHttpClient := &mocks.HttpClient{}
@@ -230,7 +231,7 @@ func TestCheckFullQueryLoggingChangeToEnabled(t *testing.T) {
 }
 
 func TestCheckFullQueryLoggingChangeToDisabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
 	mockHttpClient := &mocks.HttpClient{}
@@ -256,7 +257,7 @@ func TestCheckFullQueryLoggingChangeToDisabled(t *testing.T) {
 }
 
 func TestCheckFullQueryNotSupportedTriedToUse(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
 	mockHttpClient := &mocks.HttpClient{}
@@ -283,8 +284,11 @@ func TestCheckFullQueryNotSupportedTriedToUse(t *testing.T) {
 }
 
 func TestNotSupportedVersion(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
-	defer cleanupMockScr()
+	rc := ReconciliationContext{
+		Datacenter: &v1beta1.CassandraDatacenter{
+			Spec: v1beta1.CassandraDatacenterSpec{},
+		},
+	}
 
 	rc.Datacenter.Spec.ServerVersion = "3.11.11"
 

@@ -4,7 +4,6 @@
 package reconciliation
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -18,7 +17,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestRetryDecommissionNode(t *testing.T) {
@@ -27,7 +25,7 @@ func TestRetryDecommissionNode(t *testing.T) {
 	state := "UP"
 	podIP := "192.168.101.11"
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	rc.Datacenter.SetCondition(api.DatacenterCondition{
@@ -99,14 +97,14 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 	podIP := "192.168.101.11"
 	state := "LEFT"
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 	rc.Datacenter.SetCondition(api.DatacenterCondition{
 		Status: v1.ConditionTrue,
 		Type:   api.DatacenterScalingDown,
 	})
-	mockStatus := &statusMock{}
-	k8sMockClientStatus(mockClient, mockStatus)
+
+	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil)
 
 	labels := make(map[string]string)
 	labels[api.CassNodeState] = stateDecommissioning
@@ -148,20 +146,4 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 	if r != result.RequeueSoon(5) {
 		t.Fatalf("expected result of blah but got %s", r)
 	}
-	if mockStatus.called != 1 {
-		t.Fatalf("expected 1 call to mockStatus but had %v", mockStatus.called)
-	}
-}
-
-type statusMock struct {
-	called int
-}
-
-func (s *statusMock) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	return nil
-}
-
-func (s *statusMock) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	s.called = s.called + 1
-	return nil
 }

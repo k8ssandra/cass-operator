@@ -183,12 +183,6 @@ func k8sMockClientGet(mockClient *mocks.Client, returnArg interface{}) *mock.Cal
 		Once()
 }
 
-func k8sMockClientStatus(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Status").
-		Return(returnArg).
-		Once()
-}
-
 func k8sMockClientUpdate(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
 	return mockClient.On("Update",
 		mock.MatchedBy(
@@ -204,6 +198,24 @@ func k8sMockClientUpdate(mockClient *mocks.Client, returnArg interface{}) *mock.
 }
 
 func k8sMockClientPatch(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
+	return mockClient.On("Patch",
+		mock.MatchedBy(
+			func(ctx context.Context) bool {
+				return ctx != nil
+			}),
+		mock.MatchedBy(
+			func(obj runtime.Object) bool {
+				return obj != nil
+			}),
+		mock.MatchedBy(
+			func(patch client.Patch) bool {
+				return patch != nil
+			})).
+		Return(returnArg).
+		Once()
+}
+
+func k8sMockClientStatusPatch(mockClient *mocks.SubResourceClient, returnArg interface{}) *mock.Call {
 	return mockClient.On("Patch",
 		mock.MatchedBy(
 			func(ctx context.Context) bool {

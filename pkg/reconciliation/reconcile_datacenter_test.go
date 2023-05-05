@@ -21,7 +21,7 @@ func TestDeletePVCs(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientList(mockClient, nil).
@@ -46,7 +46,7 @@ func TestDeletePVCs_FailedToList(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientList(mockClient, fmt.Errorf("failed to list PVCs for CassandraDatacenter")).
@@ -59,8 +59,6 @@ func TestDeletePVCs_FailedToList(t *testing.T) {
 			}}
 		})
 
-	k8sMockClientDelete(mockClient, nil)
-
 	err := rc.deletePVCs()
 	if err == nil {
 		t.Fatalf("deletePVCs should have failed")
@@ -72,7 +70,7 @@ func TestDeletePVCs_PVCsNotFound(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientList(mockClient, errors.NewNotFound(schema.GroupResource{}, "name")).
@@ -95,7 +93,7 @@ func TestDeletePVCs_FailedToDelete(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientList(mockClient, nil).

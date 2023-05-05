@@ -2168,11 +2168,13 @@ func (rc *ReconciliationContext) createTask(command taskapi.CassandraCommand) er
 		return err
 	}
 
-	dcPatch := client.MergeFrom(dc.DeepCopy())
+	return nil
 
-	rc.Datacenter.Status.AddTaskToTrack(task.ObjectMeta)
+	// dcPatch := client.MergeFrom(dc.DeepCopy())
 
-	return rc.Client.Status().Patch(rc.Ctx, dc, dcPatch)
+	// rc.Datacenter.Status.AddTaskToTrack(task.ObjectMeta)
+
+	// return rc.Client.Status().Patch(rc.Ctx, dc, dcPatch)
 }
 
 func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileResult {

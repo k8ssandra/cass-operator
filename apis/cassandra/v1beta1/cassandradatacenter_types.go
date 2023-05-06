@@ -81,6 +81,25 @@ type CassandraUser struct {
 	Superuser  bool   `json:"superuser"`
 }
 
+type UserInfo struct {
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// MountPath tells the script where to read the user information. Required if annotation injection is used, otherwise optional
+	MountPath  string                  `json:"mountPath,omitempty"`
+	CSI        *corev1.CSIVolumeSource `json:"csi,omitempty"`
+	SecretName string                  `json:"secretName,omitempty"`
+
+	// ServiceAccountName override job ServiceAccount, otherwise Spec.ServiceAccount (the one used to create the server pods) is used
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+	// TODO Add CSI information here
+	/*
+		TODO Testing:
+			* Add back the Helm utilities
+			* Install Vault + Vault server there
+			* Install CSI driver
+			* Try to create clusters with both methods and see that it succeeds (and uses Vault to fetch the user rights)
+	*/
+}
+
 // CassandraDatacenterSpec defines the desired state of a CassandraDatacenter
 // +k8s:openapi-gen=true
 // +kubebuilder:pruning:PreserveUnknownFields
@@ -184,11 +203,13 @@ type CassandraDatacenterSpec struct {
 	// option on in which case the defaults are not set.
 	AllowMultipleNodesPerWorker bool `json:"allowMultipleNodesPerWorker,omitempty"`
 
-	// This secret defines the username and password for the Cassandra server superuser.
+	// SuperuserSecretName is deprecated. Use UserInfo instead. This secret defines the username and password for the Cassandra server superuser.
 	// If it is omitted, we will generate a secret instead.
 	SuperuserSecretName string `json:"superuserSecretName,omitempty"`
 
-	// The k8s service account to use for the server pods
+	UserInfo *UserInfo `json:"userInfo,omitempty"`
+
+	// ServiceAccount is the k8s service account to use for the server pods
 	ServiceAccount string `json:"serviceAccount,omitempty"`
 
 	// DEPRECATED. Use CassandraTask for rolling restarts. Whether to do a rolling restart at the next opportunity. The operator will set this back

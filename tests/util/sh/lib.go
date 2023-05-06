@@ -152,17 +152,6 @@ func OutputWithEnvWithInput(env map[string]string, cmd string, in string, args .
 
 // Copied from mage
 func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, err error) {
-	expand := func(s string) string {
-		s2, ok := env[s]
-		if ok {
-			return s2
-		}
-		return os.Getenv(s)
-	}
-	cmd = os.Expand(cmd, expand)
-	for i := range args {
-		args[i] = os.Expand(args[i], expand)
-	}
 	ran, code, err := run(env, stdout, stderr, cmd, args...)
 	if err == nil {
 		return true, nil

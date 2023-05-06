@@ -12,6 +12,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -104,6 +105,14 @@ func (rc *ReconciliationContext) CalculateRackInformation() error {
 
 func (rc *ReconciliationContext) CheckSuperuserSecretCreation() result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckSuperuserSecretCreation")
+
+	if rc.Datacenter.Spec.UserInfo != nil {
+		return result.Continue()
+	}
+
+	if rc.IsInitialized() {
+		return result.Continue()
+	}
 
 	_, err := rc.retrieveSuperuserSecretOrCreateDefault()
 	if err != nil {
@@ -876,6 +885,10 @@ func (rc *ReconciliationContext) UpdateSecretWatches() error {
 func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 	dc := rc.Datacenter
 
+	if rc.IsInitialized() {
+		return result.Continue()
+	}
+
 	if val, found := dc.Annotations[api.SkipUserCreationAnnotation]; found && val == "true" {
 		rc.ReqLogger.Info(api.SkipUserCreationAnnotation + " is set, skipping CreateUser")
 		return result.Continue()
@@ -888,15 +901,117 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 
 	rc.ReqLogger.Info("reconcile_racks::CreateUsers")
 
+	// TODO We should check if we've already created this ..
+	// TODO This should be cleaned up after a while (TTL)
+	if dc.Spec.UserInfo != nil {
+		// Create the job
+		ttl := int32(86400)
+
+		// TODO Instead of this, I should probably have a "SecretRef" generic structure. That way we could use it for all Secrets (like mgmt-api auth), supporting
+		// 		both legacy as well as new structure
+
+		// How to get this as input?
+		filePath := dc.Spec.UserInfo.MountPath
+
+		// We want to mount it as a directory and read the files as usernames
+		if dc.Spec.UserInfo.CSI != nil || dc.Spec.UserInfo.SecretName != "" {
+			filePath = "/mnt/secrets/users"
+		}
+
+		// TODO wait for it to complete before we continue..
+
+		job := batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: dc.Namespace,
+				Name:      fmt.Sprintf("usercreate-%s", dc.Name),
+			},
+			Spec: batchv1.JobSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:            "client",
+								Image:           "k8ssandra/k8ssandra-client:latest",
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								Args:            []string{"users", "add", "--path", filePath, "--dc", dc.Name},
+							},
+						},
+						RestartPolicy: corev1.RestartPolicyNever,
+					},
+				},
+				TTLSecondsAfterFinished: &ttl,
+			},
+		}
+
+		if len(dc.Spec.UserInfo.Annotations) > 0 {
+			job.Spec.Template.ObjectMeta.Annotations = dc.Spec.UserInfo.Annotations
+		}
+
+		// TODO Add verification that we can't have dual injection (CSI + annotations)
+		if dc.Spec.UserInfo.SecretName != "" || dc.Spec.UserInfo.CSI != nil {
+			vol := corev1.Volume{
+				Name: "user-source",
+			}
+			if dc.Spec.UserInfo.SecretName != "" {
+				vol.VolumeSource = corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: dc.Spec.UserInfo.SecretName,
+					},
+				}
+			}
+
+			if dc.Spec.UserInfo.CSI != nil {
+				vol.VolumeSource = corev1.VolumeSource{
+					CSI: dc.Spec.UserInfo.CSI,
+				}
+			}
+
+			job.Spec.Template.Spec.Volumes = []corev1.Volume{vol}
+			job.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+				{
+					Name:      "user-source",
+					ReadOnly:  true,
+					MountPath: filePath,
+				},
+			}
+		}
+
+		// labels := dc.GetDatacenterLabels()
+		// oplabels.AddOperatorLabels(labels, dc)
+
+		// Set CassandraDatacenter dc as the owner and controller
+		err := setControllerReference(dc, &job, rc.Scheme)
+		if err != nil {
+			return result.Error(err)
+		}
+
+		if dc.Spec.UserInfo.ServiceAccountName != "" {
+			job.Spec.Template.Spec.ServiceAccountName = dc.Spec.UserInfo.ServiceAccountName
+		} else {
+			job.Spec.Template.Spec.ServiceAccountName = dc.Spec.ServiceAccount
+		}
+
+		if err := rc.Client.Create(rc.Ctx, &job); err != nil {
+			if errors.IsAlreadyExists(err) {
+				return result.Continue()
+			}
+			return result.Error(err)
+		}
+		return result.RequeueSoon(5)
+	}
+
 	err := rc.UpdateSecretWatches()
 	if err != nil {
 		rc.ReqLogger.Error(err, "Failed to update dynamic watches on secrets")
 	}
 
 	// make sure the default superuser secret exists
-	_, err = rc.retrieveSuperuserSecretOrCreateDefault()
-	if err != nil {
-		rc.ReqLogger.Error(err, "Failed to verify superuser secret status")
+	// TODO Nope..
+	if dc.Spec.UserInfo == nil {
+		_, err = rc.retrieveSuperuserSecretOrCreateDefault()
+		if err != nil {
+			rc.ReqLogger.Error(err, "Failed to verify superuser secret status")
+		}
 	}
 
 	users := rc.GetUsers()

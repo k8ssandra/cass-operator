@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/k8ssandra/cass-operator/pkg/psp"
@@ -121,7 +122,7 @@ func CreateMockReconciliationContext(
 		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(&testing.T{})
 	mockHttpClient.On("Do",
 		mock.MatchedBy(
 			func(req *http.Request) bool {

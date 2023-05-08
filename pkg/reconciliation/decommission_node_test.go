@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -15,6 +16,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	"github.com/stretchr/testify/mock"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -36,14 +38,18 @@ func TestRetryDecommissionNode(t *testing.T) {
 		StatusCode: http.StatusBadRequest,
 		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
-	mockHttpClient := &mocks.HttpClient{}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	mockHttpClient := mocks.NewHttpClient(t)
 	mockHttpClient.On("Do",
 		mock.MatchedBy(
 			func(req *http.Request) bool {
 				return req.URL.Path == "/api/v0/ops/node/decommission"
 			})).
 		Return(res, nil).
-		Once()
+		Once().
+		Run(func(args mock.Arguments) { wg.Done() })
 
 	resFeatureSet := &http.Response{
 		StatusCode: http.StatusNotFound,
@@ -67,13 +73,19 @@ func TestRetryDecommissionNode(t *testing.T) {
 	labels := make(map[string]string)
 	labels[api.CassNodeState] = stateDecommissioning
 
-	rc.dcPods = []*v1.Pod{{
+	rc.dcPods = []*corev1.Pod{{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "pod-1",
 			Labels: labels,
 		},
-		Status: v1.PodStatus{
+		Status: corev1.PodStatus{
 			PodIP: podIP,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:  "cassandra",
+					Ready: true,
+				},
+			},
 		},
 	}}
 
@@ -89,6 +101,7 @@ func TestRetryDecommissionNode(t *testing.T) {
 	if r != result.RequeueSoon(5) {
 		t.Fatalf("expected result of result.RequeueSoon(5) but got %s", r)
 	}
+	wg.Wait()
 }
 
 func TestRemoveResourcesWhenDone(t *testing.T) {
@@ -100,7 +113,7 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 	rc.Datacenter.SetCondition(api.DatacenterCondition{
-		Status: v1.ConditionTrue,
+		Status: corev1.ConditionTrue,
 		Type:   api.DatacenterScalingDown,
 	})
 
@@ -109,12 +122,12 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 	labels := make(map[string]string)
 	labels[api.CassNodeState] = stateDecommissioning
 
-	rc.dcPods = []*v1.Pod{{
+	rc.dcPods = []*corev1.Pod{{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "pod-1",
 			Labels: labels,
 		},
-		Status: v1.PodStatus{
+		Status: corev1.PodStatus{
 			PodIP: podIP,
 		},
 	}}

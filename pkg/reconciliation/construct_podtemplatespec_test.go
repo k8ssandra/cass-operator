@@ -1457,3 +1457,131 @@ func TestPorts(t *testing.T) {
 		}
 	}
 }
+
+func TestServiceAccountPrecedence(t *testing.T) {
+	assert := assert.New(t)
+
+	tests := []struct {
+		dc          *api.CassandraDatacenter
+		accountName string
+	}{
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:        "bob",
+					ServerType:         "cassandra",
+					ServerVersion:      "4.0.9",
+					ServiceAccountName: "san",
+					Racks: []api.Rack{
+						{
+							Name: "r1",
+						},
+					},
+				},
+			},
+			accountName: "san",
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:    "bob",
+					ServerType:     "cassandra",
+					ServerVersion:  "4.0.9",
+					ServiceAccount: "sa",
+					Racks: []api.Rack{
+						{
+							Name: "r1",
+						},
+					},
+				},
+			},
+			accountName: "sa",
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.9",
+					Racks: []api.Rack{
+						{
+							Name: "r1",
+						},
+					},
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							ServiceAccountName: "pdssa",
+						},
+					},
+				},
+			},
+			accountName: "pdssa",
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:        "bob",
+					ServerType:         "cassandra",
+					ServerVersion:      "4.0.9",
+					ServiceAccountName: "san",
+					ServiceAccount:     "sa",
+					Racks: []api.Rack{
+						{
+							Name: "r1",
+						},
+					},
+				},
+			},
+			accountName: "san",
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:        "bob",
+					ServerType:         "cassandra",
+					ServerVersion:      "4.0.9",
+					ServiceAccountName: "san",
+					ServiceAccount:     "sa",
+					Racks: []api.Rack{
+						{
+							Name: "r1",
+						},
+					},
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							ServiceAccountName: "pdssa",
+						},
+					},
+				},
+			},
+			accountName: "san",
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:    "bob",
+					ServerType:     "cassandra",
+					ServerVersion:  "4.0.9",
+					ServiceAccount: "sa",
+					Racks: []api.Rack{
+						{
+							Name: "r1",
+						},
+					},
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							ServiceAccountName: "pdssa",
+						},
+					},
+				},
+			},
+			accountName: "sa",
+		},
+	}
+
+	for _, test := range tests {
+		pds, err := buildPodTemplateSpec(test.dc, test.dc.Spec.Racks[0], false)
+		assert.NoError(err)
+		assert.Equal(test.accountName, pds.Spec.ServiceAccountName)
+	}
+}

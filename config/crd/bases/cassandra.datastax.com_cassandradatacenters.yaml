@@ -8511,7 +8511,12 @@ spec:
                 pattern: (6\.8\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)
                 type: string
               serviceAccount:
-                description: The k8s service account to use for the server pods
+                description: DEPRECATED Use ServiceAccountName instead, which takes
+                  precedence. The k8s service account to use for the server pods
+                type: string
+              serviceAccountName:
+                description: ServiceAccountName is the Kubernetes service account
+                  to use for the server pods
                 type: string
               size:
                 description: Desired number of Cassandra server nodes

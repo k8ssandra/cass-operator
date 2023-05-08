@@ -188,8 +188,11 @@ type CassandraDatacenterSpec struct {
 	// If it is omitted, we will generate a secret instead.
 	SuperuserSecretName string `json:"superuserSecretName,omitempty"`
 
-	// The k8s service account to use for the server pods
+	// DEPRECATED Use ServiceAccountName instead, which takes precedence. The k8s service account to use for the server pods
 	ServiceAccount string `json:"serviceAccount,omitempty"`
+
+	// ServiceAccountName is the Kubernetes service account to use for the server pods
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// DEPRECATED. Use CassandraTask for rolling restarts. Whether to do a rolling restart at the next opportunity. The operator will set this back
 	// to false once the restart is in progress.

@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#523](https://github.com/k8ssandra/cass-operator/issues/516) Spec.ServiceAccountName is introduced as replacements to Spec.ServiceAccount (to account for naming changes in Kubernetes itself), also PodTemplateSpec.Spec.ServiceAccountName is supported. Precendence order is: Spec.ServiceAccountName > Spec.ServiceAccount > PodTemplateSpec.
 * [CHANGE] [#516](https://github.com/k8ssandra/cass-operator/issues/516) Modify sidecar default CPU and memory limits.
 
 ## v1.10.6

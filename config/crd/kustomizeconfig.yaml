@@ -15,5 +15,5 @@
 #   path: spec/conversion/webhook/clientConfig/service/namespace
 #   create: false
 
-varReference:
-- path: metadata/annotations
+# varReference:
+# - path: metadata/annotations

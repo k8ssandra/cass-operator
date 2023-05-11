@@ -19,6 +19,10 @@ resources:
 configurations:
 - kustomizeconfig.yaml
 
+# Due to the way replacements are processed in Kustomize (random order with no logic or consistency as everything in Kustomize), these
+# have to be placed on the Kustomization top file where the namespace is defined and not in a component. Only vars work correctly in components, not
+# replacements.
+
 replacements:
  - source: # Add cert-manager annotation to ValidatingWebhookConfiguration, MutatingWebhookConfiguration and CRDs
      kind: Certificate

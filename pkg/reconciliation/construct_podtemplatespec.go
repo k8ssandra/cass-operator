@@ -675,8 +675,8 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 
 	if dc.Spec.ServiceAccountName != "" {
 		baseTemplate.Spec.ServiceAccountName = dc.Spec.ServiceAccountName
-	} else if dc.Spec.ServiceAccount != "" {
-		baseTemplate.Spec.ServiceAccountName = dc.Spec.ServiceAccount
+	} else if dc.Spec.DeprecatedServiceAccount != "" {
+		baseTemplate.Spec.ServiceAccountName = dc.Spec.DeprecatedServiceAccount
 	}
 
 	// Host networking

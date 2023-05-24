@@ -58,14 +58,14 @@ func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[s
 		if rack.Name == rackName {
 			nodeAffinityLabels = utils.MergeMap(emptyMapIfNil(dc.Spec.NodeAffinityLabels),
 				emptyMapIfNil(rack.NodeAffinityLabels))
-			if rack.Zone != "" {
+			if rack.DeprecatedZone != "" {
 				if _, found := nodeAffinityLabels[zoneLabel]; found {
 					log.Error(nil,
 						"Deprecated parameter Zone is used and also defined in NodeAffinityLabels. "+
 							"You should only define it in NodeAffinityLabels")
 				}
 				nodeAffinityLabels = utils.MergeMap(
-					emptyMapIfNil(nodeAffinityLabels), map[string]string{zoneLabel: rack.Zone},
+					emptyMapIfNil(nodeAffinityLabels), map[string]string{zoneLabel: rack.DeprecatedZone},
 				)
 			}
 			break

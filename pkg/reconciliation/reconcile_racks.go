@@ -1060,10 +1060,10 @@ func (rc *ReconciliationContext) updateCurrentReplacePodsProgress() error {
 func (rc *ReconciliationContext) startReplacePodsIfReplacePodsSpecified() error {
 	dc := rc.Datacenter
 
-	if len(dc.Spec.ReplaceNodes) > 0 {
-		rc.ReqLogger.Info("Requested replacing pods", "pods", dc.Spec.ReplaceNodes)
+	if len(dc.Spec.DeprecatedReplaceNodes) > 0 {
+		rc.ReqLogger.Info("Requested replacing pods", "pods", dc.Spec.DeprecatedReplaceNodes)
 
-		for _, podName := range dc.Spec.ReplaceNodes {
+		for _, podName := range dc.Spec.DeprecatedReplaceNodes {
 			// Each podName has to be in the dcPods
 			for _, dcPod := range rc.dcPods {
 				if podName == dcPod.Name {
@@ -1087,7 +1087,7 @@ func (rc *ReconciliationContext) startReplacePodsIfReplacePodsSpecified() error 
 
 		// Now that we've recorded these nodes in the status, we can blank
 		// out this field on the spec
-		dc.Spec.ReplaceNodes = []string{}
+		dc.Spec.DeprecatedReplaceNodes = []string{}
 	}
 
 	return nil
@@ -2022,7 +2022,7 @@ func (rc *ReconciliationContext) CheckRollingRestart() result.ReconcileResult {
 	dc := rc.Datacenter
 	logger := rc.ReqLogger
 
-	if dc.Spec.RollingRestartRequested {
+	if dc.Spec.DeprecatedRollingRestartRequested {
 		dcPatch := client.MergeFrom(dc.DeepCopy())
 		dc.Status.LastRollingRestart = metav1.Now()
 		_ = rc.setCondition(
@@ -2034,7 +2034,7 @@ func (rc *ReconciliationContext) CheckRollingRestart() result.ReconcileResult {
 		}
 
 		dcPatch = client.MergeFromWithOptions(dc.DeepCopy(), client.MergeFromWithOptimisticLock{})
-		dc.Spec.RollingRestartRequested = false
+		dc.Spec.DeprecatedRollingRestartRequested = false
 		err = rc.Client.Patch(rc.Ctx, dc, dcPatch)
 		if err != nil {
 			logger.Error(err, "error patching datacenter for rolling restart")

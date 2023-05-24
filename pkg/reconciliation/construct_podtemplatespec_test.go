@@ -1484,10 +1484,10 @@ func TestServiceAccountPrecedence(t *testing.T) {
 		{
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{
-					ClusterName:    "bob",
-					ServerType:     "cassandra",
-					ServerVersion:  "4.0.9",
-					ServiceAccount: "sa",
+					ClusterName:              "bob",
+					ServerType:               "cassandra",
+					ServerVersion:            "4.0.9",
+					DeprecatedServiceAccount: "sa",
 					Racks: []api.Rack{
 						{
 							Name: "r1",
@@ -1520,11 +1520,11 @@ func TestServiceAccountPrecedence(t *testing.T) {
 		{
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{
-					ClusterName:        "bob",
-					ServerType:         "cassandra",
-					ServerVersion:      "4.0.9",
-					ServiceAccountName: "san",
-					ServiceAccount:     "sa",
+					ClusterName:              "bob",
+					ServerType:               "cassandra",
+					ServerVersion:            "4.0.9",
+					ServiceAccountName:       "san",
+					DeprecatedServiceAccount: "sa",
 					Racks: []api.Rack{
 						{
 							Name: "r1",
@@ -1537,11 +1537,11 @@ func TestServiceAccountPrecedence(t *testing.T) {
 		{
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{
-					ClusterName:        "bob",
-					ServerType:         "cassandra",
-					ServerVersion:      "4.0.9",
-					ServiceAccountName: "san",
-					ServiceAccount:     "sa",
+					ClusterName:              "bob",
+					ServerType:               "cassandra",
+					ServerVersion:            "4.0.9",
+					ServiceAccountName:       "san",
+					DeprecatedServiceAccount: "sa",
 					Racks: []api.Rack{
 						{
 							Name: "r1",
@@ -1559,10 +1559,10 @@ func TestServiceAccountPrecedence(t *testing.T) {
 		{
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{
-					ClusterName:    "bob",
-					ServerType:     "cassandra",
-					ServerVersion:  "4.0.9",
-					ServiceAccount: "sa",
+					ClusterName:              "bob",
+					ServerType:               "cassandra",
+					ServerVersion:            "4.0.9",
+					DeprecatedServiceAccount: "sa",
 					Racks: []api.Rack{
 						{
 							Name: "r1",

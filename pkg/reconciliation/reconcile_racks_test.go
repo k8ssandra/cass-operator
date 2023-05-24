@@ -1589,23 +1589,23 @@ func TestNodereplacements(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(0, len(rc.Datacenter.Status.NodeReplacements))
 
-	rc.Datacenter.Spec.ReplaceNodes = []string{""}
+	rc.Datacenter.Spec.DeprecatedReplaceNodes = []string{""}
 	err = rc.startReplacePodsIfReplacePodsSpecified()
 	assert.NoError(err)
 	assert.Equal(0, len(rc.Datacenter.Status.NodeReplacements))
-	assert.Equal(0, len(rc.Datacenter.Spec.ReplaceNodes))
+	assert.Equal(0, len(rc.Datacenter.Spec.DeprecatedReplaceNodes))
 
-	rc.Datacenter.Spec.ReplaceNodes = []string{"dc1-default-sts-3"} // Does not exist
+	rc.Datacenter.Spec.DeprecatedReplaceNodes = []string{"dc1-default-sts-3"} // Does not exist
 	err = rc.startReplacePodsIfReplacePodsSpecified()
 	assert.NoError(err)
 	assert.Equal(0, len(rc.Datacenter.Status.NodeReplacements))
-	assert.Equal(0, len(rc.Datacenter.Spec.ReplaceNodes))
+	assert.Equal(0, len(rc.Datacenter.Spec.DeprecatedReplaceNodes))
 
-	rc.Datacenter.Spec.ReplaceNodes = []string{"dc1-default-sts-0"}
+	rc.Datacenter.Spec.DeprecatedReplaceNodes = []string{"dc1-default-sts-0"}
 	err = rc.startReplacePodsIfReplacePodsSpecified()
 	assert.NoError(err)
 	assert.Equal(1, len(rc.Datacenter.Status.NodeReplacements))
-	assert.Equal(0, len(rc.Datacenter.Spec.ReplaceNodes))
+	assert.Equal(0, len(rc.Datacenter.Spec.DeprecatedReplaceNodes))
 }
 
 // TestFailedStart verifies the pod is deleted if nodeMgmtClient start fails

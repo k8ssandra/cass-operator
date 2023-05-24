@@ -306,7 +306,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					ClusterName:                 "oldname",
 					AllowMultipleNodesPerWorker: false,
 					SuperuserSecretName:         "hush",
-					ServiceAccount:              "admin",
+					DeprecatedServiceAccount:    "admin",
 					StorageConfig: StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 							StorageClassName: &storageName,
@@ -333,7 +333,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					ClusterName:                 "oldname",
 					AllowMultipleNodesPerWorker: false,
 					SuperuserSecretName:         "hush",
-					ServiceAccount:              "admin",
+					DeprecatedServiceAccount:    "admin",
 					StorageConfig: StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 							StorageClassName: &storageName,
@@ -441,7 +441,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					Name: "exampleDC",
 				},
 				Spec: CassandraDatacenterSpec{
-					ServiceAccount: "admin",
+					DeprecatedServiceAccount: "admin",
 				},
 			},
 			newDc: &CassandraDatacenter{
@@ -449,7 +449,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					Name: "exampleDC",
 				},
 				Spec: CassandraDatacenterSpec{
-					ServiceAccount: "newadmin",
+					DeprecatedServiceAccount: "newadmin",
 				},
 			},
 			errString: "change serviceAccount",

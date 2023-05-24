@@ -154,8 +154,8 @@ type CassandraDatacenterSpec struct {
 	// StorageConfig describes the persistent storage request of each server node
 	StorageConfig StorageConfig `json:"storageConfig"`
 
-	// DEPRECATED Use CassandraTask replacenode to achieve correct node replacement. A list of pod names that need to be replaced.
-	ReplaceNodes []string `json:"replaceNodes,omitempty"`
+	// Deprecated Use CassandraTask replacenode to achieve correct node replacement. A list of pod names that need to be replaced.
+	DeprecatedReplaceNodes []string `json:"replaceNodes,omitempty"`
 
 	// The name by which CQL clients and instances will know the cluster. If the same
 	// cluster name is shared by multiple Datacenters in the same Kubernetes namespace,
@@ -188,15 +188,15 @@ type CassandraDatacenterSpec struct {
 	// If it is omitted, we will generate a secret instead.
 	SuperuserSecretName string `json:"superuserSecretName,omitempty"`
 
-	// DEPRECATED Use ServiceAccountName instead, which takes precedence. The k8s service account to use for the server pods
-	ServiceAccount string `json:"serviceAccount,omitempty"`
+	// Deprecated DeprecatedServiceAccount Use ServiceAccountName instead, which takes precedence. The k8s service account to use for the server pods
+	DeprecatedServiceAccount string `json:"serviceAccount,omitempty"`
 
-	// ServiceAccountName is the Kubernetes service account to use for the server pods
+	// ServiceAccountName is the Kubernetes service account to use for the server pods.
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// DEPRECATED. Use CassandraTask for rolling restarts. Whether to do a rolling restart at the next opportunity. The operator will set this back
+	// Deprecated. Use CassandraTask for rolling restarts. Whether to do a rolling restart at the next opportunity. The operator will set this back
 	// to false once the restart is in progress.
-	RollingRestartRequested bool `json:"rollingRestartRequested,omitempty"`
+	DeprecatedRollingRestartRequested bool `json:"rollingRestartRequested,omitempty"`
 
 	// A map of label keys and values to restrict Cassandra node scheduling to k8s workers
 	// with matchiing labels.
@@ -343,8 +343,8 @@ type Rack struct {
 	// +kubebuilder:validation:MinLength=2
 	Name string `json:"name"`
 
-	// Deprecated. Use nodeAffinityLabels instead. Zone name to pin the rack, using node affinity
-	Zone string `json:"zone,omitempty"`
+	// Deprecated. Use nodeAffinityLabels instead. DeprecatedZone name to pin the rack, using node affinity
+	DeprecatedZone string `json:"zone,omitempty"`
 
 	// NodeAffinityLabels to pin the rack, using node affinity
 	NodeAffinityLabels map[string]string `json:"nodeAffinityLabels,omitempty"`

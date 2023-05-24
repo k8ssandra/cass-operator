@@ -191,7 +191,8 @@ type CassandraDatacenterSpec struct {
 	// Deprecated DeprecatedServiceAccount Use ServiceAccountName instead, which takes precedence. The k8s service account to use for the server pods
 	DeprecatedServiceAccount string `json:"serviceAccount,omitempty"`
 
-	// ServiceAccountName is the Kubernetes service account to use for the server pods.
+	// ServiceAccountName is the Kubernetes service account to use for the server pods. This takes presedence over DeprecatedServiceAccount and both take precedence over
+	// setting it in the PodTemplateSpec.
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// Deprecated. Use CassandraTask for rolling restarts. Whether to do a rolling restart at the next opportunity. The operator will set this back

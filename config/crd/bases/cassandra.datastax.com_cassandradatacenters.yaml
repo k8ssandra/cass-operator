@@ -8517,7 +8517,8 @@ spec:
                 type: string
               serviceAccountName:
                 description: ServiceAccountName is the Kubernetes service account
-                  to use for the server pods.
+                  to use for the server pods. This takes presedence over DeprecatedServiceAccount
+                  and both take precedence over setting it in the PodTemplateSpec.
                 type: string
               size:
                 description: Desired number of Cassandra server nodes

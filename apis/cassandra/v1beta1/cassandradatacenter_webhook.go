@@ -150,7 +150,7 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 		return attemptedTo("change superuserSecretName")
 	}
 
-	if oldDc.Spec.ServiceAccount != newDc.Spec.ServiceAccount {
+	if oldDc.Spec.DeprecatedServiceAccount != newDc.Spec.DeprecatedServiceAccount {
 		return attemptedTo("change serviceAccount")
 	}
 
@@ -206,11 +206,11 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 				oldRack.Name,
 				newRack.Name)
 		}
-		if oldRack.Zone != newRack.Zone {
-			if newRack.Zone != "" {
+		if oldRack.DeprecatedZone != newRack.DeprecatedZone {
+			if newRack.DeprecatedZone != "" {
 				return attemptedTo("change rack zone from '%s' to '%s'",
-					oldRack.Zone,
-					newRack.Zone)
+					oldRack.DeprecatedZone,
+					newRack.DeprecatedZone)
 			}
 		}
 	}
@@ -221,7 +221,7 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 // ValidateDeprecatedFieldUsage prevents adding fields that are deprecated
 func ValidateDeprecatedFieldUsage(dc CassandraDatacenter) error {
 	for _, rack := range dc.GetRacks() {
-		if rack.Zone != "" {
+		if rack.DeprecatedZone != "" {
 			return attemptedTo("use deprecated parameter Zone, use NodeAffinityLabels instead.")
 		}
 	}

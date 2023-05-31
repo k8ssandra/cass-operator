@@ -180,7 +180,7 @@ func (rc *ReconciliationContext) StartNodeReplace(podName string) error {
 	}
 
 	// Add the cassandra node to replace nodes
-	rc.Datacenter.Spec.ReplaceNodes = append(rc.Datacenter.Spec.ReplaceNodes, podName)
+	rc.Datacenter.Spec.DeprecatedReplaceNodes = append(rc.Datacenter.Spec.DeprecatedReplaceNodes, podName)
 
 	// Update CassandraDatacenter
 	if err := rc.Client.Update(rc.Ctx, rc.Datacenter); err != nil {

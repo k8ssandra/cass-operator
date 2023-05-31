@@ -8449,7 +8449,7 @@ spec:
                         affinity
                       type: object
                     zone:
-                      description: Deprecated. Use nodeAffinityLabels instead. Zone
+                      description: Deprecated. Use nodeAffinityLabels instead. DeprecatedZone
                         name to pin the rack, using node affinity
                       type: string
                   required:
@@ -8457,7 +8457,7 @@ spec:
                   type: object
                 type: array
               replaceNodes:
-                description: DEPRECATED Use CassandraTask replacenode to achieve correct
+                description: Deprecated Use CassandraTask replacenode to achieve correct
                   node replacement. A list of pod names that need to be replaced.
                 items:
                   type: string
@@ -8489,7 +8489,7 @@ spec:
                     type: object
                 type: object
               rollingRestartRequested:
-                description: DEPRECATED. Use CassandraTask for rolling restarts. Whether
+                description: Deprecated. Use CassandraTask for rolling restarts. Whether
                   to do a rolling restart at the next opportunity. The operator will
                   set this back to false once the restart is in progress.
                 type: boolean
@@ -8511,7 +8511,14 @@ spec:
                 pattern: (6\.8\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)
                 type: string
               serviceAccount:
-                description: The k8s service account to use for the server pods
+                description: Deprecated DeprecatedServiceAccount Use ServiceAccountName
+                  instead, which takes precedence. The k8s service account to use
+                  for the server pods
+                type: string
+              serviceAccountName:
+                description: ServiceAccountName is the Kubernetes service account
+                  to use for the server pods. This takes presedence over DeprecatedServiceAccount
+                  and both take precedence over setting it in the PodTemplateSpec.
                 type: string
               size:
                 description: Desired number of Cassandra server nodes

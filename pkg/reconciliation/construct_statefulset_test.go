@@ -624,8 +624,8 @@ func Test_newStatefulSetForCassandraDatacenter_dcNameOverride(t *testing.T) {
 			},
 			Racks: []api.Rack{
 				{
-					Name: "rack1",
-					Zone: "z1",
+					Name:           "rack1",
+					DeprecatedZone: "z1",
 				},
 			},
 		},

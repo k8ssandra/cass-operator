@@ -289,8 +289,8 @@ func (in *CassandraDatacenterSpec) DeepCopyInto(out *CassandraDatacenterSpec) {
 		}
 	}
 	in.StorageConfig.DeepCopyInto(&out.StorageConfig)
-	if in.ReplaceNodes != nil {
-		in, out := &in.ReplaceNodes, &out.ReplaceNodes
+	if in.DeprecatedReplaceNodes != nil {
+		in, out := &in.DeprecatedReplaceNodes, &out.DeprecatedReplaceNodes
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

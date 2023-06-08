@@ -649,31 +649,6 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	}
 }
 
-func hasPodPotentiallyBootstrapped(pod *corev1.Pod, nodeStatuses api.CassandraStatusMap) bool {
-	// In effect, we want to know if 'nodetool status' would indicate the relevant cassandra node
-	// is part of the cluster
-
-	// Case 1: If we have a host ID for the pod, then we know it must be a member of the cluster
-	// (even if the pod does not exist)
-	nodeStatus, ok := nodeStatuses[pod.Name]
-	if ok {
-		if nodeStatus.HostID != "" {
-			return true
-		}
-	}
-
-	// Case 2: Pod has node state label of anything other Ready-to-Start. If a pod is decommissioning,
-	// started, starting, etc. it is potentially a current member of the cluster.
-	if pod.Labels != nil {
-		state, ok := pod.Labels[api.CassNodeState]
-		if ok && state != stateReadyToStart {
-			return true
-		}
-	}
-
-	return false
-}
-
 func getStatefulSetPodNameForIdx(sts *appsv1.StatefulSet, idx int32) string {
 	return fmt.Sprintf("%s-%v", sts.Name, idx)
 }

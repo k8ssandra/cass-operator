@@ -674,26 +674,6 @@ func hasPodPotentiallyBootstrapped(pod *corev1.Pod, nodeStatuses api.CassandraSt
 	return false
 }
 
-func findAllPodsNotReadyAndPotentiallyBootstrapped(dcPods []*corev1.Pod, nodeStatuses api.CassandraStatusMap) []*corev1.Pod {
-	downPods := []*corev1.Pod{}
-	for _, pod := range dcPods {
-		if !isServerReady(pod) && hasPodPotentiallyBootstrapped(pod, nodeStatuses) {
-			downPods = append(downPods, pod)
-		}
-	}
-	return downPods
-}
-
-func findAllPodsNotReady(dcPods []*corev1.Pod) []*corev1.Pod {
-	downPods := []*corev1.Pod{}
-	for _, pod := range dcPods {
-		if !isServerReady(pod) {
-			downPods = append(downPods, pod)
-		}
-	}
-	return downPods
-}
-
 func getStatefulSetPodNameForIdx(sts *appsv1.StatefulSet, idx int32) string {
 	return fmt.Sprintf("%s-%v", sts.Name, idx)
 }
@@ -713,6 +693,30 @@ func getPodNamesFromPods(pods []*corev1.Pod) utils.StringSet {
 		podNames[pod.Name] = true
 	}
 	return podNames
+}
+
+// From check_nodes.go
+
+func (rc *ReconciliationContext) GetPodPVC(podNamespace string, podName string) (*corev1.PersistentVolumeClaim, error) {
+	pvcFullName := fmt.Sprintf("%s-%s", PvcName, podName)
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	err := rc.Client.Get(rc.Ctx, types.NamespacedName{Namespace: podNamespace, Name: pvcFullName}, pvc)
+	if err != nil {
+		rc.ReqLogger.Error(err, "error retrieving PersistentVolumeClaim")
+		return nil, err
+	}
+
+	return pvc, nil
+}
+
+func (rc *ReconciliationContext) getDCPodByName(podName string) *corev1.Pod {
+	for _, pod := range rc.dcPods {
+		if pod.Name == podName {
+			return pod
+		}
+	}
+	return nil
 }
 
 func hasStatefulSetControllerCaughtUp(statefulSets []*appsv1.StatefulSet, dcPods []*corev1.Pod) bool {

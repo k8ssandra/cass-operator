@@ -45,7 +45,7 @@ func TestCalculateReconciliationActions_GetServiceError(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientGet(mockClient, fmt.Errorf(""))
@@ -62,7 +62,7 @@ func TestCalculateReconciliationActions_FailedUpdate(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientUpdate(mockClient, fmt.Errorf("failed to update CassandraDatacenter with removed finalizers"))
@@ -73,8 +73,8 @@ func TestCalculateReconciliationActions_FailedUpdate(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-func emptySecretWatcher(rc *ReconciliationContext) {
-	mockClient := &mocks.Client{}
+func emptySecretWatcher(t *testing.T, rc *ReconciliationContext) {
+	mockClient := mocks.NewClient(t)
 	rc.SecretWatches = dynamicwatch.NewDynamicSecretWatches(mockClient)
 	k8sMockClientList(mockClient, nil).
 		Run(func(args mock.Arguments) {
@@ -90,7 +90,7 @@ func TestProcessDeletion_FailedDelete(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientList(mockClient, nil).
@@ -104,11 +104,10 @@ func TestProcessDeletion_FailedDelete(t *testing.T) {
 		})
 
 	k8sMockClientDelete(mockClient, fmt.Errorf(""))
-	// k8sMockClientUpdate(mockClient, nil).Times(0)
 
-	emptySecretWatcher(rc)
-	k8sMockClientStatus(rc.Client.(*mocks.Client), mockClient).Times(1)
-	k8sMockClientPatch(mockClient, nil).Once()
+	emptySecretWatcher(t, rc)
+
+	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil) // Update dc status
 
 	rc.Datacenter.SetFinalizers([]string{"finalizer.cassandra.datastax.com"})
 	now := metav1.Now()
@@ -128,7 +127,7 @@ func TestProcessDeletion(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientList(mockClient, nil).
@@ -139,14 +138,14 @@ func TestProcessDeletion(t *testing.T) {
 					Name: "pvc-1",
 				},
 			}}
-		})
+		}) // ListPods
 
-	k8sMockClientDelete(mockClient, nil)
-	k8sMockClientUpdate(mockClient, nil).Times(1) // Remove finalizer
+	k8sMockClientDelete(mockClient, nil) // Delete PVC
+	k8sMockClientUpdate(mockClient, nil) // Remove dc finalizer
 
-	emptySecretWatcher(rc)
-	k8sMockClientStatus(rc.Client.(*mocks.Client), mockClient).Times(1)
-	k8sMockClientPatch(mockClient, nil).Once()
+	emptySecretWatcher(t, rc)
+
+	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil) // Update dc status
 
 	rc.Datacenter.SetFinalizers([]string{"finalizer.cassandra.datastax.com"})
 	now := metav1.Now()
@@ -166,7 +165,7 @@ func TestProcessDeletion_NoFinalizer(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	now := metav1.Now()
@@ -184,7 +183,7 @@ func TestAddFinalizer(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 	k8sMockClientUpdate(mockClient, nil).Times(1) // Add finalizer
 
@@ -194,7 +193,7 @@ func TestAddFinalizer(t *testing.T) {
 	mockClient.AssertExpectations(t)
 
 	// This should not add the finalizer again
-	mockClient = &mocks.Client{}
+	mockClient = mocks.NewClient(t)
 	rc.Client = mockClient
 	rc.Datacenter.Annotations = make(map[string]string)
 	rc.Datacenter.Annotations[api.NoFinalizerAnnotation] = "true"
@@ -209,7 +208,7 @@ func TestConflictingDcNameOverride(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientList(mockClient, nil).

@@ -37,8 +37,8 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 	controlv1alpha1 "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
-	controllers "github.com/k8ssandra/cass-operator/controllers/cassandra"
-	controlcontrollers "github.com/k8ssandra/cass-operator/controllers/control"
+	controllers "github.com/k8ssandra/cass-operator/internal/controllers/cassandra"
+	controlcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/control"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	//+kubebuilder:scaffold:imports

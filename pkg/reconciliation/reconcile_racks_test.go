@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -354,7 +355,7 @@ func TestReconcilePods(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientGet(mockClient, nil)
@@ -491,7 +492,7 @@ func TestReconcileNextRack_CreateError(t *testing.T) {
 		2)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientCreate(mockClient, fmt.Errorf(""))
@@ -603,7 +604,7 @@ func TestReconcileRacks_GetStatefulsetError(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientGet(mockClient, fmt.Errorf(""))
@@ -1401,6 +1402,9 @@ func makeReloadTestPod() *corev1.Pod {
 				api.DatacenterLabel: "mydc",
 			},
 		},
+		Status: corev1.PodStatus{
+			PodIP: "127.0.0.1",
+		},
 	}
 	return pod
 }
@@ -1414,7 +1418,7 @@ func Test_callPodEndpoint(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 	mockHttpClient.On("Do",
 		mock.MatchedBy(
 			func(req *http.Request) bool {
@@ -1438,26 +1442,23 @@ func Test_callPodEndpoint(t *testing.T) {
 }
 
 func Test_callPodEndpoint_BadStatus(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
-	defer cleanupMockScr()
-
 	res := &http.Response{
 		StatusCode: http.StatusBadRequest,
 		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 	mockHttpClient.On("Do",
 		mock.MatchedBy(
 			func(req *http.Request) bool {
-				return req != nil
+				return req.URL.Path == "/api/v0/ops/seeds/reload" && req.Method == "POST"
 			})).
 		Return(res, nil).
 		Once()
 
 	client := httphelper.NodeMgmtClient{
 		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
+		Log:      zap.New(),
 		Protocol: "http",
 	}
 
@@ -1469,15 +1470,12 @@ func Test_callPodEndpoint_BadStatus(t *testing.T) {
 }
 
 func Test_callPodEndpoint_RequestFail(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
-	defer cleanupMockScr()
-
 	res := &http.Response{
 		StatusCode: http.StatusInternalServerError,
 		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 	mockHttpClient.On("Do",
 		mock.MatchedBy(
 			func(req *http.Request) bool {
@@ -1488,7 +1486,7 @@ func Test_callPodEndpoint_RequestFail(t *testing.T) {
 
 	client := httphelper.NodeMgmtClient{
 		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
+		Log:      zap.New(),
 		Protocol: "http",
 	}
 
@@ -1500,11 +1498,12 @@ func Test_callPodEndpoint_RequestFail(t *testing.T) {
 }
 
 func TestCleanupAfterScaling(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 	assert := assert.New(t)
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
+	rc.Client = mockClient
 
 	var task *taskapi.CassandraTask
 	// 1. Create task - return ok
@@ -1514,10 +1513,6 @@ func TestCleanupAfterScaling(t *testing.T) {
 			task = arg
 		}).
 		Times(1)
-
-	// 2. Patch to datacenter status
-	k8sMockClientStatus(rc.Client.(*mocks.Client), mockClient).Times(2)
-	k8sMockClientPatch(mockClient, nil).Once()
 
 	r := rc.cleanupAfterScaling()
 	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
@@ -1530,7 +1525,7 @@ func TestStripPassword(t *testing.T) {
 
 	password := "secretPassword"
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 	mockHttpClient.On("Do",
 		mock.MatchedBy(
 			func(req *http.Request) bool {
@@ -1613,7 +1608,7 @@ func TestFailedStart(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	done := make(chan struct{})
@@ -1621,15 +1616,14 @@ func TestFailedStart(t *testing.T) {
 
 	// Patch labelStarting, lastNodeStarted..
 	k8sMockClientPatch(mockClient, nil).Once()
-	k8sMockClientStatus(mockClient, mockClient).Once()
-	k8sMockClientPatch(mockClient, nil).Once()
+	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
 
 	res := &http.Response{
 		StatusCode: http.StatusInternalServerError,
 		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 	mockHttpClient.On("Do",
 		mock.MatchedBy(
 			func(req *http.Request) bool {
@@ -1665,7 +1659,8 @@ func TestFailedStart(t *testing.T) {
 		assert.Fail(t, "No pod delete occurred")
 	}
 
-	mockClient.AssertExpectations(t)
+	// mockClient.AssertExpectations(t)
+	// mockHttpClient.AssertExpectations(t)
 
 	close(fakeRecorder.Events)
 	// Should have 2 events, one to indicate Cassandra is starting, one to indicate it failed to start
@@ -1768,7 +1763,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				}
 			}
 
-			mockClient := &mocks.Client{}
+			mockClient := mocks.NewClient(t)
 			rc.Client = mockClient
 
 			done := make(chan struct{})
@@ -1776,10 +1771,31 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				// mock the calls in labelServerPodStarting:
 				// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
 				k8sMockClientPatch(mockClient, nil)
-				// get the status client
-				k8sMockClientStatus(mockClient, mockClient)
 				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
-				k8sMockClientPatch(mockClient, nil).Run(func(mock.Arguments) { close(done) })
+				k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil)
+
+				res := &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("OK")),
+				}
+
+				mockHttpClient := mocks.NewHttpClient(t)
+				mockHttpClient.On("Do",
+					mock.MatchedBy(
+						func(req *http.Request) bool {
+							return req != nil
+						})).
+					Return(res, nil).
+					Once().
+					Run(func(mock.Arguments) { close(done) })
+
+				client := httphelper.NodeMgmtClient{
+					Client:   mockHttpClient,
+					Log:      rc.ReqLogger,
+					Protocol: "http",
+				}
+				rc.NodeMgmtClient = client
+
 			}
 
 			epData := httphelper.CassMetadataEndpoints{
@@ -1901,52 +1917,47 @@ func TestStartOneNodePerRack(t *testing.T) {
 				}
 			}
 
-			mockClient := &mocks.Client{}
+			mockClient := mocks.NewClient(t)
 			rc.Client = mockClient
 
-			// if tt.wantNotReady {
-			res := &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader("OK")),
-			}
-
-			mockHttpClient := &mocks.HttpClient{}
-			mockHttpClient.On("Do",
-				mock.MatchedBy(
-					func(req *http.Request) bool {
-						return req != nil
-					})).
-				Return(res, nil).
-				Once()
-
-			client := httphelper.NodeMgmtClient{
-				Client:   mockHttpClient,
-				Log:      rc.ReqLogger,
-				Protocol: "http",
-			}
-
-			rc.NodeMgmtClient = client
 			done := make(chan struct{})
 
-			// mock the calls in labelServerPodStarting:
-			// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
-			k8sMockClientPatch(mockClient, nil).Once()
-			// get the status client
-			k8sMockClientStatus(mockClient, mockClient).Once()
 			if tt.wantNotReady {
+				res := &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("OK")),
+				}
+
+				mockHttpClient := mocks.NewHttpClient(t)
+				mockHttpClient.On("Do",
+					mock.MatchedBy(
+						func(req *http.Request) bool {
+							return req != nil
+						})).
+					Return(res, nil).
+					Once().
+					Run(func(args mock.Arguments) { close(done) })
+
+				client := httphelper.NodeMgmtClient{
+					Client:   mockHttpClient,
+					Log:      rc.ReqLogger,
+					Protocol: "http",
+				}
+				rc.NodeMgmtClient = client
+
+				// mock the calls in labelServerPodStarting:
+				// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
+				k8sMockClientPatch(mockClient, nil)
+				// get the status client
 				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
-				k8sMockClientPatch(mockClient, nil).Run(func(mock.Arguments) { close(done) })
+				k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil)
+
+				if tt.seedCount < 1 {
+					// There's additional checks here, for fetching the possible additional-seeds (the GET) and pre-adding a seed label
+					k8sMockClientGet(mockClient, nil)
+					k8sMockClientPatch(mockClient, nil)
+				}
 			}
-
-			k8sMockClientPatch(mockClient, nil).Times(4)
-
-			// 3. GET - return completed task
-			k8sMockClientGet(rc.Client.(*mocks.Client), nil).
-				Run(func(args mock.Arguments) {
-					arg := args.Get(2).(*corev1.Endpoints)
-					arg.Subsets = []corev1.EndpointSubset{}
-					// return &corev1.Endpoints{}
-				}).Once()
 
 			epData := httphelper.CassMetadataEndpoints{
 				Entity: []httphelper.EndpointState{},
@@ -1962,8 +1973,6 @@ func TestStartOneNodePerRack(t *testing.T) {
 				}
 			}
 
-			// TODO This test isn't working correctly for REST call checking
-			// mockClient.AssertExpectations(t)
 			assert.NoError(t, err)
 			assert.Equalf(t, tt.wantNotReady, gotNotReady, "expected not ready to be %v", tt.wantNotReady)
 		})

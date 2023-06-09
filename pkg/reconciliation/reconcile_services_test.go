@@ -37,7 +37,7 @@ func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	// place holder for service label maps
@@ -168,7 +168,7 @@ func TestCreateHeadlessService_ClientReturnsError(t *testing.T) {
 	rc, svc, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	k8sMockClientCreate(mockClient, fmt.Errorf(""))

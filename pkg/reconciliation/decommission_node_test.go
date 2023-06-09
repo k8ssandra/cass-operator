@@ -4,10 +4,10 @@
 package reconciliation
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -16,9 +16,9 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	"github.com/stretchr/testify/mock"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestRetryDecommissionNode(t *testing.T) {
@@ -27,7 +27,7 @@ func TestRetryDecommissionNode(t *testing.T) {
 	state := "UP"
 	podIP := "192.168.101.11"
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
 	rc.Datacenter.SetCondition(api.DatacenterCondition{
@@ -38,14 +38,18 @@ func TestRetryDecommissionNode(t *testing.T) {
 		StatusCode: http.StatusBadRequest,
 		Body:       io.NopCloser(strings.NewReader("OK")),
 	}
-	mockHttpClient := &mocks.HttpClient{}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	mockHttpClient := mocks.NewHttpClient(t)
 	mockHttpClient.On("Do",
 		mock.MatchedBy(
 			func(req *http.Request) bool {
 				return req.URL.Path == "/api/v0/ops/node/decommission"
 			})).
 		Return(res, nil).
-		Once()
+		Once().
+		Run(func(args mock.Arguments) { wg.Done() })
 
 	resFeatureSet := &http.Response{
 		StatusCode: http.StatusNotFound,
@@ -69,13 +73,19 @@ func TestRetryDecommissionNode(t *testing.T) {
 	labels := make(map[string]string)
 	labels[api.CassNodeState] = stateDecommissioning
 
-	rc.dcPods = []*v1.Pod{{
+	rc.dcPods = []*corev1.Pod{{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "pod-1",
 			Labels: labels,
 		},
-		Status: v1.PodStatus{
+		Status: corev1.PodStatus{
 			PodIP: podIP,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:  "cassandra",
+					Ready: true,
+				},
+			},
 		},
 	}}
 
@@ -91,6 +101,7 @@ func TestRetryDecommissionNode(t *testing.T) {
 	if r != result.RequeueSoon(5) {
 		t.Fatalf("expected result of result.RequeueSoon(5) but got %s", r)
 	}
+	wg.Wait()
 }
 
 func TestRemoveResourcesWhenDone(t *testing.T) {
@@ -99,24 +110,24 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 	podIP := "192.168.101.11"
 	state := "LEFT"
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 	rc.Datacenter.SetCondition(api.DatacenterCondition{
-		Status: v1.ConditionTrue,
+		Status: corev1.ConditionTrue,
 		Type:   api.DatacenterScalingDown,
 	})
-	mockStatus := &statusMock{}
-	k8sMockClientStatus(mockClient, mockStatus)
+
+	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil)
 
 	labels := make(map[string]string)
 	labels[api.CassNodeState] = stateDecommissioning
 
-	rc.dcPods = []*v1.Pod{{
+	rc.dcPods = []*corev1.Pod{{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "pod-1",
 			Labels: labels,
 		},
-		Status: v1.PodStatus{
+		Status: corev1.PodStatus{
 			PodIP: podIP,
 		},
 	}}
@@ -148,20 +159,4 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 	if r != result.RequeueSoon(5) {
 		t.Fatalf("expected result of blah but got %s", r)
 	}
-	if mockStatus.called != 1 {
-		t.Fatalf("expected 1 call to mockStatus but had %v", mockStatus.called)
-	}
-}
-
-type statusMock struct {
-	called int
-}
-
-func (s *statusMock) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	return nil
-}
-
-func (s *statusMock) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	s.called = s.called + 1
-	return nil
 }

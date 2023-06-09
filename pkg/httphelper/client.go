@@ -1162,7 +1162,11 @@ func (r *RequestError) NotFound() bool {
 }
 
 func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod) (bool, error) {
-	client.Log.Info("client::callIsFullQueryLogEnabledEndpoint")
+	client.Log.Info(
+		"calling Management API full query logging - GET /api/v0/ops/node/fullquerylogging",
+		"pod", pod.Name,
+	)
+
 	podHost, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return false, err
@@ -1198,6 +1202,7 @@ func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod)
 }
 
 func (client *NodeMgmtClient) CallSetFullQueryLog(pod *corev1.Pod, enableFullQueryLogging bool) error {
+
 	client.Log.Info("client::callIsFullQueryLogEnabledEndpoint")
 	podHost, err := BuildPodHostFromPod(pod)
 	if err != nil {
@@ -1209,6 +1214,11 @@ func (client *NodeMgmtClient) CallSetFullQueryLog(pod *corev1.Pod, enableFullQue
 		method:   http.MethodPost,
 		timeout:  time.Minute * 2,
 	}
+	client.Log.Info(
+		fmt.Sprintf("calling Management API set full query logging - POST %s", request.endpoint),
+		"pod", pod.Name,
+	)
+
 	_, err = callNodeMgmtEndpoint(client, request, "")
 	return err
 }

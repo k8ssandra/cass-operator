@@ -1,6 +1,6 @@
 domain: cassandra.datastax.com
 layout:
-- go.kubebuilder.io/v3
+- go.kubebuilder.io/v4-alpha
 multigroup: true
 plugins:
   manifests.sdk.operatorframework.io/v2: {}

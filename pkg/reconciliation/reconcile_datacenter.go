@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
 // ProcessDeletion ...
@@ -92,12 +91,6 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 	if err := rc.deletePVCs(); err != nil {
 		rc.ReqLogger.Error(err, "Failed to delete PVCs for CassandraDatacenter")
 		return result.Error(err)
-	}
-
-	if utils.IsPSPEnabled() {
-		rc.RemoveDcFromNodeToDcMap(types.NamespacedName{
-			Name:      rc.Datacenter.GetName(),
-			Namespace: rc.Datacenter.GetNamespace()})
 	}
 
 	// Update finalizer to allow delete of CassandraDatacenter

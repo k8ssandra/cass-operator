@@ -5,15 +5,8 @@ package utils
 
 import (
 	"math"
-	"os"
 	"reflect"
-	"strings"
 )
-
-func IsPSPEnabled() bool {
-	value, exists := os.LookupEnv("ENABLE_VMWARE_PSP")
-	return exists && "true" == strings.TrimSpace(value)
-}
 
 func RangeInt(min, max, step int) []int {
 	size := int(math.Ceil(float64((max - min)) / float64(step)))

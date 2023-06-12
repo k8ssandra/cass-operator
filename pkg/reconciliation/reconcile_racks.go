@@ -28,7 +28,6 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
-	"github.com/k8ssandra/cass-operator/pkg/psp"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
@@ -650,51 +649,6 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	}
 }
 
-func hasPodPotentiallyBootstrapped(pod *corev1.Pod, nodeStatuses api.CassandraStatusMap) bool {
-	// In effect, we want to know if 'nodetool status' would indicate the relevant cassandra node
-	// is part of the cluster
-
-	// Case 1: If we have a host ID for the pod, then we know it must be a member of the cluster
-	// (even if the pod does not exist)
-	nodeStatus, ok := nodeStatuses[pod.Name]
-	if ok {
-		if nodeStatus.HostID != "" {
-			return true
-		}
-	}
-
-	// Case 2: Pod has node state label of anything other Ready-to-Start. If a pod is decommissioning,
-	// started, starting, etc. it is potentially a current member of the cluster.
-	if pod.Labels != nil {
-		state, ok := pod.Labels[api.CassNodeState]
-		if ok && state != stateReadyToStart {
-			return true
-		}
-	}
-
-	return false
-}
-
-func findAllPodsNotReadyAndPotentiallyBootstrapped(dcPods []*corev1.Pod, nodeStatuses api.CassandraStatusMap) []*corev1.Pod {
-	downPods := []*corev1.Pod{}
-	for _, pod := range dcPods {
-		if !isServerReady(pod) && hasPodPotentiallyBootstrapped(pod, nodeStatuses) {
-			downPods = append(downPods, pod)
-		}
-	}
-	return downPods
-}
-
-func findAllPodsNotReady(dcPods []*corev1.Pod) []*corev1.Pod {
-	downPods := []*corev1.Pod{}
-	for _, pod := range dcPods {
-		if !isServerReady(pod) {
-			downPods = append(downPods, pod)
-		}
-	}
-	return downPods
-}
-
 func getStatefulSetPodNameForIdx(sts *appsv1.StatefulSet, idx int32) string {
 	return fmt.Sprintf("%s-%v", sts.Name, idx)
 }
@@ -714,6 +668,30 @@ func getPodNamesFromPods(pods []*corev1.Pod) utils.StringSet {
 		podNames[pod.Name] = true
 	}
 	return podNames
+}
+
+// From check_nodes.go
+
+func (rc *ReconciliationContext) GetPodPVC(podNamespace string, podName string) (*corev1.PersistentVolumeClaim, error) {
+	pvcFullName := fmt.Sprintf("%s-%s", PvcName, podName)
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	err := rc.Client.Get(rc.Ctx, types.NamespacedName{Namespace: podNamespace, Name: pvcFullName}, pvc)
+	if err != nil {
+		rc.ReqLogger.Error(err, "error retrieving PersistentVolumeClaim")
+		return nil, err
+	}
+
+	return pvc, nil
+}
+
+func (rc *ReconciliationContext) getDCPodByName(podName string) *corev1.Pod {
+	for _, pod := range rc.dcPods {
+		if pod.Name == podName {
+			return pod
+		}
+	}
+	return nil
 }
 
 func hasStatefulSetControllerCaughtUp(statefulSets []*appsv1.StatefulSet, dcPods []*corev1.Pod) bool {
@@ -2363,16 +2341,6 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 
 	if recResult := rc.CheckRackForceUpgrade(); recResult.Completed() {
 		return recResult.Output()
-	}
-
-	if utils.IsPSPEnabled() {
-		if recResult := psp.CheckEMM(rc); recResult.Completed() {
-			return recResult.Output()
-		}
-
-		// if recResult := psp.CheckPVCHealth(rc); recResult.Completed() {
-		// 	return recResult.Output()
-		// }
 	}
 
 	if recResult := rc.CheckRackScale(); recResult.Completed() {

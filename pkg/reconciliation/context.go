@@ -22,21 +22,18 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/psp"
-	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
 // ReconciliationContext contains all of the input necessary to calculate a list of ReconciliationActions
 type ReconciliationContext struct {
-	Request          *reconcile.Request
-	Client           runtimeClient.Client
-	Scheme           *runtime.Scheme
-	Datacenter       *api.CassandraDatacenter
-	NodeMgmtClient   httphelper.NodeMgmtClient
-	Recorder         record.EventRecorder
-	ReqLogger        logr.Logger
-	PSPHealthUpdater psp.HealthStatusUpdater
-	SecretWatches    dynamicwatch.DynamicWatches
+	Request        *reconcile.Request
+	Client         runtimeClient.Client
+	Scheme         *runtime.Scheme
+	Datacenter     *api.CassandraDatacenter
+	NodeMgmtClient httphelper.NodeMgmtClient
+	Recorder       record.EventRecorder
+	ReqLogger      logr.Logger
+	SecretWatches  dynamicwatch.DynamicWatches
 
 	// According to golang recommendations the context should not be stored in a struct but given that
 	// this is passed around as a parameter we feel that its a fair compromise. For further discussion
@@ -74,19 +71,6 @@ func CreateReconciliationContext(
 		WithValues("namespace", req.Namespace)
 
 	rc.ReqLogger.Info("handler::CreateReconciliationContext")
-
-	if utils.IsPSPEnabled() {
-		// Add PSP health status updater
-		// TODO: Feature gate this
-		operatorNs, err := utils.GetOperatorNamespace()
-		if err != nil {
-			return nil, err
-		}
-		rc.PSPHealthUpdater = psp.NewHealthStatusUpdater(cli, operatorNs)
-	} else {
-		// Use no-op updater if PSP is disabled
-		rc.PSPHealthUpdater = &psp.NoOpUpdater{}
-	}
 
 	// Fetch the datacenter resource
 	dc := &api.CassandraDatacenter{}

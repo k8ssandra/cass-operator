@@ -7,21 +7,14 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	corev1 "k8s.io/api/core/v1"
-
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
-	"github.com/k8ssandra/cass-operator/pkg/psp"
-	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
 // Use a var so we can mock this function
@@ -43,78 +36,6 @@ func DatacentersForNode(nodeName string) []types.NamespacedName {
 	return []types.NamespacedName{}
 }
 
-func (rc *ReconciliationContext) RemoveDcFromNodeToDcMap(dcToRemove types.NamespacedName) {
-	nodeToDcLock.Lock()
-	defer nodeToDcLock.Unlock()
-
-	for nodeName, dcs := range nodeToDc {
-		var newDcs = []types.NamespacedName{}
-		for _, dc := range dcs {
-			if dc != dcToRemove {
-				newDcs = append(newDcs, dc)
-			}
-		}
-		nodeToDc[nodeName] = newDcs
-	}
-}
-
-// We will only update the map for the current CassandraDatacenter
-// Every CassandraDatacenter with pods will have produced at least
-// one call to the reconcile loop.  Therefore this map will be
-// populated with the information for all current CassandraDatacenters.
-func (rc *ReconciliationContext) updateDcMaps() error {
-
-	dcName := rc.Datacenter.ObjectMeta.Name
-
-	// List all pods managed by the cass-operator for this dc
-
-	labelSelector := labels.SelectorFromSet(
-		labels.Set{
-			oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
-			api.DatacenterLabel:     dcName,
-		})
-
-	listOptions := &client.ListOptions{
-		LabelSelector: labelSelector,
-	}
-
-	podList := &corev1.PodList{}
-
-	err := rc.Client.List(rc.Ctx, podList, listOptions)
-	if err != nil {
-		rc.ReqLogger.Error(err, "error listing managed pods for namespace",
-			"namespace", rc.Request.Namespace)
-		return err
-	}
-
-	nodeToDcLock.Lock()
-	defer nodeToDcLock.Unlock()
-
-	for _, pod := range podList.Items {
-		dcToAdd := types.NamespacedName{
-			Namespace: pod.ObjectMeta.Namespace,
-			Name:      dcName,
-		}
-
-		// Update node map
-
-		nodeName := pod.Spec.NodeName
-
-		needToAdd := true
-		for _, dc := range nodeToDc[nodeName] {
-			if dc == dcToAdd {
-				needToAdd = false
-			}
-		}
-
-		if needToAdd {
-			nodeToDc[nodeName] = append(nodeToDc[nodeName], dcToAdd)
-		}
-	}
-
-	return nil
-}
-
 // calculateReconciliationActions will iterate over an ordered list of reconcilers which will determine if any action needs to
 // be taken on the CassandraDatacenter. If a change is needed then the apply function will be called on that reconciler and the
 // request will be requeued for the next reconciler to handle in the subsequent reconcile loop, otherwise the next reconciler
@@ -122,13 +43,6 @@ func (rc *ReconciliationContext) updateDcMaps() error {
 func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Result, error) {
 
 	rc.ReqLogger.Info("handler::calculateReconciliationActions")
-	if utils.IsPSPEnabled() {
-		if err := rc.updateDcMaps(); err != nil {
-			// We will not skip reconciliation if the map update failed
-			// return result.Error(err).Output()
-			rc.ReqLogger.V(1).Error(err, "Failed to update dc map")
-		}
-	}
 
 	// Check if the CassandraDatacenter was marked to be deleted
 	if result := rc.ProcessDeletion(); result.Completed() {
@@ -147,25 +61,11 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 		return result.Output()
 	}
 
-	if utils.IsPSPEnabled() {
-		if result := psp.CheckNetworkPolicies(rc); result.Completed() {
-			return result.Output()
-		}
-	}
-
 	if err := rc.CalculateRackInformation(); err != nil {
 		return result.Error(err).Output()
 	}
 
 	result, err := rc.ReconcileAllRacks()
-
-	if err == nil {
-		// Update PSP status
-		// Always sync the datacenter status with the PSP health status
-		if err := rc.PSPHealthUpdater.Update(*rc.Datacenter); err != nil {
-			return reconcile.Result{}, err
-		}
-	}
 
 	return result, err
 }

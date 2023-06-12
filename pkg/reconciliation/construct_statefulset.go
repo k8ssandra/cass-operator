@@ -11,7 +11,6 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
-	"github.com/k8ssandra/cass-operator/pkg/psp"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -160,10 +159,6 @@ func newStatefulSetForCassandraDatacenter(
 
 	if sts != nil && sts.Spec.ServiceName != "" && sts.Spec.ServiceName != result.Spec.ServiceName {
 		result.Spec.ServiceName = sts.Spec.ServiceName
-	}
-
-	if utils.IsPSPEnabled() {
-		result = psp.AddStatefulSetChanges(dc, result)
 	}
 
 	// add a hash here to facilitate checking if updates are needed

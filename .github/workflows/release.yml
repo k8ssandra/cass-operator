@@ -56,20 +56,6 @@ jobs:
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Build system-logger arm64
-        id: docker_build_system-logger
-        uses: docker/build-push-action@v3
-        with:
-          file: logger.Dockerfile
-          build-args: |
-            VERSION=${{ env.TARGET_VERSION }}
-          context: .
-          load: true
-          # using specific tag for arm64 builds
-          tags: k8ssandra/system-logger:v1.16.0-dev.e22769d-20230609, ghcr.io/k8ssandra/system-logger:v1.16.0-dev.e22769d-20230609
-          platforms: linux/arm64
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build cass-operator
         id: docker_build_cass-operator
         uses: docker/build-push-action@v3
@@ -83,19 +69,6 @@ jobs:
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Build cass-operator arm64
-        id: docker_build_cass-operator
-        uses: docker/build-push-action@v3
-        with:
-          file: Dockerfile
-          build-args: |
-            VERSION=${{ env.TARGET_VERSION }}
-          context: .
-          load: true
-          tags: k8ssandra/cass-operator:v1.16.0-dev.e22769d-20230609, ghcr.io/k8ssandra/cass-operator:v1.16.0-dev.e22769d-20230609
-          platforms: linux/arm64
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Push system-logger
         id: docker_push_system-logger
         uses: docker/build-push-action@v3
@@ -106,20 +79,7 @@ jobs:
           context: .
           push: ${{ !env.ACT }}
           tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}, ghcr.io/k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
-          platforms: linux/amd64
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Push system-logger arm64
-        id: docker_push_system-logger
-        uses: docker/build-push-action@v3
-        with:
-          file: logger.Dockerfile
-          build-args: |
-            VERSION=${{ env.TARGET_VERSION }}
-          context: .
-          push: ${{ !env.ACT }}
-          tags: k8ssandra/system-logger:v1.16.0-dev.e22769d-20230609, ghcr.io/k8ssandra/system-logger:v1.16.0-dev.e22769d-20230609
-          platforms: linux/arm64
+          platforms: linux/amd64, linux/arm64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Push cass-operator
@@ -132,20 +92,7 @@ jobs:
           context: .
           push: ${{ !env.ACT }}
           tags: k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}, ghcr.io/k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}
-          platforms: linux/amd64
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Push cass-operator arm64
-        id: docker_push_cass-operator
-        uses: docker/build-push-action@v3
-        with:
-          file: Dockerfile
-          build-args: |
-            VERSION=${{ env.TARGET_VERSION }}
-          context: .
-          push: ${{ !env.ACT }}
-          tags: k8ssandra/cass-operator:v1.16.0-dev.e22769d-20230609, ghcr.io/k8ssandra/cass-operator:v1.16.0-dev.e22769d-20230609
-          platforms: linux/arm64
+          platforms: linux/amd64, linux/arm64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Tag and push images for Red Hat certification

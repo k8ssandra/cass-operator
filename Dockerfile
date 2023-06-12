@@ -1,5 +1,7 @@
 # Build the manager binary
-FROM golang:1.19 as builder
+FROM golang:1.20 as builder
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -10,14 +12,14 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY main.go main.go
+COPY cmd/main.go cmd/main.go
 COPY apis/ apis/
-COPY controllers/ controllers/
 COPY pkg/ pkg/
+COPY internal/controllers/ internal/controllers/
 
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux go build -a -o manager main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 # Build the UBI image
 FROM redhat/ubi8-micro:latest

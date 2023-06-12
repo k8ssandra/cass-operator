@@ -13,37 +13,14 @@ type Client struct {
 	subResourceClient *SubResourceClient
 }
 
-// Status provides a mock function with given fields:
+// Status provides a mock function with given fields. Overrides normal mock functionality (can't be asserted)
 func (_m *Client) Status() client.SubResourceWriter {
 	return _m.SubResource("status")
-	// ret := _m.Called()
-
-	// var r0 client.SubResourceWriter
-	// if rf, ok := ret.Get(0).(func() client.SubResourceWriter); ok {
-	// 	r0 = rf()
-	// } else {
-	// 	if ret.Get(0) != nil {
-	// 		r0 = ret.Get(0).(client.SubResourceWriter)
-	// 	}
-	// }
-	// return r0
 }
 
-// SubResource provides a mock function with given fields: subResource
+// SubResource provides a mock function with given fields: subResource. Overrides normal mock functionality (can't be asserted)
 func (_m *Client) SubResource(subResource string) client.SubResourceClient {
 	return _m.subResourceClient
-	// ret := _m.Called(subResource)
-
-	// var r0 client.SubResourceClient
-	// if rf, ok := ret.Get(0).(func(string) client.SubResourceClient); ok {
-	// 	r0 = rf(subResource)
-	// } else {
-	// 	if ret.Get(0) != nil {
-	// 		r0 = ret.Get(0).(client.SubResourceClient)
-	// 	}
-	// }
-
-	// return r0
 }
 
 type mockConstructorTestingTNewClient interface {

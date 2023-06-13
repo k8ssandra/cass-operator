@@ -19,6 +19,8 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       - name: Login to DockerHub
@@ -77,7 +79,7 @@ jobs:
           context: .
           push: ${{ !env.ACT }}
           tags: k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}, ghcr.io/k8ssandra/system-logger:${{ steps.vars.outputs.tag_name}}
-          platforms: linux/amd64
+          platforms: linux/amd64, linux/arm64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Push cass-operator
@@ -90,7 +92,7 @@ jobs:
           context: .
           push: ${{ !env.ACT }}
           tags: k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}, ghcr.io/k8ssandra/cass-operator:${{ steps.vars.outputs.tag_name}}
-          platforms: linux/amd64
+          platforms: linux/amd64, linux/arm64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Tag and push images for Red Hat certification

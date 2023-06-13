@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
@@ -34,10 +35,10 @@ var fullQueryIsSupported string = `{"cassandra_version": "4.0.1",
 var httpResponseFullQueryEnabled string = `{"entity": true}`
 var httpResponseFullQueryDisabled string = `{"entity": false}`
 
-func setupPodList(rc *ReconciliationContext) {
+func setupPodList(t *testing.T, rc *ReconciliationContext) {
 	podIP := "192.168.101.11"
 
-	mockClient := &mocks.Client{}
+	mockClient := mocks.NewClient(t)
 
 	pods := []corev1.Pod{{
 		ObjectMeta: metav1.ObjectMeta{
@@ -102,7 +103,7 @@ func mockFullQueryLoggingRequestToTrue(mockHttpClient *mocks.HttpClient) {
 				return req.URL.Path == "/api/v0/ops/node/fullquerylogging"
 			})).
 		Return(resFullQueryStatus, nil).
-		Twice()
+		Once()
 }
 
 func mockFullQueryLoggingRequestToFalse(mockHttpClient *mocks.HttpClient) {
@@ -116,22 +117,22 @@ func mockFullQueryLoggingRequestToFalse(mockHttpClient *mocks.HttpClient) {
 				return req.URL.Path == "/api/v0/ops/node/fullquerylogging"
 			})).
 		Return(resFullQueryStatus, nil).
-		Twice()
+		Once()
 }
 
-func setupTestEnv() (*ReconciliationContext, func()) {
+func setupTestEnv(t *testing.T) (*ReconciliationContext, func()) {
 	rc, _, cleanupMockScr := setupTest()
-	setupPodList(rc)
+	setupPodList(t, rc)
 	rc.Datacenter.Spec.ServerType = "cassandra"
 	rc.Datacenter.Spec.ServerVersion = "4.0.1"
 	return rc, cleanupMockScr
 }
 
 func TestCheckFullQueryLoggingNoChangeEnabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 
 	// Mock features request to support FQL
 	mockFeaturesEnabled(mockHttpClient)
@@ -155,10 +156,10 @@ func TestCheckFullQueryLoggingNoChangeEnabled(t *testing.T) {
 }
 
 func TestCheckFullQueryLoggingNoChangeDisabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 
 	// Mock features request to support FQL
 	mockFeaturesEnabled(mockHttpClient)
@@ -182,10 +183,10 @@ func TestCheckFullQueryLoggingNoChangeDisabled(t *testing.T) {
 }
 
 func TestCheckFullQueryNotSupported(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 
 	// Mock features request to not support FQL
 	mockFeaturesNotAvailable(mockHttpClient)
@@ -203,16 +204,19 @@ func TestCheckFullQueryNotSupported(t *testing.T) {
 }
 
 func TestCheckFullQueryLoggingChangeToEnabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 
 	// Mock features request to support FQL
 	mockFeaturesEnabled(mockHttpClient)
 
 	// Mock fullQueryLogging to return false
 	mockFullQueryLoggingRequestToFalse(mockHttpClient)
+
+	// Mock fullQueryLogging change request
+	mockFullQueryLoggingRequestToTrue(mockHttpClient)
 
 	// Enable FQL config in the Datacenter
 	rc.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
@@ -230,16 +234,19 @@ func TestCheckFullQueryLoggingChangeToEnabled(t *testing.T) {
 }
 
 func TestCheckFullQueryLoggingChangeToDisabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 
 	// Mock features request to support FQL
 	mockFeaturesEnabled(mockHttpClient)
 
 	// Mock fullQueryLogging to return true
 	mockFullQueryLoggingRequestToTrue(mockHttpClient)
+
+	// Mock fullQueryLogging change request to false
+	mockFullQueryLoggingRequestToFalse(mockHttpClient)
 
 	// Keep FQL config disabled in the Datacenter
 
@@ -256,10 +263,10 @@ func TestCheckFullQueryLoggingChangeToDisabled(t *testing.T) {
 }
 
 func TestCheckFullQueryNotSupportedTriedToUse(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
+	rc, cleanupMockScr := setupTestEnv(t)
 	defer cleanupMockScr()
 
-	mockHttpClient := &mocks.HttpClient{}
+	mockHttpClient := mocks.NewHttpClient(t)
 
 	// Mock features request to not support FQL
 	mockFeaturesNotAvailable(mockHttpClient)
@@ -283,8 +290,11 @@ func TestCheckFullQueryNotSupportedTriedToUse(t *testing.T) {
 }
 
 func TestNotSupportedVersion(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv()
-	defer cleanupMockScr()
+	rc := ReconciliationContext{
+		Datacenter: &v1beta1.CassandraDatacenter{
+			Spec: v1beta1.CassandraDatacenterSpec{},
+		},
+	}
 
 	rc.Datacenter.Spec.ServerVersion = "3.11.11"
 

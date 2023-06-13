@@ -528,25 +528,6 @@ func (status *CassandraDatacenterStatus) GetConditionStatus(conditionType Datace
 	return corev1.ConditionUnknown
 }
 
-func (status *CassandraDatacenterStatus) AddTaskToTrack(objectMeta metav1.ObjectMeta) {
-	if status.TrackedTasks == nil {
-		status.TrackedTasks = make([]corev1.ObjectReference, 0, 1)
-	}
-
-	status.TrackedTasks = append(status.TrackedTasks, corev1.ObjectReference{
-		Name:      objectMeta.Name,
-		Namespace: objectMeta.Namespace,
-	})
-}
-
-func (status *CassandraDatacenterStatus) RemoveTrackedTask(objectMeta metav1.ObjectMeta) {
-	for index, task := range status.TrackedTasks {
-		if task.Name == objectMeta.Name && task.Namespace == objectMeta.Namespace {
-			status.TrackedTasks = append(status.TrackedTasks[:index], status.TrackedTasks[index+1:]...)
-		}
-	}
-}
-
 func (dc *CassandraDatacenter) GetConditionStatus(conditionType DatacenterConditionType) corev1.ConditionStatus {
 	return (&dc.Status).GetConditionStatus(conditionType)
 }

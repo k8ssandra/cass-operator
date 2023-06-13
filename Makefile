@@ -67,7 +67,7 @@ IMG_LATEST ?= $(IMAGE_TAG_BASE):latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:generateEmbeddedObjectMeta=true"
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.25.x
+ENVTEST_K8S_VERSION = 1.26.x
 
 # Logger image
 LOG_IMG_BASE ?= $(ORG)/system-logger
@@ -134,7 +134,7 @@ test: manifests generate fmt vet lint envtest ## Run tests.
 	# Old unit tests first - these use mocked client / fakeclient
 	go test ./pkg/... -coverprofile cover-pkg.out
 	# Then the envtest ones
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./apis/... ./controllers/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./apis/... ./internal/controllers/... -coverprofile cover.out
 
 .PHONY: integ-test
 integ-test: kustomize cert-manager helm ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
@@ -153,11 +153,11 @@ version:
 
 .PHONY: build
 build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager main.go
+	go build -o bin/manager cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+	go run ./cmd/main.go
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
@@ -242,13 +242,13 @@ HELM ?= $(LOCALBIN)/helm
 OPM ?= $(LOCALBIN)/opm
 
 ## Tool Versions
-CERT_MANAGER_VERSION ?= v1.10.1
+CERT_MANAGER_VERSION ?= v1.11.3
 KUSTOMIZE_VERSION ?= v5.0.3
-CONTROLLER_TOOLS_VERSION ?= v0.10.0
-OPERATOR_SDK_VERSION ?= 1.25.1
-HELM_VERSION ?= 3.10.2
-OPM_VERSION ?= 1.26.2
-GOLINT_VERSION ?= 1.51.2
+CONTROLLER_TOOLS_VERSION ?= v0.12.0
+OPERATOR_SDK_VERSION ?= 1.29.0
+HELM_VERSION ?= 3.12.0
+OPM_VERSION ?= 1.26.5
+GOLINT_VERSION ?= 1.52.2
 
 .PHONY: cert-manager
 cert-manager: ## Install cert-manager to the cluster

@@ -55,6 +55,8 @@ type Images struct {
 	SystemLogger string `json:"system-logger"`
 
 	ConfigBuilder string `json:"config-builder"`
+
+	Client string `json:"k8ssandra-client,omitempty"`
 }
 
 type DefaultImages struct {

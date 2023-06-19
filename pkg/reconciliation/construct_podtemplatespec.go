@@ -297,6 +297,13 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 		},
 	}
 
+	vBaseConfig := corev1.Volume{
+		Name: "server-config-base",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+
 	vServerLogs := corev1.Volume{
 		Name: "server-logs",
 		VolumeSource: corev1.VolumeSource{
@@ -304,14 +311,17 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 		},
 	}
 
-	vectorLib := corev1.Volume{
-		Name: "vector-lib",
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
-		},
-	}
+	volumeDefaults := []corev1.Volume{vServerConfig, vBaseConfig, vServerLogs}
 
-	volumeDefaults := []corev1.Volume{vServerConfig, vServerLogs, vectorLib}
+	if !dc.Spec.DisableSystemLoggerSidecar {
+		vectorLib := corev1.Volume{
+			Name: "vector-lib",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		}
+		volumeDefaults = append(volumeDefaults, vectorLib)
+	}
 
 	if addLegacyInternodeMount {
 		vServerEncryption := corev1.Volume{
@@ -377,11 +387,22 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 	serverCfg.Name = ServerConfigContainerName
 
 	if serverCfg.Image == "" {
-		if dc.GetConfigBuilderImage() != "" {
-			serverCfg.Image = dc.GetConfigBuilderImage()
-		} else {
-			serverCfg.Image = images.GetConfigBuilderImage()
+
+		if images.GetClientImage() != "" {
+			serverCfg.Image = images.GetClientImage()
+			serverCfg.Args = []string{
+				"config",
+				"build",
+			}
 		}
+
+		/*
+			if dc.GetConfigBuilderImage() != "" {
+				serverCfg.Image = dc.GetConfigBuilderImage()
+			} else {
+				serverCfg.Image = images.GetConfigBuilderImage()
+			}
+		*/
 		if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
 			serverCfg.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
 		}
@@ -392,7 +413,12 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		MountPath: "/config",
 	}
 
-	serverCfg.VolumeMounts = combineVolumeMountSlices([]corev1.VolumeMount{serverCfgMount}, serverCfg.VolumeMounts)
+	configBaseMount := corev1.VolumeMount{
+		Name:      "server-config-base",
+		MountPath: "/cassandra-base-config",
+	}
+
+	serverCfg.VolumeMounts = combineVolumeMountSlices([]corev1.VolumeMount{serverCfgMount, configBaseMount}, serverCfg.VolumeMounts)
 
 	serverCfg.Resources = *getResourcesOrDefault(&dc.Spec.ConfigBuilderResources, &DefaultsConfigInitContainer)
 
@@ -424,10 +450,32 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 
 	serverCfg.Env = combineEnvSlices(envDefaults, serverCfg.Env)
 
+	// Similar to k8ssandra 1.x, use config-container..
+	configContainer := &corev1.Container{
+		Name: "base-config-init",
+	}
+
+	if configContainer.Image == "" {
+		serverImage, err := makeImage(dc)
+		if err != nil {
+			return err
+		}
+
+		configContainer.Image = serverImage
+		if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
+			configContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
+		}
+
+		configContainer.Command = []string{"/bin/sh"}
+		configContainer.Args = []string{"-c", "cp -rf /etc/cassandra/* /cassandra-base-config/"}
+	}
+
+	configContainer.VolumeMounts = []corev1.VolumeMount{configBaseMount}
+
 	if !foundOverrides {
 		// Note that append makes a copy, so we must do this after
 		// serverCfg has been properly set up.
-		baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *serverCfg)
+		baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *configContainer, *serverCfg)
 	}
 
 	return nil

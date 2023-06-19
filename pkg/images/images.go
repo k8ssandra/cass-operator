@@ -172,6 +172,10 @@ func GetConfigBuilderImage() string {
 	return ApplyRegistry(GetImageConfig().Images.ConfigBuilder)
 }
 
+func GetClientImage() string {
+	return ApplyRegistry(GetImageConfig().Images.Client)
+}
+
 func GetSystemLoggerImage() string {
 	return ApplyRegistry(GetImageConfig().Images.SystemLogger)
 }

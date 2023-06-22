@@ -11,7 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
-* [CHANGE] [#542](https://github.com/k8ssandra/cass-operator/issues/542) Support 7.x.x version numbers for DSE
+* [CHANGE] [#542](https://github.com/k8ssandra/cass-operator/issues/542) Support 7.x.x version numbers for DSE and 5.x.x for Cassandra
 * [CHANGE] [#531](https://github.com/k8ssandra/cass-operator/issues/531) Update to Kubebuilder gov4-alpha layout structure
 * [ENHANCEMENT] [#523](https://github.com/k8ssandra/cass-operator/issues/516) Spec.ServiceAccountName is introduced as replacements to Spec.ServiceAccount (to account for naming changes in Kubernetes itself), also PodTemplateSpec.Spec.ServiceAccountName is supported. Precendence order is: Spec.ServiceAccountName > Spec.ServiceAccount > PodTemplateSpec.
 * [CHANGE] [#516](https://github.com/k8ssandra/cass-operator/issues/516) Modify sidecar default CPU and memory limits.

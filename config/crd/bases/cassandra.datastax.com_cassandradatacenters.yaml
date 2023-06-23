@@ -8750,7 +8750,7 @@ spec:
               serverVersion:
                 description: Version string for config builder, used to generate Cassandra
                   server configuration
-                pattern: (6\.8\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)
+                pattern: (6\.8\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)|(5\.\d+\.\d+)|(7\.\d+\.\d+)
                 type: string
               serviceAccount:
                 description: Deprecated DeprecatedServiceAccount Use ServiceAccountName

@@ -56,6 +56,7 @@ import (
 // +kubebuilder:rbac:groups=apps,namespace=cass-operator,resources=deployments/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods;endpoints;services;configmaps;secrets;persistentvolumeclaims;events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=namespaces,verbs=get
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=serviceaccounts,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumes;nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=policy,namespace=cass-operator,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 

@@ -49,7 +49,7 @@ func Test_newStatefulSetForCassandraDatacenter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount)
+		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount, false)
 		assert.NoError(t, err, "newStatefulSetForCassandraDatacenter should not have errored")
 		assert.NotNil(t, got, "newStatefulSetForCassandraDatacenter should not have returned a nil statefulset")
 		assert.Equal(t, map[string]string{"dedicated": "cassandra"}, got.Spec.Template.Spec.NodeSelector)
@@ -108,7 +108,7 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 	}
 
 	statefulset, newStatefulSetForCassandraDatacenterError := newStatefulSetForCassandraDatacenter(nil,
-		"rack1", dc, 1)
+		"rack1", dc, 1, false)
 
 	assert.NoError(t, newStatefulSetForCassandraDatacenterError,
 		"should not have gotten error when creating the new statefulset")
@@ -168,7 +168,7 @@ func Test_newStatefulSetForCassandraDatacenter_ServiceName(t *testing.T) {
 		},
 	}
 
-	sts, err := newStatefulSetForCassandraDatacenter(&appsv1.StatefulSet{}, "default", dc, 1)
+	sts, err := newStatefulSetForCassandraDatacenter(&appsv1.StatefulSet{}, "default", dc, 1, false)
 
 	require.NoError(t, err)
 	assert.Equal(t, dc.GetAllPodsServiceName(), sts.Spec.ServiceName)
@@ -205,7 +205,7 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 		},
 	}
 
-	sts, err := newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3)
+	sts, err := newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3, false)
 	assert.NoError(err)
 
 	assert.Equal(3, len(sts.Spec.Template.Spec.Volumes))
@@ -268,7 +268,7 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 		},
 	}
 
-	sts, err = newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3)
+	sts, err = newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3, false)
 	assert.NoError(err)
 
 	assert.Equal(3, len(sts.Spec.VolumeClaimTemplates))
@@ -367,7 +367,7 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount)
+		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount, false)
 		assert.NoError(t, err, "newStatefulSetForCassandraDatacenter should not have errored")
 		assert.NotNil(t, got, "newStatefulSetForCassandraDatacenter should not have returned a nil statefulset")
 
@@ -555,7 +555,7 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		statefulSet, err := newStatefulSetForCassandraDatacenter(nil, rack, tt.dc, replicas)
+		statefulSet, err := newStatefulSetForCassandraDatacenter(nil, rack, tt.dc, replicas, false)
 		assert.NoError(t, err, fmt.Sprintf("%s: failed to create new statefulset", tt.name))
 		assert.NotNil(t, statefulSet, fmt.Sprintf("%s: statefulset is nil", tt.name))
 
@@ -655,7 +655,7 @@ func Test_newStatefulSetForCassandraDatacenter_dcNameOverride(t *testing.T) {
 	}
 
 	statefulset, newStatefulSetForCassandraDatacenterError := newStatefulSetForCassandraDatacenter(nil,
-		"rack1", dc, 1)
+		"rack1", dc, 1, false)
 
 	assert.NoError(t, newStatefulSetForCassandraDatacenterError,
 		"should not have gotten error when creating the new statefulset")
@@ -666,6 +666,33 @@ func Test_newStatefulSetForCassandraDatacenter_dcNameOverride(t *testing.T) {
 	for _, volumeClaim := range statefulset.Spec.VolumeClaimTemplates {
 		assert.Equal(t, expectedStatefulsetLabels, volumeClaim.Labels)
 	}
+}
+
+func Test_newStatefulSetForCassandraDatacenter_OLMDeployment(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:     "cluster1",
+			ServerType:      "cassandra",
+			ServerVersion:   "4.1.2",
+			PodTemplateSpec: &corev1.PodTemplateSpec{},
+			StorageConfig: api.StorageConfig{
+				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+			},
+			Racks: []api.Rack{
+				{
+					Name: "rack1",
+				},
+			},
+		},
+	}
+
+	statefulset, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 1, true)
+	assert.NoError(err)
+	assert.Equal(OLMPodServiceAccount, statefulset.Spec.Template.Spec.ServiceAccountName)
 }
 
 func int64Ptr(n int64) *int64 {

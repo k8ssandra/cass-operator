@@ -164,6 +164,16 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 	return result.Continue()
 }
 
+func (rc *ReconciliationContext) deployedWithOLM(namespace string) (bool, error) {
+	sa := &corev1.ServiceAccount{}
+	saKey := types.NamespacedName{Namespace: namespace, Name: OLMPodServiceAccount}
+	if err := rc.Client.Get(rc.Ctx, saKey, sa); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+
+	return true, nil
+}
+
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
@@ -179,7 +189,12 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 		}
 		statefulSet := rc.statefulSets[idx]
 
-		desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, int(*statefulSet.Spec.Replicas))
+		olmDeployment, err := rc.deployedWithOLM(statefulSet.Namespace)
+		if err != nil {
+			return result.Error(err)
+		}
+
+		desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, int(*statefulSet.Spec.Replicas), olmDeployment)
 
 		if err != nil {
 			logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
@@ -330,7 +345,7 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 			// have to use zero here, because each statefulset is created with no replicas
 			// in GetStatefulSetForRack()
-			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, nextRack.NodeCount)
+			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, nextRack.NodeCount, false)
 			if err != nil {
 				logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
 				return result.Error(err)
@@ -1378,7 +1393,7 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 		currentStatefulSet,
 		nextRack.RackName,
 		rc.Datacenter,
-		nextRack.NodeCount)
+		nextRack.NodeCount, false)
 	if err != nil {
 		return nil, false, err
 	}

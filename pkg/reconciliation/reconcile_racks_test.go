@@ -26,8 +26,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -210,7 +212,7 @@ func TestReconcileRacks_ReconcilePods(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Spec.Replicas = &one
@@ -389,7 +391,7 @@ func TestReconcilePods(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	statefulSet.Status.Replicas = int32(1)
 
@@ -407,7 +409,7 @@ func TestReconcilePods_WithVolumes(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	statefulSet.Status.Replicas = int32(1)
 
@@ -465,7 +467,7 @@ func TestReconcileNextRack(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	err = rc.ReconcileNextRack(statefulSet)
@@ -489,7 +491,7 @@ func TestReconcileNextRack_CreateError(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	mockClient := mocks.NewClient(t)
@@ -566,7 +568,7 @@ func TestReconcileRacks(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -639,7 +641,7 @@ func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -681,7 +683,7 @@ func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -716,7 +718,7 @@ func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -757,7 +759,7 @@ func TestReconcileRacks_NeedToPark(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		3)
+		3, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -802,7 +804,7 @@ func TestReconcileRacks_AlreadyReconciled(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = 2
@@ -843,7 +845,7 @@ func TestReconcileStatefulSet_ImmutableSpec(t *testing.T) {
 		nil,
 		"rack0",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(err, "error occurred creating statefulset")
 
 	assert.NotEqual("immutable-service", origStatefulSet.Spec.ServiceName)
@@ -853,7 +855,7 @@ func TestReconcileStatefulSet_ImmutableSpec(t *testing.T) {
 		origStatefulSet,
 		"rack0",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(err, "error occurred creating statefulset")
 
 	assert.Equal("immutable-service", modifiedStatefulSet.Spec.ServiceName)
@@ -869,7 +871,7 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 		nil,
 		"rack0",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = 2
@@ -878,7 +880,7 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 		nil,
 		"rack1",
 		rc.Datacenter,
-		1)
+		1, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	secondDesiredStatefulSet.Status.ReadyReplicas = 1
 
@@ -980,7 +982,7 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 		nil,
 		"rack0",
 		rc.Datacenter,
-		2)
+		2, false)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = 2
@@ -1999,4 +2001,35 @@ func TestFindHostIdForIpFromEndpointsData(t *testing.T) {
 	assert.Equal(t, "2", findHostIdForIpFromEndpointsData(endpoints, "0:0:0:0:0:0:0:1"))
 	assert.Equal(t, "3", findHostIdForIpFromEndpointsData(endpoints, "2001:0DB8::8:800:200C:417A"))
 	assert.Equal(t, "", findHostIdForIpFromEndpointsData(endpoints, "192.168.1.0"))
+}
+
+func TestOLMDeploymentDetection(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	mockClient := mocks.NewClient(t)
+	rc.Client = mockClient
+
+	errNotFound := errors.NewNotFound(schema.GroupResource{Group: "", Resource: "ServiceAccount"}, OLMPodServiceAccount)
+	k8sMockClientGet(mockClient, errNotFound)
+
+	olmDeployed, err := rc.deployedWithOLM("default")
+	assert.NoError(err)
+	assert.False(olmDeployed)
+
+	sa := corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: OLMPodServiceAccount,
+		},
+	}
+
+	k8sMockClientGet(mockClient, nil).
+		Run(func(args mock.Arguments) {
+			args[1] = sa
+		})
+
+	olmDeployed, err = rc.deployedWithOLM("default")
+	assert.NoError(err)
+	assert.True(olmDeployed)
 }

@@ -31,6 +31,7 @@ const (
 	CassandraContainerName               = "cassandra"
 	PvcName                              = "server-data"
 	SystemLoggerContainerName            = "server-system-logger"
+	OLMPodServiceAccount                 = "cass-operator-cassandra-default-sa"
 )
 
 // calculateNodeAffinity provides a way to decide where to schedule pods within a statefulset based on labels
@@ -663,7 +664,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	return nil
 }
 
-func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {
+func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount, olmDeployment bool) (*corev1.PodTemplateSpec, error) {
 
 	baseTemplate := dc.Spec.PodTemplateSpec.DeepCopy()
 
@@ -672,6 +673,9 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 	}
 
 	// Service Account
+	if olmDeployment {
+		baseTemplate.Spec.ServiceAccountName = OLMPodServiceAccount
+	}
 
 	if dc.Spec.ServiceAccountName != "" {
 		baseTemplate.Spec.ServiceAccountName = dc.Spec.ServiceAccountName

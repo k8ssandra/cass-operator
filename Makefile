@@ -46,6 +46,9 @@ IMAGE_TAG_BASE ?= $(ORG)/cass-operator
 
 M_INTEG_DIR ?= all
 
+# KIND_CLUSTER is the kind context to target with the make commands to load images
+KIND_CLUSTER ?= kind
+
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
@@ -165,8 +168,8 @@ docker-build: ## Build docker image with the manager.
 
 .PHONY: docker-kind
 docker-kind: docker-build ## Build docker image and load to kind cluster
-	kind load docker-image ${IMG}
-	kind load docker-image ${IMG_LATEST}
+	kind load docker-image --name $(KIND_CLUSTER) ${IMG}
+	kind load docker-image --name $(KIND_CLUSTER) ${IMG_LATEST}
 
 .PHONY: docker-push
 docker-push: ## Build and push docker image with the manager.
@@ -184,8 +187,8 @@ docker-logger-push: ## Push system-logger-image
 
 .PHONY: docker-logger-kind
 docker-logger-kind: docker-logger-build ## Build system-logger image and load to kind cluster
-	kind load docker-image ${LOG_IMG}
-	kind load docker-image ${LOG_IMG_LATEST}
+	kind load docker-image --name $(KIND_CLUSTER) ${LOG_IMG}
+	kind load docker-image --name $(KIND_CLUSTER) ${LOG_IMG_LATEST}
 
 ##@ Deployment
 

@@ -29,11 +29,9 @@ LABEL description="Sidecar to output Cassandra system logs to stdout"
 COPY ./config/logger/vector_config.toml /etc/vector/vector.toml
 COPY --from=builder /usr/lib64/libstdc++.so.6 /usr/lib64/libstdc++.so.6
 COPY --from=builder /usr/bin/vector /usr/bin/vector
-COPY --from=builder --chown=999:999 /var/lib/vector /var/lib/vector
+COPY --from=builder /var/lib/vector /var/lib/vector
 
 ADD https://raw.githubusercontent.com/vectordotdev/vector/master/LICENSE /licences/LICENSE
 COPY ./LICENSE.txt /licenses/
 
-# Non-root user, cassandra as default
-USER cassandra:cassandra
 ENTRYPOINT ["/usr/bin/vector"]

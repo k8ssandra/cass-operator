@@ -14,6 +14,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#542](https://github.com/k8ssandra/cass-operator/issues/542) Support 7.x.x version numbers for DSE and 5.x.x for Cassandra
 * [CHANGE] [#531](https://github.com/k8ssandra/cass-operator/issues/531) Update to Kubebuilder gov4-alpha layout structure
 * [ENHANCEMENT] [#523](https://github.com/k8ssandra/cass-operator/issues/516) Spec.ServiceAccountName is introduced as replacements to Spec.ServiceAccount (to account for naming changes in Kubernetes itself), also PodTemplateSpec.Spec.ServiceAccountName is supported. Precendence order is: Spec.ServiceAccountName > Spec.ServiceAccount > PodTemplateSpec.
+* [ENHANCEMENT] [#541](https://github.com/k8ssandra/cass-operator/issues/541) When deployed through OLM, add serviceAccount to Cassandra pods that use nonroot priviledge
 * [CHANGE] [#516](https://github.com/k8ssandra/cass-operator/issues/516) Modify sidecar default CPU and memory limits.
 * [CHANGE] [#495](https://github.com/k8ssandra/cass-operator/issues/495) Remove all the VMware PSP specific code from the codebase. This has been inoperational since 1.8.0
 * [CHANGE] [#494](https://github.com/k8ssandra/cass-operator/issues/494) Remove deprecated generated clientsets. 

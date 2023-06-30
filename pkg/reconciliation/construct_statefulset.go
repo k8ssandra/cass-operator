@@ -78,7 +78,8 @@ func newStatefulSetForCassandraDatacenter(
 	sts *appsv1.StatefulSet,
 	rackName string,
 	dc *api.CassandraDatacenter,
-	replicaCount int) (*appsv1.StatefulSet, error) {
+	replicaCount int,
+	openShift bool) (*appsv1.StatefulSet, error) {
 
 	replicaCountInt32 := int32(replicaCount)
 
@@ -126,7 +127,7 @@ func newStatefulSetForCassandraDatacenter(
 
 	nsName := newNamespacedNameForStatefulSet(dc, rackName)
 
-	template, err := buildPodTemplateSpec(dc, rack, legacyInternodeMount(dc, sts))
+	template, err := buildPodTemplateSpec(dc, rack, legacyInternodeMount(dc, sts), openShift)
 	if err != nil {
 		return nil, err
 	}

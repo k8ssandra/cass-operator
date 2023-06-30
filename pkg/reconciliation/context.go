@@ -33,7 +33,7 @@ type ReconciliationContext struct {
 	Recorder       record.EventRecorder
 	ReqLogger      logr.Logger
 	SecretWatches  dynamicwatch.DynamicWatches
-	Openshift      bool
+	OpenShift      bool
 
 	// According to golang recommendations the context should not be stored in a struct but given that
 	// this is passed around as a parameter we feel that its a fair compromise. For further discussion
@@ -67,7 +67,7 @@ func CreateReconciliationContext(
 	rc.SecretWatches = secretWatches
 	rc.ReqLogger = reqLogger
 	rc.Ctx = ctx
-	rc.Openshift = runningInOpenshift
+	rc.OpenShift = runningInOpenshift
 
 	rc.ReqLogger = rc.ReqLogger.
 		WithValues("namespace", req.Namespace)

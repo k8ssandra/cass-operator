@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.16.0
 
 * [CHANGE] [#542](https://github.com/k8ssandra/cass-operator/issues/542) Support 7.x.x version numbers for DSE and 5.x.x for Cassandra
 * [CHANGE] [#531](https://github.com/k8ssandra/cass-operator/issues/531) Update to Kubebuilder gov4-alpha layout structure

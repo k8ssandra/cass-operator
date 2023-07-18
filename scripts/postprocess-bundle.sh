@@ -18,8 +18,11 @@ rm -f bundle/manifests/field-config_v1_configmap.yaml
 # Use yq to set that date to the createdAt field
 createdAt=$(date +%Y-%m-%d) yq eval '.metadata.annotations.createdAt = env(createdAt)' -i bundle/manifests/cass-operator.clusterserviceversion.yaml 
 
-# Modify image to have repository prefix (docker.io/k8ssandra/cass-operator)
-yq eval '.spec.install.spec.deployments[0].spec.template.spec.containers[0].image |= "docker.io/" + .' -i bundle/manifests/cass-operator.clusterserviceversion.yaml
+REGISTRY=$1
+if [ -n "${REGISTRY}" ]; then
+    # Modify image to have repository prefix (docker.io/k8ssandra/cass-operator)
+    yq eval '.spec.install.spec.deployments[0].spec.template.spec.containers[0].image |= "'"$REGISTRY"'" + "/" + .' -i bundle/manifests/cass-operator.clusterserviceversion.yaml
+fi
 
 # Use the correct containerImage from the deployment
 yq eval '.metadata.annotations.containerImage = .spec.install.spec.deployments[0].spec.template.spec.containers[0].image' -i bundle/manifests/cass-operator.clusterserviceversion.yaml

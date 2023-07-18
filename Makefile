@@ -41,6 +41,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # cassandra.datastax.com/cass-oper-bundle:$VERSION and cassandra.datastax.com/cass-oper-catalog:$VERSION.
 
+REGISTRY ?=
 ORG ?= k8ssandra
 IMAGE_TAG_BASE ?= $(ORG)/cass-operator
 
@@ -320,7 +321,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	scripts/preprocess-bundle.sh
 	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/manifests | $(OPSDK) generate bundle -q --overwrite --extra-service-accounts cass-operator-cassandra-default-sa --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-	scripts/postprocess-bundle.sh
+	scripts/postprocess-bundle.sh $(REGISTRY)
 	$(OPSDK) bundle validate ./bundle --select-optional suite=operatorframework
 
 .PHONY: bundle-build

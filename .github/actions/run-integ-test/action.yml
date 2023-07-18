@@ -52,12 +52,20 @@ runs:
       run: |
         docker load --input /tmp/k8ssandra-cass-operator.tar
         docker load --input /tmp/k8ssandra-system-logger.tar
+    - name: Set version value
+      id: vars
+      shell: bash
+      run: |
+        echo "version=$(make version)" >> $GITHUB_OUTPUT
     - name: Load image on the nodes of the cluster
       shell: bash
       run: |
         kind load docker-image --name=kind k8ssandra/cass-operator:latest
         kind load docker-image --name=kind k8ssandra/system-logger:latest
+
+        kind load docker-image --name=kind k8ssandra/cass-operator:v${{ steps.vars.outputs.version }}
+        kind load docker-image --name=kind k8ssandra/system-logger:v${{ steps.vars.outputs.version }}
     - name: Run integration test ( ${{ inputs.integration_test }} )
       shell: bash
       run: |
-        IMG=k8ssandra/cass-operator:latest make integ-test
+        IMG=k8ssandra/cass-operator:v${{ steps.vars.outputs.version }} LOG_IMG=k8ssandra/system-logger:v${{ steps.vars.outputs.version }} make integ-test

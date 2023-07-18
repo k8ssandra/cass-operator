@@ -208,12 +208,13 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 	sts, err := newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3, false)
 	assert.NoError(err)
 
-	assert.Equal(3, len(sts.Spec.Template.Spec.Volumes))
+	assert.Equal(4, len(sts.Spec.Template.Spec.Volumes))
 	assert.Equal("server-config", sts.Spec.Template.Spec.Volumes[0].Name)
 	assert.Equal("server-logs", sts.Spec.Template.Spec.Volumes[1].Name)
-	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[2].Name)
-	assert.NotNil(sts.Spec.Template.Spec.Volumes[2].ConfigMap)
-	assert.Equal("metrics-config-map", sts.Spec.Template.Spec.Volumes[2].ConfigMap.Name)
+	assert.Equal("vector-lib", sts.Spec.Template.Spec.Volumes[2].Name)
+	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[3].Name)
+	assert.NotNil(sts.Spec.Template.Spec.Volumes[3].ConfigMap)
+	assert.Equal("metrics-config-map", sts.Spec.Template.Spec.Volumes[3].ConfigMap.Name)
 
 	cassandraContainer := findContainer(sts.Spec.Template.Spec.Containers, CassandraContainerName)
 	assert.NotNil(cassandraContainer)
@@ -279,11 +280,11 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 	assert.Equal("cassandra-commitlogs", sts.Spec.VolumeClaimTemplates[2].Name)
 	assert.Equal(storageClassName, *sts.Spec.VolumeClaimTemplates[2].Spec.StorageClassName)
 
-	assert.Equal(2, len(sts.Spec.Template.Spec.Volumes))
+	assert.Equal(3, len(sts.Spec.Template.Spec.Volumes))
 	assert.Equal("server-config", sts.Spec.Template.Spec.Volumes[0].Name)
-	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[1].Name)
-	assert.NotNil(sts.Spec.Template.Spec.Volumes[1].ConfigMap)
-	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[1].ConfigMap.Name)
+	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[2].Name)
+	assert.NotNil(sts.Spec.Template.Spec.Volumes[2].ConfigMap)
+	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[2].ConfigMap.Name)
 
 	cassandraContainer = findContainer(sts.Spec.Template.Spec.Containers, CassandraContainerName)
 	assert.NotNil(cassandraContainer)
@@ -379,7 +380,7 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 		assert.Equal(t, "cassandra-commitlogs", got.Spec.VolumeClaimTemplates[2].Name)
 		assert.Equal(t, customCassandraCommitLogsStorageClass, *got.Spec.VolumeClaimTemplates[2].Spec.StorageClassName)
 
-		assert.Equal(t, 1, len(got.Spec.Template.Spec.Volumes))
+		assert.Equal(t, 2, len(got.Spec.Template.Spec.Volumes))
 		assert.Equal(t, "server-config", got.Spec.Template.Spec.Volumes[0].Name)
 
 		assert.Equal(t, 2, len(got.Spec.Template.Spec.Containers))
@@ -390,7 +391,7 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 		assert.Equal(t, "server-data", got.Spec.Template.Spec.Containers[0].VolumeMounts[2].Name)
 		assert.Equal(t, "server-config", got.Spec.Template.Spec.Containers[0].VolumeMounts[3].Name)
 
-		assert.Equal(t, 2, len(got.Spec.Template.Spec.Containers[1].VolumeMounts))
+		assert.Equal(t, 3, len(got.Spec.Template.Spec.Containers[1].VolumeMounts))
 		assert.Equal(t, 2, len(got.Spec.Template.Spec.InitContainers))
 
 		assert.Equal(t, "initContainer1", got.Spec.Template.Spec.InitContainers[0].Name)
@@ -433,27 +434,13 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 			name: "run cassandra as non-root user",
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{
-					ClusterName:                clusterName,
-					ServerType:                 "cassandra",
-					ServerVersion:              "3.11.10",
-					DockerImageRunsAsCassandra: boolPtr(true),
-					StorageConfig:              storageConfig,
+					ClusterName:   clusterName,
+					ServerType:    "cassandra",
+					ServerVersion: "3.11.10",
+					StorageConfig: storageConfig,
 				},
 			},
 			expected: defaultSecurityContext,
-		},
-		{
-			name: "run cassandra as root user",
-			dc: &api.CassandraDatacenter{
-				Spec: api.CassandraDatacenterSpec{
-					ClusterName:                clusterName,
-					ServerType:                 "cassandra",
-					ServerVersion:              "3.11.7",
-					DockerImageRunsAsCassandra: boolPtr(false),
-					StorageConfig:              storageConfig,
-				},
-			},
-			expected: nil,
 		},
 		{
 			// Note that DSE only supports running as non-root
@@ -697,8 +684,4 @@ func Test_newStatefulSetForCassandraDatacenter_OpenShift(t *testing.T) {
 
 func int64Ptr(n int64) *int64 {
 	return &n
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }

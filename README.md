@@ -246,7 +246,6 @@ spec:
         resources:
           requests:
             storage: 10Gi
-  dockerImageRunsAsCassandra: false
   resources:
     requests:
       memory: 2Gi

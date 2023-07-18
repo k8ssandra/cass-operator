@@ -6,7 +6,7 @@ spec:
   clusterName: cluster1
   datacenterName: My_Super_Dc
   serverType: cassandra
-  serverVersion: "4.0.7"
+  serverVersion: "4.0.10"
   managementApiAuth:
     insecure: {}
   size: 2
@@ -21,6 +21,14 @@ spec:
   racks:
     - name: r1
     - name: r2
+  podTemplateSpec:
+    spec:
+      containers:
+        - name: "cassandra"
+      securityContext:
+        runAsUser: 12345
+        runAsGroup: 0
+        runAsNonRoot: true
   config:
     cassandra-yaml:
       allocate_tokens_for_local_replication_factor: 2

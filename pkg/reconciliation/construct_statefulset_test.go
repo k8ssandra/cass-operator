@@ -211,10 +211,11 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 	assert.Equal(4, len(sts.Spec.Template.Spec.Volumes))
 	assert.Equal("server-config", sts.Spec.Template.Spec.Volumes[0].Name)
 	assert.Equal("server-logs", sts.Spec.Template.Spec.Volumes[1].Name)
-	assert.Equal("vector-lib", sts.Spec.Template.Spec.Volumes[2].Name)
-	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[3].Name)
-	assert.NotNil(sts.Spec.Template.Spec.Volumes[3].ConfigMap)
-	assert.Equal("metrics-config-map", sts.Spec.Template.Spec.Volumes[3].ConfigMap.Name)
+	assert.Equal("server-config-base", sts.Spec.Template.Spec.Volumes[2].Name)
+	assert.Equal("vector-lib", sts.Spec.Template.Spec.Volumes[3].Name)
+	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[4].Name)
+	assert.NotNil(sts.Spec.Template.Spec.Volumes[4].ConfigMap)
+	assert.Equal("metrics-config-map", sts.Spec.Template.Spec.Volumes[4].ConfigMap.Name)
 
 	cassandraContainer := findContainer(sts.Spec.Template.Spec.Containers, CassandraContainerName)
 	assert.NotNil(cassandraContainer)
@@ -232,7 +233,7 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 	dc = &api.CassandraDatacenter{
 		Spec: api.CassandraDatacenterSpec{
 			ServerType:    "cassandra",
-			ServerVersion: "4.1.0",
+			ServerVersion: "4.0.8",
 			ClusterName:   "cluster1",
 			StorageConfig: api.StorageConfig{
 				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{

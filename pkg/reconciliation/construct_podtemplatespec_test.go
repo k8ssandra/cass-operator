@@ -1140,6 +1140,79 @@ func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *te
 	assert.True(t, volumeMountsContains(systemLoggerVolumeMounts, volumeMountNameMatcher("vector-lib")))
 }
 
+func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
+	assert := assert.New(t)
+
+	dc40 := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "bob",
+			ServerType:    "cassandra",
+			ServerVersion: "4.0.8",
+			Racks: []api.Rack{
+				{
+					Name: "default",
+				},
+			},
+		},
+	}
+
+	dc41 := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "bob",
+			ServerType:    "cassandra",
+			ServerVersion: "4.1.2",
+			Racks: []api.Rack{
+				{
+					Name: "default",
+				},
+			},
+		},
+	}
+
+	// 4.0 should not have the client image or new config builder, 4.1 should
+
+	spec40, err := buildPodTemplateSpec(dc40, dc40.Spec.Racks[0], false, false)
+	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
+
+	initContainers := spec40.Spec.InitContainers
+
+	assert.Equal(1, len(initContainers))
+	assert.Equal(ServerConfigContainerName, initContainers[0].Name)
+
+	volumes := spec40.Spec.Volumes
+	assert.Equal(2, len(volumes))
+	// We use a contains check here because the ordering is not important
+	assert.True(volumesContains(volumes, volumeNameMatcher("server-config")))
+	assert.True(volumesContains(volumes, volumeNameMatcher("server-logs")))
+
+	spec41, err := buildPodTemplateSpec(dc41, dc41.Spec.Racks[0], false, false)
+	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
+
+	initContainers = spec41.Spec.InitContainers
+
+	assert.Equal(2, len(initContainers))
+
+	serverBaseConfigInitContainer := initContainers[0]
+	assert.Equal(ServerBaseConfigContainerName, serverBaseConfigInitContainer.Name)
+	assert.Equal(1, len(serverBaseConfigInitContainer.VolumeMounts))
+	// We use a contains check here because the ordering is not important
+	assert.True(volumeMountsContains(serverBaseConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config-base")))
+
+	serverConfigInitContainer := initContainers[1]
+	assert.Equal(ServerConfigContainerName, serverConfigInitContainer.Name)
+	assert.Equal(2, len(serverConfigInitContainer.VolumeMounts))
+	// We use a contains check here because the ordering is not important
+	assert.True(volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config")))
+	assert.True(volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config-base")))
+
+	volumes = spec41.Spec.Volumes
+	assert.Equal(3, len(volumes))
+	// We use a contains check here because the ordering is not important
+	assert.True(volumesContains(volumes, volumeNameMatcher("server-config")))
+	assert.True(volumesContains(volumes, volumeNameMatcher("server-logs")))
+	assert.True(volumesContains(volumes, volumeNameMatcher("server-config-base")))
+}
+
 func TestCassandraDatacenter_buildPodTemplateSpec_openShift(t *testing.T) {
 	assert := assert.New(t)
 

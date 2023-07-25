@@ -88,12 +88,12 @@ jobs:
     strategy:
       matrix:
         version:
-          - "6.8.29"
+          - "6.8.37"
         integration_test:
           - cdc_successful
         include:
-          - version: 6.8.29
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
+          - version: 6.8.37
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.37-ubi8 # DSE 6.8.37
             serverType: dse
             integration_test: "cdc_successful"
       fail-fast: true
@@ -126,7 +126,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.7"
+          - "4.1.2"
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
@@ -202,15 +202,15 @@ jobs:
     strategy:
       matrix:
         version:
-          - "3.11.14"
-          - "4.0.7"
-          - "6.8.29"
+          - "3.11.15"
+          - "4.0.10"
+          - "4.1.2"
+          - "6.8.37"
         integration_test:
           - test_all_the_things
-          - test_all_the_things
         include:
-          - version: 6.8.29
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
+          - version: 6.8.37
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.37-ubi8 # DSE 6.8.37
             serverType: dse
             integration_test: "test_all_the_things"
       fail-fast: true

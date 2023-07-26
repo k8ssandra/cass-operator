@@ -1180,10 +1180,11 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 	assert.Equal(ServerConfigContainerName, initContainers[0].Name)
 
 	volumes := spec40.Spec.Volumes
-	assert.Equal(2, len(volumes))
+	assert.Equal(3, len(volumes))
 	// We use a contains check here because the ordering is not important
 	assert.True(volumesContains(volumes, volumeNameMatcher("server-config")))
 	assert.True(volumesContains(volumes, volumeNameMatcher("server-logs")))
+	assert.True(volumesContains(volumes, volumeNameMatcher("vector-lib")))
 
 	spec41, err := buildPodTemplateSpec(dc41, dc41.Spec.Racks[0], false, false)
 	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
@@ -1206,11 +1207,12 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 	assert.True(volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config-base")))
 
 	volumes = spec41.Spec.Volumes
-	assert.Equal(3, len(volumes))
+	assert.Equal(4, len(volumes))
 	// We use a contains check here because the ordering is not important
 	assert.True(volumesContains(volumes, volumeNameMatcher("server-config")))
 	assert.True(volumesContains(volumes, volumeNameMatcher("server-logs")))
 	assert.True(volumesContains(volumes, volumeNameMatcher("server-config-base")))
+	assert.True(volumesContains(volumes, volumeNameMatcher("vector-lib")))
 }
 
 func TestCassandraDatacenter_buildPodTemplateSpec_openShift(t *testing.T) {

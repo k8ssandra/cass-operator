@@ -208,7 +208,7 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 	sts, err := newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3, false)
 	assert.NoError(err)
 
-	assert.Equal(4, len(sts.Spec.Template.Spec.Volumes))
+	assert.Equal(5, len(sts.Spec.Template.Spec.Volumes))
 	assert.Equal("server-config", sts.Spec.Template.Spec.Volumes[0].Name)
 	assert.Equal("server-logs", sts.Spec.Template.Spec.Volumes[1].Name)
 	assert.Equal("server-config-base", sts.Spec.Template.Spec.Volumes[2].Name)

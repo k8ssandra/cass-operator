@@ -541,6 +541,10 @@ func TestCassandraDatacenter_buildContainers_override_other_containers(t *testin
 				Name:      "server-logs",
 				MountPath: "/var/log/cassandra",
 			},
+			{
+				Name:      "vector-lib",
+				MountPath: "/var/lib/vector",
+			},
 		}) {
 		t.Errorf("Unexpected volume mounts for the logger container: %v", containers[0].VolumeMounts)
 	}
@@ -728,7 +732,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes
 	assert.True(t, volumeMountsContains(initContainers[1].VolumeMounts, volumeMountNameMatcher("server-config")))
 
 	volumes := podTemplateSpec.Spec.Volumes
-	assert.Equal(t, 4, len(volumes))
+	assert.Equal(t, 5, len(volumes))
 	// We use a contains check here because the ordering is not important
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("server-config")))
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("test-data")))
@@ -752,8 +756,9 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes
 	assert.NotNil(t, loggerContainer)
 
 	loggerVolumeMounts := loggerContainer.VolumeMounts
-	assert.Equal(t, 1, len(loggerVolumeMounts))
+	assert.Equal(t, 2, len(loggerVolumeMounts))
 	assert.True(t, volumeMountsContains(loggerVolumeMounts, volumeMountNameMatcher("server-logs")))
+	assert.True(t, volumeMountsContains(loggerVolumeMounts, volumeMountNameMatcher("vector-lib")))
 }
 
 func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *testing.T) {
@@ -832,7 +837,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 	assert.True(t, volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config")))
 
 	volumes := podTemplateSpec.Spec.Volumes
-	assert.Equal(t, 4, len(volumes))
+	assert.Equal(t, 5, len(volumes))
 	// We use a contains check here because the ordering is not important
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("server-config")))
 	assert.True(t, volumesContains(volumes, volumeNameMatcher("test-data")))
@@ -866,8 +871,9 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 	assert.NotNil(t, loggerContainer)
 
 	loggerVolumeMounts := loggerContainer.VolumeMounts
-	assert.Equal(t, 1, len(loggerVolumeMounts))
+	assert.Equal(t, 2, len(loggerVolumeMounts))
 	assert.True(t, volumeMountsContains(loggerVolumeMounts, volumeMountNameMatcher("server-logs")))
+	assert.True(t, volumeMountsContains(loggerVolumeMounts, volumeMountNameMatcher("vector-lib")))
 
 	// Test the non-Legacy mode also (for new datacenters)
 	testZoneRack := dc.Spec.Racks[0]
@@ -877,7 +883,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
 	volumes = podTemplateSpec.Spec.Volumes
-	assert.Equal(t, 3, len(volumes))
+	assert.Equal(t, 4, len(volumes))
 	assert.False(t, volumesContains(volumes, volumeNameMatcher("encryption-cred-storage")))
 
 	containers = podTemplateSpec.Spec.Containers
@@ -1129,8 +1135,9 @@ func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *te
 	assert.NotNil(t, systemLoggerContainer)
 
 	systemLoggerVolumeMounts := systemLoggerContainer.VolumeMounts
-	assert.Equal(t, 1, len(systemLoggerVolumeMounts))
+	assert.Equal(t, 2, len(systemLoggerVolumeMounts))
 	assert.True(t, volumeMountsContains(systemLoggerVolumeMounts, volumeMountNameMatcher("server-logs")))
+	assert.True(t, volumeMountsContains(systemLoggerVolumeMounts, volumeMountNameMatcher("vector-lib")))
 }
 
 func TestCassandraDatacenter_buildPodTemplateSpec_openShift(t *testing.T) {

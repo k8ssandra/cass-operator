@@ -11,6 +11,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#553](https://github.com/k8ssandra/cass-operator/issues/553) dockerImageRunsAsCassandra is no longer used for anything as that's the default for current images. Use SecurityContext to override default SecurityContext (999:999)
+* [ENHANCEMENT] [#554](https://github.com/k8ssandra/cass-operator/issues/554) Add new empty directory as mount to server-system-logger (/var/lib/vector) so it works with multiple securityContexes
+
 ## v1.16.0
 
 * [CHANGE] [#542](https://github.com/k8ssandra/cass-operator/issues/542) Support 7.x.x version numbers for DSE and 5.x.x for Cassandra

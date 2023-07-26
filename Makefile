@@ -68,7 +68,7 @@ IMG_LATEST ?= $(IMAGE_TAG_BASE):latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:generateEmbeddedObjectMeta=true"
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.26.x
+ENVTEST_K8S_VERSION = 1.27.x
 
 # Logger image
 LOG_IMG_BASE ?= $(ORG)/system-logger
@@ -205,6 +205,7 @@ uninstall: manifests ## Uninstall CRDs from the K8s cluster specified in ~/.kube
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	LOG_IMG=${LOG_IMG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 	kubectl apply --force-conflicts --server-side -k config/deployments/default
 
 .PHONY: undeploy
@@ -217,6 +218,7 @@ ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	LOG_IMG=${LOG_IMG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 	kubectl apply --force-conflicts --server-side -k tests/$(TEST_DIR)
 
 .PHONY: undeploy-test
@@ -243,7 +245,7 @@ HELM ?= $(LOCALBIN)/helm
 OPM ?= $(LOCALBIN)/opm
 
 ## Tool Versions
-CERT_MANAGER_VERSION ?= v1.11.3
+CERT_MANAGER_VERSION ?= v1.12.2
 KUSTOMIZE_VERSION ?= v5.0.3
 CONTROLLER_TOOLS_VERSION ?= v0.12.0
 OPERATOR_SDK_VERSION ?= 1.29.0

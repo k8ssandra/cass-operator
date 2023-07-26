@@ -226,6 +226,10 @@ func ValidateDeprecatedFieldUsage(dc CassandraDatacenter) error {
 		}
 	}
 
+	if dc.Spec.DeprecatedDockerImageRunsAsCassandra != nil && !(*dc.Spec.DeprecatedDockerImageRunsAsCassandra) {
+		return attemptedTo("use removed field dockerImageRunsAsCassandra, use SecurityContext instead")
+	}
+
 	return nil
 }
 

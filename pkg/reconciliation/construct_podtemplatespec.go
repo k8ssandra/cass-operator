@@ -304,7 +304,14 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 		},
 	}
 
-	volumeDefaults := []corev1.Volume{vServerConfig, vServerLogs}
+	vectorLib := corev1.Volume{
+		Name: "vector-lib",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+
+	volumeDefaults := []corev1.Volume{vServerConfig, vServerLogs, vectorLib}
 
 	if addLegacyInternodeMount {
 		vServerEncryption := corev1.Volume{
@@ -642,7 +649,12 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 	}
 
-	volumeMounts = combineVolumeMountSlices([]corev1.VolumeMount{cassServerLogsMount}, loggerContainer.VolumeMounts)
+	vectorMount := corev1.VolumeMount{
+		Name:      "vector-lib",
+		MountPath: "/var/lib/vector",
+	}
+
+	volumeMounts = combineVolumeMountSlices([]corev1.VolumeMount{cassServerLogsMount, vectorMount}, loggerContainer.VolumeMounts)
 
 	loggerContainer.VolumeMounts = combineVolumeMountSlices(volumeMounts, generateStorageConfigVolumesMount(dc))
 
@@ -697,14 +709,11 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 	}
 
 	if baseTemplate.Spec.SecurityContext == nil {
-		// workaround for https://cloud.google.com/kubernetes-engine/docs/security-bulletins#may-31-2019
-		if shouldDefineSecurityContext(dc) {
-			var userID int64 = 999
-			baseTemplate.Spec.SecurityContext = &corev1.PodSecurityContext{
-				RunAsUser:  &userID,
-				RunAsGroup: &userID,
-				FSGroup:    &userID,
-			}
+		var userID int64 = 999
+		baseTemplate.Spec.SecurityContext = &corev1.PodSecurityContext{
+			RunAsUser:  &userID,
+			RunAsGroup: &userID,
+			FSGroup:    &userID,
 		}
 	}
 

@@ -104,8 +104,8 @@ type CassandraDatacenterSpec struct {
 	// +kubebuilder:validation:Enum=cassandra;dse
 	ServerType string `json:"serverType"`
 
-	// Does the Server Docker image run as the Cassandra user? Defaults to true
-	DockerImageRunsAsCassandra *bool `json:"dockerImageRunsAsCassandra,omitempty"`
+	// DEPRECATED This setting does nothing and defaults to true. Use SecurityContext instead.
+	DeprecatedDockerImageRunsAsCassandra *bool `json:"dockerImageRunsAsCassandra,omitempty"`
 
 	// Config for the server, in YAML format
 	// +kubebuilder:pruning:PreserveUnknownFields

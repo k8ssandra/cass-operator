@@ -60,9 +60,6 @@ runs:
     - name: Load image on the nodes of the cluster
       shell: bash
       run: |
-        kind load docker-image --name=kind k8ssandra/cass-operator:latest
-        kind load docker-image --name=kind k8ssandra/system-logger:latest
-
         kind load docker-image --name=kind k8ssandra/cass-operator:v${{ steps.vars.outputs.version }}
         kind load docker-image --name=kind k8ssandra/system-logger:v${{ steps.vars.outputs.version }}
     - name: Run integration test ( ${{ inputs.integration_test }} )

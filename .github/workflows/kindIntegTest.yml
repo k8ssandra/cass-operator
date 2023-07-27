@@ -28,7 +28,7 @@ jobs:
           file: Dockerfile
           context: .
           push: false
-          tags: k8ssandra/cass-operator:latest, k8ssandra/cass-operator:v${{ steps.vars.outputs.version }}
+          tags: k8ssandra/cass-operator:v${{ steps.vars.outputs.version }}
           platforms: linux/amd64
           outputs: type=docker,dest=/tmp/k8ssandra-cass-operator.tar
           cache-from: type=local,src=/tmp/.buildx-cache
@@ -38,7 +38,7 @@ jobs:
         with:
           file: logger.Dockerfile
           push: false
-          tags: k8ssandra/system-logger:latest, k8ssandra/system-logger:v${{ steps.vars.outputs.version }}
+          tags: k8ssandra/system-logger:v${{ steps.vars.outputs.version }}
           outputs: type=docker,dest=/tmp/k8ssandra-system-logger.tar
           platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache

@@ -83,7 +83,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 10000", 60)
 
 			step = "stop using config secret"
-			json := ginkgo_util.CreateTestJson(`[{"op": "remove", "path": "/spec/configSecret"}, {"op": "add", "path": "/spec/config", "value": {"cassandra-yaml": {"read_request_timeout_in_ms": 25000}, "jvm-options": {"initial_heap_size": "512M", "max_heap_size": "512M"}}}]`)
+			json := ginkgo_util.CreateTestJson(`[{"op": "remove", "path": "/spec/configSecret"}, {"op": "add", "path": "/spec/config", "value": {"cassandra-yaml": {"read_request_timeout": "25000ms"}, "jvm-server-options": {"initial_heap_size": "512M", "max_heap_size": "512M"}}}]`)
 			k = kubectl.PatchJson(dcResource, json)
 			ns.ExecAndLog(step, k)
 
@@ -92,7 +92,7 @@ var _ = Describe(testName, func() {
 
 			step = "checking cassandra.yaml"
 			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
-			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 25000", 120)
+			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout: \"25000ms\"", 120)
 
 			step = "use config secret again"
 			json = `{"spec": {"config": null, "configSecret": "test-config"}}`
@@ -104,7 +104,7 @@ var _ = Describe(testName, func() {
 
 			step = "checking cassandra.yaml"
 			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
-			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 10000", 120)
+			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout: \"10000ms\"", 120)
 		})
 	})
 })

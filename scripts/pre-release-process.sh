@@ -8,7 +8,7 @@ fi
 TAG=$1
 #PREVTAG=$2
 PREVTAG=$(git describe --abbrev=0 --tags)
-IMG=k8ssandra/cass-operator:${TAG}
+IMG=cr.k8ssandra.io/k8ssandra/cass-operator:${TAG}
 
 # Ensure kustomize is installed
 make kustomize
@@ -26,6 +26,16 @@ cd config/manager && $KUSTOMIZE edit set image controller=$IMG && cd -
 
 # Modify config/manager/image_config.yaml to have proper version for server-system-logger
 LOG_IMG=k8ssandra/system-logger:${TAG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
+
+# Add cr.k8ssandra.io prefixes
+yq eval -i '.images.system-logger |= "cr.k8ssandra.io/" + .' config/manager/image_config.yaml
+yq eval -i '.defaults.cassandra.repository |= "cr.k8ssandra.io/" + .' config/manager/image_config.yaml
+
+# Add cr.dstx.io prefixes
+yq eval -i '.images.config-builder |= "cr.dtsx.io/" + .' config/manager/image_config.yaml
+yq eval -i '.defaults.dse.repository |= "cr.dtsx.io/" + .' config/manager/image_config.yaml
+
+# Modify the controller
 
 # Now add everything and create a commit + tag
 git add CHANGELOG.md

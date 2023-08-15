@@ -80,7 +80,7 @@ var _ = Describe(testName, func() {
 
 			step = "checking cassandra.yaml"
 			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
-			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout_in_ms: 10000", 60)
+			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout: 10000ms", 60)
 
 			step = "stop using config secret"
 			json := ginkgo_util.CreateTestJson(`[{"op": "remove", "path": "/spec/configSecret"}, {"op": "add", "path": "/spec/config", "value": {"cassandra-yaml": {"read_request_timeout": "25000ms"}, "jvm-server-options": {"initial_heap_size": "512M", "max_heap_size": "512M"}}}]`)

@@ -24,6 +24,7 @@ spec:
       initial_heap_size: "512m"
       max_heap_size: "512m"
     cassandra-yaml:
+      allocate_tokens_for_local_replication_factor: 2
       server_encryption_options:
         internode_encryption: all
         keystore: /etc/encryption/node-keystore.jks

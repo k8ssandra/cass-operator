@@ -23,6 +23,7 @@ require (
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/onsi/ginkgo/v2 v2.9.4
 	go.uber.org/zap v1.24.0
+	golang.org/x/mod v0.12.0
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
 )
 

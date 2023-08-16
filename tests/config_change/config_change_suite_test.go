@@ -74,7 +74,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReady(dcName)
 
 			step = "change the config"
-			json = "{\"spec\": {\"config\": {\"cassandra-yaml\": {\"roles_validity_in_ms\": 256000}}}}"
+			json = "{\"spec\": {\"config\": {\"cassandra-yaml\": {\"roles_validity\": \"256000ms\", \"materialized_views_enabled\": \"true\"}}}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
@@ -83,11 +83,11 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1800)
 			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionFalse))
 
-			step = "checking that the init container got the updated config roles_validity_in_ms=256000"
-			json = "jsonpath={.spec.initContainers[0].env[7].value}"
+			step = "checking that the init container got the updated config roles_validity=256000ms"
+			json = "jsonpath={.spec.initContainers[1].env[7].value}"
 			k = kubectl.Get(fmt.Sprintf("pod/%s-%s-r1-sts-0", clusterName, dcName)).
 				FormatOutput(json)
-			ns.WaitForOutputContainsAndLog(step, k, "\"roles_validity_in_ms\":256000", 30)
+			ns.WaitForOutputContainsAndLog(step, k, "\"roles_validity\":\"256000ms\"", 30)
 
 			step = "checking that statefulsets have the right owner reference"
 			json = "jsonpath={.metadata.ownerReferences[0].name}"

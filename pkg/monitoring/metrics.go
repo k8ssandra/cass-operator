@@ -20,8 +20,6 @@ const (
 	PodStatusDecommissioning PodStatus = "Decommissioning"
 )
 
-var podStatuses []PodStatus = []PodStatus{PodStatusInitializing, PodStatusReady, PodStatusPending, PodStatusError, PodStatusDecommissioning}
-
 func getPodStatus(pod *corev1.Pod) PodStatus {
 	status := PodStatusReady
 
@@ -66,7 +64,7 @@ func init() {
 		Help:      "Cassandra pod statuses",
 	}, []string{"cluster", "datacenter", "rack", "pod", "status"})
 
-	metrics.Registry.Register(podVec)
+	metrics.Registry.MustRegister(podVec)
 	PodStatusVec = podVec
 }
 

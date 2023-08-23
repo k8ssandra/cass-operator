@@ -27,6 +27,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
+	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
@@ -48,7 +49,6 @@ const (
 
 // CalculateRackInformation determine how many nodes per rack are needed
 func (rc *ReconciliationContext) CalculateRackInformation() error {
-
 	rc.ReqLogger.Info("reconcile_racks::calculateRackInformation")
 
 	// Create RackInformation
@@ -1091,6 +1091,7 @@ func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 	dc := rc.Datacenter
 	oldDc := rc.Datacenter.DeepCopy()
 
+	rc.ReqLogger.Info("Setting pod statuses")
 	err := rc.UpdateCassandraNodeStatus(false)
 	if err != nil {
 		return result.Error(err)
@@ -1125,6 +1126,12 @@ func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 		if err := rc.Client.Status().Patch(rc.Ctx, dc, patch); err != nil {
 			return result.Error(err)
 		}
+	}
+
+	// Update current state of the pods
+	monitoring.RemoveDatacenterPods(dc.Spec.ClusterName, dc.DatacenterName())
+	for _, pod := range rc.dcPods {
+		monitoring.UpdatePodStatusMetric(pod)
 	}
 
 	return result.Continue()

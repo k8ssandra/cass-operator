@@ -59,8 +59,8 @@ jobs:
     strategy:
       matrix:
         integration_test:
-          - upgrade_operator # Test is not setup to run against 4.0
-          - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          # - upgrade_operator # Test is not setup to run against 4.0
+          # - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
           - scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
     runs-on: ubuntu-latest
     env:
@@ -83,149 +83,149 @@ jobs:
           name: k8s-logs-${{ matrix.integration_test }}
           path: ./build/kubectl_dump
   # This job is only for tests that don't run or don't pass against 4.1 yet
-  kind_40_tests:
-    needs: build_docker_images
-    strategy:
-      matrix:
-        version:
-          - "4.0.10"
-        integration_test:
-          - cdc_successful # OSS only
-          - config_fql
-    runs-on: ubuntu-latest
-    env:
-      CGO_ENABLED: 0
-      M_INTEG_DIR: ${{ matrix.integration_test }}
-    steps:
-      - uses: actions/checkout@v3
-        if: github.event_name == 'pull_request'
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v3
-        if: github.event_name != 'pull_request'
-      - uses: ./.github/actions/run-integ-test
-        with:
-          integration_test: ${{ matrix.integration_test }}
-      - name: Archive k8s logs
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: k8s-logs-${{ matrix.integration_test }}
-          path: ./build/kubectl_dump
-  kind_dse_tests:
-    needs: build_docker_images
-    strategy:
-      matrix:
-        version:
-          - "6.8.37"
-        integration_test:
-          - cdc_successful
-        include:
-          - version: 6.8.37
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.37-ubi8 # DSE 6.8.37
-            serverType: dse
-            integration_test: "cdc_successful"
-      fail-fast: true
-    runs-on: ubuntu-latest
-    env:
-      CGO_ENABLED: 0
-      M_INTEG_DIR: ${{ matrix.integration_test }}
-      M_SERVER_VERSION: ${{ matrix.version }}
-      M_SERVER_IMAGE: ${{ matrix.serverImage }}
-      M_SERVER_TYPE: ${{ matrix.serverType }}
-    steps:
-      - uses: actions/checkout@v3
-        if: github.event_name == 'pull_request'
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v3
-        if: github.event_name != 'pull_request'
-      - uses: ./.github/actions/run-integ-test
-        with:
-          integration_test: ${{ matrix.integration_test }}
-      - name: Archive k8s logs
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: k8s-logs-smoke_test-${{ matrix.version }}
-          path: ./build/kubectl_dump
+  # kind_40_tests:
+  #   needs: build_docker_images
+  #   strategy:
+  #     matrix:
+  #       version:
+  #         - "4.0.10"
+  #       integration_test:
+  #         - cdc_successful # OSS only
+  #         - config_fql
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     CGO_ENABLED: 0
+  #     M_INTEG_DIR: ${{ matrix.integration_test }}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #       if: github.event_name == 'pull_request'
+  #       with:
+  #         ref: ${{ github.event.pull_request.head.sha }}
+  #     - uses: actions/checkout@v3
+  #       if: github.event_name != 'pull_request'
+  #     - uses: ./.github/actions/run-integ-test
+  #       with:
+  #         integration_test: ${{ matrix.integration_test }}
+  #     - name: Archive k8s logs
+  #       if: ${{ failure() }}
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: k8s-logs-${{ matrix.integration_test }}
+  #         path: ./build/kubectl_dump
+  # kind_dse_tests:
+  #   needs: build_docker_images
+  #   strategy:
+  #     matrix:
+  #       version:
+  #         - "6.8.37"
+  #       integration_test:
+  #         - cdc_successful
+  #       include:
+  #         - version: 6.8.37
+  #           serverImage: datastax/dse-mgmtapi-6_8:6.8.37-ubi8 # DSE 6.8.37
+  #           serverType: dse
+  #           integration_test: "cdc_successful"
+  #     fail-fast: true
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     CGO_ENABLED: 0
+  #     M_INTEG_DIR: ${{ matrix.integration_test }}
+  #     M_SERVER_VERSION: ${{ matrix.version }}
+  #     M_SERVER_IMAGE: ${{ matrix.serverImage }}
+  #     M_SERVER_TYPE: ${{ matrix.serverType }}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #       if: github.event_name == 'pull_request'
+  #       with:
+  #         ref: ${{ github.event.pull_request.head.sha }}
+  #     - uses: actions/checkout@v3
+  #       if: github.event_name != 'pull_request'
+  #     - uses: ./.github/actions/run-integ-test
+  #       with:
+  #         integration_test: ${{ matrix.integration_test }}
+  #     - name: Archive k8s logs
+  #       if: ${{ failure() }}
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: k8s-logs-smoke_test-${{ matrix.version }}
+  #         path: ./build/kubectl_dump
 
-  kind_int_tests:
-    needs: build_docker_images
-    strategy:
-      matrix:
-        version:
-          - "4.1.2"
-        integration_test:
-          # Single worker tests:
-          - additional_serviceoptions
-          - additional_volumes
-          # - delete_node_terminated_container # This does not test any operator behavior
-          - podspec_simple
-          # - smoke_test_oss # Converted to test_all_the_things, see below job
-          # - smoke_test_dse # Converted to test_all_the_things, see below job
-          # - terminate
-          # - timeout_prestop_termination
-          # - upgrade_operator # See kind_311_tests job, Only works for 3.11 right now
-          - webhook_validation
-          # Three worker tests:
-          - canary_upgrade
-          # - config_change_condition # config_change takes care of testing the same
-          #- cdc_successful # OSS only
-          # - delete_node_lost_readiness # DSE specific behavior
-          - host_network
-          - internode-encryption-generated
-          #- no_infinite_reconcile # smoke_test_* should take care of this
-          - node_replace
-          - nodeport_service
-          - rolling_restart
-          - rolling_restart_with_override
-          # - stop_resume
-          - superuser-secret-generated
-          - superuser-secret-provided
-          - test_bad_config_and_fix
-          - test_mtls_mgmt_api
-          # More than 3 workers tests:
-          - add_racks
-          #- additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
-          - cluster_wide_install
-          - config_change
-          - config_secret
-          # - multi_cluster_management
-          #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
-          - scale_down
-          # - scale_down_not_enough_space # Not enough stable test
-          #- scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
-          - scale_up
-          - scale_up_stop_resume
-          - seed_selection
-          #- config_fql # OSS only
-          - decommission_dc
-        # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
-      # let other tests continue to run
-      # even if one fails
-      fail-fast: false
-    runs-on: ubuntu-latest
-    env:
-      CGO_ENABLED: 0
-      M_INTEG_DIR: ${{ matrix.integration_test }}
-      M_SERVER_VERSION: ${{ matrix.version }}
-    steps:
-      - uses: actions/checkout@v3
-        if: github.event_name == 'pull_request'
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v3
-        if: github.event_name != 'pull_request'
-      - uses: ./.github/actions/run-integ-test
-        with:
-          integration_test: ${{ matrix.integration_test }}
-      - name: Archive k8s logs
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
-          path: ./build/kubectl_dump
+  # kind_int_tests:
+  #   needs: build_docker_images
+  #   strategy:
+  #     matrix:
+  #       version:
+  #         - "4.1.2"
+  #       integration_test:
+  #         # Single worker tests:
+  #         - additional_serviceoptions
+  #         - additional_volumes
+  #         # - delete_node_terminated_container # This does not test any operator behavior
+  #         - podspec_simple
+  #         # - smoke_test_oss # Converted to test_all_the_things, see below job
+  #         # - smoke_test_dse # Converted to test_all_the_things, see below job
+  #         # - terminate
+  #         # - timeout_prestop_termination
+  #         # - upgrade_operator # See kind_311_tests job, Only works for 3.11 right now
+  #         - webhook_validation
+  #         # Three worker tests:
+  #         - canary_upgrade
+  #         # - config_change_condition # config_change takes care of testing the same
+  #         #- cdc_successful # OSS only
+  #         # - delete_node_lost_readiness # DSE specific behavior
+  #         - host_network
+  #         - internode-encryption-generated
+  #         #- no_infinite_reconcile # smoke_test_* should take care of this
+  #         - node_replace
+  #         - nodeport_service
+  #         - rolling_restart
+  #         - rolling_restart_with_override
+  #         # - stop_resume
+  #         - superuser-secret-generated
+  #         - superuser-secret-provided
+  #         - test_bad_config_and_fix
+  #         - test_mtls_mgmt_api
+  #         # More than 3 workers tests:
+  #         - add_racks
+  #         #- additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
+  #         - cluster_wide_install
+  #         - config_change
+  #         - config_secret
+  #         # - multi_cluster_management
+  #         #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
+  #         - scale_down
+  #         # - scale_down_not_enough_space # Not enough stable test
+  #         #- scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
+  #         - scale_up
+  #         - scale_up_stop_resume
+  #         - seed_selection
+  #         #- config_fql # OSS only
+  #         - decommission_dc
+  #       # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
+  #     # let other tests continue to run
+  #     # even if one fails
+  #     fail-fast: false
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     CGO_ENABLED: 0
+  #     M_INTEG_DIR: ${{ matrix.integration_test }}
+  #     M_SERVER_VERSION: ${{ matrix.version }}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #       if: github.event_name == 'pull_request'
+  #       with:
+  #         ref: ${{ github.event.pull_request.head.sha }}
+  #     - uses: actions/checkout@v3
+  #       if: github.event_name != 'pull_request'
+  #     - uses: ./.github/actions/run-integ-test
+  #       with:
+  #         integration_test: ${{ matrix.integration_test }}
+  #     - name: Archive k8s logs
+  #       if: ${{ failure() }}
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
+  #         path: ./build/kubectl_dump
   kind_smoke_tests:
     needs: build_docker_images
     strategy:

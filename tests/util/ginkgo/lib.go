@@ -96,6 +96,25 @@ func CreateTestFile(dcYaml string) (string, error) {
 				config["jvm-server-options"] = config["jvm-options"]
 				delete(config, "jvm-options")
 			}
+			if config["jvm-server-options"] != nil {
+				if serverOpts, ok := config["jvm-server-options"].(map[interface{}]interface{}); ok {
+					if serverOpts["additional-jvm-opts"] != nil && serverType == "dse" {
+						if opts, ok := serverOpts["additional-jvm-opts"].([]interface{}); ok {
+							modOpts := make([]interface{}, 0, len(opts))
+							for _, opt := range opts {
+								optStr := opt.(string)
+								if strings.HasPrefix(optStr, "-Dcassandra.system_distributed_replication") {
+									dseStr := strings.ReplaceAll(optStr, "-Dcassandra.system_distributed_replication", "-Ddse.system_distributed_replication")
+									modOpts = append(modOpts, dseStr)
+								} else {
+									modOpts = append(modOpts, optStr)
+								}
+							}
+							serverOpts["additional-jvm-opts"] = modOpts
+						}
+					}
+				}
+			}
 		}
 	}
 

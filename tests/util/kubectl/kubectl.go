@@ -201,6 +201,10 @@ func Get(args ...string) KCmd {
 	return KCmd{Command: "get", Args: args}
 }
 
+func Describe(args ...string) KCmd {
+	return KCmd{Command: "describe", Args: args}
+}
+
 func GetByTypeAndName(resourceType string, names ...string) KCmd {
 	var args []string
 	for _, n := range names {
@@ -363,6 +367,9 @@ func DumpClusterInfo(path string, namespace string) {
 	// Store the list of pods in an easy to read format.
 	podWide := Get("pods", "-o", "wide", "-n", namespace).OutputPanic()
 	storeOutput(path, "pods", "out", podWide)
+
+	describePods := Describe("pods", "-n", namespace).OutputPanic()
+	storeOutput(path, "pods-describe", "out", describePods)
 
 	// Dump all objects that we need to investigate failures as a flat list and as yaml manifests
 	for _, objectType := range []string{"CassandraDatacenter", "CassandraTask"} {

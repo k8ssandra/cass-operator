@@ -66,6 +66,8 @@ jobs:
     env:
       CGO_ENABLED: 0
       M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: 3.11.15
+      M_SERVER_TYPE: cassandra
     steps:
       - uses: actions/checkout@v3
         if: github.event_name == 'pull_request'

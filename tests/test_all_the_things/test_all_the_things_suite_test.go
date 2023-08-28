@@ -143,6 +143,14 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 			wg.Wait()
 
+			found, err := regexp.MatchString("node/drain status=200 OK", logOutput)
+			if err == nil && !found {
+				ns.Log(fmt.Sprintf("logOutput, pod: statefulset.kubernetes.io/pod-name=cluster1-%s-r1-sts-0 => %s", api.CleanupForKubernetes(dcNameOverride), logOutput))
+			}
+			if err != nil {
+				ns.Log(fmt.Sprintf("Regexp parsing failed: %v", err))
+			}
+
 			// Check the log contains node/drain..
 			Expect(regexp.MatchString("node/drain status=200 OK", logOutput)).To(BeTrue())
 

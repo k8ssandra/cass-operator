@@ -30,8 +30,6 @@ spec:
         runAsGroup: 0
         runAsNonRoot: true
   config:
-    cassandra-yaml:
-      allocate_tokens_for_local_replication_factor: 2
     jvm-server-options:
       initial_heap_size: "512m"
       max_heap_size: "512m"

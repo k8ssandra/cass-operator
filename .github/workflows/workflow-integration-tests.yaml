@@ -61,7 +61,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "3.11.14"
+          - "3.11.15"
         integration_test:
           - upgrade_operator
           - cdc_successful
@@ -97,7 +97,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.7"
+          - "4.0.9"
         integration_test:
           - canary_upgrade
           - config_fql
@@ -132,13 +132,13 @@ jobs:
     strategy:
       matrix:
         version:
-          - "6.8.29"
+          - "6.8.37"
         integration_test:
           #- delete_node_lost_readiness #TODO: fix in https://github.com/k8ssandra/cass-operator/issues/459
           - additional_seeds
         include:
-          - version: "6.8.29"
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.29-jdk8 # DSE 6.8.29
+          - version: "6.8.37"
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.37-jdk8 # DSE 6.8.29
             serverType: dse
     runs-on: ubuntu-latest
     env:
@@ -168,9 +168,9 @@ jobs:
     strategy:
       matrix:
         version:
-          - "3.11.14"
-          - "4.0.7"
-          - "6.8.29"
+          - "3.11.15"
+          - "4.0.9"
+          - "6.8.37"
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
@@ -219,17 +219,17 @@ jobs:
         workflowVersion:
           - ${{ inputs.version }}
         exclude:
-          - version: "3.11.14"
+          - version: "3.11.15"
             workflowVersion: "4.0"
-          - version: "3.11.14"
+          - version: "3.11.15"
             workflowVersion: "6.8"
-          - version: "4.0.7"
+          - version: "4.0.9"
             workflowVersion: "3.11"
-          - version: "4.0.7"
+          - version: "4.0.9"
             workflowVersion: "6.8"
-          - version: "6.8.29"
+          - version: "6.8.37"
             workflowVersion: "3.11"
-          - version: "6.8.29"
+          - version: "6.8.37"
             workflowVersion: "4.0"
       # let other tests continue to run
       # even if one fails
@@ -249,7 +249,7 @@ jobs:
       - name: set environment for DSE
         if: ${{ startsWith( matrix.version, '6.8' ) }}
         run: |
-          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:6.8.29-jdk8" >> $GITHUB_ENV
+          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:6.8.37-jdk8" >> $GITHUB_ENV
           echo "M_SERVER_TYPE=dse" >> $GITHUB_ENV
       - uses: ./.github/actions/run-integ-test
         with:
@@ -265,23 +265,23 @@ jobs:
     strategy:
       matrix:
         version:
-          - "3.11.14"
-          - "4.0.7"
-          - "6.8.29"
+          - "3.11.15"
+          - "4.0.9"
+          - "6.8.37"
         workflowVersion:
           - ${{ inputs.version }}
         exclude:
-          - version: "3.11.14"
+          - version: "3.11.15"
             workflowVersion: "4.0"
-          - version: "3.11.14"
+          - version: "3.11.15"
             workflowVersion: "6.8"
-          - version: "4.0.7"
+          - version: "4.0.9"
             workflowVersion: "3.11"
-          - version: "4.0.7"
+          - version: "4.0.9"
             workflowVersion: "6.8"
-          - version: "6.8.29"
+          - version: "6.8.37"
             workflowVersion: "3.11"
-          - version: "6.8.29"
+          - version: "6.8.37"
             workflowVersion: "4.0"
       fail-fast: true
     runs-on: ubuntu-latest
@@ -299,7 +299,7 @@ jobs:
       - name: set environment for DSE
         if: ${{ startsWith( matrix.version, '6.8' ) }}
         run: |
-          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:6.8.29-jdk8" >> $GITHUB_ENV
+          echo "M_SERVER_IMAGE=datastax/dse-mgmtapi-6_8:6.8.37-jdk8" >> $GITHUB_ENV
           echo "M_SERVER_TYPE=dse" >> $GITHUB_ENV
       - uses: ./.github/actions/run-integ-test
         with:

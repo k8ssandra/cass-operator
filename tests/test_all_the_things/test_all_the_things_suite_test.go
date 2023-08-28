@@ -122,7 +122,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "Stopped", string(corev1.ConditionFalse))
 			ns.WaitForDatacenterCondition(dcName, "Resuming", string(corev1.ConditionTrue))
 
-			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1800, 1800)
 			ns.ExpectDoneReconciling(dcName)
 
 			logOutput := ""

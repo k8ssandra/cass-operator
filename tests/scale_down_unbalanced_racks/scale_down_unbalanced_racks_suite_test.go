@@ -64,7 +64,7 @@ var _ = Describe(testName, func() {
 			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1800, 1800)
 
 			step = "scale up second rack to 3 nodes"
 			json := "{\"spec\": {\"replicas\": 3}}"

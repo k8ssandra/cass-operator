@@ -59,8 +59,8 @@ jobs:
     strategy:
       matrix:
         integration_test:
-          # - upgrade_operator # Test is not setup to run against 4.0
-          # - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - upgrade_operator # Test is not setup to run against 4.0
+          - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
           - scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
     runs-on: ubuntu-latest
     env:

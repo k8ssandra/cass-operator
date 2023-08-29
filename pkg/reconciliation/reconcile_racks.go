@@ -1129,7 +1129,7 @@ func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 	}
 
 	// Update current state of the pods
-	monitoring.RemoveDatacenterPods(dc.Spec.ClusterName, dc.DatacenterName())
+	monitoring.RemoveDatacenterPods(dc.Namespace, dc.Spec.ClusterName, dc.DatacenterName())
 	for _, pod := range rc.dcPods {
 		monitoring.UpdatePodStatusMetric(pod)
 	}

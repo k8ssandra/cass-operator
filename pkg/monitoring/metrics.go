@@ -62,7 +62,7 @@ func init() {
 		Subsystem: "datacenter_pods",
 		Name:      "status",
 		Help:      "Cassandra pod statuses",
-	}, []string{"cluster", "datacenter", "rack", "pod", "status"})
+	}, []string{"namespace", "cluster", "datacenter", "rack", "pod", "status"})
 
 	metrics.Registry.MustRegister(podVec)
 	PodStatusVec = podVec
@@ -75,13 +75,13 @@ func UpdatePodStatusMetric(pod *corev1.Pod) {
 	RemovePodStatusMetric(pod)
 
 	// Add just the current one
-	PodStatusVec.WithLabelValues(pod.Labels[api.ClusterLabel], pod.Labels[api.DatacenterLabel], pod.Labels[api.RackLabel], pod.Name, strings.ToLower(string(currentState))).Set(1)
+	PodStatusVec.WithLabelValues(pod.Namespace, pod.Labels[api.ClusterLabel], pod.Labels[api.DatacenterLabel], pod.Labels[api.RackLabel], pod.Name, strings.ToLower(string(currentState))).Set(1)
 }
 
 func RemovePodStatusMetric(pod *corev1.Pod) {
-	PodStatusVec.DeletePartialMatch(prometheus.Labels{"cluster": pod.Labels[api.ClusterLabel], "datacenter": pod.Labels[api.DatacenterLabel], "rack": pod.Labels[api.RackLabel], "pod": pod.Name})
+	PodStatusVec.DeletePartialMatch(prometheus.Labels{"namespace": pod.Namespace, "cluster": pod.Labels[api.ClusterLabel], "datacenter": pod.Labels[api.DatacenterLabel], "rack": pod.Labels[api.RackLabel], "pod": pod.Name})
 }
 
-func RemoveDatacenterPods(cluster, datacenter string) {
-	PodStatusVec.DeletePartialMatch(prometheus.Labels{"cluster": cluster, "datacenter": datacenter})
+func RemoveDatacenterPods(namespace, cluster, datacenter string) {
+	PodStatusVec.DeletePartialMatch(prometheus.Labels{"namespace": namespace, "cluster": cluster, "datacenter": datacenter})
 }

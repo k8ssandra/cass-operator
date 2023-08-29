@@ -16,7 +16,8 @@ func TestMetricAdder(t *testing.T) {
 	for i := 0; i < len(pods); i++ {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("pod%d", i),
+				Name:      fmt.Sprintf("pod%d", i),
+				Namespace: "ns",
 				Labels: map[string]string{
 					api.ClusterLabel:    "cluster1",
 					api.DatacenterLabel: "datacenter1",
@@ -72,9 +73,52 @@ func TestMetricAdder(t *testing.T) {
 	require.NoError(err)
 	require.Equal("ready", status)
 
-	RemoveDatacenterPods("cluster1", "datacenter1")
+	RemoveDatacenterPods("ns", "cluster1", "datacenter1")
 	_, err = getCurrentPodStatus("pod4")
 	require.Error(err)
+}
+
+func TestNamespaceSeparatation(t *testing.T) {
+	require := require.New(t)
+	pods := make([]*corev1.Pod, 2)
+	for i := 0; i < len(pods); i++ {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("pod%d", i),
+				Namespace: fmt.Sprintf("ns%d", i),
+				Labels: map[string]string{
+					api.ClusterLabel:    "cluster1",
+					api.DatacenterLabel: "datacenter1",
+					api.RackLabel:       "rack1",
+					api.CassNodeState:   "Started",
+				},
+			},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Ready: true,
+					},
+				},
+			},
+		}
+		pods[i] = pod
+		UpdatePodStatusMetric(pod)
+	}
+	status, err := getCurrentPodStatus("pod0")
+	require.NoError(err)
+	require.Equal("ready", status)
+
+	status, err = getCurrentPodStatus("pod1")
+	require.NoError(err)
+	require.Equal("ready", status)
+
+	RemoveDatacenterPods("ns0", "cluster1", "datacenter1")
+	_, err = getCurrentPodStatus("pod0")
+	require.Error(err)
+
+	status, err = getCurrentPodStatus("pod1")
+	require.NoError(err)
+	require.Equal("ready", status)
 }
 
 func getCurrentPodStatus(podName string) (string, error) {

@@ -15,6 +15,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/internal/result"
+	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -145,6 +146,8 @@ func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData 
 			if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
 				return err
 			}
+
+			monitoring.UpdatePodStatusMetric(pod)
 
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsDecommissioning,
 				"Labeled node as decommissioning %s", pod.Name)
@@ -367,6 +370,7 @@ func (rc *ReconciliationContext) RemoveDecommissionedPodFromSts(pod *corev1.Pod)
 	maxReplicas := *sts.Spec.Replicas
 	lastPodSuffix := stsLastPodSuffix(maxReplicas)
 	if strings.HasSuffix(pod.Name, lastPodSuffix) {
+		monitoring.RemovePodStatusMetric(pod)
 		rc.ReqLogger.Info(fmt.Sprintf("UpdateRackNodeCount in STS %s to %d", sts.Name, *sts.Spec.Replicas-1))
 		return rc.UpdateRackNodeCount(sts, *sts.Spec.Replicas-1)
 	} else {

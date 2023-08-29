@@ -14,6 +14,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#553](https://github.com/k8ssandra/cass-operator/issues/553) dockerImageRunsAsCassandra is no longer used for anything as that's the default for current images. Use SecurityContext to override default SecurityContext (999:999)
 * [ENHANCEMENT] [#554](https://github.com/k8ssandra/cass-operator/issues/554) Add new empty directory as mount to server-system-logger (/var/lib/vector) so it works with multiple securityContexes
 * [ENHANCEMENT] [#512](https://github.com/k8ssandra/cass-operator/issues/512) Configs are now built using the newer k8ssandra-client config build command instead of the older cass-config-builder. This provides support for Cassandra 4.1.x config properties and to newer.
+* [ENHANCEMENT] [#184](https://github.com/k8ssandra/cass-operator/issues/184) Implement metrics to indicate the status of the Datacenter pods. Experimental, these metric names and values could be changed in the future versions.
 
 ## v1.16.0
 

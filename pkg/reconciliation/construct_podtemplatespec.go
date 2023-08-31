@@ -603,7 +603,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	if cassContainer.Lifecycle.PreStop == nil {
-		action, err := httphelper.GetMgmtApiWgetPostAction(dc, httphelper.NodeDrainEndpoint, "", 0)
+		action, err := httphelper.GetMgmtApiPostAction(dc, httphelper.NodeDrainEndpoint, 0)
 		if err != nil {
 			return err
 		}

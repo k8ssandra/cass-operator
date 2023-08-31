@@ -20,9 +20,14 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/k8ssandra/cass-operator/internal/controllers/control"
+	internal "github.com/k8ssandra/cass-operator/internal/envtest"
+	"github.com/k8ssandra/cass-operator/internal/result"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,6 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	cassandradatastaxcomv1beta1 "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
+	controlapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
+	"github.com/k8ssandra/cass-operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/pkg/reconciliation"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -48,7 +57,14 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	opts := zap.Options{
+		Development: true,
+		TimeEncoder: zapcore.ISO8601TimeEncoder,
+		DestWriter:  GinkgoWriter,
+	}
+
+	logf.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")
@@ -57,11 +73,16 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
+	Expect(images.ParseImageConfig(filepath.Join("..", "..", "..", "config", "manager", "image_config.yaml"))).To(Succeed())
+
 	cfg, err := testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
 	err = cassandradatastaxcomv1beta1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = controlapi.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -76,13 +97,44 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	operConfig := &configv1beta1.OperatorConfig{
+		OLMDeployed: false,
+	}
+
 	err = (&CassandraDatacenterReconciler{
-		Client:   k8sManager.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("cass-operator"),
+		Client:         k8sClient,
+		Log:            ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
+		Scheme:         k8sManager.GetScheme(),
+		Recorder:       k8sManager.GetEventRecorderFor("cass-operator"),
+		OperatorConfig: operConfig,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
+
+	err = (&internal.StatefulSetReconciler{
+		Client: k8sClient,
+		Scheme: k8sManager.GetScheme(),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&control.CassandraTaskReconciler{
+		Client: k8sClient,
+		Scheme: k8sManager.GetScheme(),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	// Reduce the polling times and sleeps to speed up the tests
+	cooldownPeriod = 1 * time.Millisecond
+	minimumRequeueTime = 10 * time.Millisecond
+	result.DurationFunc = func(msec int) time.Duration {
+		return time.Duration(msec * int(time.Millisecond))
+	}
+
+	reconciliation.QuietDurationFunc = func(msec int) time.Duration {
+		return time.Duration(msec * int(time.Millisecond))
+	}
+
+	control.JobRunningRequeue = time.Duration(1 * time.Millisecond)
+	control.TaskRunningRequeue = time.Duration(1 * time.Millisecond)
 
 	go func() {
 		defer GinkgoRecover()

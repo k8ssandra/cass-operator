@@ -92,14 +92,14 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 			restartedPods += int(status.UpdatedReplicas)
 			taskConfig.Completed = restartedPods
 			// This is still restarting
-			return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
+			return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
 		}
 		st.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation] = restartTime
 		if err := r.Client.Update(ctx, &st); err != nil {
 			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{RequeueAfter: jobRunningRequeue}, nil
+		return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
 	}
 
 	// We're done

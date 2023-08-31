@@ -17,8 +17,8 @@ import (
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
+	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
@@ -1754,6 +1754,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 							Ready: bool(started),
 						},
 					}
+					p.Status.PodIP = "127.0.0.1"
 					if started {
 						p.Labels[api.CassNodeState] = stateStarted
 					} else {
@@ -1908,6 +1909,7 @@ func TestStartOneNodePerRack(t *testing.T) {
 							Ready: bool(started),
 						},
 					}
+					p.Status.PodIP = "127.0.0.1"
 					if started {
 						p.Labels[api.CassNodeState] = stateStarted
 					} else {

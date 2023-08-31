@@ -24,9 +24,9 @@ import (
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
+	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
@@ -37,6 +37,8 @@ var (
 	ResultShouldRequeueNow     reconcile.Result = reconcile.Result{Requeue: true}
 	ResultShouldRequeueSoon    reconcile.Result = reconcile.Result{Requeue: true, RequeueAfter: 2 * time.Second}
 	ResultShouldRequeueTenSecs reconcile.Result = reconcile.Result{Requeue: true, RequeueAfter: 10 * time.Second}
+
+	QuietDurationFunc func(int) time.Duration = func(secs int) time.Duration { return time.Duration(secs) * time.Second }
 )
 
 const (
@@ -1663,7 +1665,7 @@ func (rc *ReconciliationContext) labelServerPodStarting(pod *corev1.Pod) error {
 func (rc *ReconciliationContext) enableQuietPeriod(seconds int) error {
 	dc := rc.Datacenter
 
-	dur := time.Second * time.Duration(seconds)
+	dur := QuietDurationFunc(seconds)
 	statusPatch := client.MergeFrom(dc.DeepCopy())
 	dc.Status.QuietPeriod = metav1.NewTime(time.Now().Add(dur))
 	err := rc.Client.Status().Patch(rc.Ctx, dc, statusPatch)
@@ -1816,7 +1818,6 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 		if notReady || err != nil {
 			return notReady, err
 		}
-
 	}
 	return false, nil
 }
@@ -2065,6 +2066,7 @@ func (rc *ReconciliationContext) setCondition(condition *api.DatacenterCondition
 }
 
 func (rc *ReconciliationContext) CheckConditionInitializedAndReady() result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::CheckConditionInitializedAndReady")
 	dc := rc.Datacenter
 	dcPatch := client.MergeFrom(dc.DeepCopy())
 	logger := rc.ReqLogger
@@ -2157,6 +2159,7 @@ func (rc *ReconciliationContext) createTask(command taskapi.CassandraCommand) er
 }
 
 func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::CheckClearActionConditions")
 	dc := rc.Datacenter
 	logger := rc.ReqLogger
 	dcPatch := client.MergeFrom(dc.DeepCopy())

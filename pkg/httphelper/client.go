@@ -34,6 +34,7 @@ type NodeMgmtClient struct {
 type nodeMgmtRequest struct {
 	endpoint string
 	host     string
+	port     int
 	method   string
 	timeout  time.Duration
 	body     []byte
@@ -184,16 +185,29 @@ func NewMgmtClient(ctx context.Context, client client.Client, dc *cassdcapi.Cass
 	}, nil
 }
 
-func BuildPodHostFromPod(pod *corev1.Pod) (string, error) {
+func BuildPodHostFromPod(pod *corev1.Pod) (string, int, error) {
 	// This function previously returned the dns hostname which includes the StatefulSet's headless service,
 	// which is the datacenter service. There are times though that we want to make a mgmt api call to the pod
 	// before the dns hostnames are available. It is therefore more reliable to simply use the PodIP.
 
 	if len(pod.Status.PodIP) == 0 {
-		return "", newNoPodIPError(pod)
+		return "", 0, newNoPodIPError(pod)
 	}
 
-	return pod.Status.PodIP, nil
+	mgmtApiPort := 8080
+
+	// Check for port override
+	for _, container := range pod.Spec.Containers {
+		if container.Name == "cassandra" {
+			for _, port := range container.Ports {
+				if port.Name == "mgmt-api-http" {
+					mgmtApiPort = int(port.ContainerPort)
+				}
+			}
+		}
+	}
+
+	return pod.Status.PodIP, mgmtApiPort, nil
 }
 
 func GetPodHost(podName, clusterName, dcName, namespace string) string {
@@ -213,7 +227,7 @@ func parseMetadataEndpointsResponseBody(body []byte) (*CassMetadataEndpoints, er
 func (client *NodeMgmtClient) CallMetadataEndpointsEndpoint(pod *corev1.Pod) (CassMetadataEndpoints, error) {
 	client.Log.Info("requesting Cassandra metadata endpoints from Node Management API", "pod", pod.Name)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return CassMetadataEndpoints{}, err
 	}
@@ -221,6 +235,7 @@ func (client *NodeMgmtClient) CallMetadataEndpointsEndpoint(pod *corev1.Pod) (Ca
 	request := nodeMgmtRequest{
 		endpoint: "/api/v0/metadata/endpoints",
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodGet,
 		timeout:  60 * time.Second,
 	}
@@ -247,7 +262,7 @@ func (client *NodeMgmtClient) CallMetadataEndpointsEndpoint(pod *corev1.Pod) (Ca
 //
 // A map length of 1 indicates schema agreement.
 func (client *NodeMgmtClient) CallSchemaVersionsEndpoint(pod *corev1.Pod) (map[string][]string, error) {
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -255,6 +270,7 @@ func (client *NodeMgmtClient) CallSchemaVersionsEndpoint(pod *corev1.Pod) (map[s
 	request := nodeMgmtRequest{
 		endpoint: "/api/v1/ops/node/schema/versions",
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodGet,
 		timeout:  60 * time.Second,
 	}
@@ -285,7 +301,7 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 	postData.Set("can_login", "true")
 	postData.Set("is_superuser", strconv.FormatBool(superuser))
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return err
 	}
@@ -293,6 +309,7 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 	request := nodeMgmtRequest{
 		endpoint: fmt.Sprintf("/api/v0/ops/auth/role?%s", postData.Encode()),
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  60 * time.Second,
 	}
@@ -310,7 +327,7 @@ func (client *NodeMgmtClient) CallProbeClusterEndpoint(pod *corev1.Pod, consiste
 		"pod", pod.Name,
 	)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return err
 	}
@@ -318,6 +335,7 @@ func (client *NodeMgmtClient) CallProbeClusterEndpoint(pod *corev1.Pod, consiste
 	request := nodeMgmtRequest{
 		endpoint: fmt.Sprintf("/api/v0/probes/cluster?consistency_level=%s&rf_per_dc=%d", consistencyLevel, rfPerDc),
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodGet,
 		timeout:  60 * time.Second,
 	}
@@ -332,7 +350,7 @@ func (client *NodeMgmtClient) CallDrainEndpoint(pod *corev1.Pod) error {
 		"pod", pod.Name,
 	)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return err
 	}
@@ -340,6 +358,7 @@ func (client *NodeMgmtClient) CallDrainEndpoint(pod *corev1.Pod) error {
 	request := nodeMgmtRequest{
 		endpoint: "/api/v0/ops/node/drain",
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  time.Minute * 2,
 	}
@@ -383,7 +402,7 @@ func createKeySpaceRequest(pod *corev1.Pod, jobs int, keyspaceName string, table
 		return nil, err
 	}
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -391,6 +410,7 @@ func createKeySpaceRequest(pod *corev1.Pod, jobs int, keyspaceName string, table
 	request := &nodeMgmtRequest{
 		endpoint: endpoint,
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		body:     body,
 	}
@@ -427,7 +447,7 @@ func (client *NodeMgmtClient) CallDatacenterRebuild(pod *corev1.Pod, sourceDatac
 		"pod", pod.Name,
 	)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return "", err
 	}
@@ -437,6 +457,7 @@ func (client *NodeMgmtClient) CallDatacenterRebuild(pod *corev1.Pod, sourceDatac
 	req := nodeMgmtRequest{
 		endpoint: queryUrl,
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  60 * time.Second,
 	}
@@ -504,7 +525,7 @@ func createCompactRequest(pod *corev1.Pod, compactRequest *CompactRequest, endpo
 		return nil, err
 	}
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -512,6 +533,7 @@ func createCompactRequest(pod *corev1.Pod, compactRequest *CompactRequest, endpo
 	request := &nodeMgmtRequest{
 		endpoint: endpoint,
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		body:     body,
 	}
@@ -578,7 +600,7 @@ func createScrubRequest(pod *corev1.Pod, scrubRequest *ScrubRequest, endpoint st
 		return nil, err
 	}
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -586,6 +608,7 @@ func createScrubRequest(pod *corev1.Pod, scrubRequest *ScrubRequest, endpoint st
 	request := &nodeMgmtRequest{
 		endpoint: endpoint,
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		body:     body,
 	}
@@ -659,7 +682,7 @@ func (client *NodeMgmtClient) modifyKeyspace(endpoint string, pod *corev1.Pod, k
 		return err
 	}
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return err
 	}
@@ -667,6 +690,7 @@ func (client *NodeMgmtClient) modifyKeyspace(endpoint string, pod *corev1.Pod, k
 	request := nodeMgmtRequest{
 		endpoint: fmt.Sprintf("/api/v0/ops/keyspace/%s", endpoint),
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  time.Second * 20,
 		body:     body,
@@ -686,7 +710,7 @@ func parseListKeyspacesEndpointsResponseBody(body []byte) ([]string, error) {
 
 // GetKeyspace calls the management API to check if a specific keyspace exists
 func (client *NodeMgmtClient) GetKeyspace(pod *corev1.Pod, keyspaceName string) ([]string, error) {
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -697,6 +721,7 @@ func (client *NodeMgmtClient) GetKeyspace(pod *corev1.Pod, keyspaceName string) 
 	request := nodeMgmtRequest{
 		endpoint: endpoint,
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodGet,
 		timeout:  time.Second * 20,
 	}
@@ -722,7 +747,7 @@ func (client *NodeMgmtClient) GetKeyspaceReplication(pod *corev1.Pod, keyspaceNa
 	if keyspaceName == "" {
 		return nil, fmt.Errorf("keyspace name cannot be empty")
 	}
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -730,6 +755,7 @@ func (client *NodeMgmtClient) GetKeyspaceReplication(pod *corev1.Pod, keyspaceNa
 	request := nodeMgmtRequest{
 		endpoint: endpoint,
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodGet,
 		timeout:  time.Second * 20,
 	}
@@ -749,7 +775,7 @@ func (client *NodeMgmtClient) ListTables(pod *corev1.Pod, keyspaceName string) (
 	if keyspaceName == "" {
 		return nil, fmt.Errorf("keyspace name cannot be empty")
 	}
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -757,6 +783,7 @@ func (client *NodeMgmtClient) ListTables(pod *corev1.Pod, keyspaceName string) (
 	request := nodeMgmtRequest{
 		endpoint: endpoint,
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodGet,
 		timeout:  time.Second * 20,
 	}
@@ -861,7 +888,7 @@ func (client *NodeMgmtClient) CreateTable(pod *corev1.Pod, table *TableDefinitio
 	if err != nil {
 		return err
 	}
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return err
 	}
@@ -869,6 +896,7 @@ func (client *NodeMgmtClient) CreateTable(pod *corev1.Pod, table *TableDefinitio
 	request := nodeMgmtRequest{
 		endpoint: endpoint,
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  time.Second * 40,
 		body:     body,
@@ -878,14 +906,15 @@ func (client *NodeMgmtClient) CreateTable(pod *corev1.Pod, table *TableDefinitio
 }
 
 func (client *NodeMgmtClient) CallLifecycleStartEndpointWithReplaceIp(pod *corev1.Pod, replaceIp string) error {
-	// talk to the pod via IP because we are dialing up a pod that isn't ready,
-	// so it won't be reachable via the service and pod DNS
-	podIP := pod.Status.PodIP
+	podHost, podPort, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
 
 	client.Log.Info(
 		"calling Management API start node - POST /api/v0/lifecycle/start",
 		"pod", pod.Name,
-		"podIP", podIP,
+		"podIP", podHost,
 		"replaceIP", replaceIp,
 	)
 
@@ -897,12 +926,13 @@ func (client *NodeMgmtClient) CallLifecycleStartEndpointWithReplaceIp(pod *corev
 
 	request := nodeMgmtRequest{
 		endpoint: endpoint,
-		host:     podIP,
+		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  10 * time.Minute,
 	}
 
-	_, err := callNodeMgmtEndpoint(client, request, "")
+	_, err = callNodeMgmtEndpoint(client, request, "")
 	return err
 }
 
@@ -916,7 +946,7 @@ func (client *NodeMgmtClient) CallReloadSeedsEndpoint(pod *corev1.Pod) error {
 		"pod", pod.Name,
 	)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return err
 	}
@@ -924,6 +954,7 @@ func (client *NodeMgmtClient) CallReloadSeedsEndpoint(pod *corev1.Pod) error {
 	request := nodeMgmtRequest{
 		endpoint: "/api/v0/ops/seeds/reload",
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  60 * time.Second,
 	}
@@ -939,7 +970,7 @@ func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) erro
 		"pod", pod.Name,
 	)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return err
 	}
@@ -947,6 +978,7 @@ func (client *NodeMgmtClient) CallDecommissionNodeEndpoint(pod *corev1.Pod) erro
 	request := nodeMgmtRequest{
 		endpoint: "/api/v0/ops/node/decommission?force=true",
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  60 * time.Second,
 	}
@@ -962,7 +994,7 @@ func (client *NodeMgmtClient) CallDecommissionNode(pod *corev1.Pod, force bool) 
 		"pod", pod.Name,
 	)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return "", err
 	}
@@ -972,6 +1004,7 @@ func (client *NodeMgmtClient) CallDecommissionNode(pod *corev1.Pod, force bool) 
 	req := nodeMgmtRequest{
 		endpoint: queryUrl,
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  60 * time.Second,
 	}
@@ -992,7 +1025,7 @@ func (client *NodeMgmtClient) FeatureSet(pod *corev1.Pod) (*FeatureSet, error) {
 		"pod", pod.Name,
 	)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -1000,6 +1033,7 @@ func (client *NodeMgmtClient) FeatureSet(pod *corev1.Pod) (*FeatureSet, error) {
 	request := nodeMgmtRequest{
 		endpoint: "/api/v0/metadata/versions/features",
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodGet,
 	}
 
@@ -1028,7 +1062,7 @@ func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDet
 		"pod", pod.Name,
 	)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -1036,6 +1070,7 @@ func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDet
 	request := nodeMgmtRequest{
 		endpoint: fmt.Sprintf("/api/v0/ops/executor/job?job_id=%s", jobId),
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodGet,
 	}
 
@@ -1065,7 +1100,7 @@ func (client *NodeMgmtClient) CallMove(pod *corev1.Pod, newToken string) (string
 		"newToken", newToken,
 	)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return "", err
 	}
@@ -1075,6 +1110,7 @@ func (client *NodeMgmtClient) CallMove(pod *corev1.Pod, newToken string) (string
 	req := nodeMgmtRequest{
 		endpoint: queryUrl,
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  60 * time.Second,
 	}
@@ -1089,7 +1125,12 @@ func (client *NodeMgmtClient) CallMove(pod *corev1.Pod, newToken string) (string
 func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, contentType string) ([]byte, error) {
 	client.Log.Info("client::callNodeMgmtEndpoint")
 
-	url := fmt.Sprintf("%s://%s:8080%s", client.Protocol, request.host, request.endpoint)
+	port := 8080
+	if request.port > 0 {
+		port = request.port
+	}
+
+	url := fmt.Sprintf("%s://%s:%d%s", client.Protocol, request.host, port, request.endpoint)
 
 	var reqBody io.Reader
 	if len(request.body) > 0 {
@@ -1167,13 +1208,14 @@ func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod)
 		"pod", pod.Name,
 	)
 
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return false, err
 	}
 	request := nodeMgmtRequest{
 		endpoint: "/api/v0/ops/node/fullquerylogging",
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodGet,
 		timeout:  time.Minute * 2,
 	}
@@ -1204,13 +1246,14 @@ func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod)
 func (client *NodeMgmtClient) CallSetFullQueryLog(pod *corev1.Pod, enableFullQueryLogging bool) error {
 
 	client.Log.Info("client::callIsFullQueryLogEnabledEndpoint")
-	podHost, err := BuildPodHostFromPod(pod)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {
 		return err
 	}
 	request := nodeMgmtRequest{
 		endpoint: "/api/v0/ops/node/fullquerylogging?enabled=" + strconv.FormatBool(enableFullQueryLogging),
 		host:     podHost,
+		port:     podPort,
 		method:   http.MethodPost,
 		timeout:  time.Minute * 2,
 	}

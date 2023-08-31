@@ -3,12 +3,13 @@ package reconciliation
 import (
 	"errors"
 
+	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 )
 
 // CheckFullQueryLogging sets FQL enabled or disabled. It calls the NodeMgmtClient which calls the Cassandra management API and returns a result.ReconcileResult.
 func (rc *ReconciliationContext) CheckFullQueryLogging() result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::CheckFullQueryLogging")
 	dc := rc.GetDatacenter()
 	if !dc.DeploymentSupportsFQL() {
 		return result.Continue()

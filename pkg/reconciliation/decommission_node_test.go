@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	"github.com/stretchr/testify/mock"
 	appsv1 "k8s.io/api/apps/v1"

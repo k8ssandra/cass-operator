@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.17.0
 
 * [CHANGE] [#565](https://github.com/k8ssandra/cass-operator/issues/565) Replace the use of wget with curl when making Kubernetes -> management-api HTTP(S) calls
 * [CHANGE] [#553](https://github.com/k8ssandra/cass-operator/issues/553) dockerImageRunsAsCassandra is no longer used for anything as that's the default for current images. Use SecurityContext to override default SecurityContext (999:999)

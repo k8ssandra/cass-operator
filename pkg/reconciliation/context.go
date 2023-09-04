@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -26,14 +27,13 @@ import (
 // ReconciliationContext contains all of the input necessary to calculate a list of ReconciliationActions
 type ReconciliationContext struct {
 	Request        *reconcile.Request
-	Client         client.Client
+	Client         runtimeClient.Client
 	Scheme         *runtime.Scheme
 	Datacenter     *api.CassandraDatacenter
 	NodeMgmtClient httphelper.NodeMgmtClient
 	Recorder       record.EventRecorder
 	ReqLogger      logr.Logger
 	SecretWatches  dynamicwatch.DynamicWatches
-	OpenShift      bool
 
 	// According to golang recommendations the context should not be stored in a struct but given that
 	// this is passed around as a parameter we feel that its a fair compromise. For further discussion
@@ -52,11 +52,10 @@ type ReconciliationContext struct {
 func CreateReconciliationContext(
 	ctx context.Context,
 	req *reconcile.Request,
-	cli client.Client,
+	cli runtimeClient.Client,
 	scheme *runtime.Scheme,
 	rec record.EventRecorder,
-	secretWatches dynamicwatch.DynamicWatches,
-	runningInOpenshift bool) (*ReconciliationContext, error) {
+	secretWatches dynamicwatch.DynamicWatches) (*ReconciliationContext, error) {
 
 	reqLogger := log.FromContext(ctx)
 	rc := &ReconciliationContext{}
@@ -67,7 +66,6 @@ func CreateReconciliationContext(
 	rc.SecretWatches = secretWatches
 	rc.ReqLogger = reqLogger
 	rc.Ctx = ctx
-	rc.OpenShift = runningInOpenshift
 
 	rc.ReqLogger = rc.ReqLogger.
 		WithValues("namespace", req.Namespace)
@@ -121,7 +119,7 @@ func (rc *ReconciliationContext) GetLogger() logr.Logger {
 	return rc.ReqLogger
 }
 
-func (rc *ReconciliationContext) GetClient() client.Client {
+func (rc *ReconciliationContext) GetClient() runtimeClient.Client {
 	return rc.Client
 }
 
@@ -166,7 +164,7 @@ func (rc *ReconciliationContext) validateDatacenterNameOverride() []error {
 		return errs
 	} else {
 		if *dc.Status.DatacenterName != dc.Spec.DatacenterName {
-			errs = append(errs, fmt.Errorf("datacenter %s name override '%s' cannot be changed after creation to '%s'", dc.Name, dc.Spec.DatacenterName, *dc.Status.DatacenterName))
+			errs = append(errs, fmt.Errorf("datacenter %s name override '%s' cannot be changed after creation to '%s'.", dc.Name, dc.Spec.DatacenterName, *dc.Status.DatacenterName))
 		}
 	}
 

@@ -5,11 +5,13 @@ cat <<EOF >> bundle.Dockerfile
 # Certified Openshift required labels
 LABEL com.redhat.openshift.versions="v4.9"
 LABEL com.redhat.delivery.operator.bundle=true
+LABEL com.redhat.delivery.backport=true
 EOF
 
 # Add them to the bundle metadata also
 yq eval -i '.annotations."com.redhat.openshift.versions" = "v4.9"' bundle/metadata/annotations.yaml
 yq eval -i '.annotations."com.redhat.delivery.operator.bundle" = true' bundle/metadata/annotations.yaml
+yq eval -i '.annotations."com.redhat.delivery.backport" = true' bundle/metadata/annotations.yaml
 yq eval -i '.annotations."com.redhat.openshift.versions" headComment = "Certified Openshift required labels"' bundle/metadata/annotations.yaml
 
 # This file is extra from creation process on config/manifests, should not be in the bundle itself

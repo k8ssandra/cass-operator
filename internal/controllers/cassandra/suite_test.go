@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	cassandradatastaxcomv1beta1 "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 	controlapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/reconciliation"
@@ -97,16 +96,11 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	operConfig := &configv1beta1.OperatorConfig{
-		OLMDeployed: false,
-	}
-
 	err = (&CassandraDatacenterReconciler{
-		Client:         k8sClient,
-		Log:            ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
-		Scheme:         k8sManager.GetScheme(),
-		Recorder:       k8sManager.GetEventRecorderFor("cass-operator"),
-		OperatorConfig: operConfig,
+		Client:   k8sClient,
+		Log:      ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("cass-operator"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

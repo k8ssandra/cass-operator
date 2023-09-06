@@ -1163,7 +1163,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 
 	// 4.0 should not have the client image or new config builder, 4.1 should
 
-	spec40, err := buildPodTemplateSpec(dc40, dc40.Spec.Racks[0], false, false)
+	spec40, err := buildPodTemplateSpec(dc40, dc40.Spec.Racks[0], false)
 	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
 
 	initContainers := spec40.Spec.InitContainers
@@ -1178,7 +1178,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 	assert.True(volumesContains(volumes, volumeNameMatcher("server-logs")))
 	assert.True(volumesContains(volumes, volumeNameMatcher("vector-lib")))
 
-	spec41, err := buildPodTemplateSpec(dc41, dc41.Spec.Racks[0], false, false)
+	spec41, err := buildPodTemplateSpec(dc41, dc41.Spec.Racks[0], false)
 	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
 
 	initContainers = spec41.Spec.InitContainers

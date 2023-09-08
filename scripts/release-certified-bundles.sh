@@ -31,7 +31,7 @@ yq -i '.spec.relatedImages += {"name": "system-logger", "image": "registry.conne
 #yq -i '.spec.relatedImages += {"name": "k8ssandra-client", "image": "registry.connect.redhat.com/datastax/k8ssandra-client@"}' bundle/manifests/cass-operator.clusterserviceversion.yaml
 SHA=$SHA yq -i '.spec.relatedImages[0].image += env(SHA)' bundle/manifests/cass-operator.clusterserviceversion.yaml
 SYSTEM_LOGGER_SHA=$SYSTEM_LOGGER_SHA yq -i '.spec.relatedImages[1].image += env(SYSTEM_LOGGER_SHA)' bundle/manifests/cass-operator.clusterserviceversion.yaml
-CLIENT_SHA=$CLIENT_SHA yq -i '.spec.relatedImages[2].image += env(CLIENT_SHA)' bundle/manifests/cass-operator.clusterserviceversion.yaml
+#CLIENT_SHA=$CLIENT_SHA yq -i '.spec.relatedImages[2].image += env(CLIENT_SHA)' bundle/manifests/cass-operator.clusterserviceversion.yaml
 
 for dir in "${TARGET_DIRS[@]}"
 do

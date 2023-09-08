@@ -18,7 +18,7 @@ TARGET_DIRS=(certified-operators)
 git checkout v$VERSION
 
 yq -i '.images.system-logger = "registry.connect.redhat.com/datastax/system-logger@"' config/manager/image_config.yaml
-yq -i '.images.k8ssandra-client = "registry.connect.redhat.com/datastax/k8ssandra-client@"' config/manager/image_config.yaml
+#yq -i '.images.k8ssandra-client = "registry.connect.redhat.com/datastax/k8ssandra-client@"' config/manager/image_config.yaml
 SYSTEM_LOGGER_SHA=$SYSTEM_LOGGER_SHA yq -i '.images.system-logger += env(SYSTEM_LOGGER_SHA)' config/manager/image_config.yaml
 
 # Create bundle
@@ -28,7 +28,7 @@ make VERSION=$VERSION IMG=registry.connect.redhat.com/datastax/cass-operator@$SH
 yq -i '.spec.relatedImages = []' bundle/manifests/cass-operator.clusterserviceversion.yaml
 yq -i '.spec.relatedImages += {"name": "cass-operator", "image": "registry.connect.redhat.com/datastax/cass-operator@"}' bundle/manifests/cass-operator.clusterserviceversion.yaml
 yq -i '.spec.relatedImages += {"name": "system-logger", "image": "registry.connect.redhat.com/datastax/system-logger@"}' bundle/manifests/cass-operator.clusterserviceversion.yaml
-yq -i '.spec.relatedImages += {"name": "k8ssandra-client", "image": "registry.connect.redhat.com/datastax/k8ssandra-client@"}' bundle/manifests/cass-operator.clusterserviceversion.yaml
+#yq -i '.spec.relatedImages += {"name": "k8ssandra-client", "image": "registry.connect.redhat.com/datastax/k8ssandra-client@"}' bundle/manifests/cass-operator.clusterserviceversion.yaml
 SHA=$SHA yq -i '.spec.relatedImages[0].image += env(SHA)' bundle/manifests/cass-operator.clusterserviceversion.yaml
 SYSTEM_LOGGER_SHA=$SYSTEM_LOGGER_SHA yq -i '.spec.relatedImages[1].image += env(SYSTEM_LOGGER_SHA)' bundle/manifests/cass-operator.clusterserviceversion.yaml
 CLIENT_SHA=$CLIENT_SHA yq -i '.spec.relatedImages[2].image += env(CLIENT_SHA)' bundle/manifests/cass-operator.clusterserviceversion.yaml

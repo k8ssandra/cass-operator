@@ -13,4 +13,3 @@ leaderElection:
   resourceName: b569adb7.cassandra.datastax.com
 disableWebhooks: false
 imageConfigFile: /configs/image_config.yaml
-olmDeployment: false

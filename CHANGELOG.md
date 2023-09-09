@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#541](https://github.com/k8ssandra/cass-operator/issues/541) Revert when deployed through OLM, add serviceAccount to Cassandra pods that use nonroot priviledge. This is no longer necessary with 1.17.0 and up.
+
 ## v1.17.0
 
 * [CHANGE] [#565](https://github.com/k8ssandra/cass-operator/issues/565) Replace the use of wget with curl when making Kubernetes -> management-api HTTP(S) calls

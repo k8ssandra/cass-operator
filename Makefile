@@ -315,8 +315,7 @@ endif
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPSDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	scripts/preprocess-bundle.sh
-	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/manifests | $(OPSDK) generate bundle -q --overwrite --extra-service-accounts cass-operator-cassandra-default-sa --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/manifests | $(OPSDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	scripts/postprocess-bundle.sh $(REGISTRY)
 	$(OPSDK) bundle validate ./bundle --select-optional suite=operatorframework
 

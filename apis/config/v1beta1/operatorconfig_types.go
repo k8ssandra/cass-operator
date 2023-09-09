@@ -38,9 +38,6 @@ type OperatorConfig struct {
 
 	// ImageConfigFile indicates the path where to load the imageConfig from
 	ImageConfigFile string `json:"imageConfigFile,omitempty"`
-
-	// OLMDeployed is set to true when operator is deployed through OLM. This will activate additional Openshift features
-	OLMDeployed bool `json:"olmDeployment,omitempty"`
 }
 
 func init() {

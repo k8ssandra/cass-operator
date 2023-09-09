@@ -566,7 +566,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_containers_merge(t *testing.T)
 			},
 		},
 	}
-	got, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, false)
+	got, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 	assert.Equal(t, 3, len(got.Spec.Containers))
@@ -600,7 +600,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_initcontainers_merge(t *testin
 			ConfigBuilderResources: testContainer.Resources,
 		},
 	}
-	got, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, false)
+	got, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 	assert.Equal(t, 2, len(got.Spec.InitContainers))
@@ -643,7 +643,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_after_config
 		},
 	}
 
-	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, false)
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
@@ -704,7 +704,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_initContainer_with_volumes
 		},
 	}
 
-	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], true, false)
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], true)
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
@@ -814,7 +814,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 		},
 	}
 
-	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], true, false)
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], true)
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
@@ -871,7 +871,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_add_container_with_volumes(t *
 	testZoneRack := dc.Spec.Racks[0]
 	testZoneRack.NodeAffinityLabels = map[string]string{zoneLabel: "testzone"}
 	dc.Spec.Racks[0] = testZoneRack
-	podTemplateSpec, err = buildPodTemplateSpec(dc, testZoneRack, false, false)
+	podTemplateSpec, err = buildPodTemplateSpec(dc, testZoneRack, false)
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
 	volumes = podTemplateSpec.Spec.Volumes
@@ -971,7 +971,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_labels_merge(t *testing.T) {
 	}
 	dc.Spec.PodTemplateSpec.Labels = map[string]string{"abc": "123"}
 
-	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, false)
+	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 	got := spec.Labels
 
 	expected := dc.GetRackLabels("testrack")
@@ -1005,7 +1005,7 @@ func TestCassandraDatacenter_buildContainers_additional_labels(t *testing.T) {
 	}
 	dc.Spec.PodTemplateSpec.Labels = map[string]string{"abc": "123"}
 
-	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, false)
+	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 	got := spec.Labels
 
 	expected := dc.GetRackLabels("testrack")
@@ -1046,7 +1046,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_overrideSecurityContext(t *tes
 		},
 	}
 
-	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, false)
+	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "should not have gotten an error when building podTemplateSpec")
 	assert.NotNil(t, spec)
@@ -1098,7 +1098,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_do_not_propagate_volumes(t *te
 		},
 	}
 
-	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], true, false)
+	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], true)
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 
 	initContainers := spec.Spec.InitContainers
@@ -1163,7 +1163,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 
 	// 4.0 should not have the client image or new config builder, 4.1 should
 
-	spec40, err := buildPodTemplateSpec(dc40, dc40.Spec.Racks[0], false, false)
+	spec40, err := buildPodTemplateSpec(dc40, dc40.Spec.Racks[0], false)
 	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
 
 	initContainers := spec40.Spec.InitContainers
@@ -1178,7 +1178,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 	assert.True(volumesContains(volumes, volumeNameMatcher("server-logs")))
 	assert.True(volumesContains(volumes, volumeNameMatcher("vector-lib")))
 
-	spec41, err := buildPodTemplateSpec(dc41, dc41.Spec.Racks[0], false, false)
+	spec41, err := buildPodTemplateSpec(dc41, dc41.Spec.Racks[0], false)
 	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
 
 	initContainers = spec41.Spec.InitContainers
@@ -1205,40 +1205,6 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 	assert.True(volumesContains(volumes, volumeNameMatcher("server-logs")))
 	assert.True(volumesContains(volumes, volumeNameMatcher("server-config-base")))
 	assert.True(volumesContains(volumes, volumeNameMatcher("vector-lib")))
-}
-
-func TestCassandraDatacenter_buildPodTemplateSpec_openShift(t *testing.T) {
-	assert := assert.New(t)
-
-	dc := &api.CassandraDatacenter{
-		Spec: api.CassandraDatacenterSpec{
-			ClusterName:   "bob",
-			ServerType:    "cassandra",
-			ServerVersion: "4.1.2",
-			Racks: []api.Rack{
-				{
-					Name: "default",
-				},
-			},
-		},
-	}
-
-	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], true, false)
-	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
-
-	assert.Equal(spec.Spec.ServiceAccountName, "", "no default serviceAccount is set")
-
-	spec, err = buildPodTemplateSpec(dc, dc.Spec.Racks[0], true, true)
-	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
-
-	assert.Equal(spec.Spec.ServiceAccountName, OpenShiftPodServiceAccount, "missing serviceAccount when running under OLM")
-
-	dc.Spec.ServiceAccountName = "overrideSA"
-
-	spec, err = buildPodTemplateSpec(dc, dc.Spec.Racks[0], true, true)
-	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
-
-	assert.Equal(spec.Spec.ServiceAccountName, "overrideSA", "under OLM the serviceAccountName must be overwritable")
 }
 
 func TestCassandraDatacenter_buildContainers_DisableSystemLoggerSidecar(t *testing.T) {
@@ -1431,7 +1397,7 @@ func TestTolerations(t *testing.T) {
 		},
 	}
 
-	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, false)
+	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "failed to build PodTemplateSpec")
 	// using ElementsMatch instead of Equal because we do not really care about ordering.
@@ -1468,7 +1434,7 @@ func TestTolerations(t *testing.T) {
 		},
 	}
 
-	spec, err = buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, false)
+	spec, err = buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 
 	assert.NoError(t, err, "failed to build PodTemplateSpec")
 	// using ElementsMatch instead of Equal because we do not really care about ordering.
@@ -1688,7 +1654,7 @@ func TestServiceAccountPrecedence(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		pds, err := buildPodTemplateSpec(test.dc, test.dc.Spec.Racks[0], false, false)
+		pds, err := buildPodTemplateSpec(test.dc, test.dc.Spec.Racks[0], false)
 		assert.NoError(err)
 		assert.Equal(test.accountName, pds.Spec.ServiceAccountName)
 	}

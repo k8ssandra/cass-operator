@@ -44,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 )
 
 var (
@@ -76,9 +75,6 @@ type CassandraDatacenterReconciler struct {
 	// during reconciliation where we update the mappings for the watches.
 	// Putting it here allows us to get it to both places.
 	SecretWatches dynamicwatch.DynamicWatches
-
-	// OperatorConfig allows Reconciler to access generic configuration properties
-	OperatorConfig *configv1beta1.OperatorConfig
 }
 
 // Reconcile reads that state of the cluster for a Datacenter object
@@ -109,7 +105,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 	logger.Info("======== handler::Reconcile has been called")
 
-	rc, err := reconciliation.CreateReconciliationContext(ctx, &request, r.Client, r.Scheme, r.Recorder, r.SecretWatches, r.OperatorConfig.OLMDeployed)
+	rc, err := reconciliation.CreateReconciliationContext(ctx, &request, r.Client, r.Scheme, r.Recorder, r.SecretWatches)
 
 	if err != nil {
 		if errors.IsNotFound(err) {

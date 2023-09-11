@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.17.1
 
 * [CHANGE] [#541](https://github.com/k8ssandra/cass-operator/issues/541) Revert when deployed through OLM, add serviceAccount to Cassandra pods that use nonroot priviledge. This is no longer necessary with 1.17.0 and up.

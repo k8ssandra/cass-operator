@@ -1474,6 +1474,32 @@ func TestPorts(t *testing.T) {
 		{
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob-override",
+					ServerType:    "cassandra",
+					ServerVersion: "4.1.2",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{
+											Name:          "mgmt-api-http",
+											ContainerPort: 8081,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			openPorts: []int32{8081, 9000, 9042, 9103, 9142},
+			notOpen:   []int32{8080, 8609, 9160},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
 					ClusterName:   "bob",
 					ServerType:    "dse",
 					ServerVersion: "6.8.31",

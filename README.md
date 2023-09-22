@@ -5,42 +5,28 @@ The DataStax Kubernetes Operator for Apache Cassandra&reg;. This repository repl
 
 ## Getting Started
 
-To create a full featured cluster, the recommend approach is to use the Helm charts from k8ssandra. Check the [Getting started](https://k8ssandra.io/docs/getting-started/) documentation at (k8ssandra.io)[https://k8ssandra.io/docs]. We also provide the ability to install and upgrade the operator with Operator Lifecycle Manager (OLM).
+``cass-operator`` can be used as standalone product to manage your Cassandra cluster or as part of the (https://docs.k8ssandra.io/install/)[k8ssandra-operator]. With tooling such as managed repairs and automated backups, see k8ssandra-operator as the recommended approach. 
 
-If you wish to use cass-operator only we provide Kustomize templates that can be used to install with kubectl only. This approach is also recommended if you wish to modify the installation beyond our provided examples. If updating from previous versions, please see ``Upgrade instructions`` section first.
+If updating from previous versions, please see ``Upgrade instructions`` section first.
 
-## Supported versions
+### Installing the operator with Helm
 
-We actively maintain two different versions of cass-operator, the [1.10.x series](https://github.com/k8ssandra/cass-operator/tree/1.10.x) as well as the newest version cut from the master branch. The [1.10.x branch](https://github.com/k8ssandra/cass-operator/tree/1.10.x) receives only bugfixes, while all the new features will only land to the newer versions.
+cass-operator is available as a Helm chart as part of the k8ssandra project. First add the k8ssandra Helm repository:
 
-### Kubernetes and Openshift version support
-
-1.10.x versions support Kubernetes versions 1.18 to 1.25. For Openshift, 1.10.x supports 4.7 and 4.8 (it will not pass validations in 4.9 due to the use of deprecated APIs).
-
-Newer releases (1.11.0 and up) are tested and supported only in supported Kubernetes versions. That means versions 1.21 and up. For Openshift installations, 1.11.0 and up are supported in 4.9 and newer.
-
-### Cassandra version support
-
-For Cassandra versions, 1.10.x will only support 3.11.x and 4.0.x. Support for 4.1 will only land in upcoming versions (1.13.0 or later). Both versions support all DSE 6.8.x releases.
-
-## Changelog between versions
-
-The next major/minor version always includes changes from the previously released supported version, but no more than that. That is, if the patch release is released after the next (next in semver) major/minor, the patches are not integrated to it, but are repeated in the changelog for the next version if required (in some cases the bugfixes are not necessary for the next major/minor).
-
-As an example, lets say the changelog has the following release sequence:
-
-```
-1.12.0
-1.10.5
-1.11.0
-1.10.4
-..
-1.10.0
+```console
+helm repo add k8ssandra https://helm.k8ssandra.io/stable
+helm repo update
 ```
 
-1.11.0 will include everything under it, including fixes from 1.10.4, however 1.11.0 does not have the fixes from 1.10.5 (as 1.11.0 was released before 1.10.5). 1.12.0 on the other hand will include all the fixes from 1.10.5, but those fixes are repeated as 1.12.0 lists everything changed from the previous major/minor, that is changes between 1.11.0 and 1.12.0.
+Then to install the cass-operator using the default settings to namespace ``cass-operator``, use the following command:
 
-While the 1.10.x branch will only have fixes released from that branch, the master branch will include all the versions.
+```console
+helm install cass-operator k8ssandra/cass-operator -n cass-operator --create-namespace
+```
+
+You can modify the installation using the values from our (values.yaml)[https://github.com/k8ssandra/k8ssandra/blob/main/charts/cass-operator/values.yaml] file.
+
+By default, the Helm installation requires ``cert-manager`` to be present in the Kubernetes installation. If you do not have cert-manager installed, follow the steps at (https://cert-manager.io/docs/installation/helm/)[cert-manager's] documentation. If you do not wish to use cert-manager, either disable the webhooks using ``--set admissionWebhooks.enabled=false`` or provide your own certificate in a secret and set it with ``--set admissionWebhooks.customCertificate=namespace/certificate-name``. 
 
 ### Installing the operator with Kustomize
 
@@ -70,23 +56,7 @@ NAME                             READY   STATUS    RESTARTS   AGE
 cass-operator-555577b9f8-zgx6j   1/1     Running   0          25h
 ```
 
-### Upgrade instructions:
-
-Updates are supported from previous versions of ``k8ssandra/cass-operator``. If upgrading from versions older than 1.7.0 (released under ``datastax/cass-operator`` name), please upgrade first to version 1.7.1. The following instructions apply when upgrading from 1.7.1 to 1.8.0 or newer up to 1.10.1. Upgrading to 1.11.0 if using Kubernetes 1.23 requires updating at least to 1.8.0 first, since 1.7.1 can not be used in Kubernetes 1.23 or newer.
-
-If you're upgrading from 1.7.1, there is an additional step to take due to the modifications to cass-operator’s underlying controller-runtime and updated Kubernetes versions. These steps need to be done manually before updating to the newest version of cass-operator. Newer Kubernetes versions require stricter validation and as such we need to remove ``preserveUnknownFields`` global property from the CRD to allow us to update to a newer CRD. The newer controller-runtime on the other hand modifies the liveness, readiness and configuration options, which require us to delete the older deployment. These commands do not delete your running Cassandra instances.
-
- Run the following commands assuming cass-operator is installed to ``cass-operator`` namespace (change -n parameter if it is installed to some other namespace):
-
-```sh
-kubectl -n cass-operator delete deployment.apps/cass-operator
-kubectl -n cass-operator delete service/cassandradatacenter-webhook-service
-kubectl patch crd cassandradatacenters.cassandra.datastax.com -p '{"spec":{"preserveUnknownFields":false}}'
-```
-
-You can now install new version of cass-operator as instructed previously.
-
-### Install Prometheus monitor rules
+#### Install Prometheus monitor rules
 
 If you have Prometheus installed in your cluster, you can apply the following command to install the Prometheus support:
 
@@ -94,12 +64,12 @@ If you have Prometheus installed in your cluster, you can apply the following co
 kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus?ref=v1.17.1
 ```
 
-### Install cert-manager
+#### Install cert-manager
 
-We have tested the cass-operator to work with cert-manager versions 1.3.1, 1.5.3 and 1.7.1. Other versions might work also. To install 1.7.1 to your cluster, run the following command:
+We have tested the current cass-operator to work with cert-manager versions 1.12.2. Other versions should work also. To install 1.12.2 to your cluster, run the following command:
 
 ```console
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.7.1/cert-manager.yaml
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.2/cert-manager.yaml
 ```
 
 #### Modifying the Kustomize template
@@ -198,6 +168,70 @@ images:
 ```
 
 Run ``kubectl apply -k our_installation`` to install cass-operator.
+
+### Installing the operator with Operator Lifecycle Manager (or installing to Openshift)
+
+cass-operator is available in the OperatorHub as a community version as well as certified version. You can install these directly from the Openshift's UI.
+
+For other distributions of Kubernetes, you can find cass-operator from the OperatorHub under the name (https://operatorhub.io/operator/cass-operator-community)[cass-operator-community].
+
+If OLM is already installed in your cluster, the operator can be installed with the following command:
+
+```
+kubectl create -f https://operatorhub.io/install/cass-operator-community.yaml
+```
+
+### Upgrade instructions:
+
+Updates are supported from previous versions of ``k8ssandra/cass-operator``. If upgrading from versions older than 1.7.0 (released under ``datastax/cass-operator`` name), please upgrade first to version 1.7.1. The following instructions apply when upgrading from 1.7.1 to 1.8.0 or newer up to 1.10.1. Upgrading to 1.11.0 if using Kubernetes 1.23 requires updating at least to 1.8.0 first, since 1.7.1 can not be used in Kubernetes 1.23 or newer.
+
+If you're upgrading from 1.7.1, there is an additional step to take due to the modifications to cass-operator’s underlying controller-runtime and updated Kubernetes versions. These steps need to be done manually before updating to the newest version of cass-operator. Newer Kubernetes versions require stricter validation and as such we need to remove ``preserveUnknownFields`` global property from the CRD to allow us to update to a newer CRD. The newer controller-runtime on the other hand modifies the liveness, readiness and configuration options, which require us to delete the older deployment. These commands do not delete your running Cassandra instances.
+
+ Run the following commands assuming cass-operator is installed to ``cass-operator`` namespace (change -n parameter if it is installed to some other namespace):
+
+```sh
+kubectl -n cass-operator delete deployment.apps/cass-operator
+kubectl -n cass-operator delete service/cassandradatacenter-webhook-service
+kubectl patch crd cassandradatacenters.cassandra.datastax.com -p '{"spec":{"preserveUnknownFields":false}}'
+```
+
+You can now install new version of cass-operator as instructed previously.
+
+
+## Supported versions
+
+We actively maintain two different versions of cass-operator, the [1.10.x series](https://github.com/k8ssandra/cass-operator/tree/1.10.x) as well as the newest version cut from the master branch. The [1.10.x branch](https://github.com/k8ssandra/cass-operator/tree/1.10.x) receives only bugfixes, while all the new features will only land to the newer versions.
+
+### Kubernetes and Openshift version support
+
+1.10.x versions support Kubernetes versions 1.18 to 1.25. For Openshift, 1.10.x supports 4.7 and 4.8 (it will not pass validations in 4.9 due to the use of deprecated APIs).
+
+Newer releases (1.11.0 and up) are tested and supported only in supported Kubernetes versions. That means versions 1.21 and up. For Openshift installations, 1.11.0 and up are supported in 4.9 and newer.
+
+### Cassandra version support
+
+For Cassandra versions, 1.10.x will only support 3.11.x and 4.0.x. For 4.1 and 5.0, we recommend using a build 1.17.0 or newer. Support for 4.1 will only land in upcoming versions (1.13.0 or later). Both versions support all DSE 6.8.x releases.
+
+## Changelog between versions
+
+The next major/minor version always includes changes from the previously released supported version, but no more than that. That is, if the patch release is released after the next (next in semver) major/minor, the patches are not integrated to it, but are repeated in the changelog for the next version if required (in some cases the bugfixes are not necessary for the next major/minor).
+
+As an example, lets say the changelog has the following release sequence:
+
+```
+1.12.0
+1.10.5
+1.11.0
+1.10.4
+..
+1.10.0
+```
+
+1.11.0 will include everything under it, including fixes from 1.10.4, however 1.11.0 does not have the fixes from 1.10.5 (as 1.11.0 was released before 1.10.5). 1.12.0 on the other hand will include all the fixes from 1.10.5, but those fixes are repeated as 1.12.0 lists everything changed from the previous major/minor, that is changes between 1.11.0 and 1.12.0.
+
+While the 1.10.x branch will only have fixes released from that branch, the master branch will include all the versions.
+
+## Creating a Cassandra cluster
 
 ### Creating a storage class
 
@@ -332,21 +366,6 @@ cluster1-superuser@cqlsh> select * from system.peers;
 (2 rows)
 ```
 
-### Installing cluster via Helm
-
-To install a cluster with optional integrated backup/restore and repair utilities, check the [k8ssandra/k8ssandra](https://github.com/k8ssandra/k8ssandra) helm charts project.
-
-If you wish to install only the cass-operator, you can run the following command:
-
-```
-helm repo add k8ssandra https://helm.k8ssandra.io/stable
-helm install cass-operator k8ssandra/cass-operator -n cass-operator --create-namespace
-```
-
-## Installing from OperatorHub / OLM
-
-cass-operator is available in the OperatorHub community under the name of [cass-operator-community](https://operatorhub.io/operator/cass-operator-community), but also in the Openshift's certified catalog.
-
 ## Features
 
 - Proper token ring initialization, with only one node bootstrapping at a time
@@ -367,11 +386,9 @@ The operator is comprised of the following container images working in concert:
 
 * The operator, built from sources using the kubebuilder v3 structure, from [controllers](controllers/) directory.
 * The config builder init container, built from sources in [datastax/cass-config-builder](https://github.com/datastax/cass-config-builder).
-* server-system-logger, a tiny tail logger for outputting Cassandra logs for kubectl. Implemented in [logger.Dockerfile](logger.Dockerfile)
-* Cassandra, built from
-  [datastax/management-api-for-apache-cassandra](https://github.com/k8ssandra/management-api-for-apache-cassandra),
-  with Cassandra 3.11.11 and 4.0.1 support
-* ... or DSE, built from [datastax/docker-images](https://github.com/datastax/docker-images).
+* For Cassandra 4.1 and up, we use [k8ssandra-client](https://github.com/k8ssandra/k8ssandra-client) to build the configuration.
+* server-system-logger, a Vector agent for outputting Cassandra logs for kubectl. Implemented in [logger.Dockerfile](logger.Dockerfile)
+* Cassandra/DSE, built from [datastax/management-api-for-apache-cassandra](https://github.com/k8ssandra/management-api-for-apache-cassandra),
 
 The Cassandra container must be built with support for management-api, otherwise cass-operator will fail to work correctly.
 
@@ -432,7 +449,7 @@ spec:
 
 ## Contributing
 
-If you wish to file a bug, enhancement proposal or have other questions, use the issues in this repository or in the [k8ssandra/k8ssandra](https://github.com/k8ssandra/k8ssandra) repository. PRs should target this repository and you can link the PR to issue repository with ``k8ssandra/k8ssandra#ticketNumber`` syntax.
+If you wish to file a bug, enhancement proposal or have other questions, use the issues in this repository. We also accept PRs from the community.
 
 For other means of contacting, check [k8ssandra community](https://k8ssandra.io/community/) resources.
 
@@ -440,7 +457,7 @@ For other means of contacting, check [k8ssandra community](https://k8ssandra.io/
 
 Almost every build, test, or development task requires the following pre-requisites...
 
-* Golang 1.19 or newer
+* Golang 1.21 or newer
 * Docker, either the docker.io packages on Ubuntu, Docker Desktop for Mac,
   or your preferred docker distribution. Other container engines such as podman should work also.
 * Kind or similar Kubernetes distribution for testing (Docker Desktop / Minikube will work if correct StorageClass is added)
@@ -524,7 +541,3 @@ Licensed under the Apache License, Version 2.0 (the "License"); you may not use 
 http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-
-## Dependencies
-
-For information on the packaged dependencies of Cass Operator and their licenses, check out our [open source report](https://app.fossa.com/reports/ed8a8cc0-4bb4-405b-b07c-5316f9b524f5).

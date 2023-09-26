@@ -28,6 +28,9 @@ spec:
     - name: r1
   podTemplateSpec:
     spec:
+      initContainers:
+        - name: server-config-init
+          resources: {}
       containers:
         - args: ["/bin/sh", "-c", "tail -n+1 -F /var/log/cassandra/system.log"]
           image: busybox

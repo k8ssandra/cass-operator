@@ -1207,6 +1207,172 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 	assert.True(volumesContains(volumes, volumeNameMatcher("vector-lib")))
 }
 
+func TestCassandraDatacenter_buildPodTemplateSpec_clientImage_withContainerOverrides(t *testing.T) {
+	assert := assert.New(t)
+
+	// Example from k8ssandra-operator when medusa is used
+	dc41 := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "bob",
+			ServerType:    "cassandra",
+			ServerVersion: "4.1.2",
+			Racks: []api.Rack{
+				{
+					Name: "default",
+				},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name:      ServerConfigContainerName,
+							Resources: corev1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec41, err := buildPodTemplateSpec(dc41, dc41.Spec.Racks[0], false)
+	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
+
+	initContainers := spec41.Spec.InitContainers
+
+	assert.Equal(2, len(initContainers))
+
+	serverBaseConfigInitContainer := initContainers[0]
+	assert.Equal(ServerBaseConfigContainerName, serverBaseConfigInitContainer.Name)
+	assert.Equal(1, len(serverBaseConfigInitContainer.VolumeMounts))
+	// We use a contains check here because the ordering is not important
+	assert.True(volumeMountsContains(serverBaseConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config-base")))
+
+	serverConfigInitContainer := initContainers[1]
+	assert.Equal(ServerConfigContainerName, serverConfigInitContainer.Name)
+	assert.Equal(2, len(serverConfigInitContainer.VolumeMounts))
+	// We use a contains check here because the ordering is not important
+	assert.True(volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config")))
+	assert.True(volumeMountsContains(serverConfigInitContainer.VolumeMounts, volumeMountNameMatcher("server-config-base")))
+
+	volumes := spec41.Spec.Volumes
+	assert.Equal(4, len(volumes))
+	// We use a contains check here because the ordering is not important
+	assert.True(volumesContains(volumes, volumeNameMatcher("server-config")))
+	assert.True(volumesContains(volumes, volumeNameMatcher("server-logs")))
+	assert.True(volumesContains(volumes, volumeNameMatcher("server-config-base")))
+	assert.True(volumesContains(volumes, volumeNameMatcher("vector-lib")))
+
+	// Give extra containers and swap the orders
+
+	dc41 = &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "bob",
+			ServerType:    "cassandra",
+			ServerVersion: "4.1.2",
+			Racks: []api.Rack{
+				{
+					Name: "default",
+				},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name: "my-own-init-container",
+						},
+						{
+							Name:      ServerBaseConfigContainerName,
+							Resources: corev1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec41, err = buildPodTemplateSpec(dc41, dc41.Spec.Racks[0], false)
+	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
+	initContainers = spec41.Spec.InitContainers
+	assert.Equal(3, len(initContainers))
+
+	assert.Equal(ServerBaseConfigContainerName, initContainers[1].Name)
+	assert.Equal(ServerConfigContainerName, initContainers[2].Name)
+
+	//
+
+	dc41 = &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "bob",
+			ServerType:    "cassandra",
+			ServerVersion: "4.1.2",
+			Racks: []api.Rack{
+				{
+					Name: "default",
+				},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name:      ServerBaseConfigContainerName,
+							Resources: corev1.ResourceRequirements{},
+						},
+						{
+							Name: "my-own-init-container",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec41, err = buildPodTemplateSpec(dc41, dc41.Spec.Racks[0], false)
+	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
+	initContainers = spec41.Spec.InitContainers
+	assert.Equal(3, len(initContainers))
+
+	assert.Equal(ServerBaseConfigContainerName, initContainers[0].Name)
+	assert.Equal("my-own-init-container", initContainers[1].Name)
+	assert.Equal(ServerConfigContainerName, initContainers[2].Name)
+
+	//
+
+	dc41 = &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "bob",
+			ServerType:    "cassandra",
+			ServerVersion: "4.1.2",
+			Racks: []api.Rack{
+				{
+					Name: "default",
+				},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name:      ServerConfigContainerName,
+							Resources: corev1.ResourceRequirements{},
+						},
+						{
+							Name: "my-own-init-container",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec41, err = buildPodTemplateSpec(dc41, dc41.Spec.Racks[0], false)
+	assert.NoError(err, "should not have gotten error when building podTemplateSpec")
+	initContainers = spec41.Spec.InitContainers
+	assert.Equal(3, len(initContainers))
+
+	assert.Equal(ServerBaseConfigContainerName, initContainers[0].Name)
+	assert.Equal(ServerConfigContainerName, initContainers[1].Name)
+	assert.Equal("my-own-init-container", initContainers[2].Name)
+}
+
 func TestCassandraDatacenter_buildContainers_DisableSystemLoggerSidecar(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		Spec: api.CassandraDatacenterSpec{

@@ -376,14 +376,20 @@ func symmetricDifference(list1 []corev1.Volume, list2 []corev1.Volume) []corev1.
 func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTemplate *corev1.PodTemplateSpec) error {
 
 	serverCfg := &corev1.Container{}
-	foundOverrides := false
+	configContainer := &corev1.Container{}
+
+	serverContainerIndex := -1
+	configContainerIndex := -1
 
 	for i, c := range baseTemplate.Spec.InitContainers {
 		if c.Name == ServerConfigContainerName {
 			// Modify the existing container
-			foundOverrides = true
+			serverContainerIndex = i
 			serverCfg = &baseTemplate.Spec.InitContainers[i]
-			break
+		}
+		if c.Name == ServerBaseConfigContainerName {
+			configContainerIndex = i
+			configContainer = &baseTemplate.Spec.InitContainers[i]
 		}
 	}
 
@@ -420,7 +426,6 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 
 	configMounts := []corev1.VolumeMount{serverCfgMount}
 
-	var configContainer *corev1.Container
 	if dc.UseClientImage() {
 
 		configBaseMount := corev1.VolumeMount{
@@ -431,8 +436,10 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		configMounts = append(configMounts, configBaseMount)
 
 		// Similar to k8ssandra 1.x, use config-container if use new config-builder replacement
-		configContainer = &corev1.Container{
-			Name: ServerBaseConfigContainerName,
+		if configContainerIndex < 0 {
+			configContainer = &corev1.Container{
+				Name: ServerBaseConfigContainerName,
+			}
 		}
 
 		if configContainer.Image == "" {
@@ -483,14 +490,21 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 
 	serverCfg.Env = combineEnvSlices(envDefaults, serverCfg.Env)
 
-	if !foundOverrides {
-		// Note that append makes a copy, so we must do this after
-		// serverCfg has been properly set up.
-		if dc.UseClientImage() {
-			baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *configContainer, *serverCfg)
+	if dc.UseClientImage() && configContainerIndex < 0 {
+		if serverContainerIndex >= 0 {
+			// Set before serverCfg
+			if serverContainerIndex == 0 {
+				baseTemplate.Spec.InitContainers = append([]corev1.Container{*configContainer}, baseTemplate.Spec.InitContainers...)
+			} else {
+				baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers[:serverContainerIndex], append([]corev1.Container{*configContainer}, baseTemplate.Spec.InitContainers[serverContainerIndex:]...)...)
+			}
 		} else {
-			baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *serverCfg)
+			baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *configContainer)
 		}
+	}
+
+	if serverContainerIndex < 0 {
+		baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *serverCfg)
 	}
 
 	return nil

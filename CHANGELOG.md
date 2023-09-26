@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#571](https://github.com/k8ssandra/cass-operator/issues/571) Ensure both "server-config-init" as well as "server-config-init-base" are always created in the initContainers if 4.1.x is used.  
+
 ## v1.17.1
 
 * [CHANGE] [#541](https://github.com/k8ssandra/cass-operator/issues/541) Revert when deployed through OLM, add serviceAccount to Cassandra pods that use nonroot priviledge. This is no longer necessary with 1.17.0 and up.

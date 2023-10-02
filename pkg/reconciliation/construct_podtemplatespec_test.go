@@ -461,6 +461,7 @@ func TestLoggerContainerEnvVars(t *testing.T) {
 	podNameEnvVar := corev1.EnvVar{Name: "POD_NAME", ValueFrom: selectorFromFieldPath("metadata.name")}
 	nodeNameEnvVar := corev1.EnvVar{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")}
 	rackNameEnvVar := corev1.EnvVar{Name: "RACK_NAME", ValueFrom: selectorFromFieldPath("metadata.labels['cassandra.datastax.com/rack']")}
+	namespaceEnvVar := corev1.EnvVar{Name: "NAMESPACE", ValueFrom: selectorFromFieldPath("metadata.namespace")}
 
 	templateSpec := &corev1.PodTemplateSpec{}
 	dc := &api.CassandraDatacenter{
@@ -487,9 +488,9 @@ func TestLoggerContainerEnvVars(t *testing.T) {
 	assert.True(envVarsContains(loggerContainer.Env, podNameEnvVar))
 	assert.True(envVarsContains(loggerContainer.Env, nodeNameEnvVar))
 	assert.True(envVarsContains(loggerContainer.Env, rackNameEnvVar))
+	assert.True(envVarsContains(loggerContainer.Env, namespaceEnvVar))
 	assert.True(envVarsContains(loggerContainer.Env, corev1.EnvVar{Name: "CLUSTER_NAME", Value: dc.Spec.ClusterName}))
 	assert.True(envVarsContains(loggerContainer.Env, corev1.EnvVar{Name: "DATACENTER_NAME", Value: dc.DatacenterName()}))
-	assert.True(envVarsContains(loggerContainer.Env, corev1.EnvVar{Name: "NAMESPACE", Value: dc.Namespace}))
 }
 
 func TestCassandraDatacenter_buildContainers_override_other_containers(t *testing.T) {

@@ -489,6 +489,7 @@ func TestLoggerContainerEnvVars(t *testing.T) {
 	assert.True(envVarsContains(loggerContainer.Env, rackNameEnvVar))
 	assert.True(envVarsContains(loggerContainer.Env, corev1.EnvVar{Name: "CLUSTER_NAME", Value: dc.Spec.ClusterName}))
 	assert.True(envVarsContains(loggerContainer.Env, corev1.EnvVar{Name: "DATACENTER_NAME", Value: dc.DatacenterName()}))
+	assert.True(envVarsContains(loggerContainer.Env, corev1.EnvVar{Name: "NAMESPACE", Value: dc.Namespace}))
 }
 
 func TestCassandraDatacenter_buildContainers_override_other_containers(t *testing.T) {

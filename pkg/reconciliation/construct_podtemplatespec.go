@@ -710,6 +710,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		{Name: "CLUSTER_NAME", Value: dc.Spec.ClusterName},
 		{Name: "DATACENTER_NAME", Value: dc.DatacenterName()},
 		{Name: "RACK_NAME", ValueFrom: selectorFromFieldPath("metadata.labels['cassandra.datastax.com/rack']")},
+		{Name: "NAMESPACE", Value: dc.Namespace},
 	}
 
 	loggerContainer.Env = combineEnvSlices(loggerEnvDefaults, loggerContainer.Env)

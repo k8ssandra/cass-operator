@@ -50,6 +50,11 @@ data:
     if err == null {
       .rack = rack
     }
+
+    namespace, err = get_env_var("NAMESPACE")
+    if err == null {
+      .namespace = namespace
+    }
     '''
 
     [sinks.console]

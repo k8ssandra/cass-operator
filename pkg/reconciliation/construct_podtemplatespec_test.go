@@ -482,7 +482,7 @@ func TestLoggerContainerEnvVars(t *testing.T) {
 	loggerContainer := findContainer(templateSpec.Spec.Containers, SystemLoggerContainerName)
 	assert.Equal(SystemLoggerContainerName, loggerContainer.Name)
 
-	assert.Equal(5, len(loggerContainer.Env))
+	assert.Equal(6, len(loggerContainer.Env))
 
 	assert.True(envVarsContains(loggerContainer.Env, podNameEnvVar))
 	assert.True(envVarsContains(loggerContainer.Env, nodeNameEnvVar))

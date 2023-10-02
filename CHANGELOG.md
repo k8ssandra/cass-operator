@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#573](https://github.com/k8ssandra/cass-operator/issues/573) Add the namespace as env variable in the server-system-logger container to label metrics with.
+
 ## v1.17.2
 
 * [ENHANCEMENT] [#571](https://github.com/k8ssandra/cass-operator/issues/571) Ensure both "server-config-init" as well as "server-config-init-base" are always created in the initContainers if 4.1.x is used.  

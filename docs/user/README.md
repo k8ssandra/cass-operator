@@ -429,7 +429,7 @@ metadata:
 spec:
   serverType: cassandra
   serverVersion: 3.11.7
-  serverImage: private-docker-registry.example.com/cass-img/cassandra-with-mgmtapi:1a2b3c4d
+  serverImage: private-docker-registry.example.com/cass-img/cassandra-with-mgmtapi@sha256:1a2b3c4d
 ```
 
 DSE:
@@ -441,7 +441,7 @@ metadata:
 spec:
   serverType: dse
   serverVersion: 6.8.4
-  serverImage: private-docker-registry.example.com/dse-img/dse:5f6e7d8c
+  serverImage: private-docker-registry.example.com/dse-img/dse@sha256:5f6e7d8c
 ```
 
 ## Configuring a NodePort service

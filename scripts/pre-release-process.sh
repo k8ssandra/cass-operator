@@ -29,6 +29,7 @@ LOG_IMG=k8ssandra/system-logger:${TAG} yq eval -i '.images.system-logger = env(L
 
 # Add cr.k8ssandra.io prefixes
 yq eval -i '.images.system-logger |= "cr.k8ssandra.io/" + .' config/manager/image_config.yaml
+yq eval -i '.images.k8ssandra-client |= "cr.k8ssandra.io/" + .' config/manager/image_config.yaml
 yq eval -i '.defaults.cassandra.repository |= "cr.k8ssandra.io/" + .' config/manager/image_config.yaml
 
 # Add cr.dstx.io prefixes

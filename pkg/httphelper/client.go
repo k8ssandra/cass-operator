@@ -138,6 +138,8 @@ const (
 	FullQuerySupport        Feature = "full_query_logging"
 	Rebuild                 Feature = "rebuild"
 	Move                    Feature = "async_move_task"
+	AsyncGarbageCollect     Feature = "async_gc_task"
+	AsyncFlush              Feature = "async_flush_task"
 )
 
 func (f *FeatureSet) UnmarshalJSON(b []byte) error {
@@ -593,7 +595,6 @@ type ScrubRequest struct {
 	Tables                []string `json:"tables"`
 }
 
-// TODO This, keyspaceRequest and compactRequest are all pretty much the same..
 func createScrubRequest(pod *corev1.Pod, scrubRequest *ScrubRequest, endpoint string) (*nodeMgmtRequest, error) {
 	body, err := json.Marshal(scrubRequest)
 	if err != nil {
@@ -1263,5 +1264,74 @@ func (client *NodeMgmtClient) CallSetFullQueryLog(pod *corev1.Pod, enableFullQue
 	)
 
 	_, err = callNodeMgmtEndpoint(client, request, "")
+
+	return err
+}
+
+func (client *NodeMgmtClient) CallFlush(pod *corev1.Pod, keyspaceName string, tables []string) (string, error) {
+	client.Log.Info(
+		"calling Management API keyspace flush - POST /api/v1/ops/tables/flush",
+		"pod", pod.Name,
+	)
+
+	req, err := createKeySpaceRequest(pod, -1, keyspaceName, tables, "/api/v1/ops/tables/flush")
+	if err != nil {
+		return "", err
+	}
+
+	req.timeout = 20 * time.Second
+
+	jobId, err := callNodeMgmtEndpoint(client, *req, "application/json")
+	return string(jobId), err
+}
+
+func (client *NodeMgmtClient) CallFlushEndpoint(pod *corev1.Pod, keyspaceName string, tables []string) error {
+	client.Log.Info(
+		"calling Management API keyspace flush - POST /api/v0/ops/tables/flush",
+		"pod", pod.Name,
+	)
+
+	req, err := createKeySpaceRequest(pod, -1, keyspaceName, tables, "/api/v0/ops/tables/flush")
+	if err != nil {
+		return err
+	}
+
+	req.timeout = 60 * time.Second
+
+	_, err = callNodeMgmtEndpoint(client, *req, "application/json")
+	return err
+}
+
+func (client *NodeMgmtClient) CallGarbageCollect(pod *corev1.Pod, keyspaceName string, tables []string) (string, error) {
+	client.Log.Info(
+		"calling Management API keyspace flush - POST /api/v1/ops/tables/garbagecollect",
+		"pod", pod.Name,
+	)
+
+	req, err := createKeySpaceRequest(pod, -1, keyspaceName, tables, "/api/v1/ops/tables/garbagecollect")
+	if err != nil {
+		return "", err
+	}
+
+	req.timeout = 20 * time.Second
+
+	jobId, err := callNodeMgmtEndpoint(client, *req, "application/json")
+	return string(jobId), err
+}
+
+func (client *NodeMgmtClient) CallGarbageCollectEndpoint(pod *corev1.Pod, keyspaceName string, tables []string) error {
+	client.Log.Info(
+		"calling Management API keyspace flush - POST /api/v0/ops/tables/garbagecollect",
+		"pod", pod.Name,
+	)
+
+	req, err := createKeySpaceRequest(pod, -1, keyspaceName, tables, "/api/v0/ops/tables/garbagecollect")
+	if err != nil {
+		return err
+	}
+
+	req.timeout = 60 * time.Second
+
+	_, err = callNodeMgmtEndpoint(client, *req, "application/json")
 	return err
 }

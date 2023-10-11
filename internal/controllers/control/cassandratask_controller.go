@@ -292,16 +292,18 @@ JobDefinition:
 			break JobDefinition
 		case api.CommandReplaceNode:
 			r.replace(taskConfig)
-		case "forceupgraderacks":
-			// res, failed, completed, err = r.reconcileDatacenter(ctx, &dc, forceupgrade(taskConfigProto))
 		case api.CommandUpgradeSSTables:
 			upgradesstables(taskConfig)
 		case api.CommandScrub:
-			// res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, scrub(taskConfigProto))
+			// scrub(taskConfig)
 		case api.CommandCompaction:
-			// res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, compact(taskConfigProto, job.Arguments))
+			// compact(taskConfig)
 		case api.CommandMove:
 			r.move(taskConfig)
+		case api.CommandFlush:
+			flush(taskConfig)
+		case api.CommandGarbageCollect:
+			gc(taskConfig)
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err

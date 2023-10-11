@@ -124,6 +124,10 @@ spec:
                           type: string
                         source_datacenter:
                           type: string
+                        tables:
+                          items:
+                            type: string
+                          type: array
                       type: object
                     command:
                       description: Command defines what is run against Cassandra pods

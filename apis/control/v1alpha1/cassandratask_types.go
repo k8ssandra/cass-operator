@@ -78,6 +78,8 @@ const (
 	CommandCompaction      CassandraCommand = "compact"
 	CommandScrub           CassandraCommand = "scrub"
 	CommandMove            CassandraCommand = "move"
+	CommandGarbageCollect  CassandraCommand = "garbagecollect"
+	CommandFlush           CassandraCommand = "flush"
 )
 
 type CassandraJob struct {
@@ -91,10 +93,11 @@ type CassandraJob struct {
 }
 
 type JobArguments struct {
-	KeyspaceName     string `json:"keyspace_name,omitempty"`
-	SourceDatacenter string `json:"source_datacenter,omitempty"`
-	PodName          string `json:"pod_name,omitempty"`
-	RackName         string `json:"rack,omitempty"`
+	KeyspaceName     string   `json:"keyspace_name,omitempty"`
+	SourceDatacenter string   `json:"source_datacenter,omitempty"`
+	PodName          string   `json:"pod_name,omitempty"`
+	RackName         string   `json:"rack,omitempty"`
+	Tables           []string `json:"tables,omitempty"`
 
 	// NewTokens is a map of pod names to their newly-assigned tokens. Required for the move
 	// command, ignored otherwise. Pods referenced in this map must exist; any existing pod not

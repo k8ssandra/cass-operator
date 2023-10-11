@@ -307,6 +307,54 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 3))
 			})
+			It("Runs a flush task against the datacenter pods", func() {
+				By("Creating a task for flush")
+
+				taskKey, task := buildTask(api.CommandFlush, testNamespaceName)
+				task.Spec.Jobs[0].Arguments.KeyspaceName = "ks1"
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v1/ops/tables/flush"]).To(Equal(nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
+			It("Runs a flush task against a pod", func() {
+				By("Creating a task for flush")
+
+				taskKey, task := buildTask(api.CommandFlush, testNamespaceName)
+				task.Spec.Jobs[0].Arguments.KeyspaceName = "ks1"
+				task.Spec.Jobs[0].Arguments.PodName = fmt.Sprintf("%s-%s-r0-sts-0", clusterName, testDatacenterName)
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v1/ops/tables/flush"]).To(Equal(1))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
+
+			It("Runs a garbagecollect task against the datacenter pods", func() {
+				By("Creating a task for garbagecollect")
+				taskKey, task := buildTask(api.CommandGarbageCollect, testNamespaceName)
+				task.Spec.Jobs[0].Arguments.KeyspaceName = "ks1"
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v1/ops/tables/garbagecollect"]).To(Equal(nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+
+				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
+
 			When("Running cleanup twice in the same datacenter", func() {
 				It("Runs a cleanup task against the datacenter pods", func() {
 					By("Creating a task for cleanup")
@@ -457,6 +505,40 @@ var _ = Describe("CassandraTask controller tests", func() {
 				createPod(testNamespaceName, clusterName, testDatacenterName, "r1", 2)
 
 				completedTask := waitForTaskCompletion(taskKey)
+
+				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
+
+			It("Runs a flush task against the datacenter pods", func() {
+				By("Creating a task for flush")
+				time.Sleep(1 * time.Second) // Otherwise the CreationTimestamp could be too new
+				taskKey, task := buildTask(api.CommandFlush, testNamespaceName)
+				task.Spec.Jobs[0].Arguments.KeyspaceName = "ks1"
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v0/ops/tables/flush"]).To(Equal(nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+
+				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
+
+			It("Runs a garbagecollect task against the datacenter pods", func() {
+				By("Creating a task for garbagecollect")
+				time.Sleep(1 * time.Second) // Otherwise the CreationTimestamp could be too new
+				taskKey, task := buildTask(api.CommandGarbageCollect, testNamespaceName)
+				task.Spec.Jobs[0].Arguments.KeyspaceName = "ks1"
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v0/ops/tables/garbagecollect"]).To(Equal(nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))

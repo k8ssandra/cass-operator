@@ -21,15 +21,15 @@ import (
 // Cleanup functionality
 
 func callCleanup(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
-	// TODO Add more arguments configurations
 	keyspaceName := taskConfig.Arguments.KeyspaceName
-	return nodeMgmtClient.CallKeyspaceCleanup(pod, -1, keyspaceName, nil)
+	tables := taskConfig.Arguments.Tables
+	return nodeMgmtClient.CallKeyspaceCleanup(pod, -1, keyspaceName, tables)
 }
 
 func callCleanupSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
-	// TODO Add more arguments configurations
 	keyspaceName := taskConfig.Arguments.KeyspaceName
-	return nodeMgmtClient.CallKeyspaceCleanupEndpoint(pod, -1, keyspaceName, nil)
+	tables := taskConfig.Arguments.Tables
+	return nodeMgmtClient.CallKeyspaceCleanupEndpoint(pod, -1, keyspaceName, tables)
 }
 
 func cleanup(taskConfig *TaskConfiguration) {
@@ -109,15 +109,15 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 // UpgradeSSTables functionality
 
 func callUpgradeSSTables(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
-	// TODO Add more arguments configurations
 	keyspaceName := taskConfig.Arguments.KeyspaceName
-	return nodeMgmtClient.CallUpgradeSSTables(pod, -1, keyspaceName, nil)
+	tables := taskConfig.Arguments.Tables
+	return nodeMgmtClient.CallUpgradeSSTables(pod, -1, keyspaceName, tables)
 }
 
 func callUpgradeSSTablesSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
-	// TODO Add more arguments configurations
 	keyspaceName := taskConfig.Arguments.KeyspaceName
-	return nodeMgmtClient.CallUpgradeSSTablesEndpoint(pod, -1, keyspaceName, nil)
+	tables := taskConfig.Arguments.Tables
+	return nodeMgmtClient.CallUpgradeSSTablesEndpoint(pod, -1, keyspaceName, tables)
 }
 
 func upgradesstables(taskConfig *TaskConfiguration) {
@@ -178,10 +178,13 @@ func (r *CassandraTaskReconciler) replaceValidator(taskConfig *TaskConfiguration
 	return fmt.Errorf("valid pod_name to replace is required")
 }
 
-func replaceFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
+func genericPodFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
 	// If pod isn't in the to be replaced pods, return false
 	podName := taskConfig.Arguments.PodName
-	return pod.Name == podName
+	if podName != "" {
+		return pod.Name == podName
+	}
+	return true
 }
 
 // replacePreProcess adds enough information to CassandraDatacenter to ensure cass-operator knows this pod is being replaced
@@ -207,7 +210,7 @@ func (r *CassandraTaskReconciler) setDatacenterCondition(dc *cassapi.CassandraDa
 func (r *CassandraTaskReconciler) replace(taskConfig *TaskConfiguration) {
 	taskConfig.SyncFunc = r.replacePod
 	taskConfig.ValidateFunc = r.replaceValidator
-	taskConfig.PodFilter = replaceFilter
+	taskConfig.PodFilter = genericPodFilter
 	taskConfig.PreProcessFunc = r.replacePreProcess
 }
 
@@ -251,6 +254,48 @@ func (r *CassandraTaskReconciler) move(taskConfig *TaskConfiguration) {
 	taskConfig.AsyncFunc = callMove
 	taskConfig.PodFilter = moveFilter
 	taskConfig.ValidateFunc = r.moveValidator
+}
+
+// Flush functionality
+
+func callFlushSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
+	keyspaceName := taskConfig.Arguments.KeyspaceName
+	tables := taskConfig.Arguments.Tables
+	return nodeMgmtClient.CallFlushEndpoint(pod, keyspaceName, tables)
+}
+
+func callFlushAsync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
+	keyspaceName := taskConfig.Arguments.KeyspaceName
+	tables := taskConfig.Arguments.Tables
+	return nodeMgmtClient.CallFlush(pod, keyspaceName, tables)
+}
+
+func flush(taskConfig *TaskConfiguration) {
+	taskConfig.AsyncFeature = httphelper.AsyncFlush
+	taskConfig.PodFilter = genericPodFilter
+	taskConfig.SyncFunc = callFlushSync
+	taskConfig.AsyncFunc = callFlushAsync
+}
+
+// GarbageCollect functionality
+
+func callGarbageCollectAsync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
+	keyspaceName := taskConfig.Arguments.KeyspaceName
+	tables := taskConfig.Arguments.Tables
+	return nodeMgmtClient.CallGarbageCollect(pod, keyspaceName, tables)
+}
+
+func callGarbageCollectSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
+	keyspaceName := taskConfig.Arguments.KeyspaceName
+	tables := taskConfig.Arguments.Tables
+	return nodeMgmtClient.CallGarbageCollectEndpoint(pod, keyspaceName, tables)
+}
+
+func gc(taskConfig *TaskConfiguration) {
+	taskConfig.AsyncFeature = httphelper.AsyncGarbageCollect
+	taskConfig.PodFilter = genericPodFilter
+	taskConfig.AsyncFunc = callGarbageCollectAsync
+	taskConfig.SyncFunc = callGarbageCollectSync
 }
 
 // Common functions

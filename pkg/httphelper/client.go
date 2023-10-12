@@ -133,7 +133,7 @@ const (
 	// AsyncSSTableTasks includes "cleanup" and "decommission"
 	AsyncSSTableTasks       Feature = "async_sstable_tasks"
 	AsyncUpgradeSSTableTask Feature = "async_upgrade_sstable_task"
-	AsyncCompactionTasks    Feature = "async_compaction_task"
+	AsyncCompactionTask     Feature = "async_compaction_task"
 	AsyncScrubTask          Feature = "async_scrub_task"
 	FullQuerySupport        Feature = "full_query_logging"
 	Rebuild                 Feature = "rebuild"

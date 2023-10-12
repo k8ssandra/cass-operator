@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#573](https://github.com/k8ssandra/cass-operator/issues/573) Add the namespace as env variable in the server-system-logger container to label metrics with.
+* [BUGFIX] [#585](https://github.com/k8ssandra/cass-operator/issues/585) If task validation fails, stop processing the task and mark the validation error to Failed condition
 
 ## v1.17.2
 

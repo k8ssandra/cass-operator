@@ -161,25 +161,30 @@ func (r *CassandraTaskReconciler) replacePod(nodeMgmtClient httphelper.NodeMgmtC
 	return nil
 }
 
-func (r *CassandraTaskReconciler) replaceValidator(taskConfig *TaskConfiguration) error {
+func (r *CassandraTaskReconciler) replaceValidator(taskConfig *TaskConfiguration) (bool, error) {
 	// Check that arguments has replaceable pods and that those pods are actually existing pods
 	if taskConfig.Arguments.PodName != "" {
 		pods, err := r.getDatacenterPods(taskConfig.Context, taskConfig.Datacenter)
 		if err != nil {
-			return err
+			return true, err
 		}
 		for _, pod := range pods {
 			if pod.Name == taskConfig.Arguments.PodName {
-				return nil
+				return true, nil
 			}
 		}
 	}
 
-	return fmt.Errorf("valid pod_name to replace is required")
+	return false, fmt.Errorf("valid pod_name to replace is required")
+}
+
+func requiredPodFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
+	// If pod isn't in the to be replaced pods, return false
+	podName := taskConfig.Arguments.PodName
+	return pod.Name == podName
 }
 
 func genericPodFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
-	// If pod isn't in the to be replaced pods, return false
 	podName := taskConfig.Arguments.PodName
 	if podName != "" {
 		return pod.Name == podName
@@ -210,7 +215,7 @@ func (r *CassandraTaskReconciler) setDatacenterCondition(dc *cassapi.CassandraDa
 func (r *CassandraTaskReconciler) replace(taskConfig *TaskConfiguration) {
 	taskConfig.SyncFunc = r.replacePod
 	taskConfig.ValidateFunc = r.replaceValidator
-	taskConfig.PodFilter = genericPodFilter
+	taskConfig.PodFilter = requiredPodFilter
 	taskConfig.PreProcessFunc = r.replacePreProcess
 }
 
@@ -226,13 +231,13 @@ func moveFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
 	return found
 }
 
-func (r *CassandraTaskReconciler) moveValidator(taskConfig *TaskConfiguration) error {
+func (r *CassandraTaskReconciler) moveValidator(taskConfig *TaskConfiguration) (bool, error) {
 	if len(taskConfig.Arguments.NewTokens) == 0 {
-		return fmt.Errorf("missing required new_tokens argument")
+		return false, fmt.Errorf("missing required new_tokens argument")
 	}
 	pods, err := r.getDatacenterPods(taskConfig.Context, taskConfig.Datacenter)
 	if err != nil {
-		return err
+		return true, err
 	}
 	for podName := range taskConfig.Arguments.NewTokens {
 		found := false
@@ -243,10 +248,10 @@ func (r *CassandraTaskReconciler) moveValidator(taskConfig *TaskConfiguration) e
 			}
 		}
 		if !found {
-			return fmt.Errorf("invalid new_tokens argument: pod doesn't exist: %s", podName)
+			return false, fmt.Errorf("invalid new_tokens argument: pod doesn't exist: %s", podName)
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func (r *CassandraTaskReconciler) move(taskConfig *TaskConfiguration) {
@@ -296,6 +301,20 @@ func gc(taskConfig *TaskConfiguration) {
 	taskConfig.PodFilter = genericPodFilter
 	taskConfig.AsyncFunc = callGarbageCollectAsync
 	taskConfig.SyncFunc = callGarbageCollectSync
+}
+
+// Scrub functionality
+
+func scrub(taskConfig *TaskConfiguration) {
+	taskConfig.AsyncFeature = httphelper.AsyncScrubTask
+	taskConfig.PodFilter = genericPodFilter
+}
+
+// Compaction functionality
+
+func compact(taskConfig *TaskConfiguration) {
+	taskConfig.AsyncFeature = httphelper.AsyncCompactionTask
+	taskConfig.PodFilter = genericPodFilter
 }
 
 // Common functions

@@ -187,6 +187,11 @@ func (in *JobArguments) DeepCopyInto(out *JobArguments) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.JobsCount != nil {
+		in, out := &in.JobsCount, &out.JobsCount
+		*out = new(int)
+		**out = **in
+	}
 	if in.NewTokens != nil {
 		in, out := &in.NewTokens, &out.NewTokens
 		*out = make(map[string]string, len(*in))

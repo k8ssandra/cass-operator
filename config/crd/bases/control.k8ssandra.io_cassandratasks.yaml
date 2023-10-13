@@ -108,6 +108,8 @@ spec:
                     args:
                       description: Arguments are additional parameters for the command
                       properties:
+                        jobs:
+                          type: integer
                         keyspace_name:
                           type: string
                         new_tokens:
@@ -118,10 +120,17 @@ spec:
                             Pods referenced in this map must exist; any existing pod
                             not referenced in this map will not be moved.
                           type: object
+                        no_snapshot:
+                          type: boolean
+                        no_validate:
+                          description: Scrub arguments
+                          type: boolean
                         pod_name:
                           type: string
                         rack:
                           type: string
+                        skip_corrupted:
+                          type: boolean
                         source_datacenter:
                           type: string
                         tables:

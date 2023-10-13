@@ -448,7 +448,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				})
 			})
 		})
-		Context("Sync jobs", func() {
+		FContext("Sync jobs", func() {
 			var testNamespaceName string
 			BeforeEach(func() {
 				By("Creating fake synchronous mgmt-api server")

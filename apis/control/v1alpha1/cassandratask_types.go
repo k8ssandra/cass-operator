@@ -98,6 +98,14 @@ type JobArguments struct {
 	PodName          string   `json:"pod_name,omitempty"`
 	RackName         string   `json:"rack,omitempty"`
 	Tables           []string `json:"tables,omitempty"`
+	JobsCount        *int     `json:"jobs,omitempty"`
+
+	// Scrub arguments
+	NoValidate    bool `json:"no_validate,omitempty"`
+	NoSnapshot    bool `json:"no_snapshot,omitempty"`
+	SkipCorrupted bool `json:"skip_corrupted,omitempty"`
+
+	// Compaction arguments
 
 	// NewTokens is a map of pod names to their newly-assigned tokens. Required for the move
 	// command, ignored otherwise. Pods referenced in this map must exist; any existing pod not

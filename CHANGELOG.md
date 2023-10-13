@@ -12,6 +12,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#573](https://github.com/k8ssandra/cass-operator/issues/573) Add the namespace as env variable in the server-system-logger container to label metrics with.
+* [ENHANCEMENT] [#580](https://github.com/k8ssandra/cass-operator/issues/580) Add garbageCollect CassandraTask that removes deleted data
+* [ENHANCEMENT] [#578](https://github.com/k8ssandra/cass-operator/issues/578) Add flush CassandraTask that flushed memtables to the disk
+* [ENHANCEMENT] [#586](https://github.com/k8ssandra/cass-operator/issues/578) Add scrub CassandraTask that allows rebuilding SSTables
+* [ENHANCEMENT] [#582](https://github.com/k8ssandra/cass-operator/issues/582) Add compaction CassandraTask to force a compaction
 * [BUGFIX] [#585](https://github.com/k8ssandra/cass-operator/issues/585) If task validation fails, stop processing the task and mark the validation error to Failed condition
 
 ## v1.17.2

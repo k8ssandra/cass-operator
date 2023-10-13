@@ -311,20 +311,20 @@ JobDefinition:
 			return ctrl.Result{}, err
 		}
 
-		valid, errValidate := taskConfig.Validate()
-		if errValidate != nil && valid {
-			// Retry, this is a transient error
-			return ctrl.Result{}, errValidate
-		}
-
-		if !valid {
-			failed++
-			err = errValidate
-			res = ctrl.Result{}
-			break
-		}
-
 		if !r.HasCondition(cassTask, api.JobRunning, metav1.ConditionTrue) {
+			valid, errValidate := taskConfig.Validate()
+			if errValidate != nil && valid {
+				// Retry, this is a transient error
+				return ctrl.Result{}, errValidate
+			}
+
+			if !valid {
+				failed++
+				err = errValidate
+				res = ctrl.Result{}
+				break
+			}
+
 			if err := taskConfig.PreProcess(); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -344,12 +344,15 @@ JobDefinition:
 
 		if res.RequeueAfter > 0 {
 			// This job isn't complete yet or there's an error, do not continue
+			logger.V(1).Info("This job isn't complete yet or there's an error, requeueing", "requeueAfter", res.RequeueAfter)
 			break
 		}
 		// completedCount++
+		logger.V(1).Info("We're returning from this", "completed", completed, "failed", failed)
 	}
 
 	if res.RequeueAfter == 0 && !res.Requeue {
+		logger.V(1).Info("No requeues queued..", "completed", completed, "failed", failed, "jobCount", len(cassTask.Spec.Jobs))
 		// Job has been completed
 		cassTask.GetLabels()[taskStatusLabel] = completedTaskLabelValue
 		if errUpdate := r.Client.Update(ctx, &cassTask); errUpdate != nil {
@@ -734,6 +737,11 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				return ctrl.Result{}, failed, completed, err
 			}
 		} else {
+			if len(jobRunner) > 0 {
+				// Something is still holding the worker
+				return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, nil
+			}
+
 			if taskConfig.SyncFunc == nil {
 				// This feature is not supported in sync mode, mark everything as done
 				err := fmt.Errorf("this job isn't supported by the target pod")
@@ -760,44 +768,53 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 
 			pod := pod
 
-			go func(targetPod *corev1.Pod) {
+			go func() {
+				// go func(targetPod *corev1.Pod) {
 				// Write value to the jobRunner to indicate we're running
 				podKey := types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}
-				logger.V(1).Info("starting execution of sync blocking job", "Pod", targetPod)
+				logger.V(1).Info("starting execution of sync blocking job", "Pod", pod)
 				jobRunner <- idx
 				defer func() {
 					// Remove the value from the jobRunner
 					<-jobRunner
 				}()
 
-				if err = taskConfig.SyncFunc(nodeMgmtClient, targetPod, taskConfig); err != nil {
+				if err = taskConfig.SyncFunc(nodeMgmtClient, &pod, taskConfig); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod
-					logger.Error(err, "executing the sync task failed", "Pod", targetPod)
+					logger.Error(err, "executing the sync task failed", "Pod", pod)
 					jobStatus.Status = podJobError
 				} else {
 					jobStatus.Status = podJobCompleted
 				}
 
 				if err := r.Client.Get(context.Background(), podKey, &pod); err != nil {
-					logger.Error(err, "Failed to get pod for annotation update", "Pod", targetPod)
-					return
+					logger.Error(err, "Failed to get pod for annotation update", "Pod", pod)
 				}
 
-				podPatch := client.MergeFrom(targetPod.DeepCopy())
+				podPatch := client.MergeFrom(pod.DeepCopy())
 
-				if err = JobStatusToPodAnnotations(taskConfig.Id, targetPod.Annotations, jobStatus); err != nil {
-					logger.Error(err, "Failed to update local job's status", "Pod", targetPod)
+				if pod.Annotations == nil {
+					pod.Annotations = make(map[string]string)
+				}
+				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
+					logger.Error(err, "Failed to update local job's status", "Pod", pod)
 				}
 
-				if err = r.Client.Patch(ctx, targetPod, podPatch); err != nil {
+				if err = r.Client.Patch(ctx, &pod, podPatch); err != nil {
 					// err = r.Client.Update(ctx, &pod)
-					logger.Error(err, "Failed to update local job's status", "Pod", targetPod)
+					logger.Error(err, "Failed to update local job's status", "Pod", pod)
 				}
-			}(&pod)
+			}()
 		}
 
 		// We have a job going on, return back later to check the status
 		return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, nil
 	}
+
+	if len(jobRunner) > 0 {
+		// Something is still holding the worker while none of the existing pods are, probably the replace job.
+		return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, nil
+	}
+
 	return ctrl.Result{}, failed, completed, nil
 }

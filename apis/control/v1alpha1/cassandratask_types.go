@@ -106,6 +106,9 @@ type JobArguments struct {
 	SkipCorrupted bool `json:"skip_corrupted,omitempty"`
 
 	// Compaction arguments
+	SplitOutput bool   `json:"split_output,omitempty"`
+	StartToken  string `json:"start_token,omitempty"`
+	EndToken    string `json:"end_token,omitempty"`
 
 	// NewTokens is a map of pod names to their newly-assigned tokens. Required for the move
 	// command, ignored otherwise. Pods referenced in this map must exist; any existing pod not

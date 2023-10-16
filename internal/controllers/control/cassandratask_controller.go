@@ -347,12 +347,9 @@ JobDefinition:
 			logger.V(1).Info("This job isn't complete yet or there's an error, requeueing", "requeueAfter", res.RequeueAfter)
 			break
 		}
-		// completedCount++
-		logger.V(1).Info("We're returning from this", "completed", completed, "failed", failed)
 	}
 
 	if res.RequeueAfter == 0 && !res.Requeue {
-		logger.V(1).Info("No requeues queued..", "completed", completed, "failed", failed, "jobCount", len(cassTask.Spec.Jobs))
 		// Job has been completed
 		cassTask.GetLabels()[taskStatusLabel] = completedTaskLabelValue
 		if errUpdate := r.Client.Update(ctx, &cassTask); errUpdate != nil {

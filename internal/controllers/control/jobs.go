@@ -374,6 +374,9 @@ func createCompactRequest(taskConfig *TaskConfiguration) *httphelper.CompactRequ
 	return &httphelper.CompactRequest{
 		KeyspaceName: taskConfig.Arguments.KeyspaceName,
 		Tables:       taskConfig.Arguments.Tables,
+		SplitOutput:  taskConfig.Arguments.SplitOutput,
+		StartToken:   taskConfig.Arguments.StartToken,
+		EndToken:     taskConfig.Arguments.EndToken,
 	}
 }
 

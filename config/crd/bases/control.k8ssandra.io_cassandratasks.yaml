@@ -108,6 +108,8 @@ spec:
                     args:
                       description: Arguments are additional parameters for the command
                       properties:
+                        end_token:
+                          type: string
                         jobs:
                           type: integer
                         keyspace_name:
@@ -132,6 +134,11 @@ spec:
                         skip_corrupted:
                           type: boolean
                         source_datacenter:
+                          type: string
+                        split_output:
+                          description: Compaction arguments
+                          type: boolean
+                        start_token:
                           type: string
                         tables:
                           items:

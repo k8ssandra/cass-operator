@@ -378,7 +378,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				Expect(sreq.KeyspaceName).To(Equal("ks1"))
 			})
 
-			FIt("Runs a compaction task against a pod", func() {
+			It("Runs a compaction task against a pod", func() {
 				By("Creating a task for compaction")
 
 				taskKey, task := buildTask(api.CommandCompaction, testNamespaceName)

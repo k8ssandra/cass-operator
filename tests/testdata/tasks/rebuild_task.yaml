@@ -10,4 +10,4 @@ spec:
     - name: rebuild-dc2
       command: rebuild
       args:
-        datacenter: dc1
+        datacenter: My_Super_Dc

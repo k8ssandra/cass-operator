@@ -27,7 +27,7 @@ var (
 	dc1Label        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dc1OverrideName))
 	dc2Label        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dc2Name)
 	seedLabel       = "cassandra.datastax.com/seed-node=true"
-	taskYaml        = "../testdata/tasks/rebuild_dc_task.yaml"
+	taskYaml        = "../testdata/tasks/rebuild_task.yaml"
 	// dcLabel   = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns = ginkgo_util.NewWrapper(testName, namespace)
 )

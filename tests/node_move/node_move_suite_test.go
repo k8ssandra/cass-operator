@@ -5,9 +5,10 @@ package node_move
 
 import (
 	"fmt"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"testing"
 
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
@@ -60,7 +61,7 @@ var _ = Describe(testName, func() {
 		})
 		Specify("the operator can move a cassandra node to a new token", func() {
 
-			// Create CassandraTask that should replace a node
+			// Create CassandraTask that should move tokens
 			step := "creating a cassandra task to move a node"
 			k := kubectl.ApplyFiles(taskYaml)
 			ns.ExecAndLog(step, k)

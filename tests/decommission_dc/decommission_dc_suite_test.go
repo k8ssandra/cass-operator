@@ -27,6 +27,7 @@ var (
 	dc1Label        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dc1OverrideName))
 	dc2Label        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dc2Name)
 	seedLabel       = "cassandra.datastax.com/seed-node=true"
+	taskYaml        = "../testdata/tasks/rebuild_dc_task.yaml"
 	// dcLabel   = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns = ginkgo_util.NewWrapper(testName, namespace)
 )
@@ -126,6 +127,15 @@ var _ = Describe(testName, func() {
 			// We need to verify that reconciliation has stopped for both dcs
 			ns.ExpectDoneReconciling(dc1Name)
 			ns.ExpectDoneReconciling(dc2Name)
+
+			// Create a CassandraTask to rebuild dc2 from dc1
+			// Create CassandraTask that should replace a node
+			step = "creating a cassandra rebuild dc2"
+			k = kubectl.ApplyFiles(taskYaml)
+			ns.ExecAndLog(step, k)
+
+			// Wait for the task to be completed
+			ns.WaitForCompleteTask("rebuild-dc")
 
 			podNames := ns.GetDatacenterReadyPodNames(dc1OverrideName)
 			Expect(len(podNames)).To(Equal(2))

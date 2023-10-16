@@ -1,0 +1,13 @@
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: CassandraTask
+metadata:
+  name: rebuild-dc
+spec:
+  datacenter:
+    name: dc2
+    namespace: test-decommission-dc
+  jobs:
+    - name: rebuild-dc2
+      command: rebuild
+      args:
+        datacenter: dc1

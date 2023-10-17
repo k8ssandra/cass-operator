@@ -143,6 +143,7 @@ func createPod(namespace, clusterName, dcName, rackName string, ordinal int) {
 			Labels: map[string]string{
 				cassdcapi.ClusterLabel:    clusterName,
 				cassdcapi.DatacenterLabel: dcName,
+				cassdcapi.RackLabel:       rackName,
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -352,6 +353,22 @@ var _ = Describe("CassandraTask controller tests", func() {
 				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
 
 				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount))
+			})
+
+			It("Runs a garbagecollect task against rack's pods", func() {
+				By("Creating a task for garbagecollect")
+				taskKey, task := buildTask(api.CommandGarbageCollect, testNamespaceName)
+				task.Spec.Jobs[0].Arguments.KeyspaceName = "ks1"
+				task.Spec.Jobs[0].Arguments.RackName = "r2"
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v1/ops/tables/garbagecollect"]).To(Equal(nodeCount / rackCount))
+				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount/rackCount))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount/rackCount))
+
+				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount/rackCount))
 			})
 
 			It("Runs a scrub task against a pod", func() {

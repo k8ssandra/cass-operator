@@ -216,11 +216,17 @@ func requiredPodFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
 }
 
 func genericPodFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
+	accept := true
+	rackName := taskConfig.Arguments.RackName
+	if rackName != "" {
+		accept = accept && pod.Labels[cassapi.RackLabel] == rackName
+	}
+
 	podName := taskConfig.Arguments.PodName
 	if podName != "" {
-		return pod.Name == podName
+		accept = accept && pod.Name == podName
 	}
-	return true
+	return accept
 }
 
 // replacePreProcess adds enough information to CassandraDatacenter to ensure cass-operator knows this pod is being replaced

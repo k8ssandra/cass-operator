@@ -1059,8 +1059,9 @@ func (client *NodeMgmtClient) FeatureSet(pod *corev1.Pod) (*FeatureSet, error) {
 
 func (client *NodeMgmtClient) JobDetails(pod *corev1.Pod, jobId string) (*JobDetails, error) {
 	client.Log.Info(
-		"calling Management API features - GET /api/v0/ops/executor/job",
+		"calling Management API jobDetails - GET /api/v0/ops/executor/job",
 		"pod", pod.Name,
+		"jobId", jobId,
 	)
 
 	podHost, podPort, err := BuildPodHostFromPod(pod)

@@ -96,6 +96,9 @@ var _ = Describe(testName, func() {
 
 			ns.ExpectDatacenterNameStatusUpdated(dcName, dcNameOverride)
 
+			// Ensure we have a single CassandraTask created which is a cleanup (and it succeeded)
+			ns.WaitForCompletedCassandraTasks(dcName, "cleanup", 1)
+
 			step = "stopping the dc"
 			json = "{\"spec\": {\"stopped\": true}}"
 			k = kubectl.PatchMerge(dcResource, json)

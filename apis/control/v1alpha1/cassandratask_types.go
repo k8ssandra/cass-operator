@@ -78,6 +78,8 @@ const (
 	CommandCompaction      CassandraCommand = "compact"
 	CommandScrub           CassandraCommand = "scrub"
 	CommandMove            CassandraCommand = "move"
+	CommandGarbageCollect  CassandraCommand = "garbagecollect"
+	CommandFlush           CassandraCommand = "flush"
 )
 
 type CassandraJob struct {
@@ -91,10 +93,22 @@ type CassandraJob struct {
 }
 
 type JobArguments struct {
-	KeyspaceName     string `json:"keyspace_name,omitempty"`
-	SourceDatacenter string `json:"source_datacenter,omitempty"`
-	PodName          string `json:"pod_name,omitempty"`
-	RackName         string `json:"rack,omitempty"`
+	KeyspaceName     string   `json:"keyspace_name,omitempty"`
+	SourceDatacenter string   `json:"source_datacenter,omitempty"`
+	PodName          string   `json:"pod_name,omitempty"`
+	RackName         string   `json:"rack,omitempty"`
+	Tables           []string `json:"tables,omitempty"`
+	JobsCount        *int     `json:"jobs,omitempty"`
+
+	// Scrub arguments
+	NoValidate    bool `json:"no_validate,omitempty"`
+	NoSnapshot    bool `json:"no_snapshot,omitempty"`
+	SkipCorrupted bool `json:"skip_corrupted,omitempty"`
+
+	// Compaction arguments
+	SplitOutput bool   `json:"split_output,omitempty"`
+	StartToken  string `json:"start_token,omitempty"`
+	EndToken    string `json:"end_token,omitempty"`
 
 	// NewTokens is a map of pod names to their newly-assigned tokens. Required for the move
 	// command, ignored otherwise. Pods referenced in this map must exist; any existing pod not
@@ -104,9 +118,6 @@ type JobArguments struct {
 
 // CassandraTaskStatus defines the observed state of CassandraJob
 type CassandraTaskStatus struct {
-
-	// TODO Status and Conditions is almost 1:1 to Kubernetes Job's definitions.
-
 	// The latest available observations of an object's current state. When a Job
 	// fails, one of the conditions will have type "Failed" and status true. When
 	// a Job is suspended, one of the conditions will have type "Suspended" and
@@ -118,7 +129,7 @@ type CassandraTaskStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	// +listType=atomic
-	Conditions []JobCondition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// Represents time when the job controller started processing a job. When a
 	// Job is created in the suspended state, this field is not set until the
@@ -157,25 +168,6 @@ const (
 	// JobRunning means the job is currently executing
 	JobRunning JobConditionType = "Running"
 )
-
-type JobCondition struct {
-	// Type of job condition, Complete or Failed.
-	Type JobConditionType `json:"type"`
-	// Status of the condition, one of True, False, Unknown.
-	Status corev1.ConditionStatus `json:"status"`
-	// Last time the condition was checked.
-	// +optional
-	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
-	// Last time the condition transit from one status to another.
-	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
-	// (brief) reason for the condition's last transition.
-	// +optional
-	Reason string `json:"reason,omitempty"`
-	// Human readable message indicating details about last transition.
-	// +optional
-	Message string `json:"message,omitempty"`
-}
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status

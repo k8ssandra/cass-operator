@@ -70,8 +70,10 @@ type AsyncTaskExecutorFunc func(httphelper.NodeMgmtClient, *corev1.Pod, *TaskCon
 // SyncTaskExecutorFunc is called as a backup if async one isn't supported
 type SyncTaskExecutorFunc func(httphelper.NodeMgmtClient, *corev1.Pod, *TaskConfiguration) error
 
-// ValidatorFunc validates that necessary parameters are set for the task
-type ValidatorFunc func(*TaskConfiguration) error
+// ValidatorFunc validates that necessary parameters are set for the task. If false is returned, the task
+// has failed the validation and the error has the details. If true is returned, the error is transient and
+// should be retried.
+type ValidatorFunc func(*TaskConfiguration) (bool, error)
 
 // ProcessFunc is a function that's run before the pods are being processed individually, or after
 // the pods have been processed.
@@ -106,11 +108,11 @@ type TaskConfiguration struct {
 	Completed int
 }
 
-func (t *TaskConfiguration) Validate() error {
+func (t *TaskConfiguration) Validate() (bool, error) {
 	if t.ValidateFunc != nil {
 		return t.ValidateFunc(t)
 	}
-	return nil
+	return true, nil
 }
 
 func (t *TaskConfiguration) Filter(pod *corev1.Pod) bool {
@@ -292,32 +294,43 @@ JobDefinition:
 			break JobDefinition
 		case api.CommandReplaceNode:
 			r.replace(taskConfig)
-		case "forceupgraderacks":
-			// res, failed, completed, err = r.reconcileDatacenter(ctx, &dc, forceupgrade(taskConfigProto))
 		case api.CommandUpgradeSSTables:
 			upgradesstables(taskConfig)
 		case api.CommandScrub:
-			// res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, scrub(taskConfigProto))
+			scrub(taskConfig)
 		case api.CommandCompaction:
-			// res, failed, completed, err = r.reconcileEveryPodTask(ctx, &dc, compact(taskConfigProto, job.Arguments))
+			compact(taskConfig)
 		case api.CommandMove:
 			r.move(taskConfig)
+		case api.CommandFlush:
+			flush(taskConfig)
+		case api.CommandGarbageCollect:
+			gc(taskConfig)
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err
 		}
 
-		if err := taskConfig.Validate(); err != nil {
-			return ctrl.Result{}, err
-		}
+		if !r.HasCondition(cassTask, api.JobRunning, metav1.ConditionTrue) {
+			valid, errValidate := taskConfig.Validate()
+			if errValidate != nil && valid {
+				// Retry, this is a transient error
+				return ctrl.Result{}, errValidate
+			}
 
-		if !r.HasCondition(cassTask, api.JobRunning, corev1.ConditionTrue) {
+			if !valid {
+				failed++
+				err = errValidate
+				res = ctrl.Result{}
+				break
+			}
+
 			if err := taskConfig.PreProcess(); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 
-		if modified := SetCondition(&cassTask, api.JobRunning, corev1.ConditionTrue); modified {
+		if modified := SetCondition(&cassTask, api.JobRunning, metav1.ConditionTrue, ""); modified {
 			if err = r.Client.Status().Update(ctx, &cassTask); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -331,28 +344,35 @@ JobDefinition:
 
 		if res.RequeueAfter > 0 {
 			// This job isn't complete yet or there's an error, do not continue
+			logger.V(1).Info("This job isn't complete yet or there's an error, requeueing", "requeueAfter", res.RequeueAfter)
 			break
 		}
-		// completedCount++
 	}
 
 	if res.RequeueAfter == 0 && !res.Requeue {
 		// Job has been completed
 		cassTask.GetLabels()[taskStatusLabel] = completedTaskLabelValue
-		if err = r.Client.Update(ctx, &cassTask); err != nil {
-			return res, err
+		if errUpdate := r.Client.Update(ctx, &cassTask); errUpdate != nil {
+			return res, errUpdate
 		}
 
-		err = r.cleanupJobAnnotations(ctx, dc, taskId)
-		if err != nil {
+		if errCleanup := r.cleanupJobAnnotations(ctx, dc, taskId); errCleanup != nil {
 			// Not the end of the world
-			logger.Error(err, "Failed to cleanup job annotations from pods")
+			logger.Error(errCleanup, "Failed to cleanup job annotations from pods")
 		}
 
 		cassTask.Status.Active = 0
 		cassTask.Status.CompletionTime = &timeNow
-		SetCondition(&cassTask, api.JobComplete, corev1.ConditionTrue)
-		SetCondition(&cassTask, api.JobRunning, corev1.ConditionFalse)
+		SetCondition(&cassTask, api.JobComplete, metav1.ConditionTrue, "")
+		SetCondition(&cassTask, api.JobRunning, metav1.ConditionFalse, "")
+
+		if failed > 0 {
+			errMsg := ""
+			if err != nil {
+				errMsg = err.Error()
+			}
+			SetCondition(&cassTask, api.JobFailed, metav1.ConditionTrue, errMsg)
+		}
 
 		// Requeue for deletion later
 		deletionTime := calculateDeletionTime(&cassTask)
@@ -378,26 +398,29 @@ func (r *CassandraTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *CassandraTaskReconciler) HasCondition(task api.CassandraTask, condition api.JobConditionType, status corev1.ConditionStatus) bool {
+func (r *CassandraTaskReconciler) HasCondition(task api.CassandraTask, condition api.JobConditionType, status metav1.ConditionStatus) bool {
 	for _, cond := range task.Status.Conditions {
-		if cond.Type == condition {
+		if cond.Type == string(condition) {
 			return cond.Status == status
 		}
 	}
 	return false
 }
 
-func SetCondition(task *api.CassandraTask, condition api.JobConditionType, status corev1.ConditionStatus) bool {
+func SetCondition(task *api.CassandraTask, condition api.JobConditionType, status metav1.ConditionStatus, message string) bool {
 	existing := false
 	for i := 0; i < len(task.Status.Conditions); i++ {
 		cond := task.Status.Conditions[i]
-		if cond.Type == condition {
+		if cond.Type == string(condition) {
 			if cond.Status == status {
 				// Already correct status
 				return false
 			}
 			cond.Status = status
 			cond.LastTransitionTime = metav1.Now()
+			if message != "" {
+				cond.Message = message
+			}
 			existing = true
 			task.Status.Conditions[i] = cond
 			break
@@ -405,10 +428,14 @@ func SetCondition(task *api.CassandraTask, condition api.JobConditionType, statu
 	}
 
 	if !existing {
-		cond := api.JobCondition{
-			Type:               condition,
+		cond := metav1.Condition{
+			Type:               string(condition),
+			Reason:             string(condition),
 			Status:             status,
 			LastTransitionTime: metav1.Now(),
+		}
+		if message != "" {
+			cond.Message = message
 		}
 		task.Status.Conditions = append(task.Status.Conditions, cond)
 	}
@@ -707,10 +734,16 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				return ctrl.Result{}, failed, completed, err
 			}
 		} else {
+			if len(jobRunner) > 0 {
+				// Something is still holding the worker
+				return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, nil
+			}
+
 			if taskConfig.SyncFunc == nil {
 				// This feature is not supported in sync mode, mark everything as done
 				err := fmt.Errorf("this job isn't supported by the target pod")
 				logger.Error(err, "unable to execute requested job against pod", "Pod", pod)
+				failed++
 				return ctrl.Result{}, failed, completed, err
 			}
 
@@ -732,36 +765,53 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 
 			pod := pod
 
-			go func(targetPod *corev1.Pod) {
+			go func() {
+				// go func(targetPod *corev1.Pod) {
 				// Write value to the jobRunner to indicate we're running
-				logger.V(1).Info("starting execution of sync blocking job", "Pod", targetPod)
+				podKey := types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}
+				logger.V(1).Info("starting execution of sync blocking job", "Pod", pod)
 				jobRunner <- idx
 				defer func() {
 					// Remove the value from the jobRunner
 					<-jobRunner
 				}()
 
-				if err = taskConfig.SyncFunc(nodeMgmtClient, targetPod, taskConfig); err != nil {
+				if err = taskConfig.SyncFunc(nodeMgmtClient, &pod, taskConfig); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod
-					logger.Error(err, "executing the sync task failed", "Pod", targetPod)
+					logger.Error(err, "executing the sync task failed", "Pod", pod)
 					jobStatus.Status = podJobError
 				} else {
 					jobStatus.Status = podJobCompleted
 				}
 
-				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-					logger.Error(err, "Failed to update local job's status", "Pod", targetPod)
+				if err := r.Client.Get(context.Background(), podKey, &pod); err != nil {
+					logger.Error(err, "Failed to get pod for annotation update", "Pod", pod)
 				}
 
-				err = r.Client.Update(ctx, &pod)
-				if err != nil {
-					logger.Error(err, "Failed to update local job's status", "Pod", targetPod)
+				podPatch := client.MergeFrom(pod.DeepCopy())
+
+				if pod.Annotations == nil {
+					pod.Annotations = make(map[string]string)
 				}
-			}(&pod)
+				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
+					logger.Error(err, "Failed to update local job's status", "Pod", pod)
+				}
+
+				if err = r.Client.Patch(ctx, &pod, podPatch); err != nil {
+					// err = r.Client.Update(ctx, &pod)
+					logger.Error(err, "Failed to update local job's status", "Pod", pod)
+				}
+			}()
 		}
 
 		// We have a job going on, return back later to check the status
 		return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, nil
 	}
+
+	if len(jobRunner) > 0 {
+		// Something is still holding the worker while none of the existing pods are, probably the replace job.
+		return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, nil
+	}
+
 	return ctrl.Result{}, failed, completed, nil
 }

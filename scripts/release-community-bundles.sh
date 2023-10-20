@@ -14,7 +14,7 @@ TARGET_DIRS=(community-operators community-operators-prod)
 git checkout v$VERSION
 
 # Create bundle
-make VERSION=$VERSION REGISTRY=docker.io bundle
+make VERSION=$VERSION REGISTRY=cr.dtsx.io bundle
 
 # Modify package name to cass-operator-community
 yq eval -i '.annotations."operators.operatorframework.io.bundle.package.v1" = "cass-operator-community"' bundle/metadata/annotations.yaml

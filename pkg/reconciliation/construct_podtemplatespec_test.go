@@ -1441,7 +1441,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "dse",
 				serverVersion: "6.8.0",
 			},
-			want:      "datastax/dse-server:6.8.0-ubi7",
+			want:      "datastax/dse-mgmtapi-6_8:6.8.0-ubi8",
 			errString: "",
 		},
 		{
@@ -1451,7 +1451,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "cassandra",
 				serverVersion: "3.11.10",
 			},
-			want:      "k8ssandra/cass-management-api:3.11.10",
+			want:      "k8ssandra/cass-management-api:3.11.10-ubi8",
 			errString: "",
 		},
 		{
@@ -1491,7 +1491,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "dse",
 				serverVersion: "6.8.1234",
 			},
-			want:      "datastax/dse-server:6.8.1234-ubi7",
+			want:      "datastax/dse-mgmtapi-6_8:6.8.1234-ubi8",
 			errString: "",
 		},
 		{
@@ -1501,7 +1501,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "dse",
 				serverVersion: "6.8.26",
 			},
-			want:      "datastax/dse-server:6.8.26-ubi7",
+			want:      "datastax/dse-mgmtapi-6_8:6.8.26-ubi8",
 			errString: "",
 		},
 	}

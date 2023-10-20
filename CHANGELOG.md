@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#479](https://github.com/k8ssandra/cass-operator/issues/479) Set the default deployed DSE image to use our newer management-api by changing the repository to datastax/dse-mgmtapi-6_8
 * [CHANGE] [#573](https://github.com/k8ssandra/cass-operator/issues/573) Add the namespace as env variable in the server-system-logger container to label metrics with.
 * [ENHANCEMENT] [#580](https://github.com/k8ssandra/cass-operator/issues/580) Add garbageCollect CassandraTask that removes deleted data
 * [ENHANCEMENT] [#578](https://github.com/k8ssandra/cass-operator/issues/578) Add flush CassandraTask that flushed memtables to the disk

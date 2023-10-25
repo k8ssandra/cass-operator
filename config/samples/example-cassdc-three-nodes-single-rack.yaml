@@ -5,7 +5,7 @@ metadata:
 spec:
   clusterName: development
   serverType: cassandra
-  serverVersion: "4.0.3"
+  serverVersion: "4.1.2"
   managementApiAuth:
     insecure: {}
   size: 3
@@ -17,7 +17,11 @@ spec:
         resources:
           requests:
             storage: 10Gi
-  dockerImageRunsAsCassandra: false
+  podTemplateSpec:
+    spec:
+      containers:
+        - name: "cassandra"
+      securityContext: {}
   resources:
     requests:
       memory: 2Gi

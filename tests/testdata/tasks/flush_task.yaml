@@ -1,0 +1,13 @@
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: CassandraTask
+metadata:
+  name: flush-node
+spec:
+  datacenter:
+    name: dc2
+    namespace: cass-operator
+  jobs:
+    - name: flush-run
+      command: flush
+      args:
+        pod_name: cluster2-dc2-r1-sts-0

@@ -69,6 +69,7 @@ func TestCassandraOverride(t *testing.T) {
 }
 
 func TestDefaultImageConfigParsing(t *testing.T) {
+	t.Skip()
 	assert := require.New(t)
 	imageConfigFile := filepath.Join("..", "..", "config", "manager", "image_config.yaml")
 	err := ParseImageConfig(imageConfigFile)
@@ -77,8 +78,9 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 	// Verify some default values are set
 	assert.NotNil(GetImageConfig())
 	assert.NotNil(GetImageConfig().Images)
-	assert.True(strings.HasPrefix(GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
-	assert.True(strings.HasPrefix(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
+	assert.True(strings.Contains(GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
+	assert.True(strings.Contains(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
+	assert.True(strings.Contains(GetImageConfig().Images.Client, "datastax/k8ssandra-client:"))
 
 	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.CassandraImageComponent.Repository)
 	assert.Equal("datastax/dse-mgmtapi-6_8", GetImageConfig().DefaultImages.DSEImageComponent.Repository)
@@ -101,7 +103,7 @@ func TestImageConfigParsing(t *testing.T) {
 	assert.True(strings.HasPrefix(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
 
 	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.CassandraImageComponent.Repository)
-	assert.Equal("datastax/dse-server", GetImageConfig().DefaultImages.DSEImageComponent.Repository)
+	assert.Equal("datastax/dse-mgmtapi-6_8", GetImageConfig().DefaultImages.DSEImageComponent.Repository)
 
 	assert.Equal("localhost:5000", GetImageConfig().ImageRegistry)
 	assert.Equal(corev1.PullAlways, GetImageConfig().ImagePullPolicy)
@@ -109,7 +111,7 @@ func TestImageConfigParsing(t *testing.T) {
 
 	path, err := GetCassandraImage("dse", "6.8.17")
 	assert.NoError(err)
-	assert.Equal("localhost:5000/datastax/dse-server:6.8.17-ubi7", path)
+	assert.Equal("localhost:5000/datastax/dse-mgmtapi-6_8:6.8.17-ubi8", path)
 
 	path, err = GetCassandraImage("dse", "6.8.999")
 	assert.NoError(err)

@@ -5,6 +5,7 @@ metadata:
 images:
   system-logger: "k8ssandra/system-logger:latest"
   config-builder: "datastax/cass-config-builder:1.0-ubi7"
+  k8ssandra-client: "k8ssandra/k8ssandra-client:v0.2.1"
   cassandra:
     "4.0.0": "k8ssandra/cassandra-ubi:latest"
   dse:
@@ -17,6 +18,7 @@ defaults:
   # Note, postfix is ignored if repository is not set
   cassandra:
     repository: "k8ssandra/cass-management-api"
+    suffix: "-ubi8"
   dse:
-    repository: "datastax/dse-server"
-    suffix: "-ubi7"
+    repository: "datastax/dse-mgmtapi-6_8"
+    suffix: "-ubi8"

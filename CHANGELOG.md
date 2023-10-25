@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+## v1.18.1
+
 ## v1.18.0
 
 * [CHANGE] [#479](https://github.com/k8ssandra/cass-operator/issues/479) Set the default deployed DSE image to use our newer management-api by changing the repository to datastax/dse-mgmtapi-6_8

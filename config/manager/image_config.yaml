@@ -3,7 +3,7 @@ kind: ImageConfig
 metadata:
   name: image-config
 images:
-  system-logger: "cr.k8ssandra.io/k8ssandra/system-logger:v1.18.0"
+  system-logger: "k8ssandra/system-logger:latest"
   config-builder: "cr.dtsx.io/datastax/cass-config-builder:1.0-ubi7"
   k8ssandra-client: "cr.k8ssandra.io/k8ssandra/k8ssandra-client:v0.2.1"
   # cassandra:

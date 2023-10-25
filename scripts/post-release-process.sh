@@ -14,6 +14,16 @@ cd config/manager && $KUSTOMIZE edit set image controller=$IMG && cd -
 # Return config/manager/image_config.yaml to :latest
 LOG_IMG=k8ssandra/system-logger:latest yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 
+# Remove cr.k8ssandra.io prefixes
+yq eval -i '.images.k8ssandra-client |= sub("cr.k8ssandra.io/", "")' config/manager/image_config.yaml
+yq eval -i '.defaults.cassandra.repository |= sub("cr.k8ssandra.io/", "")' config/manager/image_config.yaml
+
+# Remove cr.dstx.io prefixes
+yq eval -i '.images.config-builder |= sub("cr.dtsx.io/", "")' config/manager/image_config.yaml
+yq eval -i '.defaults.dse.repository |= sub("cr.dtsx.io/", "")' config/manager/image_config.yaml
+
+
+
 # Commit to git
 NEXT_VERSION=$(gawk 'match($0, /^VERSION \?= /) { print substr($0, RLENGTH+1)}' Makefile)
 

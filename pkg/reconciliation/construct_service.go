@@ -144,6 +144,9 @@ func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter)
 	service.Spec.Type = "ClusterIP"
 	service.Spec.ClusterIP = "None"
 	service.Spec.PublishNotReadyAddresses = true
+	// Adding ipFamilies and ipFamilyPolicy
+	service.Spec.IPfamilies = []corev1.IPFamily{"IPv4"}
+	service.Spec.IPFamilyPolicy = corev1.IPFamilyPolicySingleStack
 
 	addAdditionalOptions(&service, &dc.Spec.AdditionalServiceConfig.AdditionalSeedService)
 

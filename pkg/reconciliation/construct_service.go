@@ -124,7 +124,7 @@ func newSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.S
 	service.Spec.Selector = buildLabelSelectorForSeedService(dc)
 	service.Spec.PublishNotReadyAddresses = true
 	// Adding ipFamilies and ipFamilyPolicy
-	service.SpecIPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+	service.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
 	// Create a variable of type corev1.IPFamilyPolicyType
         ipFamilyPolicy := corev1.IPFamilyPolicySingleStack
         // Set IPFamilyPolicy for localSeedSvc
@@ -151,7 +151,7 @@ func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter)
 	service.Spec.ClusterIP = "None"
 	service.Spec.PublishNotReadyAddresses = true
 	// Adding ipFamilies and ipFamilyPolicy
-	service.SpecIPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+	service.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
 	// Create a variable of type corev1.IPFamilyPolicyType
         ipFamilyPolicy := corev1.IPFamilyPolicySingleStack
         // Set IPFamilyPolicy for localSeedSvc

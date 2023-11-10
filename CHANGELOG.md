@@ -9,6 +9,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [BUGFIX] [#593](https://github.com/k8ssandra/cass-operator/issues/593) Update k8ssandra-client to 0.2.2 to fix the issue with clusterName config generation when using 4.1
+
 ## v1.18.1
 
 ## v1.18.0

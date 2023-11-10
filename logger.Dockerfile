@@ -3,7 +3,7 @@ ARG VERSION
 ARG TARGETPLATFORM
 
 # Install Vector
-ENV VECTOR_VERSION 0.31.0
+ENV VECTOR_VERSION 0.33.1
 RUN case ${TARGETPLATFORM} in \
          "linux/amd64")  VECTOR_ARCH=x86_64  ;; \
          "linux/arm64")  VECTOR_ARCH=aarch64  ;; \

@@ -306,7 +306,7 @@ spec:
 Apply the above as follows:
 
 ```console
-kubectl -n cass-operator apply -f https://github.com/k8ssandra/cass-operator/blob/master/config/samples/example-cassdc-three-nodes-single-rack.yaml
+kubectl -n cass-operator apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/master/config/samples/example-cassdc-three-nodes-single-rack.yaml
 ```
 
 You can check the status of pods in the Cassandra cluster as follows:

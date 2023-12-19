@@ -457,6 +457,23 @@ func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
 				"Update rack annotations for StatefulSet %s", statefulSet.Name)
 		}
+
+		ptsAnns := statefulSet.Spec.Template.GetAnnotations()
+		oplabels.AddOperatorAnnotations(ptsAnns, rc.Datacenter)
+		if !reflect.DeepEqual(ptsAnns, statefulSet.GetAnnotations()) {
+			rc.ReqLogger.Info("Updating annotations",
+				"statefulSet", statefulSet,
+				"current", ptsAnns,
+				"desired", updatedLabels)
+			statefulSet.Spec.Template.SetAnnotations(ptsAnns)
+
+			if err := rc.Client.Patch(rc.Ctx, statefulSet, patch); err != nil {
+				return result.Error(err)
+			}
+
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
+				"Update pod template spec rack annotations for StatefulSet %s", statefulSet.Name)
+		}
 	}
 
 	return result.Continue()
@@ -1577,27 +1594,6 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
 				"Update rack labels for Pod %s", podName)
-		}
-
-		podAnns := pod.GetAnnotations()
-		oplabels.AddOperatorAnnotations(podAnns, rc.Datacenter)
-		if !reflect.DeepEqual(podAnns, pod.GetAnnotations()) {
-			rc.ReqLogger.Info("Updating annotations",
-				"Pod", podName,
-				"current", pod.GetAnnotations(),
-				"desired", podAnns)
-			pod.SetAnnotations(podAnns)
-
-			if err := rc.Client.Patch(rc.Ctx, pod, podPatch); err != nil {
-				rc.ReqLogger.Error(
-					err,
-					"Unable to update pod with annotation",
-					"Pod", podName,
-				)
-			}
-
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
-				"Update rack annotations for pod %s", pod.Name)
 		}
 
 		if pod.Spec.Volumes == nil || len(pod.Spec.Volumes) == 0 || pod.Spec.Volumes[0].PersistentVolumeClaim == nil {

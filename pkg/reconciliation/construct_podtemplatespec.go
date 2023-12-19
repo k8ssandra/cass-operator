@@ -799,7 +799,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 	// Labels
 
 	podLabels := dc.GetRackLabels(rack.Name)
-	oplabels.AddOperatorLabels(podLabels, dc)
+	oplabels.AddOperatorTags(podLabels, dc)
 	podLabels[api.CassNodeState] = stateReadyToStart
 
 	if baseTemplate.Labels == nil {

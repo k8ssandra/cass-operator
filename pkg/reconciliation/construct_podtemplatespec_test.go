@@ -977,7 +977,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_labels_merge(t *testing.T) {
 	got := spec.Labels
 
 	expected := dc.GetRackLabels("testrack")
-	oplabels.AddOperatorLabels(expected, dc)
+	oplabels.AddOperatorTags(expected, dc)
 	expected[api.CassNodeState] = stateReadyToStart
 	expected["app.kubernetes.io/managed-by"] = oplabels.ManagedByLabelValue
 	expected["abc"] = "123"
@@ -1003,24 +1003,34 @@ func TestCassandraDatacenter_buildContainers_additional_labels(t *testing.T) {
 			AdditionalLabels: map[string]string{
 				"Add": "Label",
 			},
+			AdditionalAnnotations: map[string]string{
+				"Add": "Annotation",
+			},
 		},
 	}
 	dc.Spec.PodTemplateSpec.Labels = map[string]string{"abc": "123"}
 
 	spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
-	got := spec.Labels
+	gotLabels := spec.Labels
 
-	expected := dc.GetRackLabels("testrack")
-	oplabels.AddOperatorLabels(expected, dc)
-	expected[api.CassNodeState] = stateReadyToStart
-	expected["app.kubernetes.io/managed-by"] = oplabels.ManagedByLabelValue
-	expected["abc"] = "123"
-	expected["Add"] = "Label"
+	expectedLabels := dc.GetRackLabels("testrack")
+	oplabels.AddOperatorTags(expectedLabels, dc)
+	expectedLabels[api.CassNodeState] = stateReadyToStart
+	expectedLabels["app.kubernetes.io/managed-by"] = oplabels.ManagedByLabelValue
+	expectedLabels["abc"] = "123"
+	expectedLabels["Add"] = "Label"
 
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
-	if !reflect.DeepEqual(expected, got) {
-		t.Errorf("labels = %v, want %v", got, expected)
+	if !reflect.DeepEqual(expectedLabels, gotLabels) {
+		t.Errorf("labels = %v, want %v", gotLabels, expectedLabels)
 	}
+
+	gotAnns := spec.Annotations
+	expectedAnnotations := map[string]string{"Add": "Annotation"}
+	if !reflect.DeepEqual(expectedAnnotations, gotAnns) {
+		t.Errorf("labels = %v, want %v", gotAnns, expectedAnnotations)
+	}
+
 }
 
 func TestCassandraDatacenter_buildPodTemplateSpec_overrideSecurityContext(t *testing.T) {

@@ -56,7 +56,7 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 
 	if dc.ShouldGenerateSuperuserSecret() {
 		labels := make(map[string]string)
-		oplabels.AddOperatorLabels(labels, dc)
+		oplabels.AddOperatorTags(labels, dc)
 
 		secretNamespacedName := dc.GetSuperuserSecretNamespacedName()
 		secret = &corev1.Secret{

@@ -5,9 +5,10 @@ package reconciliation
 
 import (
 	"fmt"
-	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"reflect"
 	"testing"
+
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -115,6 +116,9 @@ func TestLabelsWithNewSeedServiceForCassandraDatacenter(t *testing.T) {
 			AdditionalLabels: map[string]string{
 				"Add": "label",
 			},
+			AdditionalAnnotations: map[string]string{
+				"Add": "annotation",
+			},
 		},
 	}
 
@@ -134,6 +138,12 @@ func TestLabelsWithNewSeedServiceForCassandraDatacenter(t *testing.T) {
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
 	}
+	if !reflect.DeepEqual(expected, service.Labels) {
+		t.Errorf("service labels = \n %v \n, want \n %v", service.Annotations, map[string]string{
+			"Add": "annotation",
+		})
+	}
+
 }
 
 func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T) {
@@ -174,6 +184,9 @@ func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T) {
 			AdditionalLabels: map[string]string{
 				"Add": "label",
 			},
+			AdditionalAnnotations: map[string]string{
+				"Add": "annotation",
+			},
 		},
 	}
 
@@ -193,6 +206,11 @@ func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
+	}
+	if !reflect.DeepEqual(expected, service.Labels) {
+		t.Errorf("service labels = \n %v \n, want \n %v", service.Annotations, map[string]string{
+			"Add": "annotation",
+		})
 	}
 }
 
@@ -234,6 +252,9 @@ func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T) {
 			AdditionalLabels: map[string]string{
 				"Add": "label",
 			},
+			AdditionalAnnotations: map[string]string{
+				"Add": "annotation",
+			},
 		},
 	}
 
@@ -254,6 +275,11 @@ func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
+	}
+	if !reflect.DeepEqual(expected, service.Labels) {
+		t.Errorf("service labels = \n %v \n, want \n %v", service.Annotations, map[string]string{
+			"Add": "annotation",
+		})
 	}
 }
 
@@ -295,6 +321,9 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T) {
 			AdditionalLabels: map[string]string{
 				"Add": "label",
 			},
+			AdditionalAnnotations: map[string]string{
+				"Add": "annotation",
+			},
 		},
 	}
 
@@ -314,6 +343,11 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
+	}
+	if !reflect.DeepEqual(expected, service.Labels) {
+		t.Errorf("service labels = \n %v \n, want \n %v", service.Annotations, map[string]string{
+			"Add": "annotation",
+		})
 	}
 }
 
@@ -355,6 +389,9 @@ func TestLabelsWithNewAdditionalSeedServiceForCassandraDatacenter(t *testing.T) 
 			AdditionalLabels: map[string]string{
 				"Add": "label",
 			},
+			AdditionalAnnotations: map[string]string{
+				"Add": "annotation",
+			},
 		},
 	}
 
@@ -374,6 +411,11 @@ func TestLabelsWithNewAdditionalSeedServiceForCassandraDatacenter(t *testing.T) 
 
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
+	}
+	if !reflect.DeepEqual(expected, service.Labels) {
+		t.Errorf("service labels = \n %v \n, want \n %v", service.Annotations, map[string]string{
+			"Add": "annotation",
+		})
 	}
 }
 
@@ -406,6 +448,31 @@ func TestAddingAdditionalLabels(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = %v, want %v", service.Labels, expected)
+	}
+}
+
+func TestAddingAdditionalAnnotations(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "piclem",
+			ServerVersion: "4.0.1",
+			AdditionalAnnotations: map[string]string{
+				"Add": "annotation",
+			},
+		},
+	}
+
+	expected := map[string]string{
+		"Add": "annotation",
+	}
+
+	service := newServiceForCassandraDatacenter(dc)
+
+	if !reflect.DeepEqual(expected, service.Annotations) {
+		t.Errorf("service Annotations = %v, want %v", service.Annotations, expected)
 	}
 }
 

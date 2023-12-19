@@ -71,10 +71,10 @@ func newStatefulSetForCassandraDatacenter(
 	// see https://github.com/kubernetes/kubernetes/pull/74941
 	// pvc labels are ignored before k8s 1.15.0
 	pvcLabels := dc.GetRackLabels(rackName)
-	oplabels.AddOperatorLabels(pvcLabels, dc)
+	oplabels.AddOperatorTags(pvcLabels, dc)
 
 	statefulSetLabels := dc.GetRackLabels(rackName)
-	oplabels.AddOperatorLabels(statefulSetLabels, dc)
+	oplabels.AddOperatorTags(statefulSetLabels, dc)
 
 	statefulSetSelectorLabels := dc.GetRackLabels(rackName)
 

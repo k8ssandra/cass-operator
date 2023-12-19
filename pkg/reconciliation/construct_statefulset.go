@@ -78,7 +78,7 @@ func newStatefulSetForCassandraDatacenter(
 
 	statefulSetSelectorLabels := dc.GetRackLabels(rackName)
 
-	anns := dc.GetAnnotations()
+	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
 
 	var volumeClaimTemplates []corev1.PersistentVolumeClaim

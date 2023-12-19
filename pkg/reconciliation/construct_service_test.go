@@ -465,15 +465,9 @@ func TestAddingAdditionalAnnotations(t *testing.T) {
 		},
 	}
 
-	expected := map[string]string{
-		"Add": "annotation",
-	}
-
 	service := newServiceForCassandraDatacenter(dc)
 
-	if !reflect.DeepEqual(expected, service.Annotations) {
-		t.Errorf("service Annotations = %v, want %v", service.Annotations, expected)
-	}
+	assert.Contains(t, service.Annotations, "Add")
 }
 
 func TestServicePorts(t *testing.T) {

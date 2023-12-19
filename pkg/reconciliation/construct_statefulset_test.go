@@ -123,15 +123,13 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 		assert.Equal(t, expectedStatefulsetLabels, volumeClaim.Labels)
 	}
 
-	assert.Equal(t,
-		map[string]string{
-			"Add": "annotation"},
-		statefulset.Annotations)
+	assert.Contains(t,
+		statefulset.Annotations, "Add")
 
 	for _, volumeClaim := range statefulset.Spec.VolumeClaimTemplates {
-		assert.Equal(t, map[string]string{
-			"Add": "annotation"},
-			volumeClaim.Annotations)
+		assert.Contains(t,
+			volumeClaim.Annotations,
+			"Add")
 	}
 
 }

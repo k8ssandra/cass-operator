@@ -70,6 +70,9 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 	}
 
 	service.Spec.Ports = ports
+	anns := make(map[string]string)
+	oplabels.AddOperatorAnnotations(anns, dc)
+	service.ObjectMeta.Annotations = anns
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.DatacenterService)
 
@@ -301,7 +304,7 @@ func makeGenericHeadlessService(dc *api.CassandraDatacenter) *corev1.Service {
 	service.Spec.Type = "ClusterIP"
 	service.Spec.ClusterIP = "None"
 
-	anns := dc.GetAnnotations()
+	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
 	service.ObjectMeta.Annotations = anns
 

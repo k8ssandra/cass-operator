@@ -237,7 +237,8 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		utils.MergeMap(cassTask.Labels, dc.GetDatacenterLabels())
-		oplabels.AddOperatorTags(cassTask.GetLabels(), dc)
+		oplabels.AddOperatorLabels(cassTask.GetLabels(), dc)
+		oplabels.AddOperatorAnnotations(cassTask.GetAnnotations(), dc)
 
 		// Starting the run, set the Active label so we can quickly fetch the active ones
 		cassTask.GetLabels()[taskStatusLabel] = activeTaskLabelValue

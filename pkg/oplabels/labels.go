@@ -20,7 +20,7 @@ const (
 	CreatedByLabelValue = ManagedByLabelValue
 )
 
-func AddOperatorTags(m map[string]string, dc *api.CassandraDatacenter) {
+func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
 	m[ManagedByLabel] = ManagedByLabelValue
 	m[NameLabel] = NameLabelValue
 	m[VersionLabel] = dc.Spec.ServerVersion
@@ -33,6 +33,12 @@ func AddOperatorTags(m map[string]string, dc *api.CassandraDatacenter) {
 		}
 	}
 
+}
+
+func AddOperatorAnnotations(m map[string]string, dc *api.CassandraDatacenter) {
+	if m == nil {
+		m = make(map[string]string)
+	}
 	if len(dc.Spec.AdditionalAnnotations) != 0 {
 		for key, value := range dc.Spec.AdditionalAnnotations {
 			m[key] = api.CleanLabelValue(value)

@@ -118,8 +118,12 @@ func newSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.S
 	service.ObjectMeta.Name = dc.GetSeedServiceName()
 
 	labels := dc.GetClusterLabels()
-	oplabels.AddOperatorTags(labels, dc)
+	oplabels.AddOperatorLabels(labels, dc)
 	service.ObjectMeta.Labels = labels
+
+	anns := dc.GetAnnotations()
+	oplabels.AddOperatorAnnotations(anns, dc)
+	service.ObjectMeta.Annotations = anns
 
 	service.Spec.Selector = buildLabelSelectorForSeedService(dc)
 	service.Spec.PublishNotReadyAddresses = true
@@ -135,11 +139,14 @@ func newSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.S
 // whether the additional seed pods are ready or not
 func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	labels := dc.GetDatacenterLabels()
-	oplabels.AddOperatorTags(labels, dc)
+	oplabels.AddOperatorLabels(labels, dc)
+	anns := dc.GetAnnotations()
+	oplabels.AddOperatorAnnotations(anns, dc)
 	var service corev1.Service
 	service.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
 	service.ObjectMeta.Namespace = dc.Namespace
 	service.ObjectMeta.Labels = labels
+	service.ObjectMeta.Annotations = anns
 	// We omit the label selector because we will create the endpoints manually
 	service.Spec.Type = "ClusterIP"
 	service.Spec.ClusterIP = "None"
@@ -154,11 +161,14 @@ func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter)
 
 func newEndpointsForAdditionalSeeds(dc *api.CassandraDatacenter) (*corev1.Endpoints, error) {
 	labels := dc.GetDatacenterLabels()
-	oplabels.AddOperatorTags(labels, dc)
+	oplabels.AddOperatorLabels(labels, dc)
 	endpoints := corev1.Endpoints{}
 	endpoints.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
 	endpoints.ObjectMeta.Namespace = dc.Namespace
 	endpoints.ObjectMeta.Labels = labels
+	anns := dc.GetAnnotations()
+	oplabels.AddOperatorAnnotations(anns, dc)
+	endpoints.ObjectMeta.Annotations = anns
 
 	addresses := make([]corev1.EndpointAddress, 0, len(dc.Spec.AdditionalSeeds))
 	for _, additionalSeed := range dc.Spec.AdditionalSeeds {
@@ -282,7 +292,7 @@ func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev
 // inside the k8s cluster.
 func makeGenericHeadlessService(dc *api.CassandraDatacenter) *corev1.Service {
 	labels := dc.GetDatacenterLabels()
-	oplabels.AddOperatorTags(labels, dc)
+	oplabels.AddOperatorLabels(labels, dc)
 	selector := dc.GetDatacenterLabels()
 	var service corev1.Service
 	service.ObjectMeta.Namespace = dc.Namespace
@@ -290,5 +300,10 @@ func makeGenericHeadlessService(dc *api.CassandraDatacenter) *corev1.Service {
 	service.Spec.Selector = selector
 	service.Spec.Type = "ClusterIP"
 	service.Spec.ClusterIP = "None"
+
+	anns := dc.GetAnnotations()
+	oplabels.AddOperatorAnnotations(anns, dc)
+	service.ObjectMeta.Annotations = anns
+
 	return &service
 }

@@ -440,6 +440,23 @@ func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
 				"Update rack labels for StatefulSet %s", statefulSet.Name)
 		}
+
+		stsAnns := statefulSet.GetAnnotations()
+		oplabels.AddOperatorAnnotations(stsAnns, rc.Datacenter)
+		if !reflect.DeepEqual(stsAnns, statefulSet.GetAnnotations()) {
+			rc.ReqLogger.Info("Updating annotations",
+				"statefulSet", statefulSet,
+				"current", stsAnns,
+				"desired", updatedLabels)
+			statefulSet.SetAnnotations(stsAnns)
+
+			if err := rc.Client.Patch(rc.Ctx, statefulSet, patch); err != nil {
+				return result.Error(err)
+			}
+
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
+				"Update rack annotations for StatefulSet %s", statefulSet.Name)
+		}
 	}
 
 	return result.Continue()
@@ -1562,6 +1579,27 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 				"Update rack labels for Pod %s", podName)
 		}
 
+		podAnns := pod.GetAnnotations()
+		oplabels.AddOperatorAnnotations(podAnns, rc.Datacenter)
+		if !reflect.DeepEqual(podAnns, pod.GetAnnotations()) {
+			rc.ReqLogger.Info("Updating annotations",
+				"Pod", podName,
+				"current", pod.GetAnnotations(),
+				"desired", podAnns)
+			pod.SetAnnotations(podAnns)
+
+			if err := rc.Client.Patch(rc.Ctx, pod, podPatch); err != nil {
+				rc.ReqLogger.Error(
+					err,
+					"Unable to update pod with annotation",
+					"Pod", podName,
+				)
+			}
+
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
+				"Update rack annotations for pod %s", pod.Name)
+		}
+
 		if pod.Spec.Volumes == nil || len(pod.Spec.Volumes) == 0 || pod.Spec.Volumes[0].PersistentVolumeClaim == nil {
 			continue
 		}
@@ -1616,12 +1654,32 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
 				"Update rack labels for PersistentVolumeClaim %s", pvc.Name)
 		}
+		pvcAnns := pvc.GetAnnotations()
+		oplabels.AddOperatorAnnotations(pvcAnns, rc.Datacenter)
+		if !reflect.DeepEqual(pvcAnns, pvc.GetAnnotations()) {
+			rc.ReqLogger.Info("Updating annotations",
+				"PVC", pvc,
+				"current", pvc.GetAnnotations(),
+				"desired", pvcAnns)
+			pvc.SetAnnotations(pvcAnns)
+			pvcPatch := client.MergeFrom(pvc.DeepCopy())
+			if err := rc.Client.Patch(rc.Ctx, pvc, pvcPatch); err != nil {
+				rc.ReqLogger.Error(
+					err,
+					"Unable to update pvc with annotation",
+					"PVC", pvc,
+				)
+			}
+
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
+				"Update rack annotations for pvc %s", pvc.Name)
+		}
 	}
 
 	return nil
 }
 
-func mergeInLabelsIfDifferent(existingLabels, newLabels map[string]string) (bool, map[string]string) {
+func mergeInTagsIfDifferent(existingLabels, newLabels map[string]string) (bool, map[string]string) {
 	updatedLabels := utils.MergeMap(map[string]string{}, existingLabels, newLabels)
 	if reflect.DeepEqual(existingLabels, updatedLabels) {
 		return false, existingLabels
@@ -1634,16 +1692,16 @@ func mergeInLabelsIfDifferent(existingLabels, newLabels map[string]string) (bool
 // resource. It will return the updated map and a boolean denoting whether the resource needs to be updated with the new labels.
 func shouldUpdateLabelsForClusterResource(resourceLabels map[string]string, dc *api.CassandraDatacenter) (bool, map[string]string) {
 	desired := dc.GetClusterLabels()
-	oplabels.AddOperatorTags(desired, dc)
-	return mergeInLabelsIfDifferent(resourceLabels, desired)
+	oplabels.AddOperatorLabels(desired, dc)
+	return mergeInTagsIfDifferent(resourceLabels, desired)
 }
 
 // shouldUpdateLabelsForRackResource will compare the labels passed in with what the labels should be for a rack level
 // resource. It will return the updated map and a boolean denoting whether the resource needs to be updated with the new labels.
 func shouldUpdateLabelsForRackResource(resourceLabels map[string]string, dc *api.CassandraDatacenter, rackName string) (bool, map[string]string) {
 	desired := dc.GetRackLabels(rackName)
-	oplabels.AddOperatorTags(desired, dc)
-	return mergeInLabelsIfDifferent(resourceLabels, desired)
+	oplabels.AddOperatorLabels(desired, dc)
+	return mergeInTagsIfDifferent(resourceLabels, desired)
 }
 
 func (rc *ReconciliationContext) labelServerPodStarting(pod *corev1.Pod) error {
@@ -2125,12 +2183,15 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 func (rc *ReconciliationContext) createTask(command taskapi.CassandraCommand) error {
 	generatedName := fmt.Sprintf("%s-%d", command, time.Now().Unix())
 	dc := rc.Datacenter
+	anns := make(map[string]string)
 
+	oplabels.AddOperatorAnnotations(anns, dc)
 	task := &taskapi.CassandraTask{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      generatedName,
-			Namespace: rc.Datacenter.Namespace,
-			Labels:    dc.GetDatacenterLabels(),
+			Name:        generatedName,
+			Namespace:   rc.Datacenter.Namespace,
+			Labels:      dc.GetDatacenterLabels(),
+			Annotations: anns,
 		},
 		Spec: taskapi.CassandraTaskSpec{
 			Datacenter: corev1.ObjectReference{
@@ -2149,7 +2210,7 @@ func (rc *ReconciliationContext) createTask(command taskapi.CassandraCommand) er
 		Status: taskapi.CassandraTaskStatus{},
 	}
 
-	oplabels.AddOperatorTags(task.GetLabels(), dc)
+	oplabels.AddOperatorLabels(task.GetLabels(), dc)
 
 	if err := rc.Client.Create(rc.Ctx, task); err != nil {
 		return err

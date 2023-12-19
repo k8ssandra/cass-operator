@@ -61,7 +61,7 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(map[string]string{"add": "annotation"}, secret.Annotations) {
-			t.Errorf("labels = \n %v \n, want \n %v", secret.Labels, expectedSecretLabels)
+			t.Errorf("annotations = \n %v \n, want \n %v", secret.Annotations, map[string]string{"add": "annotation"})
 		}
 
 		if !reflect.DeepEqual(expectedSecretLabels, secret.Labels) {

@@ -71,12 +71,15 @@ func newStatefulSetForCassandraDatacenter(
 	// see https://github.com/kubernetes/kubernetes/pull/74941
 	// pvc labels are ignored before k8s 1.15.0
 	pvcLabels := dc.GetRackLabels(rackName)
-	oplabels.AddOperatorTags(pvcLabels, dc)
+	oplabels.AddOperatorLabels(pvcLabels, dc)
 
 	statefulSetLabels := dc.GetRackLabels(rackName)
-	oplabels.AddOperatorTags(statefulSetLabels, dc)
+	oplabels.AddOperatorLabels(statefulSetLabels, dc)
 
 	statefulSetSelectorLabels := dc.GetRackLabels(rackName)
+
+	anns := dc.GetAnnotations()
+	oplabels.AddOperatorAnnotations(anns, dc)
 
 	var volumeClaimTemplates []corev1.PersistentVolumeClaim
 
@@ -90,8 +93,9 @@ func newStatefulSetForCassandraDatacenter(
 
 	volumeClaimTemplates = []corev1.PersistentVolumeClaim{{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: pvcLabels,
-			Name:   PvcName,
+			Labels:      pvcLabels,
+			Name:        PvcName,
+			Annotations: anns,
 		},
 		Spec: *dc.Spec.StorageConfig.CassandraDataVolumeClaimSpec,
 	}}
@@ -100,8 +104,9 @@ func newStatefulSetForCassandraDatacenter(
 		if storage.PVCSpec != nil {
 			pvc := corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   storage.Name,
-					Labels: pvcLabels,
+					Name:        storage.Name,
+					Labels:      pvcLabels,
+					Annotations: anns,
 				},
 				Spec: *storage.PVCSpec,
 			}
@@ -126,9 +131,10 @@ func newStatefulSetForCassandraDatacenter(
 
 	result := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      nsName.Name,
-			Namespace: nsName.Namespace,
-			Labels:    statefulSetLabels,
+			Name:        nsName.Name,
+			Namespace:   nsName.Namespace,
+			Labels:      statefulSetLabels,
+			Annotations: anns,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -141,7 +147,6 @@ func newStatefulSetForCassandraDatacenter(
 			VolumeClaimTemplates: volumeClaimTemplates,
 		},
 	}
-	result.Annotations = map[string]string{}
 
 	if sts != nil && sts.Spec.ServiceName != "" && sts.Spec.ServiceName != result.Spec.ServiceName {
 		result.Spec.ServiceName = sts.Spec.ServiceName

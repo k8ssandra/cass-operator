@@ -22,7 +22,7 @@ CRD_TARGET_PATH=$CRD_TMP_DIR
 TEMPLATE_HOME=$CHART_HOME/templates
 
 # Checkout tag
-# git checkout v$VERSION
+git checkout v$VERSION
 
 # Create CRDs
 kustomize build config/crd  --output $CRD_TARGET_PATH

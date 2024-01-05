@@ -33,7 +33,7 @@ for f in $CRD_TARGET_PATH/*; do
     mv $f $CRD_TARGET_PATH/$TARGET_FILENAME
 done
 
-# Add Helm conditionals to the end and beginnin of CRDs before applying them to the templates path
+# Add Helm conditionals to the end and beginning of CRDs before applying them to the templates path
 echo "Updating CRDs in" $TEMPLATE_HOME
 CRD_FILE_NAME=$TEMPLATE_HOME/crds.yaml
 echo '{{- if .Values.updateCRDs }}' > $CRD_FILE_NAME

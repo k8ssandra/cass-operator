@@ -1,4 +1,8 @@
 #!/bin/sh
+if [[ ! $0 == scripts/* ]]; then
+    echo "This script must be run from the root directory"
+    exit 1
+fi
 
 if [ "$#" -ne 1 ]; then
     echo "Usage: scripts/release-community-bundles.sh version"

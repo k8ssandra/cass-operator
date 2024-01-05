@@ -1,4 +1,9 @@
 #!/bin/sh
+if [[ ! $0 == scripts/* ]]; then
+    echo "This script must be run from the root directory"
+    exit 1
+fi
+
 IMG=k8ssandra/cass-operator:latest
 KUSTOMIZE=$(pwd)/bin/kustomize
 

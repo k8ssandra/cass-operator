@@ -1,4 +1,8 @@
 #!/bin/sh
+if [[ ! $0 == scripts/* ]]; then
+    echo "This script must be run from the root directory"
+    exit 1
+fi
 
 # These labels are required to be in the bundle.Dockerfile, but can't be added by the operator-sdk automatically
 cat <<EOF >> bundle.Dockerfile

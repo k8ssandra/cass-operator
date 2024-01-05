@@ -1,4 +1,8 @@
 #!/bin/sh
+if [[ ! $0 == scripts/* ]]; then
+    echo "This script must be run from the root directory"
+    exit 1
+fi
 
 if [ "$#" -ne 1 ]; then
     echo "Usage: scripts/pre-release-process.sh newTag"
@@ -16,10 +20,10 @@ make kustomize
 KUSTOMIZE=$(pwd)/bin/kustomize
 
 # Modify CHANGELOG automatically to match the tag
-sed -i -e "s/## unreleased/## $TAG/" CHANGELOG.md
+sed -i '' -e "s/## unreleased/## $TAG/" CHANGELOG.md
 
 # Modify README to include proper installation refs
-sed -i -e "s/$PREVTAG/$TAG/g" README.md
+sed -i '' -e "s/$PREVTAG/$TAG/g" README.md
 
 # Modify config/manager/kustomization.yaml to have proper newTag for cass-operator
 cd config/manager && $KUSTOMIZE edit set image controller=$IMG && cd -

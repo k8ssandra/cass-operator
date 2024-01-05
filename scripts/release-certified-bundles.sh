@@ -1,4 +1,8 @@
 #!/bin/sh
+if [[ ! $0 == scripts/* ]]; then
+    echo "This script must be run from the root directory"
+    exit 1
+fi
 
 if [ "$#" -ne 4 ]; then
     echo "Usage: scripts/release-certified-bundles.sh version sha256:<cass-operator-sha256> sha256:<system-logger-sha256> sha256:<k8ssandra-client-sha256>"

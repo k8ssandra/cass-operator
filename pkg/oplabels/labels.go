@@ -41,7 +41,7 @@ func AddOperatorAnnotations(m map[string]string, dc *api.CassandraDatacenter) {
 	}
 	if len(dc.Spec.AdditionalAnnotations) != 0 {
 		for key, value := range dc.Spec.AdditionalAnnotations {
-			m[key] = api.CleanLabelValue(value)
+			m[key] = value
 		}
 	}
 }

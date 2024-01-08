@@ -1675,7 +1675,7 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 	return nil
 }
 
-func mergeInTagsIfDifferent(existingLabels, newLabels map[string]string) (bool, map[string]string) {
+func mergeInLabelsIfDifferent(existingLabels, newLabels map[string]string) (bool, map[string]string) {
 	updatedLabels := utils.MergeMap(map[string]string{}, existingLabels, newLabels)
 	if reflect.DeepEqual(existingLabels, updatedLabels) {
 		return false, existingLabels
@@ -1689,7 +1689,7 @@ func mergeInTagsIfDifferent(existingLabels, newLabels map[string]string) (bool, 
 func shouldUpdateLabelsForClusterResource(resourceLabels map[string]string, dc *api.CassandraDatacenter) (bool, map[string]string) {
 	desired := dc.GetClusterLabels()
 	oplabels.AddOperatorLabels(desired, dc)
-	return mergeInTagsIfDifferent(resourceLabels, desired)
+	return mergeInLabelsIfDifferent(resourceLabels, desired)
 }
 
 // shouldUpdateLabelsForRackResource will compare the labels passed in with what the labels should be for a rack level
@@ -1697,7 +1697,7 @@ func shouldUpdateLabelsForClusterResource(resourceLabels map[string]string, dc *
 func shouldUpdateLabelsForRackResource(resourceLabels map[string]string, dc *api.CassandraDatacenter, rackName string) (bool, map[string]string) {
 	desired := dc.GetRackLabels(rackName)
 	oplabels.AddOperatorLabels(desired, dc)
-	return mergeInTagsIfDifferent(resourceLabels, desired)
+	return mergeInLabelsIfDifferent(resourceLabels, desired)
 }
 
 func (rc *ReconciliationContext) labelServerPodStarting(pod *corev1.Pod) error {

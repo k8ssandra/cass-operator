@@ -13,6 +13,9 @@ if [ "$#" -ne 1 ]; then
     exit
 fi
 
+# Includes here to get all the updates even if we swap to an older branch
+. scripts/lib.sh
+
 # This should work with BSD/MacOS mktemp and GNU one
 CRD_TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'crd')
 
@@ -36,12 +39,13 @@ done
 # Add Helm conditionals to the end and beginning of CRDs before applying them to the templates path
 echo "Updating CRDs in" $TEMPLATE_HOME
 CRD_FILE_NAME=$TEMPLATE_HOME/crds.yaml
-echo '{{- if .Values.updateCRDs }}' > $CRD_FILE_NAME
+echo '{{- if .Values.manageCrds }}' > $CRD_FILE_NAME
 
 declare -a files
 files=($CRD_TARGET_PATH/*)
 for i in ${!files[@]}; do
     echo "Processing " ${files[$i]}
+    yq -i '.metadata.annotations."helm.sh/resource-policy" = "keep"' ${files[$i]}
     cat ${files[$i]} >> $CRD_FILE_NAME
     if [[ $i -lt ${#files[@]}-1 ]]; then
         echo "---" >> $CRD_FILE_NAME
@@ -53,7 +57,6 @@ rm -fr $CRD_TMP_DIR
 
 # Update version of the Chart.yaml automatically (to next minor one)
 CURRENT_VERSION=$(yq '.version' $CHART_HOME/Chart.yaml)
-. scripts/lib.sh
 next_minor_version
 echo "Updating Chart.yaml version to next minor version" $NEXT_VERSION
 yq -i '.version = "'"$NEXT_VERSION"'"' $CHART_HOME/Chart.yaml
@@ -68,6 +71,6 @@ SYSTEM_LOGGER_IMAGE=$(yq '.images.system-logger' config/manager/image_config.yam
 K8SSANDRA_CLIENT_IMAGE=$(yq '.images.k8ssandra-client' config/manager/image_config.yaml)
 CONFIG_BUILDER_IMAGE=$(yq '.images.config-builder' config/manager/image_config.yaml)
 
-yq -i '.imageConfig.systemLogger = "cr.k8ssandra.io" + "/" + "'"$SYSTEM_LOGGER_IMAGE"'"' $CHART_HOME/values.yaml
-yq -i '.imageConfig.k8ssandraClient = "cr.k8ssandra.io" + "/" + "'"$K8SSANDRA_CLIENT_IMAGE"'"' $CHART_HOME/values.yaml
-yq -i '.imageConfig.configBuilder = "cr.dtsx.io" + "/" + "'"$CONFIG_BUILDER_IMAGE"'"' $CHART_HOME/values.yaml
+yq -i '.imageConfig.systemLogger = "'"$SYSTEM_LOGGER_IMAGE"'"' $CHART_HOME/values.yaml
+yq -i '.imageConfig.k8ssandraClient = "'"$K8SSANDRA_CLIENT_IMAGE"'"' $CHART_HOME/values.yaml
+yq -i '.imageConfig.configBuilder = "'"$CONFIG_BUILDER_IMAGE"'"' $CHART_HOME/values.yaml

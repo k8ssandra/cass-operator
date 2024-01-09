@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [FEATURE] [#601](https://github.com/k8ssandra/cass-operator/pull/601) Add additionalAnnotations field to CR so that all resources created by the operator can be annotated.
+
 ## v1.18.2
 
 * [BUGFIX] [#593](https://github.com/k8ssandra/cass-operator/issues/593) Update k8ssandra-client to 0.2.2 to fix the issue with clusterName config generation when using 4.1

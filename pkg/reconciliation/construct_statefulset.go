@@ -78,6 +78,9 @@ func newStatefulSetForCassandraDatacenter(
 
 	statefulSetSelectorLabels := dc.GetRackLabels(rackName)
 
+	anns := make(map[string]string)
+	oplabels.AddOperatorAnnotations(anns, dc)
+
 	var volumeClaimTemplates []corev1.PersistentVolumeClaim
 
 	rack := dc.GetRack(rackName)
@@ -90,8 +93,9 @@ func newStatefulSetForCassandraDatacenter(
 
 	volumeClaimTemplates = []corev1.PersistentVolumeClaim{{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: pvcLabels,
-			Name:   PvcName,
+			Labels:      pvcLabels,
+			Name:        PvcName,
+			Annotations: anns,
 		},
 		Spec: *dc.Spec.StorageConfig.CassandraDataVolumeClaimSpec,
 	}}
@@ -100,8 +104,9 @@ func newStatefulSetForCassandraDatacenter(
 		if storage.PVCSpec != nil {
 			pvc := corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   storage.Name,
-					Labels: pvcLabels,
+					Name:        storage.Name,
+					Labels:      pvcLabels,
+					Annotations: anns,
 				},
 				Spec: *storage.PVCSpec,
 			}
@@ -126,9 +131,10 @@ func newStatefulSetForCassandraDatacenter(
 
 	result := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      nsName.Name,
-			Namespace: nsName.Namespace,
-			Labels:    statefulSetLabels,
+			Name:        nsName.Name,
+			Namespace:   nsName.Namespace,
+			Labels:      statefulSetLabels,
+			Annotations: anns,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -141,7 +147,6 @@ func newStatefulSetForCassandraDatacenter(
 			VolumeClaimTemplates: volumeClaimTemplates,
 		},
 	}
-	result.Annotations = map[string]string{}
 
 	if sts != nil && sts.Spec.ServiceName != "" && sts.Spec.ServiceName != result.Spec.ServiceName {
 		result.Spec.ServiceName = sts.Spec.ServiceName

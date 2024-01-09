@@ -809,12 +809,10 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 
 	// Annotations
 
-	podAnnotations := map[string]string{}
-
 	if baseTemplate.Annotations == nil {
 		baseTemplate.Annotations = make(map[string]string)
 	}
-	baseTemplate.Annotations = utils.MergeMap(baseTemplate.Annotations, podAnnotations)
+	oplabels.AddOperatorAnnotations(baseTemplate.Annotations, dc)
 
 	// Affinity
 	nodeAffinityLabels, nodeAffinityLabelsConfigurationError := rackNodeAffinitylabels(dc, rack.Name)

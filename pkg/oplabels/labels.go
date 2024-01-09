@@ -32,6 +32,18 @@ func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
 			m[key] = api.CleanLabelValue(value)
 		}
 	}
+
+}
+
+func AddOperatorAnnotations(m map[string]string, dc *api.CassandraDatacenter) {
+	if m == nil {
+		m = make(map[string]string)
+	}
+	if len(dc.Spec.AdditionalAnnotations) != 0 {
+		for key, value := range dc.Spec.AdditionalAnnotations {
+			m[key] = value
+		}
+	}
 }
 
 func HasManagedByCassandraOperatorLabel(m map[string]string) bool {

@@ -28,6 +28,7 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 				AdditionalLabels: map[string]string{
 					"piclem": "add",
 				},
+				AdditionalAnnotations: map[string]string{"add": "annotation"},
 			},
 		}
 		secret, err := buildDefaultSuperuserSecret(dc)
@@ -57,6 +58,10 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 			oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 			oplabels.VersionLabel:   "",
 			"piclem":                "add",
+		}
+
+		if !reflect.DeepEqual(map[string]string{"add": "annotation"}, secret.Annotations) {
+			t.Errorf("annotations = \n %v \n, want \n %v", secret.Annotations, map[string]string{"add": "annotation"})
 		}
 
 		if !reflect.DeepEqual(expectedSecretLabels, secret.Labels) {

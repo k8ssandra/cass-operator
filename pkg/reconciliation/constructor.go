@@ -22,12 +22,15 @@ func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.
 	labels := dc.GetDatacenterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
 	selectorLabels := dc.GetDatacenterLabels()
+	anns := map[string]string{}
+	oplabels.AddOperatorAnnotations(anns, dc)
+
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        dc.SanitizedName() + "-pdb",
 			Namespace:   dc.Namespace,
 			Labels:      labels,
-			Annotations: map[string]string{},
+			Annotations: anns,
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{

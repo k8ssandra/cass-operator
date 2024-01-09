@@ -346,6 +346,13 @@ func (in *CassandraDatacenterSpec) DeepCopyInto(out *CassandraDatacenterSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.AdditionalAnnotations != nil {
+		in, out := &in.AdditionalAnnotations, &out.AdditionalAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.CDC != nil {
 		in, out := &in.CDC, &out.CDC
 		*out = new(CDCConfiguration)

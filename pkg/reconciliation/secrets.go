@@ -57,6 +57,8 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 	if dc.ShouldGenerateSuperuserSecret() {
 		labels := make(map[string]string)
 		oplabels.AddOperatorLabels(labels, dc)
+		anns := make(map[string]string)
+		oplabels.AddOperatorAnnotations(anns, dc)
 
 		secretNamespacedName := dc.GetSuperuserSecretNamespacedName()
 		secret = &corev1.Secret{
@@ -65,9 +67,10 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 				APIVersion: "v1",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretNamespacedName.Name,
-				Namespace: secretNamespacedName.Namespace,
-				Labels:    labels,
+				Name:        secretNamespacedName.Name,
+				Namespace:   secretNamespacedName.Namespace,
+				Labels:      labels,
+				Annotations: anns,
 			},
 		}
 		username := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-superuser"

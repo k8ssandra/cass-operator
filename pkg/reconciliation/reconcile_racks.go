@@ -440,6 +440,40 @@ func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
 				"Update rack labels for StatefulSet %s", statefulSet.Name)
 		}
+
+		stsAnns := statefulSet.GetAnnotations()
+		oplabels.AddOperatorAnnotations(stsAnns, rc.Datacenter)
+		if !reflect.DeepEqual(stsAnns, statefulSet.GetAnnotations()) {
+			rc.ReqLogger.Info("Updating annotations",
+				"statefulSet", statefulSet,
+				"current", stsAnns,
+				"desired", updatedLabels)
+			statefulSet.SetAnnotations(stsAnns)
+
+			if err := rc.Client.Patch(rc.Ctx, statefulSet, patch); err != nil {
+				return result.Error(err)
+			}
+
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
+				"Update rack annotations for StatefulSet %s", statefulSet.Name)
+		}
+
+		ptsAnns := statefulSet.Spec.Template.GetAnnotations()
+		oplabels.AddOperatorAnnotations(ptsAnns, rc.Datacenter)
+		if !reflect.DeepEqual(ptsAnns, statefulSet.GetAnnotations()) {
+			rc.ReqLogger.Info("Updating annotations",
+				"statefulSet", statefulSet,
+				"current", ptsAnns,
+				"desired", updatedLabels)
+			statefulSet.Spec.Template.SetAnnotations(ptsAnns)
+
+			if err := rc.Client.Patch(rc.Ctx, statefulSet, patch); err != nil {
+				return result.Error(err)
+			}
+
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
+				"Update pod template spec rack annotations for StatefulSet %s", statefulSet.Name)
+		}
 	}
 
 	return result.Continue()
@@ -1616,6 +1650,26 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
 				"Update rack labels for PersistentVolumeClaim %s", pvc.Name)
 		}
+		pvcAnns := pvc.GetAnnotations()
+		oplabels.AddOperatorAnnotations(pvcAnns, rc.Datacenter)
+		if !reflect.DeepEqual(pvcAnns, pvc.GetAnnotations()) {
+			rc.ReqLogger.Info("Updating annotations",
+				"PVC", pvc,
+				"current", pvc.GetAnnotations(),
+				"desired", pvcAnns)
+			pvc.SetAnnotations(pvcAnns)
+			pvcPatch := client.MergeFrom(pvc.DeepCopy())
+			if err := rc.Client.Patch(rc.Ctx, pvc, pvcPatch); err != nil {
+				rc.ReqLogger.Error(
+					err,
+					"Unable to update pvc with annotation",
+					"PVC", pvc,
+				)
+			}
+
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
+				"Update rack annotations for pvc %s", pvc.Name)
+		}
 	}
 
 	return nil
@@ -2125,12 +2179,15 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 func (rc *ReconciliationContext) createTask(command taskapi.CassandraCommand) error {
 	generatedName := fmt.Sprintf("%s-%d", command, time.Now().Unix())
 	dc := rc.Datacenter
+	anns := make(map[string]string)
 
+	oplabels.AddOperatorAnnotations(anns, dc)
 	task := &taskapi.CassandraTask{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      generatedName,
-			Namespace: rc.Datacenter.Namespace,
-			Labels:    dc.GetDatacenterLabels(),
+			Name:        generatedName,
+			Namespace:   rc.Datacenter.Namespace,
+			Labels:      dc.GetDatacenterLabels(),
+			Annotations: anns,
 		},
 		Spec: taskapi.CassandraTaskSpec{
 			Datacenter: corev1.ObjectReference{

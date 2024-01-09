@@ -70,6 +70,9 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 	}
 
 	service.Spec.Ports = ports
+	anns := make(map[string]string)
+	oplabels.AddOperatorAnnotations(anns, dc)
+	service.ObjectMeta.Annotations = anns
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.DatacenterService)
 
@@ -121,6 +124,10 @@ func newSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.S
 	oplabels.AddOperatorLabels(labels, dc)
 	service.ObjectMeta.Labels = labels
 
+	anns := dc.GetAnnotations()
+	oplabels.AddOperatorAnnotations(anns, dc)
+	service.ObjectMeta.Annotations = anns
+
 	service.Spec.Selector = buildLabelSelectorForSeedService(dc)
 	service.Spec.PublishNotReadyAddresses = true
 
@@ -136,10 +143,13 @@ func newSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.S
 func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	labels := dc.GetDatacenterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
+	anns := dc.GetAnnotations()
+	oplabels.AddOperatorAnnotations(anns, dc)
 	var service corev1.Service
 	service.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
 	service.ObjectMeta.Namespace = dc.Namespace
 	service.ObjectMeta.Labels = labels
+	service.ObjectMeta.Annotations = anns
 	// We omit the label selector because we will create the endpoints manually
 	service.Spec.Type = "ClusterIP"
 	service.Spec.ClusterIP = "None"
@@ -159,6 +169,9 @@ func newEndpointsForAdditionalSeeds(dc *api.CassandraDatacenter) (*corev1.Endpoi
 	endpoints.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
 	endpoints.ObjectMeta.Namespace = dc.Namespace
 	endpoints.ObjectMeta.Labels = labels
+	anns := dc.GetAnnotations()
+	oplabels.AddOperatorAnnotations(anns, dc)
+	endpoints.ObjectMeta.Annotations = anns
 
 	addresses := make([]corev1.EndpointAddress, 0, len(dc.Spec.AdditionalSeeds))
 	for _, additionalSeed := range dc.Spec.AdditionalSeeds {
@@ -290,5 +303,10 @@ func makeGenericHeadlessService(dc *api.CassandraDatacenter) *corev1.Service {
 	service.Spec.Selector = selector
 	service.Spec.Type = "ClusterIP"
 	service.Spec.ClusterIP = "None"
+
+	anns := make(map[string]string)
+	oplabels.AddOperatorAnnotations(anns, dc)
+	service.ObjectMeta.Annotations = anns
+
 	return &service
 }

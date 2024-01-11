@@ -457,23 +457,6 @@ func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
 				"Update rack annotations for StatefulSet %s", statefulSet.Name)
 		}
-
-		ptsAnns := statefulSet.Spec.Template.GetAnnotations()
-		oplabels.AddOperatorAnnotations(ptsAnns, rc.Datacenter)
-		if !reflect.DeepEqual(ptsAnns, statefulSet.GetAnnotations()) {
-			rc.ReqLogger.Info("Updating annotations",
-				"statefulSet", statefulSet,
-				"current", ptsAnns,
-				"desired", updatedLabels)
-			statefulSet.Spec.Template.SetAnnotations(ptsAnns)
-
-			if err := rc.Client.Patch(rc.Ctx, statefulSet, patch); err != nil {
-				return result.Error(err)
-			}
-
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledRackResource,
-				"Update pod template spec rack annotations for StatefulSet %s", statefulSet.Name)
-		}
 	}
 
 	return result.Continue()

@@ -20,7 +20,7 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 	t.Run("test default superuser secret is created", func(t *testing.T) {
 		dc := &api.CassandraDatacenter{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "exampleDC",
+				Name:      "exampledc",
 				Namespace: "examplens",
 			},
 			Spec: api.CassandraDatacenterSpec{
@@ -52,6 +52,8 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 		}
 
 		expectedSecretLabels := map[string]string{
+			api.ClusterLabel:        "exampleCluster",
+			api.DatacenterLabel:     "exampledc",
 			oplabels.InstanceLabel:  "cassandra-exampleCluster",
 			oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 			oplabels.NameLabel:      oplabels.NameLabelValue,

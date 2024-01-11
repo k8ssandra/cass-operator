@@ -21,6 +21,9 @@ const (
 )
 
 func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
+	if m == nil {
+		m = make(map[string]string)
+	}
 	m[ManagedByLabel] = ManagedByLabelValue
 	m[NameLabel] = NameLabelValue
 	m[VersionLabel] = dc.Spec.ServerVersion

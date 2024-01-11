@@ -70,9 +70,6 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 	}
 
 	service.Spec.Ports = ports
-	anns := make(map[string]string)
-	oplabels.AddOperatorAnnotations(anns, dc)
-	service.ObjectMeta.Annotations = anns
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.DatacenterService)
 
@@ -143,7 +140,7 @@ func newSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.S
 func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	labels := dc.GetDatacenterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
-	anns := dc.GetAnnotations()
+	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
 	var service corev1.Service
 	service.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
@@ -169,7 +166,7 @@ func newEndpointsForAdditionalSeeds(dc *api.CassandraDatacenter) (*corev1.Endpoi
 	endpoints.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
 	endpoints.ObjectMeta.Namespace = dc.Namespace
 	endpoints.ObjectMeta.Labels = labels
-	anns := dc.GetAnnotations()
+	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
 	endpoints.ObjectMeta.Annotations = anns
 

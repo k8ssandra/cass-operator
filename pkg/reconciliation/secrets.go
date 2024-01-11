@@ -55,11 +55,6 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 	var secret *corev1.Secret = nil
 
 	if dc.ShouldGenerateSuperuserSecret() {
-		labels := make(map[string]string)
-		oplabels.AddOperatorLabels(labels, dc)
-		anns := make(map[string]string)
-		oplabels.AddOperatorAnnotations(anns, dc)
-
 		secretNamespacedName := dc.GetSuperuserSecretNamespacedName()
 		secret = &corev1.Secret{
 			TypeMeta: metav1.TypeMeta{
@@ -69,10 +64,12 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        secretNamespacedName.Name,
 				Namespace:   secretNamespacedName.Namespace,
-				Labels:      labels,
-				Annotations: anns,
+				Labels:      dc.GetDatacenterLabels(),
+				Annotations: make(map[string]string),
 			},
 		}
+		oplabels.AddOperatorLabels(secret.Labels, dc)
+		oplabels.AddOperatorAnnotations(secret.Annotations, dc)
 		username := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-superuser"
 		password, err := generateUtf8Password()
 		if err != nil {
@@ -152,10 +149,16 @@ func (rc *ReconciliationContext) createInternodeCACredential() (*corev1.Secret, 
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      rc.keystoreCASecret().Name,
-			Namespace: rc.keystoreCASecret().Namespace,
+			Name:        rc.keystoreCASecret().Name,
+			Namespace:   rc.keystoreCASecret().Namespace,
+			Labels:      rc.Datacenter.GetDatacenterLabels(),
+			Annotations: make(map[string]string),
 		},
 	}
+
+	oplabels.AddOperatorLabels(secret.Labels, rc.Datacenter)
+	oplabels.AddOperatorAnnotations(secret.Annotations, rc.Datacenter)
+
 	if keypem, certpem, err := utils.GetNewCAandKey(fmt.Sprintf("%s-ca-keystore", rc.Datacenter.Name), rc.Datacenter.Namespace); err == nil {
 		secret.Data = map[string][]byte{
 			"key":  []byte(keypem),
@@ -168,29 +171,31 @@ func (rc *ReconciliationContext) createInternodeCACredential() (*corev1.Secret, 
 }
 
 func (rc *ReconciliationContext) createCABootstrappingSecret(jksBlob []byte) error {
-	_, err := rc.retrieveSecret(types.NamespacedName{
+	if _, err := rc.retrieveSecret(types.NamespacedName{
 		Name:      fmt.Sprintf("%s-keystore", rc.Datacenter.Name),
 		Namespace: rc.Datacenter.Namespace,
-	})
-
-	if err == nil { // This secret already exists, nothing to do
+	}); err == nil {
 		return nil
 	}
 
 	secret := &corev1.Secret{
-
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-keystore", rc.Datacenter.Name),
-			Namespace: rc.Datacenter.Namespace,
+			Name:        fmt.Sprintf("%s-keystore", rc.Datacenter.Name),
+			Namespace:   rc.Datacenter.Namespace,
+			Labels:      make(map[string]string),
+			Annotations: make(map[string]string),
 		},
 	}
 	secret.Data = map[string][]byte{
 		"node-keystore.jks": jksBlob,
 	}
+
+	oplabels.AddOperatorLabels(secret.Labels, rc.Datacenter)
+	oplabels.AddOperatorAnnotations(secret.Annotations, rc.Datacenter)
 
 	return rc.Client.Create(rc.Ctx, secret)
 }

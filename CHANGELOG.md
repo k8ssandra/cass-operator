@@ -13,6 +13,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [FEATURE] [#601](https://github.com/k8ssandra/cass-operator/pull/601) Add additionalAnnotations field to CR so that all resources created by the operator can be annotated.
 * [BUGFIX] [#607](https://github.com/k8ssandra/cass-operator/issues/607) Add missing additional labels and annotations to the superuserSecret.
+* [BUGFIX] [#612](https://github.com/k8ssandra/cass-operator/issues/612) Improve error message handling in the task jobs by retaining the message that previously failed pod has generated
 
 ## v1.18.2
 

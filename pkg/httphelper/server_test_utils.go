@@ -26,7 +26,7 @@ var featuresReply = `{
 
 var jobDetailsCompleted = `{"submit_time":"1638545895255","end_time":"1638545895255","id":"%s","type":"Cleanup","status":"COMPLETED"}`
 
-var jobDetailsFailed = `{"submit_time":"1638545895255","end_time":"1638545895255","id":"%s","type":"Cleanup","status":"ERROR"}`
+var jobDetailsFailed = `{"submit_time":"1638545895255","end_time":"1638545895255","id":"%s","type":"Cleanup","status":"ERROR","error":"any error"}`
 
 func mgmtApiListener() (net.Listener, error) {
 	mgmtApiListener, err := net.Listen("tcp", "127.0.0.1:8080")

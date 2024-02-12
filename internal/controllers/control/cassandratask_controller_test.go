@@ -473,7 +473,9 @@ var _ = Describe("CassandraTask controller tests", func() {
 					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
 					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
 
-					Expect(completedTask.Status.Failed).To(BeNumerically(">=", nodeCount))
+					Expect(completedTask.Status.Failed).To(BeNumerically("==", nodeCount))
+					Expect(completedTask.Status.Conditions[2].Type).To(Equal(string(api.JobFailed)))
+					Expect(completedTask.Status.Conditions[2].Message).To(Equal("any error"))
 				})
 				It("If retryPolicy is set, we should see a retry", func() {
 					By("Creating fake mgmt-api server")
@@ -492,12 +494,14 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 					completedTask := waitForTaskCompletion(taskKey)
 
-					// Due to retry, we have double the amount of calls
-					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(nodeCount * 2))
-					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount*2))
-					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount*2))
+					// Due to retry, we try twice and then bail out
+					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(2 * nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 2*nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 2*nodeCount))
 
-					Expect(completedTask.Status.Failed).To(BeNumerically(">=", nodeCount))
+					Expect(completedTask.Status.Failed).To(BeNumerically("==", nodeCount))
+					Expect(completedTask.Status.Conditions[2].Type).To(Equal(string(api.JobFailed)))
+					Expect(completedTask.Status.Conditions[2].Message).To(Equal("any error"))
 				})
 				It("Replace a node in the datacenter without specifying the pod", func() {
 					testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())

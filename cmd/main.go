@@ -80,6 +80,7 @@ func main() {
 	operConfig := configv1beta1.OperatorConfig{}
 	options := ctrl.Options{Scheme: scheme}
 	if configFile != "" {
+		//nolint:staticcheck
 		options, err = options.AndFrom(ctrl.ConfigFile().AtPath(configFile).OfKind(&operConfig))
 		if err != nil {
 			setupLog.Error(err, "unable to load the config file")

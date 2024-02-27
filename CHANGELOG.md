@@ -11,6 +11,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#618](https://github.com/k8ssandra/cass-operator/issues/618) Update dependencies to support controller-runtime 0.17.2, modify required parts.
+* [ENHANCEMENT] [#532](https://github.com/k8ssandra/cass-operator/issues/532) Instead of rejecting updates/creates with deprecated fields, return kubectl warnings.
+
 ## v1.19.0
 
 * [FEATURE] [#601](https://github.com/k8ssandra/cass-operator/pull/601) Add additionalAnnotations field to CR so that all resources created by the operator can be annotated.

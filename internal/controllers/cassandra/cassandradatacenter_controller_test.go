@@ -243,7 +243,7 @@ func createStubCassDc(dcName string, nodeCount int32) cassdcapi.CassandraDatacen
 				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 					StorageClassName: pointer.String("default"),
 					AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1Gi")},
 					},
 				},

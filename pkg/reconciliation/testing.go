@@ -68,7 +68,7 @@ func CreateMockReconciliationContext(
 		CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 			StorageClassName: &storageName,
 			AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
 			},
 		},

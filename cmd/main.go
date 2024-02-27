@@ -41,7 +41,6 @@ import (
 	controlcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/control"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
-	//+kubebuilder:scaffold:imports
 )
 
 var (
@@ -55,7 +54,6 @@ func init() {
 	utilruntime.Must(api.AddToScheme(scheme))
 	utilruntime.Must(configv1beta1.AddToScheme(scheme))
 	utilruntime.Must(controlv1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
@@ -97,15 +95,26 @@ func main() {
 		}
 	}
 
+	options.Cache = cache.Options{
+		DefaultNamespaces: map[string]cache.Config{},
+	}
+
 	// Add support for MultiNamespace set in WATCH_NAMESPACE (e.g ns1,ns2)
 	if strings.Contains(ns, ",") {
 		setupLog.Info("manager set up with multiple namespaces", "namespaces", ns)
 		// configure cluster-scoped with MultiNamespacedCacheBuilder
-		options.Namespace = ""
-		options.NewCache = cache.MultiNamespacedCacheBuilder(strings.Split(ns, ","))
+		namespaces := strings.Split(ns, ",")
+		for _, namespace := range namespaces {
+			options.Cache.DefaultNamespaces[namespace] = cache.Config{}
+		}
 	} else {
-		setupLog.Info("watch namespace configured", "namespace", ns)
-		options.Namespace = ns
+		if ns != "" {
+			setupLog.Info("watch namespace configured", "namespace", ns)
+			options.Cache.DefaultNamespaces[ns] = cache.Config{}
+		} else {
+			setupLog.Info("manager set up to watch and manage resources in all namespaces")
+			options.Cache.DefaultNamespaces[cache.AllNamespaces] = cache.Config{}
+		}
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
@@ -137,7 +146,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraTask")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

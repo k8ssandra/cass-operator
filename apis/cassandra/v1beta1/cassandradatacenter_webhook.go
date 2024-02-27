@@ -29,6 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 const (
@@ -62,6 +63,17 @@ func attemptedTo(action string, actionStrArgs ...interface{}) error {
 		msg = action
 	}
 	return fmt.Errorf("CassandraDatacenter write rejected, attempted to %s", msg)
+}
+
+func deprecatedWarning(field, instead, extra string) string {
+	warning := "CassandraDatacenter is using deprecated field '%s'"
+	if instead != "" {
+		warning += fmt.Sprintf(", use '%s' instead", instead)
+	}
+	if extra != "" {
+		warning += ". %s"
+	}
+	return warning
 }
 
 // ValidateSingleDatacenter checks that no values are improperly set on a CassandraDatacenter
@@ -219,18 +231,19 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 }
 
 // ValidateDeprecatedFieldUsage prevents adding fields that are deprecated
-func ValidateDeprecatedFieldUsage(dc CassandraDatacenter) error {
+func ValidateDeprecatedFieldUsage(dc CassandraDatacenter) admission.Warnings {
+	warnings := admission.Warnings{}
 	for _, rack := range dc.GetRacks() {
 		if rack.DeprecatedZone != "" {
-			return attemptedTo("use deprecated parameter Zone, use NodeAffinityLabels instead.")
+			warnings = append(warnings, deprecatedWarning("zone", "NodeAffinityLabels", ""))
 		}
 	}
 
 	if dc.Spec.DeprecatedDockerImageRunsAsCassandra != nil && !(*dc.Spec.DeprecatedDockerImageRunsAsCassandra) {
-		return attemptedTo("use removed field dockerImageRunsAsCassandra, use SecurityContext instead")
+		warnings = append(warnings, deprecatedWarning("dockerImageRunsAsCassandra", "SecurityContext", ""))
 	}
 
-	return nil
+	return warnings
 }
 
 func ValidateAdditionalVolumes(dc CassandraDatacenter) error {
@@ -251,31 +264,35 @@ func ValidateAdditionalVolumes(dc CassandraDatacenter) error {
 // +kubebuilder:webhook:path=/validate-cassandradatacenter,mutating=false,failurePolicy=ignore,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=validate-cassandradatacenter-webhook
 var _ webhook.Validator = &CassandraDatacenter{}
 
-func (dc *CassandraDatacenter) ValidateCreate() error {
+func (dc *CassandraDatacenter) ValidateCreate() (admission.Warnings, error) {
 	log.Info("Validating webhook called for create")
 	if err := ValidateSingleDatacenter(*dc); err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
-	return ValidateDeprecatedFieldUsage(*dc)
+	return ValidateDeprecatedFieldUsage(*dc), nil
 }
 
-func (dc *CassandraDatacenter) ValidateUpdate(old runtime.Object) error {
+func (dc *CassandraDatacenter) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	log.Info("Validating webhook called for update")
 	oldDc, ok := old.(*CassandraDatacenter)
 	if !ok {
-		return errors.New("old object in ValidateUpdate cannot be cast to CassandraDatacenter")
+		return nil, errors.New("old object in ValidateUpdate cannot be cast to CassandraDatacenter")
 	}
 
 	if err := ValidateSingleDatacenter(*dc); err != nil {
-		return err
+		return nil, err
 	}
 
-	return ValidateDatacenterFieldChanges(*oldDc, *dc)
+	if err := ValidateDatacenterFieldChanges(*oldDc, *dc); err != nil {
+		return nil, err
+	}
+
+	return ValidateDeprecatedFieldUsage(*dc), nil
 }
 
-func (dc *CassandraDatacenter) ValidateDelete() error {
-	return nil
+func (dc *CassandraDatacenter) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
 var (

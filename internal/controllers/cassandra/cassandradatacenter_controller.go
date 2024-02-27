@@ -41,7 +41,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
@@ -185,7 +184,7 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		Owns(&policyv1.PodDisruptionBudget{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
 		Owns(&corev1.Service{}, builder.WithPredicates(managedByCassandraOperatorPredicate))
 
-	configSecretMapFn := func(mapObj client.Object) []reconcile.Request {
+	configSecretMapFn := func(ctx context.Context, mapObj client.Object) []reconcile.Request {
 		requests := make([]reconcile.Request, 0)
 		secret := mapObj.(*corev1.Secret)
 		if v, ok := secret.Annotations[api.DatacenterAnnotation]; ok {
@@ -223,15 +222,14 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		},
 	}
 
-	c = c.Watches(&source.Kind{Type: &corev1.Secret{}}, handler.EnqueueRequestsFromMapFunc(configSecretMapFn), builder.WithPredicates(configSecretPredicate))
+	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(configSecretMapFn), builder.WithPredicates(configSecretPredicate))
 
 	// Setup watches for Secrets. These secrets are often not owned by or created by
 	// the operator, so we must create a mapping back to the appropriate datacenters.
 
 	r.SecretWatches = dynamicwatch.NewDynamicSecretWatches(r.Client)
 	dynamicSecretWatches := r.SecretWatches
-
-	toRequests := func(a client.Object) []reconcile.Request {
+	toRequests := func(ctx context.Context, a client.Object) []reconcile.Request {
 		watchers := dynamicSecretWatches.FindWatchers(a)
 		requests := []reconcile.Request{}
 		for _, watcher := range watchers {
@@ -240,10 +238,14 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		return requests
 	}
 
-	c = c.Watches(
-		&source.Kind{Type: &corev1.Secret{}},
-		handler.EnqueueRequestsFromMapFunc(toRequests),
-	)
+	/*
+		// Watch ReplicaSets and enqueue ReplicaSet object key
+		if err := c.Watch(source.Kind(mgr.GetCache(), &appsv1.ReplicaSet{}), &handler.EnqueueRequestForObject{}); err != nil {
+			entryLog.Error(err, "unable to watch ReplicaSets")
+			os.Exit(1)
+		}	*/
+
+	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(toRequests))
 
 	return c.Complete(r)
 }

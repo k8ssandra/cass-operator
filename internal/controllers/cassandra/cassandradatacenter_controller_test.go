@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer" //nolint:staticcheck
+	"k8s.io/utils/ptr" //nolint:staticcheck
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -74,7 +74,7 @@ var _ = Describe("CassandraDatacenter tests", func() {
 						Name: testNamespaceName,
 					},
 				}
-				Expect(k8sClient.Create(context.Background(), testNamespace)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, testNamespace)).Should(Succeed())
 			})
 
 			AfterEach(func() {
@@ -83,7 +83,7 @@ var _ = Describe("CassandraDatacenter tests", func() {
 						Name: testNamespaceName,
 					},
 				}
-				Expect(k8sClient.Delete(context.TODO(), testNamespaceDel)).To(Succeed())
+				Expect(k8sClient.Delete(ctx, testNamespaceDel)).To(Succeed())
 			})
 			When("There is a single rack and a single node", func() {
 				It("should end up in a Ready state", func(ctx SpecContext) {
@@ -237,11 +237,11 @@ func createStubCassDc(dcName string, nodeCount int32) cassdcapi.CassandraDatacen
 			},
 			ClusterName:   clusterName(),
 			ServerType:    "cassandra",
-			ServerVersion: "4.0.7",
+			ServerVersion: "4.1.4",
 			Size:          nodeCount,
 			StorageConfig: cassdcapi.StorageConfig{
 				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-					StorageClassName: pointer.String("default"),
+					StorageClassName: ptr.To[string]("default"),
 					AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
 					Resources: corev1.VolumeResourceRequirements{
 						Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1Gi")},

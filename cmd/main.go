@@ -108,14 +108,9 @@ func main() {
 		for _, namespace := range namespaces {
 			options.Cache.DefaultNamespaces[namespace] = cache.Config{}
 		}
-	} else {
-		if ns != "" {
-			setupLog.Info("watch namespace configured", "namespace", ns)
-			options.Cache.DefaultNamespaces[ns] = cache.Config{}
-		} else {
-			setupLog.Info("manager set up to watch and manage resources in all namespaces")
-			options.Cache.DefaultNamespaces[cache.AllNamespaces] = cache.Config{}
-		}
+	} else if ns != "" {
+		setupLog.Info("watch namespace configured", "namespace", ns)
+		options.Cache.DefaultNamespaces[ns] = cache.Config{}
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)

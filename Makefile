@@ -259,7 +259,7 @@ kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong ver
 $(KUSTOMIZE): $(LOCALBIN)
 ifeq ($(GITHUB_ACTIONS), true)
 	@echo "Running in GitHub Actions, using the kustomize version provided by the runner."
-	ln -s $(shell which kustomize) $(LOCALBIN)/kustomize
+	test -e $(LOCALBIN)/kustomize || ln -s $(shell which kustomize) $(LOCALBIN)/kustomize
 else
 	@if test -x $(LOCALBIN)/kustomize && ! $(LOCALBIN)/kustomize version | grep -q $(KUSTOMIZE_VERSION); then \
 		echo "$(LOCALBIN)/kustomize version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \

@@ -222,6 +222,7 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 				} else {
 					partition = int32(rc.desiredRackInformation[idx].NodeCount) - dc.Spec.CanaryUpgradeCount
 				}
+
 				strategy := appsv1.StatefulSetUpdateStrategy{
 					Type: appsv1.RollingUpdateStatefulSetStrategyType,
 					RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
@@ -262,8 +263,7 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			)
 
 			statefulSet.SetResourceVersion(resVersion)
-			err = rc.Client.Update(rc.Ctx, statefulSet)
-			if err != nil {
+			if err := rc.Client.Update(rc.Ctx, statefulSet); err != nil {
 				if errors.IsInvalid(err) {
 					if err = rc.deleteStatefulSet(statefulSet); err != nil {
 						return result.Error(err)

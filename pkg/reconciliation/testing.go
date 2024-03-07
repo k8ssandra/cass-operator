@@ -68,7 +68,7 @@ func CreateMockReconciliationContext(
 		CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 			StorageClassName: &storageName,
 			AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
 			},
 		},
@@ -98,7 +98,7 @@ func CreateMockReconciliationContext(
 	s := scheme.Scheme
 	s.AddKnownTypes(api.GroupVersion, cassandraDatacenter)
 
-	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithStatusSubresource(cassandraDatacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	request := &reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -146,7 +146,7 @@ func fakeClientWithService(cassandraDatacenter *api.CassandraDatacenter) (*clien
 		service,
 	}
 
-	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithStatusSubresource(cassandraDatacenter, service).WithRuntimeObjects(trackObjects...).Build()
 
 	return &fakeClient, service
 }

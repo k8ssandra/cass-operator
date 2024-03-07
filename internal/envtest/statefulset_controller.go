@@ -251,7 +251,7 @@ func createPVC(ctx context.Context, cli client.Client, mountName string, pod *co
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
 			},
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					// TODO Hardcoded not real value
 					corev1.ResourceStorage: resource.MustParse("1Gi"),

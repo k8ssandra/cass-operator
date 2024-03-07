@@ -67,7 +67,7 @@ IMG ?= $(IMAGE_TAG_BASE):v$(VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:generateEmbeddedObjectMeta=true"
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.27.x
+ENVTEST_K8S_VERSION = 1.28.x
 
 # Logger image
 LOG_IMG_BASE ?= $(ORG)/system-logger
@@ -239,12 +239,12 @@ HELM ?= $(LOCALBIN)/helm
 OPM ?= $(LOCALBIN)/opm
 
 ## Tool Versions
-CERT_MANAGER_VERSION ?= v1.12.2
-KUSTOMIZE_VERSION ?= v5.0.3
-CONTROLLER_TOOLS_VERSION ?= v0.12.0
-OPERATOR_SDK_VERSION ?= 1.29.0
-HELM_VERSION ?= 3.12.0
-OPM_VERSION ?= 1.26.5
+CERT_MANAGER_VERSION ?= v1.14.3
+KUSTOMIZE_VERSION ?= v5.3.0
+CONTROLLER_TOOLS_VERSION ?= v0.14.0
+OPERATOR_SDK_VERSION ?= 1.34.0
+HELM_VERSION ?= 3.14.2
+OPM_VERSION ?= 1.36.0
 GOLINT_VERSION ?= 1.55.2
 
 .PHONY: cert-manager
@@ -257,11 +257,16 @@ KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/k
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
 $(KUSTOMIZE): $(LOCALBIN)
+ifeq ($(GITHUB_ACTIONS), true)
+	@echo "Running in GitHub Actions, using the kustomize version provided by the runner."
+	test -e $(LOCALBIN)/kustomize || ln -s $(shell which kustomize) $(LOCALBIN)/kustomize
+else
 	@if test -x $(LOCALBIN)/kustomize && ! $(LOCALBIN)/kustomize version | grep -q $(KUSTOMIZE_VERSION); then \
 		echo "$(LOCALBIN)/kustomize version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/kustomize; \
 	fi
 	test -s $(LOCALBIN)/kustomize || { curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }
+endif
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.

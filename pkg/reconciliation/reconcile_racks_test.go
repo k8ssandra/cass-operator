@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/pointer" //nolint:staticcheck
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
@@ -227,7 +227,7 @@ func TestReconcileRacks_ReconcilePods(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = "default"
@@ -288,67 +288,66 @@ func TestCheckRackPodTemplate_SetControllerRefOnStatefulSet(t *testing.T) {
 	assert.Equal(t, rc.statefulSets[0].Name, actualObject.GetName())
 }
 
-// Disabled due to a bug in the controller-runtime: https://github.com/kubernetes-sigs/controller-runtime/issues/1832
-// func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
-// 	rc, _, cleanpMockSrc := setupTest()
-// 	defer cleanpMockSrc()
+func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
+	rc, _, cleanpMockSrc := setupTest()
+	defer cleanpMockSrc()
 
-// 	rc.Datacenter.Spec.ServerVersion = "6.8.2"
-// 	rc.Datacenter.Spec.Racks = []api.Rack{
-// 		{Name: "rack1", Zone: "zone-1"},
-// 	}
+	rc.Datacenter.Spec.ServerVersion = "6.8.2"
+	rc.Datacenter.Spec.Racks = []api.Rack{
+		{Name: "rack1", DeprecatedZone: "zone-1"},
+	}
 
-// 	if err := rc.CalculateRackInformation(); err != nil {
-// 		t.Fatalf("failed to calculate rack information: %s", err)
-// 	}
+	if err := rc.CalculateRackInformation(); err != nil {
+		t.Fatalf("failed to calculate rack information: %s", err)
+	}
 
-// 	result := rc.CheckRackCreation()
-// 	assert.False(t, result.Completed(), "CheckRackCreation did not complete as expected")
+	result := rc.CheckRackCreation()
+	assert.False(t, result.Completed(), "CheckRackCreation did not complete as expected")
 
-// 	if err := rc.Client.Update(rc.Ctx, rc.Datacenter); err != nil {
-// 		t.Fatalf("failed to add rack to cassandradatacenter: %s", err)
-// 	}
+	if err := rc.Client.Update(rc.Ctx, rc.Datacenter); err != nil {
+		t.Fatalf("failed to add rack to cassandradatacenter: %s", err)
+	}
 
-// 	result = rc.CheckRackPodTemplate()
-// 	_, err := result.Output()
+	result = rc.CheckRackPodTemplate()
+	_, err := result.Output()
 
-// 	assert.True(t, result.Completed())
-// 	assert.Nil(t, err)
-// 	previousLabels := rc.statefulSets[0].Spec.Template.Labels
+	assert.True(t, result.Completed())
+	assert.Nil(t, err)
+	previousLabels := rc.statefulSets[0].Spec.Template.Labels
 
-// 	rc.Datacenter.Spec.CanaryUpgrade = true
-// 	rc.Datacenter.Spec.CanaryUpgradeCount = 1
-// 	rc.Datacenter.Spec.ServerVersion = "6.8.3"
+	rc.Datacenter.Spec.CanaryUpgrade = true
+	rc.Datacenter.Spec.CanaryUpgradeCount = 1
+	rc.Datacenter.Spec.ServerVersion = "6.8.3"
+	partition := rc.Datacenter.Spec.CanaryUpgradeCount
 
-// 	result = rc.CheckRackPodTemplate()
-// 	_, err = result.Output()
+	result = rc.CheckRackPodTemplate()
+	_, err = result.Output()
 
-// 	assert.True(t, result.Completed())
-// 	assert.Nil(t, err)
+	assert.True(t, result.Completed())
+	assert.Nil(t, err)
 
-// 	assert.Equal(t, rc.Datacenter.Status.CassandraOperatorProgress, api.ProgressUpdating)
+	assert.Equal(t, rc.Datacenter.Status.CassandraOperatorProgress, api.ProgressUpdating)
 
-// 	partition := &rc.Datacenter.Spec.CanaryUpgradeCount
-// 	expectedStrategy := appsv1.StatefulSetUpdateStrategy{
-// 		Type: appsv1.RollingUpdateStatefulSetStrategyType,
-// 		RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-// 			Partition: partition,
-// 		},
-// 	}
+	expectedStrategy := appsv1.StatefulSetUpdateStrategy{
+		Type: appsv1.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+			Partition: &partition,
+		},
+	}
 
-// 	assert.Equal(t, expectedStrategy, rc.statefulSets[0].Spec.UpdateStrategy)
+	assert.Equal(t, expectedStrategy, rc.statefulSets[0].Spec.UpdateStrategy)
 
-// 	rc.statefulSets[0].Status.Replicas = 2
-// 	rc.statefulSets[0].Status.ReadyReplicas = 2
-// 	rc.statefulSets[0].Status.CurrentReplicas = 1
-// 	rc.statefulSets[0].Status.UpdatedReplicas = 1
+	rc.statefulSets[0].Status.Replicas = 2
+	rc.statefulSets[0].Status.ReadyReplicas = 2
+	rc.statefulSets[0].Status.CurrentReplicas = 1
+	rc.statefulSets[0].Status.UpdatedReplicas = 1
 
-// 	result = rc.CheckRackPodTemplate()
+	result = rc.CheckRackPodTemplate()
 
-// 	assert.EqualValues(t, previousLabels, rc.statefulSets[0].Spec.Template.Labels)
+	assert.EqualValues(t, previousLabels, rc.statefulSets[0].Spec.Template.Labels)
 
-// 	assert.True(t, result.Completed())
-// }
+	assert.True(t, result.Completed())
+}
 
 func TestReconcilePods(t *testing.T) {
 	t.Skip()
@@ -448,7 +447,7 @@ func TestReconcilePods_WithVolumes(t *testing.T) {
 		pvc,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(pod, pvc).WithRuntimeObjects(trackObjects...).Build()
 	err = rc.ReconcilePods(statefulSet)
 	assert.NoErrorf(t, err, "Should not have returned an error")
 }
@@ -580,7 +579,7 @@ func TestReconcileRacks(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(desiredStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -652,7 +651,7 @@ func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(desiredStatefulSet).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -688,7 +687,7 @@ func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
 		preExistingStatefulSet,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(preExistingStatefulSet).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -729,7 +728,7 @@ func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(preExistingStatefulSet).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -765,7 +764,7 @@ func TestReconcileRacks_NeedToPark(t *testing.T) {
 		rc.Datacenter,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(preExistingStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -815,7 +814,7 @@ func TestReconcileRacks_AlreadyReconciled(t *testing.T) {
 		desiredPdb,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(desiredStatefulSet, rc.Datacenter, desiredPdb).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -888,7 +887,7 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 		rc.Datacenter,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(desiredStatefulSet, secondDesiredStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -958,7 +957,7 @@ func TestReconcileRacks_UpdateRackNodeCount(t *testing.T) {
 				rc.Datacenter,
 			}
 
-			rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+			rc.Client = fake.NewClientBuilder().WithStatusSubresource(tt.args.statefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 			if err := rc.UpdateRackNodeCount(tt.args.statefulSet, tt.args.newNodeCount); (err != nil) != tt.wantErr {
 				t.Errorf("updateRackNodeCount() error = %v, wantErr %v", err, tt.wantErr)
@@ -999,7 +998,7 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(desiredStatefulSet, rc.Datacenter, desiredPdb).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 

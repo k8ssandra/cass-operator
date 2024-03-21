@@ -409,7 +409,7 @@ func (ns *NsWrapper) WaitForDatacenterReadyPodCountWithTimeout(dcName string, co
 	step := "waiting for the node to become ready"
 	json := "jsonpath={.items[*].status.containerStatuses[0].ready}"
 	k := kubectl.Get("pods").
-		WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dcName))).
+		WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanLabelValue(dcName))).
 		WithFlag("field-selector", "status.phase=Running").
 		FormatOutput(json)
 	ns.WaitForOutputAndLog(step, k, duplicate("true", count), timeout)
@@ -516,7 +516,7 @@ func (ns *NsWrapper) GetDatacenterPodNames(dcName string) []string {
 func (ns *NsWrapper) GetDatacenterReadyPodNames(dcName string) []string {
 	json := "jsonpath={.items[?(@.status.containerStatuses[0].ready==true)].metadata.name}"
 	k := kubectl.Get("pods").
-		WithFlag("selector", fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dcName))).
+		WithFlag("selector", fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanLabelValue(dcName))).
 		FormatOutput(json)
 
 	output := ns.OutputPanic(k)

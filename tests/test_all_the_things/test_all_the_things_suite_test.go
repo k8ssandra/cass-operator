@@ -28,7 +28,7 @@ var (
 	dcNameOverride = "My_Super_Dc"
 	dcYaml         = "../testdata/default-two-rack-two-node-dc.yaml"
 	dcResource     = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dcNameOverride))
+	dcLabel        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanLabelValue(dcNameOverride))
 	ns             = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -89,7 +89,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterConditionWithTimeout(dcName, "ScalingUp", string(corev1.ConditionFalse), 1200)
 			// Ensure that when 'ScaleUp' becomes 'false' that our pods are in fact up and running
-			Expect(len(ns.GetDatacenterReadyPodNames(api.CleanupForKubernetes(dcNameOverride)))).To(Equal(4))
+			Expect(len(ns.GetDatacenterReadyPodNames(api.CleanLabelValue(dcNameOverride)))).To(Equal(4))
 
 			ns.ExpectDoneReconciling(dcName)
 			ns.WaitForDatacenterReady(dcName)
@@ -114,7 +114,7 @@ var _ = Describe(testName, func() {
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "4", 20)
 
-			ns.WaitForDatacenterToHaveNoPods(api.CleanupForKubernetes(dcNameOverride))
+			ns.WaitForDatacenterToHaveNoPods(api.CleanLabelValue(dcNameOverride))
 
 			step = "resume the dc"
 			json = "{\"spec\": {\"stopped\": false}}"
@@ -133,7 +133,7 @@ var _ = Describe(testName, func() {
 			wg.Add(1)
 			go func() {
 				k = kubectl.Logs("-f").
-					WithLabel(fmt.Sprintf("statefulset.kubernetes.io/pod-name=cluster1-%s-r1-sts-0", api.CleanupForKubernetes(dcNameOverride))).
+					WithLabel(fmt.Sprintf("statefulset.kubernetes.io/pod-name=cluster1-%s-r1-sts-0", api.CleanLabelValue(dcNameOverride))).
 					WithFlag("container", "cassandra")
 				output, err := ns.Output(k)
 				Expect(err).ToNot(HaveOccurred())
@@ -148,7 +148,7 @@ var _ = Describe(testName, func() {
 
 			found, err := regexp.MatchString("node/drain status=200 OK", logOutput)
 			if err == nil && !found {
-				ns.Log(fmt.Sprintf("logOutput, pod: statefulset.kubernetes.io/pod-name=cluster1-%s-r1-sts-0 => %s", api.CleanupForKubernetes(dcNameOverride), logOutput))
+				ns.Log(fmt.Sprintf("logOutput, pod: statefulset.kubernetes.io/pod-name=cluster1-%s-r1-sts-0 => %s", api.CleanLabelValue(dcNameOverride), logOutput))
 			}
 			if err != nil {
 				ns.Log(fmt.Sprintf("Regexp parsing failed: %v", err))

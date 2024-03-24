@@ -133,7 +133,7 @@ var _ = Describe(testName, func() {
 			wg.Add(1)
 			go func() {
 				k = kubectl.Logs("-f").
-					WithLabel(fmt.Sprintf("statefulset.kubernetes.io/pod-name=cluster1-%s-r1-sts-0", api.CleanLabelValue(dcNameOverride))).
+					WithLabel(fmt.Sprintf("statefulset.kubernetes.io/pod-name=cluster1-%s-r1-sts-0", api.CleanupForKubernetes(dcNameOverride))).
 					WithFlag("container", "cassandra")
 				output, err := ns.Output(k)
 				Expect(err).ToNot(HaveOccurred())

@@ -49,20 +49,16 @@ runs:
         path: /tmp
     - name: Load Docker images
       shell: bash
+      id: load
       run: |
-        docker load --input /tmp/k8ssandra-cass-operator.tar
-        docker load --input /tmp/k8ssandra-system-logger.tar
-    - name: Set version value
-      id: vars
-      shell: bash
-      run: |
-        echo "version=$(make version)" >> $GITHUB_OUTPUT
+        echo "operator_img=$(docker load --input /tmp/k8ssandra-cass-operator.tar | cut -f 3 -d' ')" >> $GITHUB_OUTPUT
+        echo "logger_img=$(docker load --input /tmp/k8ssandra-system-logger.tar | cut -f 3 -d' ')" >> $GITHUB_OUTPUT
     - name: Load image on the nodes of the cluster
       shell: bash
       run: |
-        kind load docker-image --name=kind k8ssandra/cass-operator:v${{ steps.vars.outputs.version }}
-        kind load docker-image --name=kind k8ssandra/system-logger:v${{ steps.vars.outputs.version }}
+        kind load docker-image --name=kind ${{ steps.load.outputs.operator_img }}
+        kind load docker-image --name=kind ${{ steps.load.outputs.logger_img }}
     - name: Run integration test ( ${{ inputs.integration_test }} )
       shell: bash
       run: |
-        IMG=k8ssandra/cass-operator:v${{ steps.vars.outputs.version }} LOG_IMG=k8ssandra/system-logger:v${{ steps.vars.outputs.version }} make integ-test
+        IMG=${{ steps.load.outputs.operator_img }} LOG_IMG=${{ steps.load.outputs.logger_img }} make integ-test

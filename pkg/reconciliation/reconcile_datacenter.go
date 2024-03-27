@@ -144,7 +144,7 @@ func (rc *ReconciliationContext) listPVCs() (*corev1.PersistentVolumeClaimList, 
 	rc.ReqLogger.Info("reconciler::listPVCs")
 
 	selector := map[string]string{
-		api.DatacenterLabel: rc.Datacenter.Name,
+		api.DatacenterLabel: api.CleanLabelValue(rc.Datacenter.DatacenterName()),
 	}
 
 	listOptions := &client.ListOptions{

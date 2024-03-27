@@ -234,7 +234,7 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
-OPSDK ?= $(LOCALBIN)/operator-sdk
+OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
 HELM ?= $(LOCALBIN)/helm
 OPM ?= $(LOCALBIN)/opm
 
@@ -242,7 +242,7 @@ OPM ?= $(LOCALBIN)/opm
 CERT_MANAGER_VERSION ?= v1.14.3
 KUSTOMIZE_VERSION ?= v5.3.0
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
-OPERATOR_SDK_VERSION ?= 1.34.0
+OPERATOR_SDK_VERSION ?= 1.34.1
 HELM_VERSION ?= 3.14.2
 OPM_VERSION ?= 1.36.0
 GOLINT_VERSION ?= 1.55.2
@@ -282,8 +282,8 @@ $(ENVTEST): $(LOCALBIN)
 OS=$(shell go env GOOS)
 ARCH=$(shell go env GOARCH)
 
-.PHONY: helm
 HELMTARNAME = helm-v$(HELM_VERSION)-${OS}-${ARCH}.tar.gz
+.PHONY: helm
 helm: ## Download helm locally if necessary.
 ifeq (,$(wildcard $(HELM)))
 ifeq (,$(shell which helm 2>/dev/null))
@@ -302,27 +302,28 @@ endif
 endif
 
 .PHONY: operator-sdk
-operator-sdk: ## Download operator-sdk locally if necessary
-ifeq (,$(wildcard $(OPSDK)))
-ifeq (,$(shell which operator-sdk 2>/dev/null))
+operator-sdk: ## Download operator-sdk locally if necessary.
+ifeq (,$(wildcard $(OPERATOR_SDK)))
+ifeq (, $(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
-	# mkdir -p $(dir $(OPSDK)) ;\
-	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/v$(OPERATOR_SDK_VERSION)/operator-sdk_${OS}_${ARCH} ;\
-	chmod +x $(OPSDK) ;\
+	mkdir -p $(dir $(OPERATOR_SDK)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/v$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
+	chmod +x $(OPERATOR_SDK) ;\
 	}
 else
-OPSDK = $(shell which operator-sdk)
+OPERATOR_SDK = $(shell which operator-sdk)
 endif
 endif
 
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPSDK) generate kustomize manifests -q
+	$(OPERATOR_SDK) generate kustomize manifests --interactive=false -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/manifests | $(OPSDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(BUNDLE_GEN_FLAGS)
 	scripts/postprocess-bundle.sh $(REGISTRY)
-	$(OPSDK) bundle validate ./bundle --select-optional suite=operatorframework
+	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.

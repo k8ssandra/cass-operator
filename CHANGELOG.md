@@ -14,6 +14,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#618](https://github.com/k8ssandra/cass-operator/issues/618) Update dependencies to support controller-runtime 0.17.2, modify required parts.
 * [ENHANCEMENT] [#532](https://github.com/k8ssandra/cass-operator/issues/532) Instead of rejecting updates/creates with deprecated fields, return kubectl warnings.
 * [BUGFIX] [#622](https://github.com/k8ssandra/cass-operator/issues/622) Fix sanitization of DC label
+* [BUGFIX] [#626](https://github.com/k8ssandra/cass-operator/issues/626) If multiple datacenters are present in the same namespace, the seed-service ownership is constantly updated between these two resources
 
 ## v1.19.0
 

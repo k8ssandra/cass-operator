@@ -24,7 +24,7 @@ var (
 	dc2Name         = "dc2"
 	dc1Yaml         = "../testdata/default-two-rack-two-node-dc.yaml"
 	dc2Yaml         = "../testdata/default-two-rack-two-node-dc2.yaml"
-	dc1Label        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanupForKubernetes(dc1OverrideName))
+	dc1Label        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanLabelValue(dc1OverrideName))
 	dc2Label        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dc2Name)
 	seedLabel       = "cassandra.datastax.com/seed-node=true"
 	taskYaml        = "../testdata/tasks/rebuild_task.yaml"

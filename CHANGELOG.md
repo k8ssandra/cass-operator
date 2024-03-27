@@ -9,6 +9,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [BUGFIX] [#622](https://github.com/k8ssandra/cass-operator/issues/622) Fix sanitization of DC label
+
 ## v1.19.0
 
 * [FEATURE] [#601](https://github.com/k8ssandra/cass-operator/pull/601) Add additionalAnnotations field to CR so that all resources created by the operator can be annotated.

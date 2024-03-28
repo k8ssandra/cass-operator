@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [BUGFIX] [#622](https://github.com/k8ssandra/cass-operator/issues/622) Fix sanitization of DC label
+* [BUGFIX] [#626](https://github.com/k8ssandra/cass-operator/issues/626) If multiple datacenters are present in the same namespace, the seed-service ownership is constantly updated between these two resources
 
 ## v1.19.0
 

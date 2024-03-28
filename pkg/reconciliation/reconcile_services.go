@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
@@ -72,9 +73,7 @@ func (rc *ReconciliationContext) CheckHeadlessServices() result.ReconcileResult 
 	for idx := range services {
 		desiredSvc := services[idx]
 
-		// Set CassandraDatacenter dc as the owner and controller
-		err := setControllerReference(dc, desiredSvc, rc.Scheme)
-		if err != nil {
+		if err := setControllerReference(dc, desiredSvc, rc.Scheme); err != nil {
 			logger.Error(err, "Could not set controller reference for headless service")
 			return result.Error(err)
 		}
@@ -82,20 +81,22 @@ func (rc *ReconciliationContext) CheckHeadlessServices() result.ReconcileResult 
 		// See if the service already exists
 		nsName := types.NamespacedName{Name: desiredSvc.Name, Namespace: desiredSvc.Namespace}
 		currentService := &corev1.Service{}
-		err = client.Get(rc.Ctx, nsName, currentService)
-
-		if err != nil && errors.IsNotFound(err) {
+		if err := client.Get(rc.Ctx, nsName, currentService); err != nil && errors.IsNotFound(err) {
 			// if it's not found, put the service in the slice to be created when Apply is called
 			createNeeded = append(createNeeded, desiredSvc)
-
 		} else if err != nil {
 			// if we hit a k8s error, log it and error out
 			logger.Error(err, "Could not get headless seed service",
 				"name", nsName,
 			)
 			return result.Error(err)
-
 		} else {
+			if controllerutil.HasControllerReference(currentService) && currentService.GetOwnerReferences()[0].Kind == "CassandraDatacenter" && currentService.GetOwnerReferences()[0].Name != dc.GetName() {
+				// Some other CassandraDatacenter owns this service, so we should ignore it
+				logger.Info("Service is owned by another CassandraDatacenter, not updating it as part of this reconcile", "service", currentService, "datacenter", currentService.GetOwnerReferences()[0].Name)
+				continue
+			}
+
 			// if we found the service already, check if they need updating
 			if !utils.ResourcesHaveSameHash(currentService, desiredSvc) {
 				resourceVersion := currentService.GetResourceVersion()

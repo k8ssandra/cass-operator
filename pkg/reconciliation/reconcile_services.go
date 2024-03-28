@@ -9,7 +9,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
@@ -91,7 +90,7 @@ func (rc *ReconciliationContext) CheckHeadlessServices() result.ReconcileResult 
 			)
 			return result.Error(err)
 		} else {
-			if controllerutil.HasControllerReference(currentService) && currentService.GetOwnerReferences()[0].Kind == "CassandraDatacenter" && currentService.GetOwnerReferences()[0].Name != dc.GetName() {
+			if len(currentService.GetOwnerReferences()) > 0 && currentService.GetOwnerReferences()[0].Kind == "CassandraDatacenter" && currentService.GetOwnerReferences()[0].Name != dc.GetName() {
 				// Some other CassandraDatacenter owns this service, so we should ignore it
 				logger.Info("Service is owned by another CassandraDatacenter, not updating it as part of this reconcile", "service", currentService, "datacenter", currentService.GetOwnerReferences()[0].Name)
 				continue

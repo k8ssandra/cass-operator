@@ -37,13 +37,13 @@ Default installation is simple, the kubectl will create a namespace ``cass-opera
 Default install requires cert-manager to be installed, since webhooks require TLS certificates to be injected. See below how to install cert-manager if your environment does not have it installed previously.
 
 ```console
-kubectl apply --force-conflicts --server-side -k github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.19.0
+kubectl apply --force-conflicts --server-side -k github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.19.1
 ```
 
 If you wish to install it with cluster wide rights to monitor all the namespaces for ``CassandraDatacenter`` objects, use the following command:
 
 ```console
-kubectl apply --force-conflicts --server-side -k github.com/k8ssandra/cass-operator/config/deployments/cluster?ref=v1.19.0
+kubectl apply --force-conflicts --server-side -k github.com/k8ssandra/cass-operator/config/deployments/cluster?ref=v1.19.1
 ```
 
 Alternatively, if you checkout the code, you can use ``make deploy`` to run [Kustomize](https://kustomize.io/) and deploy the files.
@@ -61,7 +61,7 @@ cass-operator-555577b9f8-zgx6j   1/1     Running   0          25h
 If you have Prometheus installed in your cluster, you can apply the following command to install the Prometheus support:
 
 ```console
-kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus?ref=v1.19.0
+kubectl apply -k github.com/k8ssandra/cass-operator/config/prometheus?ref=v1.19.1
 ```
 
 #### Install cert-manager
@@ -83,10 +83,10 @@ kind: Kustomization
 namespace: cass-operator
 
 resources:
-  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.19.0
+  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.19.1
 
 components:
-  - github.com/k8ssandra/cass-operator/config/components/cluster?ref=v1.19.0
+  - github.com/k8ssandra/cass-operator/config/components/cluster?ref=v1.19.1
 ```
 
 We provide both components to modify the installation as well as some additional resources for custom features. At the moment, you can modify the behavior of the installation in the following ways, or remove a component to
@@ -121,7 +121,7 @@ kind: ImageConfig
 metadata:
   name: image-config
 images:
-  system-logger: "k8ssandra/system-logger:v1.19.0"
+  system-logger: "k8ssandra/system-logger:v1.19.1"
   config-builder: "datastax/cass-config-builder:1.0-ubi7"
   imageRegistry: "localhost:5000"
 defaults:
@@ -152,7 +152,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.19.0
+  - github.com/k8ssandra/cass-operator/config/deployments/default?ref=v1.19.1
 
 components:
   - components/private_image_config
@@ -164,7 +164,7 @@ If you also wish to load the cass-operator from a different path, you will need 
 images:
 - name: controller
   newName: localhost:5000/k8ssandra/cass-operator
-  newTag: v1.19.0
+  newTag: v1.19.1
 ```
 
 Run ``kubectl apply -k our_installation`` to install cass-operator.
@@ -253,7 +253,7 @@ reclaimPolicy: Delete
 Paste the above to a file and apply:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.19.0/operator/k8s-flavors/gke/storage.yaml
+kubectl apply -f https://raw.githubusercontent.com/k8ssandra/cass-operator/v1.19.1/operator/k8s-flavors/gke/storage.yaml
 ```
 
 ### Creating a CassandraDatacenter

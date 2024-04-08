@@ -68,5 +68,16 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 		return err
 	}
 
+	// The allow-upgrade=once annotation is temporary and should be removed after first successful reconcile
+	if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, "cassandra.datastax.com/allow-upgrade") && rc.Datacenter.Annotations["cassandra.datastax.com/allow-upgrade"] == "once" {
+		// remove the annotation
+		patch = client.MergeFrom(rc.Datacenter.DeepCopy())
+		delete(rc.Datacenter.ObjectMeta.Annotations, "cassandra.datastax.com/allow-upgrade")
+		if err := rc.Client.Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
+			rc.ReqLogger.Error(err, "error removing the allow-upgrade=once annotation")
+			return err
+		}
+	}
+
 	return nil
 }

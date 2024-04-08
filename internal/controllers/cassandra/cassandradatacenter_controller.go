@@ -179,7 +179,7 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 	// Create a new managed controller builder
 	c := ctrl.NewControllerManagedBy(mgr).
 		Named("cassandradatacenter_controller").
-		For(&api.CassandraDatacenter{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		For(&api.CassandraDatacenter{}, builder.WithPredicates(predicate.Or(predicate.GenerationChangedPredicate{}, predicate.AnnotationChangedPredicate{}))). // We might want to consider annotation filtering
 		Owns(&appsv1.StatefulSet{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
 		Owns(&policyv1.PodDisruptionBudget{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
 		Owns(&corev1.Service{}, builder.WithPredicates(managedByCassandraOperatorPredicate))

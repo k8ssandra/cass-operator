@@ -166,6 +166,10 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 	return result.Continue()
 }
 
+func (rc *ReconciliationContext) AllowdUpdate() bool {
+	return rc.Datacenter.GenerationChanged() || metav1.HasAnnotation(rc.Datacenter.ObjectMeta, "cassandra.datastax.com/allow-upgrade")
+}
+
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
@@ -200,6 +204,14 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 		}
 
 		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) {
+			logger.
+				WithValues("rackName", rackName, "allowUpdate", rc.AllowdUpdate()).
+				Info("statefulset needs an update")
+
+			// TODO If AllowedUpdate is false, but we notice there's a difference, add a new Condition to the Status
+		}
+
+		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && rc.AllowdUpdate() {
 			logger.
 				WithValues("rackName", rackName).
 				Info("statefulset needs an update")
@@ -378,7 +390,6 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 			if err := rc.Client.Update(rc.Ctx, statefulSet); err != nil {
 				if errors.IsInvalid(err) {
 					if err = rc.deleteStatefulSet(statefulSet); err != nil {
-						// logger.Error(err, "Failed to delete the StatefulSet", "Invalid", errors.IsInvalid(err), "Forbidden", errors.IsForbidden(err))
 						return result.Error(err)
 					}
 				} else {

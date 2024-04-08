@@ -961,3 +961,7 @@ func (dc *CassandraDatacenter) DatacenterName() string {
 func (dc *CassandraDatacenter) UseClientImage() bool {
 	return dc.Spec.ServerType == "cassandra" && semver.Compare(fmt.Sprintf("v%s", dc.Spec.ServerVersion), "v4.1.0") >= 0
 }
+
+func (dc *CassandraDatacenter) GenerationChanged() bool {
+	return dc.Status.ObservedGeneration < dc.Generation
+}

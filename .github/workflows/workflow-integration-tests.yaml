@@ -63,7 +63,6 @@ jobs:
         version:
           - "3.11.14"
         integration_test:
-          - upgrade_operator
           - cdc_successful
           - additional_seeds
           - scale_down_unbalanced_racks
@@ -205,6 +204,7 @@ jobs:
           - cluster_wide_install
           - config_change
           - config_secret
+          - upgrade_operator # Unnecessary to run against multiple versions
           #- multi_cluster_management # cluster_wide_install verifies the same thing
           #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
           - scale_down

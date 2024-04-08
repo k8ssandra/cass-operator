@@ -20,7 +20,7 @@ var (
 	testName   = "Upgrade Operator"
 	namespace  = "test-upgrade-operator"
 	dcName     = "dc1"
-	dcYaml     = "../testdata/operator-1.7.1-oss-dc.yaml"
+	dcYaml     = "../testdata/default-three-rack-three-node-dc-4x.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns         = ginkgo_util.NewWrapper(testName, namespace)
@@ -48,7 +48,7 @@ func TestLifecycle(t *testing.T) {
 
 // InstallOldOperator installs the oldest supported upgrade path (for Kubernetes 1.25)
 func InstallOldOperator() {
-	step := "install cass-operator 1.12.0"
+	step := "install cass-operator 1.19.1"
 	By(step)
 
 	err := kustomize.DeployDir(namespace, "upgrade_operator")
@@ -82,54 +82,77 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReady(dcName)
 
 			// Get UID of the cluster pod
-			// step = "get Cassandra pods UID"
-			// k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
-			// createdPodUID := ns.OutputAndLog(step, k)
+			step = "get Cassandra pods UID"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
+			createdPodUID := ns.OutputAndLog(step, k)
 
-			step = "get name of 1.12.0 operator pod"
+			step = "get name of 1.19.1 operator pod"
 			json := "jsonpath={.items[].metadata.name}"
 			k = kubectl.Get("pods").WithFlag("selector", "name=cass-operator").FormatOutput(json)
 			oldOperatorName := ns.OutputAndLog(step, k)
 
 			UpgradeOperator()
 
-			step = "wait for 1.12.0 operator pod to be removed"
+			step = "wait for 1.19.1 operator pod to be removed"
 			k = kubectl.Get("pods").WithFlag("field-selector", fmt.Sprintf("metadata.name=%s", oldOperatorName))
 			ns.WaitForOutputAndLog(step, k, "", 60)
 
 			ns.WaitForOperatorReady()
 
-			// give the operator a minute to reconcile and update the datacenter
-			time.Sleep(1 * time.Minute)
-
+			// Let the new operator get the lock and start reconciling if it's going to
+			time.Sleep(60 * time.Second)
 			ns.WaitForDatacenterReady(dcName)
-
 			ns.ExpectDoneReconciling(dcName)
 
 			// Verify Pod hasn't restarted
-			// step = "get Cassandra pods UID"
-			// k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
-			// postUpgradeCassPodUID := ns.OutputAndLog(step, k)
+			step = "get Cassandra pods UID"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
+			postUpgradeCassPodUID := ns.OutputAndLog(step, k)
 
-			// Expect(createdPodUID).To(Equal(postUpgradeCassPodUID))
+			Expect(createdPodUID).To(Equal(postUpgradeCassPodUID))
 
 			// Verify PodDisruptionBudget is available (1.11 updates from v1beta1 -> v1)
-			json = "jsonpath={.items[].metadata.name}"
-			k = kubectl.Get("poddisruptionbudgets").WithLabel("cassandra.datastax.com/datacenter").FormatOutput(json)
-			err = ns.WaitForOutputContains(k, "dc1-pdb", 20)
-			Expect(err).ToNot(HaveOccurred())
+			// json = "jsonpath={.items[].metadata.name}"
+			// k = kubectl.Get("poddisruptionbudgets").WithLabel("cassandra.datastax.com/datacenter").FormatOutput(json)
+			// err = ns.WaitForOutputContains(k, "dc1-pdb", 20)
+			// Expect(err).ToNot(HaveOccurred())
 
-			// Update Cassandra version to ensure we can still do changes
-			step = "perform cassandra upgrade"
-			json = "{\"spec\": {\"serverVersion\": \"3.11.14\"}}"
+			// Get current system-logger image
+			// Verify the Pod now has updated system-logger container image
+			step = "get Cassandra pod system-logger"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
+			loggerImage := ns.OutputAndLog(step, k)
+			Expect(loggerImage).To(Equal("cr.k8ssandra.io/k8ssandra/system-logger:v1.19.1"))
+
+			// Add annotation to allow upgrade to update the StatefulSets
+			step = "add annotation to allow upgrade"
+			json = "{\"metadata\": {\"annotations\": {\"cassandra.datastax.com/allow-upgrade\": \"once\"}}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
+			// Wait for the operator to reconcile the datacenter
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
-			ns.WaitForDatacenterReadyPodCount(dcName, 3)
-
 			ns.ExpectDoneReconciling(dcName)
+
+			// Verify pod has been restarted
+			step = "get Cassandra pods UID"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
+			postAllowUpgradeUID := ns.OutputAndLog(step, k)
+
+			Expect(postUpgradeCassPodUID).ToNot(Equal(postAllowUpgradeUID))
+
+			// Verify the Pod now has updated system-logger container image
+			step = "get Cassandra pod system-logger"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
+			loggerImageNew := ns.OutputAndLog(step, k)
+			Expect(loggerImage).To(Not(Equal(loggerImageNew)))
+
+			// Verify the allow-upgrade=once annotation was removed from CassandraDatacenter
+			step = "get CassandraDatacenter allow-upgrade annotation"
+			k = kubectl.Get("CassandraDatacenter", dcName).FormatOutput("jsonpath={.metadata.annotations}")
+			annotations := ns.OutputAndLog(step, k)
+			Expect(annotations).To(Not(ContainSubstring("cassandra.datastax.com/allow-upgrade")))
 
 			// Verify delete still works correctly and that we won't leave any resources behind
 			step = "deleting the dc"

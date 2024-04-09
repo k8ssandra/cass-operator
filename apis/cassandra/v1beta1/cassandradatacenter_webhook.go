@@ -25,6 +25,7 @@ import (
 
 	"github.com/k8ssandra/cass-operator/pkg/images"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -137,6 +138,12 @@ func ValidateSingleDatacenter(dc CassandraDatacenter) error {
 
 	if err := ValidateAdditionalVolumes(dc); err != nil {
 		return err
+	}
+
+	if metav1.HasAnnotation(dc.ObjectMeta, UpdateAllowedAnnotation) {
+		if dc.Annotations[UpdateAllowedAnnotation] != "once" && dc.Annotations[UpdateAllowedAnnotation] != "always" {
+			return attemptedTo("use %s annotation with value other than 'once' or 'always'", UpdateAllowedAnnotation)
+		}
 	}
 
 	return ValidateFQLConfig(dc)

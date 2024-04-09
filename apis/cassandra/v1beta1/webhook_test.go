@@ -318,6 +318,38 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 			},
 			errString: "configure DatacenterService with reserved annotations and/or labels (prefixes cassandra.datastax.com and/or k8ssandra.io)",
 		},
+		{
+			name: "Allow upgrade should not accept invalid values",
+			dc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+					Annotations: map[string]string{
+						"cassandra.datastax.com/allow-upgrade": "invalid",
+					},
+				},
+				Spec: CassandraDatacenterSpec{
+					ServerType:    "dse",
+					ServerVersion: "6.8.42",
+				},
+			},
+			errString: "use cassandra.datastax.com/allow-upgrade annotation with value other than 'once' or 'always'",
+		},
+		{
+			name: "Allow upgrade should accept once value",
+			dc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+					Annotations: map[string]string{
+						"cassandra.datastax.com/allow-upgrade": "once",
+					},
+				},
+				Spec: CassandraDatacenterSpec{
+					ServerType:    "dse",
+					ServerVersion: "6.8.42",
+				},
+			},
+			errString: "",
+		},
 	}
 
 	for _, tt := range tests {

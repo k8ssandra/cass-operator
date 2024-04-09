@@ -77,8 +77,9 @@ func CreateMockReconciliationContext(
 	// Instance a cassandraDatacenter
 	cassandraDatacenter := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:       name,
+			Namespace:  namespace,
+			Generation: 1,
 		},
 		Spec: api.CassandraDatacenterSpec{
 			Size:          size,

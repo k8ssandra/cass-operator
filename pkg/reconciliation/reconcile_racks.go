@@ -166,8 +166,9 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) AllowdUpdate() bool {
-	return rc.Datacenter.GenerationChanged() || metav1.HasAnnotation(rc.Datacenter.ObjectMeta, "cassandra.datastax.com/allow-upgrade")
+func (rc *ReconciliationContext) UpdateAllowed() bool {
+	// HasAnnotation might require also checking if it's "once / always".. or then we need to validate those allowed values in the webhook
+	return rc.Datacenter.GenerationChanged() || metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation)
 }
 
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
@@ -203,15 +204,20 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			return result.Error(err)
 		}
 
-		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) {
+		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && !rc.UpdateAllowed() {
 			logger.
-				WithValues("rackName", rackName, "allowUpdate", rc.AllowdUpdate()).
-				Info("statefulset needs an update")
-
-			// TODO If AllowedUpdate is false, but we notice there's a difference, add a new Condition to the Status
+				WithValues("rackName", rackName).
+				Info("update is blocked, but statefulset needs an update. Marking datacenter as requiring update.")
+			dcPatch := client.MergeFrom(dc.DeepCopy())
+			rc.setCondition(api.NewDatacenterCondition(api.DatacenterRequiresUpdate, corev1.ConditionTrue))
+			if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
+				logger.Error(err, "error patching datacenter status for updating")
+				return result.Error(err)
+			}
+			return result.Continue()
 		}
 
-		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && rc.AllowdUpdate() {
+		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && rc.UpdateAllowed() {
 			logger.
 				WithValues("rackName", rackName).
 				Info("statefulset needs an update")

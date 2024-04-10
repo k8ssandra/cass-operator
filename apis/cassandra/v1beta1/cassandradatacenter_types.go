@@ -13,7 +13,6 @@ import (
 	"github.com/Jeffail/gabs/v2"
 	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
 	"github.com/pkg/errors"
-	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -959,5 +958,6 @@ func (dc *CassandraDatacenter) DatacenterName() string {
 }
 
 func (dc *CassandraDatacenter) UseClientImage() bool {
-	return dc.Spec.ServerType == "cassandra" && semver.Compare(fmt.Sprintf("v%s", dc.Spec.ServerVersion), "v4.1.0") >= 0
+	return true
+	// return dc.Spec.ServerType == "cassandra" && semver.Compare(fmt.Sprintf("v%s", dc.Spec.ServerVersion), "v4.1.0") >= 0
 }

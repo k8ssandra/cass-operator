@@ -82,7 +82,7 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 	assert.NotNil(GetImageConfig().Images)
 	assert.True(strings.Contains(GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
 	assert.True(strings.Contains(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
-	assert.True(strings.Contains(GetImageConfig().Images.Client, "datastax/k8ssandra-client:"))
+	assert.True(strings.Contains(GetImageConfig().Images.Client, "k8ssandra/k8ssandra-client:"))
 
 	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
 	assert.Equal("datastax/dse-mgmtapi-6_8", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
@@ -103,6 +103,7 @@ func TestImageConfigParsing(t *testing.T) {
 	assert.NotNil(GetImageConfig().Images)
 	assert.True(strings.HasPrefix(GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
 	assert.True(strings.HasPrefix(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
+	assert.True(strings.Contains(GetImageConfig().Images.Client, "k8ssandra/k8ssandra-client:"))
 
 	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
 	assert.Equal("datastax/dse-mgmtapi-6_8", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)

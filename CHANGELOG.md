@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#618](https://github.com/k8ssandra/cass-operator/issues/618) Update dependencies to support controller-runtime 0.17.2, modify required parts.
+* [ENHANCEMENT] [#628](https://github.com/k8ssandra/cass-operator/issues/628) Replace pod task can replace any node, including those that have crashed
 * [ENHANCEMENT] [#532](https://github.com/k8ssandra/cass-operator/issues/532) Instead of rejecting updates/creates with deprecated fields, return kubectl warnings.
 
 ## v1.19.1

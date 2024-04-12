@@ -211,6 +211,8 @@ var _ = Describe(testName, func() {
 			verifyAllPodsAreCorrect()
 		})
 		Specify("cassandratask can be used to replace a node", func() {
+			// TODO Crash the Cassandra instance (emulate fsync failure or similar)
+
 			// Create CassandraTask that should replace a node
 			step := "creating a cassandra task to replace a node"
 			k := kubectl.ApplyFiles(taskYaml)

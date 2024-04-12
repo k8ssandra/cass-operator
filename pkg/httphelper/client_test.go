@@ -210,6 +210,11 @@ func Test_featureSet(t *testing.T) {
 	assert.False(featureSet.Supports(AsyncSSTableTasks))
 }
 
+func TestEmptyFeatureSupports(t *testing.T) {
+	features := &FeatureSet{}
+	assert.False(t, features.Supports(AsyncSSTableTasks))
+}
+
 func TestNodeMgmtClient_GetKeyspaceReplication(t *testing.T) {
 	successBody := map[string]string{"class": "org.apache.cassandra.locator.NetworkTopologyStrategy", "dc1": "3", "dc2": "1"}
 	tests := []struct {

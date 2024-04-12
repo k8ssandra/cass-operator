@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	cassapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	api "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
@@ -288,13 +289,15 @@ JobDefinition:
 				return ctrl.Result{}, err
 			}
 
-			res, err = r.restartSts(ctx, sts, taskConfig)
+			res, err = r.restartSts(taskConfig, sts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
 			completed = taskConfig.Completed
 			break JobDefinition
 		case api.CommandReplaceNode:
+			// Should we do it here? This is going to target just a single node in any case
+			// Validate the pod is a known one and get it
 			r.replace(taskConfig)
 		case api.CommandUpgradeSSTables:
 			upgradesstables(taskConfig)
@@ -322,7 +325,7 @@ JobDefinition:
 
 			if !valid {
 				failed++
-				err = errValidate
+				err = reconcile.TerminalError(errValidate)
 				res = ctrl.Result{}
 				break
 			}
@@ -336,6 +339,29 @@ JobDefinition:
 			if err = r.Client.Status().Update(ctx, &cassTask); err != nil {
 				return ctrl.Result{}, err
 			}
+		}
+
+		if job.Command == api.CommandReplaceNode {
+			// Special handling for replace process
+			if err := r.replacePreProcess(taskConfig); err != nil {
+				return ctrl.Result{}, err
+			}
+			nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			pod := &corev1.Pod{}
+			if err := r.Client.Get(taskConfig.Context, types.NamespacedName{Name: taskConfig.Arguments.PodName, Namespace: dc.Namespace}, pod); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err := r.replacePod(nodeMgmtClient, pod, taskConfig); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			completed++
+			res = ctrl.Result{}
+			break
 		}
 
 		res, failed, completed, errMsg, err = r.reconcileEveryPodTask(ctx, dc, taskConfig)
@@ -616,9 +642,12 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 			continue
 		}
 
-		features, err := nodeMgmtClient.FeatureSet(&pod)
-		if err != nil {
-			return ctrl.Result{}, failed, completed, errMsg, err
+		features := &httphelper.FeatureSet{}
+		if taskConfig.AsyncFeature != "" {
+			features, err = nodeMgmtClient.FeatureSet(&pod)
+			if err != nil {
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
 		}
 
 		if pod.Annotations == nil {

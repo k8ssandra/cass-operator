@@ -211,11 +211,23 @@ var _ = Describe(testName, func() {
 			verifyAllPodsAreCorrect()
 		})
 		Specify("cassandratask can be used to replace a node", func() {
-			// TODO Crash the Cassandra instance (emulate fsync failure or similar)
+			// Get PVC id
+			step := "retrieve the persistent volume claim"
+			json := "jsonpath={.spec.volumes[?(.name=='server-data')].persistentVolumeClaim.claimName}"
+			k := kubectl.Get("pod", podNameToReplace).FormatOutput(json)
+			pvcName := ns.OutputAndLog(step, k)
+
+			step = "find PVC volume"
+			json = "jsonpath={.spec.volumeName}"
+			k = kubectl.Get("pvc", pvcName).FormatOutput(json)
+			pvName := ns.OutputAndLog(step, k)
+
+			// Kill the Cassandra instance (emulate fsync failure or similar)
+			ns.KillCassandra(podNameToReplace)
 
 			// Create CassandraTask that should replace a node
-			step := "creating a cassandra task to replace a node"
-			k := kubectl.ApplyFiles(taskYaml)
+			step = "creating a cassandra task to replace a node"
+			k = kubectl.ApplyFiles(taskYaml)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionTrue))
@@ -226,12 +238,25 @@ var _ = Describe(testName, func() {
 			Expect(len(ns.GetDatacenterReadyPodNames(dcName))).To(Equal(3))
 
 			step = "wait for the pod to return to life"
-			json := "jsonpath={.status.containerStatuses[?(.name=='cassandra')].ready}"
+			json = "jsonpath={.status.containerStatuses[?(.name=='cassandra')].ready}"
 			k = kubectl.Get("pod", podNameToReplace).
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "true", 1200)
 
 			verifyAllPodsAreCorrect()
+
+			// Verify the PV id is different
+			step = "retrieve the persistent volume claim after pod replace"
+			json = "jsonpath={.spec.volumes[?(.name=='server-data')].persistentVolumeClaim.claimName}"
+			k = kubectl.Get("pod", podNameToReplace).FormatOutput(json)
+			pvcName = ns.OutputAndLog(step, k)
+
+			step = "find PVC volume"
+			json = "jsonpath={.spec.volumeName}"
+			k = kubectl.Get("pvc", pvcName).FormatOutput(json)
+			newPvName := ns.OutputAndLog(step, k)
+
+			Expect(pvName).ToNot(Equal(newPvName), "Expected PV volume to be different after node replace")
 		})
 	})
 })

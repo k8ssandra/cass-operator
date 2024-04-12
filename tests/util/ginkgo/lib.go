@@ -500,6 +500,15 @@ func (ns *NsWrapper) EnableGossip(podName string) {
 	ns.ExecVPanic(k)
 }
 
+func (ns *NsWrapper) KillCassandra(podName string) {
+	execArgs := []string{"-c", "cassandra",
+		"--", "bash", "-c",
+		"pkill -f -9 CassandraDaemon",
+	}
+	k := kubectl.ExecOnPod(podName, execArgs...)
+	ns.ExecVPanic(k)
+}
+
 func (ns *NsWrapper) GetDatacenterPodNames(dcName string) []string {
 	json := "jsonpath={.items[*].metadata.name}"
 	k := kubectl.Get("pods").

@@ -13,6 +13,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#618](https://github.com/k8ssandra/cass-operator/issues/618) Update dependencies to support controller-runtime 0.17.2, modify required parts.
 * [ENHANCEMENT] [#532](https://github.com/k8ssandra/cass-operator/issues/532) Instead of rejecting updates/creates with deprecated fields, return kubectl warnings.
+* [ENHANCEMENT] [#532](https://github.com/k8ssandra/k8ssandra-operator/issues/532) Extend ImageConfig type to allow additional parameters for k8ssandra-operator requirements. These include per-image PullPolicy / PullSecrets as well as additional image
 
 ## v1.19.1
 

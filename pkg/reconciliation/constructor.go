@@ -71,7 +71,7 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 	}
 
 	// The allow-upgrade=once annotation is temporary and should be removed after first successful reconcile
-	if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation) && rc.Datacenter.Annotations[api.UpdateAllowedAnnotation] == "once" {
+	if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation) && rc.Datacenter.Annotations[api.UpdateAllowedAnnotation] == string(api.AllowUpdateOnce) {
 		// remove the annotation
 		patch = client.MergeFrom(rc.Datacenter.DeepCopy())
 		delete(rc.Datacenter.ObjectMeta.Annotations, api.UpdateAllowedAnnotation)

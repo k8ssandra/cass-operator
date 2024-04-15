@@ -324,7 +324,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 					Annotations: map[string]string{
-						"cassandra.datastax.com/allow-upgrade": "invalid",
+						"cassandra.datastax.com/autoupdate-spec": "invalid",
 					},
 				},
 				Spec: CassandraDatacenterSpec{
@@ -332,7 +332,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 					ServerVersion: "6.8.42",
 				},
 			},
-			errString: "use cassandra.datastax.com/allow-upgrade annotation with value other than 'once' or 'always'",
+			errString: "use cassandra.datastax.com/autoupdate-spec annotation with value other than 'once' or 'always'",
 		},
 		{
 			name: "Allow upgrade should accept once value",
@@ -340,7 +340,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 					Annotations: map[string]string{
-						"cassandra.datastax.com/allow-upgrade": "once",
+						"cassandra.datastax.com/autoupdate-spec": "once",
 					},
 				},
 				Spec: CassandraDatacenterSpec{

@@ -126,7 +126,7 @@ var _ = Describe(testName, func() {
 
 			// Add annotation to allow upgrade to update the StatefulSets
 			step = "add annotation to allow upgrade"
-			json = "{\"metadata\": {\"annotations\": {\"cassandra.datastax.com/allow-upgrade\": \"once\"}}}"
+			json = "{\"metadata\": {\"annotations\": {\"cassandra.datastax.com/autoupdate-spec\": \"once\"}}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
@@ -152,7 +152,7 @@ var _ = Describe(testName, func() {
 			step = "get CassandraDatacenter allow-upgrade annotation"
 			k = kubectl.Get("CassandraDatacenter", dcName).FormatOutput("jsonpath={.metadata.annotations}")
 			annotations := ns.OutputAndLog(step, k)
-			Expect(annotations).To(Not(ContainSubstring("cassandra.datastax.com/allow-upgrade")))
+			Expect(annotations).To(Not(ContainSubstring("cassandra.datastax.com/autoupdate-spec")))
 
 			// Verify delete still works correctly and that we won't leave any resources behind
 			step = "deleting the dc"

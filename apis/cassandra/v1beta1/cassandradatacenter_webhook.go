@@ -140,12 +140,6 @@ func ValidateSingleDatacenter(dc CassandraDatacenter) error {
 		return err
 	}
 
-	if metav1.HasAnnotation(dc.ObjectMeta, UpdateAllowedAnnotation) {
-		if dc.Annotations[UpdateAllowedAnnotation] != "once" && dc.Annotations[UpdateAllowedAnnotation] != "always" {
-			return attemptedTo("use %s annotation with value other than 'once' or 'always'", UpdateAllowedAnnotation)
-		}
-	}
-
 	return ValidateFQLConfig(dc)
 }
 
@@ -340,6 +334,13 @@ func ValidateServiceLabelsAndAnnotations(dc CassandraDatacenter) error {
 	for svcName, config := range services {
 		if containsReservedAnnotations(config) || containsReservedLabels(config) {
 			return attemptedTo(fmt.Sprintf("configure %s with reserved annotations and/or labels (prefixes %s and/or %s)", svcName, datastaxPrefix, k8ssandraPrefix))
+		}
+	}
+
+	if metav1.HasAnnotation(dc.ObjectMeta, UpdateAllowedAnnotation) {
+		updateType := AllowUpdateType(dc.Annotations[UpdateAllowedAnnotation])
+		if updateType != AllowUpdateAlways && updateType != AllowUpdateOnce {
+			return attemptedTo("use %s annotation with value other than 'once' or 'always'", UpdateAllowedAnnotation)
 		}
 	}
 

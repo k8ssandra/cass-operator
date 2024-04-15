@@ -65,8 +65,11 @@ const (
 	// cluster has gone through scale up operation.
 	NoAutomatedCleanupAnnotation = "cassandra.datastax.com/no-cleanup"
 
-	// UpdateAllowedAnnotation marks the Datacenter to allow upgrades to StatefulSets even if CassandraDatacenter object was not modified. Allowed values are "once" and "always"
-	UpdateAllowedAnnotation = "cassandra.datastax.com/allow-upgrade"
+	// UpdateAllowedAnnotation marks the Datacenter to allow upgrades to StatefulSets Spec even if CassandraDatacenter object was not modified. Allowed values are "once" and "always"
+	UpdateAllowedAnnotation = "cassandra.datastax.com/autoupdate-spec"
+
+	AllowUpdateAlways AllowUpdateType = "always"
+	AllowUpdateOnce   AllowUpdateType = "once"
 
 	CassNodeState = "cassandra.datastax.com/node-state"
 
@@ -76,6 +79,8 @@ const (
 	DefaultNativePort    = 9042
 	DefaultInternodePort = 7000
 )
+
+type AllowUpdateType string
 
 // ProgressState - this type exists so there's no chance of pushing random strings to our progress status
 type ProgressState string

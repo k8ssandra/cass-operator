@@ -371,7 +371,7 @@ func TestCheckRackPodTemplate_GenerationCheck(t *testing.T) {
 	assert.Equal(corev1.ConditionTrue, cond.Status)
 
 	// Add annotation
-	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation, "always")
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation, string(api.AllowUpdateAlways))
 	rc.Datacenter.Spec.ServerVersion = "6.8.44" // This needs to be reapplied, since we call Patch in the CheckRackPodTemplate()
 
 	res = rc.CheckRackPodTemplate()

@@ -10,6 +10,7 @@ import (
 
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 
+	cassapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	api "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -683,7 +684,6 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 		AfterEach(func() {
 			deleteDatacenter(testNamespaceName)
-			// Expect(k8sClient.Delete(context.TODO(), testDc)).Should(Succeed())
 		})
 
 		Context("Restart", func() {
@@ -777,6 +777,50 @@ var _ = Describe("CassandraTask controller tests", func() {
 					return true
 				}, "5s", "50ms").Should(BeTrue())
 
+				_ = waitForTaskCompletion(taskKey)
+			})
+		})
+	})
+	Describe("Execute jobs against Datacenters", func() {
+		var testNamespaceName string
+		BeforeEach(func() {
+			testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
+			By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
+		})
+
+		AfterEach(func() {
+			deleteDatacenter(testNamespaceName)
+		})
+
+		Context("Refresh", func() {
+			It("Adds an annotation if CassandraDatacenter does not have one and waits for completion", func() {
+				taskKey, task := buildTask(api.CommandRefresh, testNamespaceName)
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				dc := &cassdcapi.CassandraDatacenter{}
+				Eventually(func() bool {
+					if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: testDatacenterName, Namespace: testNamespaceName}, dc); err != nil {
+						return false
+					}
+					if metav1.HasAnnotation(dc.ObjectMeta, cassapi.UpdateAllowedAnnotation) {
+						return dc.Annotations[cassapi.UpdateAllowedAnnotation] == "once"
+					}
+					return false
+				}, "5s", "50ms").Should(BeTrue())
+
+				delete(dc.Annotations, cassapi.UpdateAllowedAnnotation)
+				Expect(k8sClient.Update(context.Background(), dc)).Should(Succeed())
+
+				_ = waitForTaskCompletion(taskKey)
+			})
+			It("Completes if autoupdate-spec is always allowed", func() {
+				dc := &cassdcapi.CassandraDatacenter{}
+				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: testDatacenterName, Namespace: testNamespaceName}, dc)).To(Succeed())
+				metav1.SetMetaDataAnnotation(&dc.ObjectMeta, cassapi.UpdateAllowedAnnotation, string(cassapi.AllowUpdateAlways))
+				Expect(k8sClient.Update(context.Background(), dc)).Should(Succeed())
+
+				taskKey, task := buildTask(api.CommandRefresh, testNamespaceName)
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 				_ = waitForTaskCompletion(taskKey)
 			})
 		})

@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cassapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -402,6 +403,45 @@ func compact(taskConfig *TaskConfiguration) {
 	taskConfig.PodFilter = genericPodFilter
 	taskConfig.SyncFunc = compactSync
 	taskConfig.AsyncFunc = compactAsync
+}
+
+// Refresh CassandraDatacenter
+
+func (r *CassandraTaskReconciler) refreshDatacenter(ctx context.Context, dc *cassapi.CassandraDatacenter, task *api.CassandraTask) (ctrl.Result, error) {
+	// If there's no "always" annotation, add "once" annotation and check that it's removed (that indicates finished)
+	if metav1.HasAnnotation(dc.ObjectMeta, cassapi.UpdateAllowedAnnotation) {
+		// No need to add anything, process is still going or it was always allowed
+		val := cassapi.AllowUpdateType(dc.Annotations[cassapi.UpdateAllowedAnnotation])
+		if val == cassapi.AllowUpdateAlways {
+			// Nothing to do here, the autoupdate is set
+			return ctrl.Result{}, nil
+		} else {
+			// Still waiting for the refresh to happen
+			return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
+		}
+	}
+
+	if r.HasCondition(task, api.DatacenterUpdated, metav1.ConditionTrue) {
+		// The refresh has completed, since the annotation is gone
+		return ctrl.Result{}, nil
+	}
+
+	// Lets start the process
+	patch := client.MergeFrom(dc.DeepCopy())
+
+	metav1.SetMetaDataAnnotation(&dc.ObjectMeta, cassapi.UpdateAllowedAnnotation, string(cassapi.AllowUpdateOnce))
+
+	if err := r.Patch(ctx, dc, patch); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	taskPatch := client.MergeFrom(task.DeepCopy())
+	if modified := SetCondition(task, api.DatacenterUpdated, metav1.ConditionTrue, "Datacenter updated to update spec once"); modified {
+		if err := r.Client.Status().Patch(ctx, task, taskPatch); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
 }
 
 // Common functions

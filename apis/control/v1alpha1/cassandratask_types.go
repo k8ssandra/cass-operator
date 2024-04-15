@@ -80,6 +80,7 @@ const (
 	CommandMove            CassandraCommand = "move"
 	CommandGarbageCollect  CassandraCommand = "garbagecollect"
 	CommandFlush           CassandraCommand = "flush"
+	CommandRefresh         CassandraCommand = "refresh"
 )
 
 type CassandraJob struct {
@@ -167,6 +168,8 @@ const (
 	JobFailed JobConditionType = "Failed"
 	// JobRunning means the job is currently executing
 	JobRunning JobConditionType = "Running"
+	// DatacenterUpdated
+	DatacenterUpdated JobConditionType = "DatacenterUpdated"
 )
 
 //+kubebuilder:object:root=true

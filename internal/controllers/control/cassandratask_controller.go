@@ -296,8 +296,6 @@ JobDefinition:
 			completed = taskConfig.Completed
 			break JobDefinition
 		case api.CommandReplaceNode:
-			// Should we do it here? This is going to target just a single node in any case
-			// Validate the pod is a known one and get it
 			r.replace(taskConfig)
 		case api.CommandUpgradeSSTables:
 			upgradesstables(taskConfig)
@@ -342,7 +340,7 @@ JobDefinition:
 		}
 
 		if job.Command == api.CommandReplaceNode {
-			// Special handling for replace process
+			// Special handling for replace process since it targets a single pod
 			if err := r.replacePreProcess(taskConfig); err != nil {
 				return ctrl.Result{}, err
 			}

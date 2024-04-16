@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cassapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	api "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
@@ -59,7 +60,7 @@ func rebuild(taskConfig *TaskConfiguration) {
 
 // Rolling restart functionality
 
-func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.StatefulSet, taskConfig *TaskConfiguration) (ctrl.Result, error) {
+func (r *CassandraTaskReconciler) restartSts(taskConfig *TaskConfiguration, sts []appsv1.StatefulSet) (ctrl.Result, error) {
 	// Sort to ensure we don't process StatefulSets in wrong order and restart multiple racks at the same time
 	sort.Slice(sts, func(i, j int) bool {
 		return sts[i].Name < sts[j].Name
@@ -103,7 +104,7 @@ func (r *CassandraTaskReconciler) restartSts(ctx context.Context, sts []appsv1.S
 			return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
 		}
 		st.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation] = restartTime
-		if err := r.Client.Update(ctx, &st); err != nil {
+		if err := r.Client.Update(taskConfig.Context, &st); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -147,6 +148,8 @@ func upgradesstables(taskConfig *TaskConfiguration) {
 
 // replacePod will drain the node, remove the PVCs and delete the pod. cass-operator will then call replace-node process when it starts Cassandra
 func (r *CassandraTaskReconciler) replacePod(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
+	logger := log.FromContext(taskConfig.Context)
+
 	// We check the podStartTime to prevent replacing the pod multiple times since annotations are removed when we delete the pod
 	podStartTime := pod.GetCreationTimestamp()
 	uid := pod.UID
@@ -155,7 +158,7 @@ func (r *CassandraTaskReconciler) replacePod(nodeMgmtClient httphelper.NodeMgmtC
 		if isCassandraUp(pod) {
 			// Verify the cassandra pod is healthy before trying the drain
 			if err := nodeMgmtClient.CallDrainEndpoint(pod); err != nil {
-				return err
+				logger.Error(err, "Failed to drain pod", "pod", pod.Name)
 			}
 		}
 

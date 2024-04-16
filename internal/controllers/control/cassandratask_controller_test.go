@@ -515,7 +515,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 					Expect(completedTask.Status.Failed).To(BeNumerically(">=", 1))
 					Expect(completedTask.Status.Conditions[2].Type).To(Equal(string(api.JobFailed)))
-					Expect(completedTask.Status.Conditions[2].Message).To(Equal("valid pod_name to replace is required"))
+					Expect(completedTask.Status.Conditions[2].Message).To(Equal("terminal error: valid pod_name to replace is required"))
 				})
 			})
 		})

@@ -43,6 +43,8 @@ type ImagePolicy struct {
 	ImagePullSecret corev1.LocalObjectReference `json:"imagePullSecret,omitempty"`
 
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	ImageNamespace string `json:"imageNamespace,omitempty"`
 }
 
 //+kubebuilder:object:root=true

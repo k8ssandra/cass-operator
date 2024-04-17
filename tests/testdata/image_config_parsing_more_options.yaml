@@ -17,6 +17,7 @@ imageRegistry: "localhost:5000"
 imagePullPolicy: Always
 imagePullSecret:
   name: my-secret-pull-registry
+imageNamespace: "enterprise"
 defaults:
   # Note, suffix is ignored if repository is not set
   cassandra:

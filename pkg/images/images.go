@@ -88,6 +88,24 @@ func stripRegistry(image string) string {
 	}
 }
 
+func applyNamespaceOverride(image string) string {
+	namespace := GetImageConfig().ImageNamespace
+
+	if namespace == "" {
+		return image
+	}
+
+	// It can be first or second..
+	imageNoRegistry := stripRegistry(image)
+	comps := strings.Split(imageNoRegistry, "/")
+	if len(comps) > 1 {
+		noNamespace := strings.Join(comps[1:], "/")
+		return fmt.Sprintf("%s/%s", namespace, noNamespace)
+	} else {
+		return image // We can't process this correctly, we only have 1 component
+	}
+}
+
 func applyDefaultRegistryOverride(customRegistry, image string) string {
 	customRegistry = strings.TrimSuffix(customRegistry, "/")
 
@@ -117,7 +135,7 @@ func getRegistryOverride(imageType string) string {
 	return defaultRegistry
 }
 
-func applyRegistry(imageType, image string) string {
+func applyOverrides(imageType, image string) string {
 	registry := getRegistryOverride(imageType)
 
 	return applyDefaultRegistryOverride(registry, image)
@@ -179,7 +197,7 @@ func getImageComponents(serverType string) (string, string) {
 
 func GetCassandraImage(serverType, version string) (string, error) {
 	if found, image := getCassandraContainerImageOverride(serverType, version); found {
-		return applyRegistry(serverType, image), nil
+		return applyOverrides(serverType, image), nil
 	}
 
 	switch serverType {
@@ -201,15 +219,15 @@ func GetCassandraImage(serverType, version string) (string, error) {
 
 	prefix, suffix := getImageComponents(serverType)
 
-	return applyRegistry(serverType, fmt.Sprintf("%s:%s%s", prefix, version, suffix)), nil
+	return applyOverrides(serverType, fmt.Sprintf("%s:%s%s", prefix, version, suffix)), nil
 }
 
 func GetConfiguredImage(imageType, image string) string {
-	return applyRegistry(imageType, image)
+	return applyOverrides(imageType, image)
 }
 
 func GetImage(imageType string) string {
-	return applyRegistry(imageType, GetImageConfig().Images.Others[imageType])
+	return applyOverrides(imageType, GetImageConfig().Images.Others[imageType])
 }
 
 func GetImagePullPolicy(imageType string) corev1.PullPolicy {
@@ -233,15 +251,15 @@ func GetImagePullPolicy(imageType string) corev1.PullPolicy {
 }
 
 func GetConfigBuilderImage() string {
-	return applyRegistry(configv1beta1.ConfigBuilderImageComponent, GetImageConfig().Images.ConfigBuilder)
+	return applyOverrides(configv1beta1.ConfigBuilderImageComponent, GetImageConfig().Images.ConfigBuilder)
 }
 
 func GetClientImage() string {
-	return applyRegistry(configv1beta1.ClientImageComponent, GetImageConfig().Images.Client)
+	return applyOverrides(configv1beta1.ClientImageComponent, GetImageConfig().Images.Client)
 }
 
 func GetSystemLoggerImage() string {
-	return applyRegistry(configv1beta1.SystemLoggerImageComponent, GetImageConfig().Images.SystemLogger)
+	return applyOverrides(configv1beta1.SystemLoggerImageComponent, GetImageConfig().Images.SystemLogger)
 }
 
 func AddDefaultRegistryImagePullSecrets(podSpec *corev1.PodSpec, imageTypes ...string) {

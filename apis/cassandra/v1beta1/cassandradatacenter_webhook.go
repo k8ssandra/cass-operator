@@ -25,6 +25,7 @@ import (
 
 	"github.com/k8ssandra/cass-operator/pkg/images"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -333,6 +334,13 @@ func ValidateServiceLabelsAndAnnotations(dc CassandraDatacenter) error {
 	for svcName, config := range services {
 		if containsReservedAnnotations(config) || containsReservedLabels(config) {
 			return attemptedTo(fmt.Sprintf("configure %s with reserved annotations and/or labels (prefixes %s and/or %s)", svcName, datastaxPrefix, k8ssandraPrefix))
+		}
+	}
+
+	if metav1.HasAnnotation(dc.ObjectMeta, UpdateAllowedAnnotation) {
+		updateType := AllowUpdateType(dc.Annotations[UpdateAllowedAnnotation])
+		if updateType != AllowUpdateAlways && updateType != AllowUpdateOnce {
+			return attemptedTo("use %s annotation with value other than 'once' or 'always'", UpdateAllowedAnnotation)
 		}
 	}
 

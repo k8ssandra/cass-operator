@@ -309,12 +309,20 @@ JobDefinition:
 			flush(taskConfig)
 		case api.CommandGarbageCollect:
 			gc(taskConfig)
+		case api.CommandRefresh:
+			// This targets the Datacenter only
+			res, err = r.refreshDatacenter(ctx, dc, &cassTask)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			completed = taskConfig.Completed
+			break JobDefinition
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err
 		}
 
-		if !r.HasCondition(cassTask, api.JobRunning, metav1.ConditionTrue) {
+		if !r.HasCondition(&cassTask, api.JobRunning, metav1.ConditionTrue) {
 			valid, errValidate := taskConfig.Validate()
 			if errValidate != nil && valid {
 				// Retry, this is a transient error
@@ -423,7 +431,7 @@ func (r *CassandraTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *CassandraTaskReconciler) HasCondition(task api.CassandraTask, condition api.JobConditionType, status metav1.ConditionStatus) bool {
+func (r *CassandraTaskReconciler) HasCondition(task *api.CassandraTask, condition api.JobConditionType, status metav1.ConditionStatus) bool {
 	for _, cond := range task.Status.Conditions {
 		if cond.Type == string(condition) {
 			return cond.Status == status

@@ -65,6 +65,12 @@ const (
 	// cluster has gone through scale up operation.
 	NoAutomatedCleanupAnnotation = "cassandra.datastax.com/no-cleanup"
 
+	// UpdateAllowedAnnotation marks the Datacenter to allow upgrades to StatefulSets Spec even if CassandraDatacenter object was not modified. Allowed values are "once" and "always"
+	UpdateAllowedAnnotation = "cassandra.datastax.com/autoupdate-spec"
+
+	AllowUpdateAlways AllowUpdateType = "always"
+	AllowUpdateOnce   AllowUpdateType = "once"
+
 	CassNodeState = "cassandra.datastax.com/node-state"
 
 	ProgressUpdating ProgressState = "Updating"
@@ -73,6 +79,8 @@ const (
 	DefaultNativePort    = 9042
 	DefaultInternodePort = 7000
 )
+
+type AllowUpdateType string
 
 // ProgressState - this type exists so there's no chance of pushing random strings to our progress status
 type ProgressState string
@@ -379,6 +387,7 @@ const (
 	DatacenterRollingRestart DatacenterConditionType = "RollingRestart"
 	DatacenterValid          DatacenterConditionType = "Valid"
 	DatacenterDecommission   DatacenterConditionType = "Decommission"
+	DatacenterRequiresUpdate DatacenterConditionType = "RequiresUpdate"
 
 	// DatacenterHealthy indicates if QUORUM can be reached from all deployed nodes.
 	// If this check fails, certain operations such as scaling up will not proceed.
@@ -960,4 +969,8 @@ func (dc *CassandraDatacenter) DatacenterName() string {
 
 func (dc *CassandraDatacenter) UseClientImage() bool {
 	return dc.Spec.ServerType == "cassandra" && semver.Compare(fmt.Sprintf("v%s", dc.Spec.ServerVersion), "v4.1.0") >= 0
+}
+
+func (dc *CassandraDatacenter) GenerationChanged() bool {
+	return dc.Status.ObservedGeneration < dc.Generation
 }

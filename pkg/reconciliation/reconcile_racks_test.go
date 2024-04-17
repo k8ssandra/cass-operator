@@ -24,6 +24,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -347,6 +348,34 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 	assert.EqualValues(t, previousLabels, rc.statefulSets[0].Spec.Template.Labels)
 
 	assert.True(t, result.Completed())
+}
+
+func TestCheckRackPodTemplate_GenerationCheck(t *testing.T) {
+	assert := assert.New(t)
+	rc, _, cleanpMockSrc := setupTest()
+	defer cleanpMockSrc()
+
+	require.NoError(t, rc.CalculateRackInformation())
+
+	res := rc.CheckRackCreation()
+	assert.False(res.Completed(), "CheckRackCreation did not complete as expected")
+
+	// Update the generation manually and now verify we won't do updates to StatefulSets if the generation hasn't changed
+	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
+	rc.Datacenter.Spec.ServerVersion = "6.8.44"
+
+	res = rc.CheckRackPodTemplate()
+	assert.Equal(result.Continue(), res)
+	cond, found := rc.Datacenter.GetCondition(api.DatacenterRequiresUpdate)
+	assert.True(found)
+	assert.Equal(corev1.ConditionTrue, cond.Status)
+
+	// Add annotation
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation, string(api.AllowUpdateAlways))
+	rc.Datacenter.Spec.ServerVersion = "6.8.44" // This needs to be reapplied, since we call Patch in the CheckRackPodTemplate()
+
+	res = rc.CheckRackPodTemplate()
+	assert.True(res.Completed())
 }
 
 func TestReconcilePods(t *testing.T) {

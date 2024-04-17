@@ -166,6 +166,11 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 	return result.Continue()
 }
 
+func (rc *ReconciliationContext) UpdateAllowed() bool {
+	// HasAnnotation might require also checking if it's "once / always".. or then we need to validate those allowed values in the webhook
+	return rc.Datacenter.GenerationChanged() || metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation)
+}
+
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
@@ -199,7 +204,20 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			return result.Error(err)
 		}
 
-		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) {
+		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && !rc.UpdateAllowed() {
+			logger.
+				WithValues("rackName", rackName).
+				Info("update is blocked, but statefulset needs an update. Marking datacenter as requiring update.")
+			dcPatch := client.MergeFrom(dc.DeepCopy())
+			rc.setCondition(api.NewDatacenterCondition(api.DatacenterRequiresUpdate, corev1.ConditionTrue))
+			if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
+				logger.Error(err, "error patching datacenter status for updating")
+				return result.Error(err)
+			}
+			return result.Continue()
+		}
+
+		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && rc.UpdateAllowed() {
 			logger.
 				WithValues("rackName", rackName).
 				Info("statefulset needs an update")
@@ -378,7 +396,6 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 			if err := rc.Client.Update(rc.Ctx, statefulSet); err != nil {
 				if errors.IsInvalid(err) {
 					if err = rc.deleteStatefulSet(statefulSet); err != nil {
-						// logger.Error(err, "Failed to delete the StatefulSet", "Invalid", errors.IsInvalid(err), "Forbidden", errors.IsForbidden(err))
 						return result.Error(err)
 					}
 				} else {

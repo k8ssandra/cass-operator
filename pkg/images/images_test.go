@@ -112,8 +112,8 @@ func TestImageConfigParsing(t *testing.T) {
 	assert.True(strings.HasPrefix(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
 	assert.True(strings.Contains(GetImageConfig().Images.Client, "k8ssandra/k8ssandra-client:"))
 
-	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
-	assert.Equal("datastax/dse-mgmtapi-6_8", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
+	assert.Equal("cr.k8ssandra.io/k8ssandra/cass-management-api", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
+	assert.Equal("cr.dtsx.io/datastax/dse-mgmtapi-6_8", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
 
 	assert.Equal("localhost:5000", GetImageConfig().ImageRegistry)
 	assert.Equal(corev1.PullAlways, GetImageConfig().ImagePullPolicy)
@@ -144,9 +144,9 @@ func TestExtendedImageConfigParsing(t *testing.T) {
 	assert.NotNil(GetImageConfig().DefaultImages)
 
 	medusaImage := GetImage("medusa")
-	assert.Equal("localhost:5005/k8ssandra/medusa:latest", medusaImage)
+	assert.Equal("localhost:5005/enterprise/medusa:latest", medusaImage)
 	reaperImage := GetImage("reaper")
-	assert.Equal("localhost:5000/k8ssandra/reaper:latest", reaperImage)
+	assert.Equal("localhost:5000/enterprise/reaper:latest", reaperImage)
 
 	assert.Equal(corev1.PullAlways, GetImagePullPolicy(configv1beta1.SystemLoggerImageComponent))
 	assert.Equal(corev1.PullIfNotPresent, GetImagePullPolicy(configv1beta1.CassandraImageComponent))
@@ -186,6 +186,52 @@ func TestPullPolicyOverride(t *testing.T) {
 	AddDefaultRegistryImagePullSecrets(podSpec)
 	assert.Equal(1, len(podSpec.ImagePullSecrets))
 	assert.Equal("my-secret-pull-registry", podSpec.ImagePullSecrets[0].Name)
+}
+
+func TestRepositoryAndNamespaceOverride(t *testing.T) {
+	assert := assert.New(t)
+	imageConfig = configv1beta1.ImageConfig{}
+	imageConfig.Images = &configv1beta1.Images{}
+	imageConfig.DefaultImages = &configv1beta1.DefaultImages{}
+
+	path, err := GetCassandraImage("dse", "6.8.44")
+	assert.NoError(err)
+	assert.Equal("datastax/dse-mgmtapi-6_8:6.8.44", path)
+
+	imageConfig.ImageRegistry = "ghcr.io"
+	path, err = GetCassandraImage("dse", "6.8.44")
+	assert.NoError(err)
+	assert.Equal("ghcr.io/datastax/dse-mgmtapi-6_8:6.8.44", path)
+
+	imageConfig.ImageNamespace = "enterprise"
+	path, err = GetCassandraImage("dse", "6.8.44")
+	assert.NoError(err)
+	assert.Equal("ghcr.io/enterprise/dse-mgmtapi-6_8:6.8.44", path)
+
+	imageConfig = configv1beta1.ImageConfig{}
+	imageConfig.Images = &configv1beta1.Images{}
+	imageConfig.DefaultImages = &configv1beta1.DefaultImages{}
+	imageConfig.ImageNamespace = "enterprise"
+	path, err = GetCassandraImage("dse", "6.8.44")
+	assert.NoError(err)
+	assert.Equal("enterprise/dse-mgmtapi-6_8:6.8.44", path)
+
+	imageConfig = configv1beta1.ImageConfig{}
+	imageConfig.Images = &configv1beta1.Images{}
+	imageConfig.DefaultImages = &configv1beta1.DefaultImages{
+		ImageComponents: map[string]configv1beta1.ImageComponent{
+			configv1beta1.DSEImageComponent: {
+				Repository: "cr.dtsx.io/datastax/dse-mgmtapi-6_8",
+			},
+		},
+	}
+	path, err = GetCassandraImage("dse", "6.8.44")
+	assert.NoError(err)
+	assert.Equal("cr.dtsx.io/datastax/dse-mgmtapi-6_8:6.8.44", path)
+	imageConfig.ImageNamespace = "internal"
+	path, err = GetCassandraImage("dse", "6.8.44")
+	assert.NoError(err)
+	assert.Equal("cr.dtsx.io/internal/dse-mgmtapi-6_8:6.8.44", path)
 }
 
 func TestImageConfigByteParsing(t *testing.T) {

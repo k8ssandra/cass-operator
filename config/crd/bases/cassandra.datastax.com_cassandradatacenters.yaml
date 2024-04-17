@@ -11218,6 +11218,10 @@ spec:
                   properties:
                     hostID:
                       type: string
+                    ip:
+                      type: string
+                    rack:
+                      type: string
                   type: object
                 type: object
               observedGeneration:

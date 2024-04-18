@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/utils/pointer" //nolint:staticcheck
+	"k8s.io/utils/ptr"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
@@ -1764,7 +1764,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				rackPods := tt.racks[rackName]
 				sts := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{Name: rackName},
-					Spec:       appsv1.StatefulSetSpec{Replicas: pointer.Int32(int32(len(rackPods)))},
+					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
 				}
 				rc.statefulSets = append(rc.statefulSets, sts)
 				for i, started := range rackPods {
@@ -1919,7 +1919,7 @@ func TestStartOneNodePerRack(t *testing.T) {
 			for rackName, rackPods := range tt.racks {
 				sts := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{Name: rackName},
-					Spec:       appsv1.StatefulSetSpec{Replicas: pointer.Int32(int32(len(rackPods)))},
+					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
 				}
 				rc.statefulSets = append(rc.statefulSets, sts)
 				for i, started := range rackPods {

@@ -13,7 +13,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/utils/pointer" //nolint:staticcheck
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -50,7 +50,6 @@ func TestCalculateReconciliationActions_GetServiceError(t *testing.T) {
 
 	k8sMockClientGet(mockClient, fmt.Errorf(""))
 	k8sMockClientUpdate(mockClient, nil).Times(1)
-	// k8sMockClientCreate(mockClient, nil)
 
 	_, err := rc.CalculateReconciliationActions()
 	assert.Errorf(t, err, "Should have returned an error while calculating reconciliation actions")
@@ -234,7 +233,7 @@ func TestChangeDcNameFailure1(t *testing.T) {
 	defer cleanupMockScr()
 
 	rc.Datacenter.Status = api.CassandraDatacenterStatus{
-		DatacenterName: pointer.String("test"),
+		DatacenterName: ptr.To("test"),
 	}
 
 	errs := rc.validateDatacenterNameOverride()
@@ -248,7 +247,7 @@ func TestChangeDcNameFailure2(t *testing.T) {
 
 	rc.Datacenter.Spec.DatacenterName = "test"
 	rc.Datacenter.Status = api.CassandraDatacenterStatus{
-		DatacenterName: pointer.String(""),
+		DatacenterName: ptr.To(""),
 	}
 
 	errs := rc.validateDatacenterNameOverride()
@@ -261,7 +260,7 @@ func TestChangeDcNameNotModified1(t *testing.T) {
 	defer cleanupMockScr()
 	rc.Datacenter.Spec.DatacenterName = "test"
 	rc.Datacenter.Status = api.CassandraDatacenterStatus{
-		DatacenterName: pointer.String("test"),
+		DatacenterName: ptr.To("test"),
 	}
 
 	errs := rc.validateDatacenterNameOverride()
@@ -280,287 +279,3 @@ func TestChangeDcNameNotModified2(t *testing.T) {
 	errs := rc.validateDatacenterNameOverride()
 	assert.Empty(errs, "validateDatacenterNameOverride should return an error as the datacenter name is being modified")
 }
-
-// func TestReconcile(t *testing.T) {
-// 	t.Skip()
-
-// 	// Set up verbose logging
-// 	logger := zap.New()
-// 	logf.SetLogger(logger)
-
-// 	var (
-// 		name            = "cluster-example-cluster.dc-example-datacenter"
-// 		namespace       = "default"
-// 		size      int32 = 2
-// 	)
-// 	storageSize := resource.MustParse("1Gi")
-// 	storageName := "server-data"
-// 	storageConfig := api.StorageConfig{
-// 		CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-// 			StorageClassName: &storageName,
-// 			AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-// 			Resources: corev1.ResourceRequirements{
-// 				Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
-// 			},
-// 		},
-// 	}
-
-// 	// Instance a CassandraDatacenter
-// 	dc := &api.CassandraDatacenter{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:      name,
-// 			Namespace: namespace,
-// 		},
-// 		Spec: api.CassandraDatacenterSpec{
-// 			ManagementApiAuth: api.ManagementApiAuthConfig{
-// 				Insecure: &api.ManagementApiAuthInsecureConfig{},
-// 			},
-// 			Size:          size,
-// 			ServerVersion: "6.8.0",
-// 			StorageConfig: storageConfig,
-// 			ClusterName:   "cluster-example",
-// 		},
-// 	}
-
-// 	// Objects to keep track of
-// 	trackObjects := []runtime.Object{
-// 		dc,
-// 	}
-
-// 	s := scheme.Scheme
-// 	s.AddKnownTypes(api.GroupVersion, dc)
-
-// 	fakeClient := fake.NewFakeClient(trackObjects...)
-
-// 	r := &ReconcileCassandraDatacenter{
-// 		client:   fakeClient,
-// 		scheme:   s,
-// 		recorder: record.NewFakeRecorder(100),
-// 	}
-
-// 	request := reconcile.Request{
-// 		NamespacedName: types.NamespacedName{
-// 			Name:      name,
-// 			Namespace: namespace,
-// 		},
-// 	}
-
-// 	result, err := r.Reconcile(request)
-// 	if err != nil {
-// 		t.Fatalf("Reconciliation Failure: (%v)", err)
-// 	}
-
-// 	if result != (reconcile.Result{Requeue: true}) {
-// 		t.Error("Reconcile did not return a correct result.")
-// 	}
-// }
-
-// func TestReconcile_NotFound(t *testing.T) {
-// 	t.Skip()
-
-// 	// Set up verbose logging
-// 	logger := zap.New()
-// 	logf.SetLogger(logger)
-
-// 	var (
-// 		name            = "datacenter-example"
-// 		namespace       = "default"
-// 		size      int32 = 2
-// 	)
-
-// 	storageSize := resource.MustParse("1Gi")
-// 	storageName := "server-data"
-// 	storageConfig := api.StorageConfig{
-// 		CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-// 			StorageClassName: &storageName,
-// 			AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-// 			Resources: corev1.ResourceRequirements{
-// 				Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
-// 			},
-// 		},
-// 	}
-
-// 	// Instance a CassandraDatacenter
-// 	dc := &api.CassandraDatacenter{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:      name,
-// 			Namespace: namespace,
-// 		},
-// 		Spec: api.CassandraDatacenterSpec{
-// 			ManagementApiAuth: api.ManagementApiAuthConfig{
-// 				Insecure: &api.ManagementApiAuthInsecureConfig{},
-// 			},
-// 			Size:          size,
-// 			StorageConfig: storageConfig,
-// 		},
-// 	}
-
-// 	// Objects to keep track of
-// 	trackObjects := []runtime.Object{}
-
-// 	s := scheme.Scheme
-// 	s.AddKnownTypes(api.GroupVersion, dc)
-
-// 	fakeClient := fake.NewFakeClient(trackObjects...)
-
-// 	r := &ReconcileCassandraDatacenter{
-// 		client: fakeClient,
-// 		scheme: s,
-// 	}
-
-// 	request := reconcile.Request{
-// 		NamespacedName: types.NamespacedName{
-// 			Name:      name,
-// 			Namespace: namespace,
-// 		},
-// 	}
-
-// 	result, err := r.Reconcile(request)
-// 	if err != nil {
-// 		t.Fatalf("Reconciliation Failure: (%v)", err)
-// 	}
-
-// 	expected := reconcile.Result{}
-// 	if result != expected {
-// 		t.Error("expected to get a zero-value reconcile.Result")
-// 	}
-// }
-
-// func TestReconcile_Error(t *testing.T) {
-// 	// Set up verbose logging
-// 	logger := zap.New()
-// 	logf.SetLogger(logger)
-
-// 	var (
-// 		name            = "datacenter-example"
-// 		namespace       = "default"
-// 		size      int32 = 2
-// 	)
-
-// 	storageSize := resource.MustParse("1Gi")
-// 	storageName := "server-data"
-// 	storageConfig := api.StorageConfig{
-// 		CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-// 			StorageClassName: &storageName,
-// 			AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-// 			Resources: corev1.ResourceRequirements{
-// 				Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
-// 			},
-// 		},
-// 	}
-
-// 	// Instance a CassandraDatacenter
-// 	dc := &api.CassandraDatacenter{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:      name,
-// 			Namespace: namespace,
-// 		},
-// 		Spec: api.CassandraDatacenterSpec{
-// 			ManagementApiAuth: api.ManagementApiAuthConfig{
-// 				Insecure: &api.ManagementApiAuthInsecureConfig{},
-// 			},
-// 			Size:          size,
-// 			StorageConfig: storageConfig,
-// 		},
-// 	}
-
-// 	// Objects to keep track of
-
-// 	s := scheme.Scheme
-// 	s.AddKnownTypes(api.GroupVersion, dc)
-
-// 	mockClient := &mocks.Client{}
-// 	k8sMockClientGet(mockClient, fmt.Errorf(""))
-
-// 	r := &ReconcileCassandraDatacenter{
-// 		client: mockClient,
-// 		scheme: s,
-// 	}
-
-// 	request := reconcile.Request{
-// 		NamespacedName: types.NamespacedName{
-// 			Name:      name,
-// 			Namespace: namespace,
-// 		},
-// 	}
-
-// 	_, err := r.Reconcile(request)
-// 	if err == nil {
-// 		t.Fatalf("Reconciliation should have failed")
-// 	}
-// }
-
-// func TestReconcile_CassandraDatacenterToBeDeleted(t *testing.T) {
-// 	t.Skip()
-// 	// Set up verbose logging
-// 	logger := zap.New()
-// 	logf.SetLogger(logger)
-
-// 	var (
-// 		name            = "datacenter-example"
-// 		namespace       = "default"
-// 		size      int32 = 2
-// 	)
-
-// 	storageSize := resource.MustParse("1Gi")
-// 	storageName := "server-data"
-// 	storageConfig := api.StorageConfig{
-// 		CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-// 			StorageClassName: &storageName,
-// 			AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-// 			Resources: corev1.ResourceRequirements{
-// 				Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
-// 			},
-// 		},
-// 	}
-
-// 	// Instance a CassandraDatacenter
-// 	now := metav1.Now()
-// 	dc := &api.CassandraDatacenter{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:              name,
-// 			Namespace:         namespace,
-// 			DeletionTimestamp: &now,
-// 			Finalizers:        nil,
-// 		},
-// 		Spec: api.CassandraDatacenterSpec{
-// 			ManagementApiAuth: api.ManagementApiAuthConfig{
-// 				Insecure: &api.ManagementApiAuthInsecureConfig{},
-// 			},
-// 			Size:          size,
-// 			ServerVersion: "6.8.0",
-// 			StorageConfig: storageConfig,
-// 		},
-// 	}
-
-// 	// Objects to keep track of
-// 	trackObjects := []runtime.Object{
-// 		dc,
-// 	}
-
-// 	s := scheme.Scheme
-// 	s.AddKnownTypes(api.GroupVersion, dc)
-
-// 	fakeClient := fake.NewFakeClient(trackObjects...)
-
-// 	r := &controllers.CassandraDatacenterReconciler{
-// 		Client: fakeClient,
-// 		Scheme: s,
-// 	}
-
-// 	request := reconcile.Request{
-// 		NamespacedName: types.NamespacedName{
-// 			Name:      name,
-// 			Namespace: namespace,
-// 		},
-// 	}
-
-// 	result, err := r.Reconcile(context.TODO(), request)
-// 	if err != nil {
-// 		t.Fatalf("Reconciliation Failure: (%v)", err)
-// 	}
-
-// 	if result != (reconcile.Result{}) {
-// 		t.Error("Reconcile did not return an empty result.")
-// 	}
-// }

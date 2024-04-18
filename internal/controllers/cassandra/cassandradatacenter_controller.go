@@ -112,7 +112,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 			// Owned objects are automatically garbage collected.
 			// Return and don't requeue
 			logger.Info("CassandraDatacenter resource not found. Ignoring since object must be deleted.")
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, reconcile.TerminalError(err)
 		}
 
 		// Error reading the object
@@ -123,7 +123,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	if err := rc.IsValid(rc.Datacenter); err != nil {
 		logger.Error(err, "CassandraDatacenter resource is invalid")
 		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ValidationFailed", err.Error())
-		return ctrl.Result{}, err
+		return ctrl.Result{}, reconcile.TerminalError(err)
 	}
 
 	// TODO fold this into the quiet period

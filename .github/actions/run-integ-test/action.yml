@@ -23,7 +23,7 @@ runs:
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /opt/ghc
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version-file: 'go.mod'
         cache: true
@@ -38,12 +38,12 @@ runs:
       run: |
         hack/cluster.sh
     - name: Download cass-operator image
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: cass-operator
         path: /tmp
     - name: Download system-logger image
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: system-logger
         path: /tmp

@@ -220,6 +220,9 @@ type CassandraDatacenterSpec struct {
 
 	DseWorkloads *DseWorkloads `json:"dseWorkloads,omitempty"`
 
+	// set the minReadySeconds value for cassandra StatefulSet
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
+
 	// PodTemplate provides customisation options (labels, annotations, affinity rules, resource requests, and so on) for the cassandra pods
 	PodTemplateSpec *corev1.PodTemplateSpec `json:"podTemplateSpec,omitempty"`
 

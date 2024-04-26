@@ -145,6 +145,7 @@ func newStatefulSetForCassandraDatacenter(
 			PodManagementPolicy:  appsv1.ParallelPodManagement,
 			Template:             *template,
 			VolumeClaimTemplates: volumeClaimTemplates,
+			MinReadySeconds:      dc.Spec.MinReadySeconds,
 		},
 	}
 

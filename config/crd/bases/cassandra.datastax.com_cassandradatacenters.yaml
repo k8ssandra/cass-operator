@@ -348,6 +348,11 @@ spec:
                     - serverSecretName
                     type: object
                 type: object
+              minReadySeconds:
+                description: This is an alpha field from kubernetes 1.22 until 1.24
+                  which requires enabling the StatefulSetMinReadySeconds feature gate.
+                format: int32
+                type: integer
               networking:
                 properties:
                   hostNetwork:

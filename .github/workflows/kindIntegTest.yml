@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Set version value
@@ -20,10 +20,10 @@ jobs:
         run: |
           echo "version=$(make version)" >> $GITHUB_OUTPUT
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Build and push
         id: docker_build
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           file: Dockerfile
           context: .
@@ -34,7 +34,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build and push
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           file: logger.Dockerfile
           push: false
@@ -44,12 +44,12 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Upload cass-operator image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cass-operator
           path: /tmp/k8ssandra-cass-operator.tar
       - name: Upload system-logger image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: system-logger
           path: /tmp/k8ssandra-system-logger.tar
@@ -65,21 +65,21 @@ jobs:
     env:
       CGO_ENABLED: 0
       M_INTEG_DIR: ${{ matrix.integration_test }}
-      M_SERVER_VERSION: 3.11.15
+      M_SERVER_VERSION: 3.11.17
       M_SERVER_TYPE: cassandra
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
           integration_test: ${{ matrix.integration_test }}
       - name: Archive k8s logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: k8s-logs-${{ matrix.integration_test }}
           path: ./build/kubectl_dump
@@ -89,7 +89,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.10"
+          - "4.0.12"
         integration_test:
           - cdc_successful # OSS only
           - config_fql
@@ -98,18 +98,18 @@ jobs:
       CGO_ENABLED: 0
       M_INTEG_DIR: ${{ matrix.integration_test }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
           integration_test: ${{ matrix.integration_test }}
       - name: Archive k8s logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: k8s-logs-${{ matrix.integration_test }}
           path: ./build/kubectl_dump
@@ -118,12 +118,12 @@ jobs:
     strategy:
       matrix:
         version:
-          - "6.8.39"
+          - "6.8.46"
         integration_test:
           - cdc_successful
         include:
-          - version: 6.8.39
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.39-ubi8 # DSE 6.8.39
+          - version: 6.8.46
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.46-ubi8 # DSE 6.8.46
             serverType: dse
             integration_test: "cdc_successful"
       fail-fast: true
@@ -135,18 +135,18 @@ jobs:
       M_SERVER_IMAGE: ${{ matrix.serverImage }}
       M_SERVER_TYPE: ${{ matrix.serverType }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
           integration_test: ${{ matrix.integration_test }}
       - name: Archive k8s logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: k8s-logs-smoke_test-${{ matrix.version }}
           path: ./build/kubectl_dump
@@ -156,7 +156,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.1.2"
+          - "4.1.4"
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
@@ -213,18 +213,18 @@ jobs:
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_SERVER_VERSION: ${{ matrix.version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
           integration_test: ${{ matrix.integration_test }}
       - name: Archive k8s logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
           path: ./build/kubectl_dump
@@ -233,15 +233,15 @@ jobs:
     strategy:
       matrix:
         version:
-          - "3.11.15"
-          - "4.0.10"
-          - "4.1.2"
-          - "6.8.39"
+          - "3.11.17"
+          - "4.0.12"
+          - "4.1.4"
+          - "6.8.46"
         integration_test:
           - test_all_the_things
         include:
-          - version: 6.8.39
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.39-ubi8 # DSE 6.8.39
+          - version: 6.8.46
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.46-ubi8 # DSE 6.8.46
             serverType: dse
             integration_test: "test_all_the_things"
       fail-fast: true
@@ -253,18 +253,18 @@ jobs:
       M_SERVER_IMAGE: ${{ matrix.serverImage }}
       M_SERVER_TYPE: ${{ matrix.serverType }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
           integration_test: ${{ matrix.integration_test }}
       - name: Archive k8s logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: k8s-logs-smoke_test-${{ matrix.version }}
           path: ./build/kubectl_dump

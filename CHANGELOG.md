@@ -17,6 +17,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#628](https://github.com/k8ssandra/cass-operator/issues/628) Replace pod task can replace any node, including those that have crashed
 * [ENHANCEMENT] [#532](https://github.com/k8ssandra/cass-operator/issues/532) Instead of rejecting updates/creates with deprecated fields, return kubectl warnings.
 * [ENHANCEMENT] [#637](https://github.com/k8ssandra/cass-operator/issues/637) Expand nodeStatuses to include IPs and racks.
+* [BUGFIX] [#639](https://github.com/k8ssandra/cass-operator/issues/639) Remove InvalidState check, there's no need to block reconcile here. Keep the InvalidState as information for the user only.
 
 ## v1.19.1
 

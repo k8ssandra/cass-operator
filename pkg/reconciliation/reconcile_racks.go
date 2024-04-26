@@ -2279,16 +2279,6 @@ func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileRe
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) CheckForInvalidState() result.ReconcileResult {
-	cond, isSet := rc.Datacenter.GetCondition(api.DatacenterValid)
-	if isSet && cond.Status == corev1.ConditionFalse {
-		err := fmt.Errorf("datacenter %s is not in a valid state: %s", rc.Datacenter.Name, cond.Message)
-		return result.Error(err)
-	}
-
-	return result.Continue()
-}
-
 func (rc *ReconciliationContext) CheckStatefulSetControllerCaughtUp() result.ReconcileResult {
 	if hasStatefulSetControllerCaughtUp(rc.statefulSets, rc.dcPods) {
 		// We do this here instead of in CheckPodsReady where we fix stuck pods
@@ -2340,10 +2330,6 @@ func (rc *ReconciliationContext) fixMissingPVC() (bool, error) {
 // ReconcileAllRacks determines if a rack needs to be reconciled.
 func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	rc.ReqLogger.Info("reconciliationContext::reconcileAllRacks")
-
-	if recResult := rc.CheckForInvalidState(); recResult.Completed() {
-		return recResult.Output()
-	}
 
 	logger := rc.ReqLogger
 

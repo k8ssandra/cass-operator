@@ -1003,7 +1003,7 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 					if nodeStatus.HostID == "" {
 						logger.Info("Failed to find host ID", "pod", pod.Name)
 					}
-					nodeStatus.Ip = ip
+					nodeStatus.IP = ip
 					nodeStatus.Rack = pod.Labels[api.RackLabel]
 				}
 			}

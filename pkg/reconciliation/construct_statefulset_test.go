@@ -420,6 +420,7 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 		assert.Equal(t, 1, len(got.Spec.Template.Spec.InitContainers[1].VolumeMounts))
 		assert.Equal(t, "server-config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].Name)
 		assert.Equal(t, "/config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].MountPath)
+		assert.Equal(t, int32(5), got.Spec.MinReadySeconds)
 	}
 }
 

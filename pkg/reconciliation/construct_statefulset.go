@@ -145,6 +145,7 @@ func newStatefulSetForCassandraDatacenter(
 			PodManagementPolicy:  appsv1.ParallelPodManagement,
 			Template:             *template,
 			VolumeClaimTemplates: volumeClaimTemplates,
+			MinReadySeconds:      5,
 		},
 	}
 
@@ -167,6 +168,10 @@ func newStatefulSetForCassandraDatacenter(
 			},
 		}
 		result.Spec.UpdateStrategy = strategy
+	}
+
+	if dc.Spec.MinReadySeconds != nil {
+		result.Spec.MinReadySeconds = *dc.Spec.MinReadySeconds
 	}
 
 	// add a hash here to facilitate checking if updates are needed

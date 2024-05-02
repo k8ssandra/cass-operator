@@ -258,6 +258,10 @@ type CassandraDatacenterSpec struct {
 	// Use cautiously.
 	// +optional
 	DatacenterName string `json:"datacenterName,omitempty"`
+
+	// MinReadySeconds sets the minimum number of seconds for which a newly created pod should be ready without any of its containers crashing, for it to be considered available. Defaults to 5 seconds and is set in the StatefulSet spec.
+	// Setting to 0 might cause multiple Cassandra pods to restart at the same time despite PodDisruptionBudget settings.
+	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
 }
 
 type NetworkingConfig struct {

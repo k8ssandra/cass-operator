@@ -231,7 +231,7 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			desiredSts.Spec.VolumeClaimTemplates = statefulSet.Spec.VolumeClaimTemplates
 			// selector must match podTemplate.Labels, those can't be updated either
 			desiredSts.Spec.Selector = statefulSet.Spec.Selector
-			desiredSts.Spec.Template.Labels = statefulSet.Spec.Template.Labels
+			// desiredSts.Spec.Template.Labels = statefulSet.Spec.Template.Labels // TODO Test this line
 
 			if dc.Spec.CanaryUpgrade {
 				var partition int32

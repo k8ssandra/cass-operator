@@ -378,6 +378,72 @@ func TestCheckRackPodTemplate_GenerationCheck(t *testing.T) {
 	assert.True(res.Completed())
 }
 
+func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
+	require := require.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	rc.Datacenter.Spec.PodTemplateSpec = &corev1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "cassandra",
+				},
+			},
+		},
+	}
+
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
+		"default",
+		rc.Datacenter,
+		2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+
+	desiredStatefulSet.Spec.Replicas = ptr.To(int32(1))
+	desiredStatefulSet.Status.ReadyReplicas = int32(1)
+
+	trackObjects := []runtime.Object{
+		desiredStatefulSet,
+		rc.Datacenter,
+	}
+
+	nextRack := &RackInformation{}
+	nextRack.RackName = "default"
+	nextRack.NodeCount = 1
+	nextRack.SeedCount = 1
+
+	rackInfo := []*RackInformation{nextRack}
+
+	rc.desiredRackInformation = rackInfo
+	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
+	rc.statefulSets[0] = desiredStatefulSet
+
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	res := rc.CheckRackPodTemplate()
+	require.Equal(result.Done(), res)
+
+	sts := &appsv1.StatefulSet{}
+	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: desiredStatefulSet.Name, Namespace: desiredStatefulSet.Namespace}, sts))
+	require.Equal("bar", sts.Spec.Template.Labels["foo"])
+
+	// Now update the template and verify that the StatefulSet is updated
+	rc.Datacenter.Spec.PodTemplateSpec.ObjectMeta.Labels["foo2"] = "baz"
+	rc.Datacenter.Generation++
+	res = rc.CheckRackPodTemplate()
+	require.Equal(result.Done(), res)
+
+	sts = &appsv1.StatefulSet{}
+	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: desiredStatefulSet.Name, Namespace: desiredStatefulSet.Namespace}, sts))
+	require.Equal("bar", sts.Spec.Template.Labels["foo"])
+	require.Equal("baz", sts.Spec.Template.Labels["foo2"])
+}
+
 func TestReconcilePods(t *testing.T) {
 	t.Skip()
 	rc, _, cleanupMockScr := setupTest()

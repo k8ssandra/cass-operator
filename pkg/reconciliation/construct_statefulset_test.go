@@ -9,9 +9,11 @@ import (
 	"testing"
 
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/pkg/utils"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -433,9 +435,9 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 	}
 
 	defaultSecurityContext := &corev1.PodSecurityContext{
-		RunAsUser:  int64Ptr(999),
-		RunAsGroup: int64Ptr(999),
-		FSGroup:    int64Ptr(999),
+		RunAsUser:  ptr.To(int64(999)),
+		RunAsGroup: ptr.To(int64(999)),
+		FSGroup:    ptr.To(int64(999)),
 	}
 
 	tests := []struct {
@@ -479,18 +481,18 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 					PodTemplateSpec: &corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							SecurityContext: &corev1.PodSecurityContext{
-								RunAsUser:  int64Ptr(12345),
-								RunAsGroup: int64Ptr(54321),
-								FSGroup:    int64Ptr(11111),
+								RunAsUser:  ptr.To(int64(12345)),
+								RunAsGroup: ptr.To(int64(54321)),
+								FSGroup:    ptr.To(int64(11111)),
 							},
 						},
 					},
 				},
 			},
 			expected: &corev1.PodSecurityContext{
-				RunAsUser:  int64Ptr(12345),
-				RunAsGroup: int64Ptr(54321),
-				FSGroup:    int64Ptr(11111),
+				RunAsUser:  ptr.To(int64(12345)),
+				RunAsGroup: ptr.To(int64(54321)),
+				FSGroup:    ptr.To(int64(11111)),
 			},
 		},
 		{
@@ -504,18 +506,18 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 					PodTemplateSpec: &corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							SecurityContext: &corev1.PodSecurityContext{
-								RunAsUser:  int64Ptr(12345),
-								RunAsGroup: int64Ptr(54321),
-								FSGroup:    int64Ptr(11111),
+								RunAsUser:  ptr.To(int64(12345)),
+								RunAsGroup: ptr.To(int64(54321)),
+								FSGroup:    ptr.To(int64(11111)),
 							},
 						},
 					},
 				},
 			},
 			expected: &corev1.PodSecurityContext{
-				RunAsUser:  int64Ptr(12345),
-				RunAsGroup: int64Ptr(54321),
-				FSGroup:    int64Ptr(11111),
+				RunAsUser:  ptr.To(int64(12345)),
+				RunAsGroup: ptr.To(int64(54321)),
+				FSGroup:    ptr.To(int64(11111)),
 			},
 		},
 		{
@@ -668,6 +670,44 @@ func Test_newStatefulSetForCassandraDatacenter_dcNameOverride(t *testing.T) {
 	}
 }
 
-func int64Ptr(n int64) *int64 {
-	return &n
+func TestPodTemplateSpecHashAnnotationChanges(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "test",
+			ServerType:    "cassandra",
+			ServerVersion: "4.0.7",
+			StorageConfig: api.StorageConfig{
+				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+			},
+			Racks: []api.Rack{
+				{
+					Name: "testrack",
+				},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{},
+		},
+	}
+
+	sts, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3)
+	assert.NoError(err, "failed to build statefulset")
+
+	// Test that the hash annotation is set
+	assert.Contains(sts.Annotations, utils.ResourceHashAnnotationKey)
+	currentHash := sts.Annotations[utils.ResourceHashAnnotationKey]
+
+	// Add PodTemplateSpec labels
+	dc.Spec.PodTemplateSpec.Labels = map[string]string{"abc": "123"}
+	sts, err = newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3)
+	assert.NoError(err)
+	updatedHash := sts.Annotations[utils.ResourceHashAnnotationKey]
+	assert.NotEqual(currentHash, updatedHash, "expected hash to change when PodTemplateSpec labels change")
+
+	// Add more labels
+	dc.Spec.PodTemplateSpec.Labels["more"] = "labels"
+	sts, err = newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3)
+	// spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
+	assert.NoError(err)
+	updatedHash = sts.Annotations[utils.ResourceHashAnnotationKey]
+	assert.NotEqual(currentHash, updatedHash, "expected hash to change when PodTemplateSpec labels change")
 }

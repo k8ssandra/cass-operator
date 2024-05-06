@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.20.0
 
 * [CHANGE] [#566](https://github.com/k8ssandra/cass-operator/issues/566) BREAKING: StatefulSets will no longer be automatically updated if CassandraDatacenter is not modified, unless an annotation "cassandra.datastax.com/autoupdate-spec" is set to the CassandraDatacenter with value "always" or "once". This means users of config secret should set this variable to "always" to keep their existing behavior. For other users, this means that for example the upgrades of operator will no longer automatically apply updated settings or system-logger image. The benefit is that updating the operator no longer causes the cluster to have a rolling restart. A new condition to indicate such change could be necessary is called "RequiresUpdate" and it will be set to True until the next refresh of reconcile has happened. 

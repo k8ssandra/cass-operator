@@ -231,7 +231,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			desiredSts.Spec.VolumeClaimTemplates = statefulSet.Spec.VolumeClaimTemplates
 			// selector must match podTemplate.Labels, those can't be updated either
 			desiredSts.Spec.Selector = statefulSet.Spec.Selector
-			// desiredSts.Spec.Template.Labels = statefulSet.Spec.Template.Labels // TODO Test this line
 
 			if dc.Spec.CanaryUpgrade {
 				var partition int32
@@ -1760,13 +1759,6 @@ func (rc *ReconciliationContext) findStartingNodes() (bool, bool, error) {
 					return false, true, nil
 				}
 			} else {
-				// TODO Calling start again on the pod seemed like a good defensive practice
-				// TODO but was making problems w/ overloading management API
-				// TODO Use a label to hold state and request starting no more than once per minute?
-
-				// if err := rc.callNodeManagementStart(pod); err != nil {
-				// 	return false, err
-				// }
 				return true, false, nil
 			}
 		}
@@ -2096,7 +2088,6 @@ func (rc *ReconciliationContext) CheckRollingRestart() result.ReconcileResult {
 					"pod", pod.Name)
 			}
 			// get a fresh pod
-			// TODO should we keep the pod and cycle the DB with mgmt api?
 			err = rc.Client.Delete(rc.Ctx, pod)
 			if err != nil {
 				return result.Error(err)

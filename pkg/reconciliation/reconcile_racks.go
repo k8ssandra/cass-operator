@@ -989,21 +989,21 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 		}
 
 		if pod.Status.PodIP != "" && isMgmtApiRunning(pod) {
+			ip := getRpcAddress(dc, pod)
+			nodeStatus.IP = ip
+			nodeStatus.Rack = pod.Labels[api.RackLabel]
+
 			// Getting the HostID requires a call to the node management API which is
 			// moderately expensive, so if we already have a HostID, don't bother. This
 			// would only change if something has gone horribly horribly wrong.
-
 			if force || nodeStatus.HostID == "" {
 				endpointsResponse, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
 				if err == nil {
-					ip := getRpcAddress(dc, pod)
 					nodeStatus.HostID = findHostIdForIpFromEndpointsData(
 						endpointsResponse.Entity, ip)
 					if nodeStatus.HostID == "" {
 						logger.Info("Failed to find host ID", "pod", pod.Name)
 					}
-					nodeStatus.IP = ip
-					nodeStatus.Rack = pod.Labels[api.RackLabel]
 				}
 			}
 		}

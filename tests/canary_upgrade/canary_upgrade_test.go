@@ -100,6 +100,22 @@ var _ = Describe(testName, func() {
 			ns.WaitForCassandraImages(dcName, images, 300)
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)
 
+			// TODO Verify that after the canary upgrade we can issue upgrades to the rest of the nodes
+			step = "remove canary upgrade"
+			json = "{\"spec\": {\"canaryUpgrade\": false}"
+			k = kubectl.PatchMerge(dcResource, json)
+			ns.ExecAndLog(step, k)
+
+			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
+			ns.WaitForDatacenterReadyPodCount(dcName, 3)
+
+			images = []string{
+				updated,
+				updated,
+				updated,
+			}
+			ns.WaitForCassandraImages(dcName, images, 300)
+
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(dcYaml)
 			ns.ExecAndLog(step, k)

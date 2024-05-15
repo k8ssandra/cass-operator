@@ -102,7 +102,7 @@ var _ = Describe(testName, func() {
 
 			// TODO Verify that after the canary upgrade we can issue upgrades to the rest of the nodes
 			step = "remove canary upgrade"
-			json = "{\"spec\": {\"canaryUpgrade\": false}"
+			json = "{\"spec\": {\"canaryUpgrade\": false}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 

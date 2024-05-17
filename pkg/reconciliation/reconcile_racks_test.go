@@ -293,7 +293,6 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 	rc, _, cleanpMockSrc := setupTest()
 	defer cleanpMockSrc()
 
-	rc.Datacenter.Spec.ServerVersion = "6.8.2"
 	rc.Datacenter.Spec.Racks = []api.Rack{
 		{Name: "rack1", DeprecatedZone: "zone-1"},
 	}
@@ -314,11 +313,10 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 
 	assert.True(t, result.Completed())
 	assert.Nil(t, err)
-	previousLabels := rc.statefulSets[0].Spec.Template.Labels
 
 	rc.Datacenter.Spec.CanaryUpgrade = true
 	rc.Datacenter.Spec.CanaryUpgradeCount = 1
-	rc.Datacenter.Spec.ServerVersion = "6.8.3"
+	rc.Datacenter.Spec.ServerVersion = "6.8.44"
 	partition := rc.Datacenter.Spec.CanaryUpgradeCount
 
 	result = rc.CheckRackPodTemplate()
@@ -342,12 +340,14 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 	rc.statefulSets[0].Status.ReadyReplicas = 2
 	rc.statefulSets[0].Status.CurrentReplicas = 1
 	rc.statefulSets[0].Status.UpdatedReplicas = 1
+	rc.statefulSets[0].Status.CurrentRevision = "1"
+	rc.statefulSets[0].Status.UpdateRevision = "2"
+
+	rc.Datacenter.Spec.CanaryUpgrade = false
 
 	result = rc.CheckRackPodTemplate()
-
-	assert.EqualValues(t, previousLabels, rc.statefulSets[0].Spec.Template.Labels)
-
 	assert.True(t, result.Completed())
+	assert.NotEqual(t, expectedStrategy, rc.statefulSets[0].Spec.UpdateStrategy)
 }
 
 func TestCheckRackPodTemplate_GenerationCheck(t *testing.T) {
@@ -405,7 +405,11 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 		2)
 	require.NoErrorf(err, "error occurred creating statefulset")
 
+	desiredStatefulSet.Generation = 1
 	desiredStatefulSet.Spec.Replicas = ptr.To(int32(1))
+	desiredStatefulSet.Status.Replicas = int32(1)
+	desiredStatefulSet.Status.UpdatedReplicas = int32(1)
+	desiredStatefulSet.Status.ObservedGeneration = 1
 	desiredStatefulSet.Status.ReadyReplicas = int32(1)
 
 	trackObjects := []runtime.Object{
@@ -424,9 +428,10 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
 	rc.statefulSets[0] = desiredStatefulSet
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter, rc.statefulSets[0]).WithRuntimeObjects(trackObjects...).Build()
 	res := rc.CheckRackPodTemplate()
 	require.Equal(result.Done(), res)
+	rc.statefulSets[0].Status.ObservedGeneration = rc.statefulSets[0].Generation
 
 	sts := &appsv1.StatefulSet{}
 	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: desiredStatefulSet.Name, Namespace: desiredStatefulSet.Namespace}, sts))

@@ -12,6 +12,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [BUGFIX] [#652](https://github.com/k8ssandra/cass-operator/issues/652) Update nodeStatuses info when a pod is recreated
+* [BUGFIX] [#656](https://github.com/k8ssandra/cass-operator/issues/656) After canary upgrade, it was not possible to continue upgrading rest of the nodes if the only change was removing the canary upgrade
+* [BUGFIX] [#657](https://github.com/k8ssandra/cass-operator/issues/657) If a change did not result in StatefulSet changes, a Ready -> Ready state would lose an ObservedGeneration update in the status
+* [BUGFIX] [#382](https://github.com/k8ssandra/cass-operator/issues/382) If StatefulSet has not caught up yet, do not allow any changes to it. Instead, requeue and wait (does not change behavior of forceRacksUpgrade)
 
 ## v1.20.0
 

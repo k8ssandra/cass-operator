@@ -152,6 +152,23 @@ func newStatefulSetForCassandraDatacenter(
 		result.Spec.ServiceName = sts.Spec.ServiceName
 	}
 
+	if dc.Spec.CanaryUpgrade {
+		var partition int32
+		if dc.Spec.CanaryUpgradeCount == 0 || dc.Spec.CanaryUpgradeCount > replicaCountInt32 {
+			partition = replicaCountInt32
+		} else {
+			partition = replicaCountInt32 - dc.Spec.CanaryUpgradeCount
+		}
+
+		strategy := appsv1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				Partition: &partition,
+			},
+		}
+		result.Spec.UpdateStrategy = strategy
+	}
+
 	// add a hash here to facilitate checking if updates are needed
 	utils.AddHashAnnotation(result)
 

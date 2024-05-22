@@ -171,10 +171,38 @@ func (rc *ReconciliationContext) UpdateAllowed() bool {
 	return rc.Datacenter.GenerationChanged() || metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation)
 }
 
+func (rc *ReconciliationContext) CheckPVCResizing() result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::CheckPVCResizing")
+	pvcList, err := rc.listPVCs()
+	if err != nil {
+		return result.Error(err)
+	}
+
+	for _, pvc := range pvcList.Items {
+		if isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimResizing) ||
+			isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimFileSystemResizePending) {
+			rc.ReqLogger.Info("Waiting for PVC resize to complete",
+				"pvc", pvc.Name)
+			return result.RequeueSoon(10)
+		}
+	}
+
+	return result.Continue()
+}
+
+func isPVCStatusConditionTrue(pvc corev1.PersistentVolumeClaim, conditionType corev1.PersistentVolumeClaimConditionType) bool {
+	for _, condition := range pvc.Status.Conditions {
+		if condition.Type == conditionType && condition.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
-	logger.Info("starting CheckRackPodTemplate()")
+	logger.Info("reconcile_racks::CheckRackPodTemplate")
 
 	for idx := range rc.desiredRackInformation {
 		rackName := rc.desiredRackInformation[idx].RackName
@@ -252,6 +280,8 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			desiredSts.Annotations = utils.MergeMap(map[string]string{}, statefulSet.Annotations, desiredSts.Annotations)
 
 			// copy the stuff that can't be updated
+			// TODO Modifications might change this behavior. Resize here before continuing?
+			// TODO Do not allow reducing the size
 			desiredSts.Spec.VolumeClaimTemplates = statefulSet.Spec.VolumeClaimTemplates
 			// selector must match podTemplate.Labels, those can't be updated either
 			desiredSts.Spec.Selector = statefulSet.Spec.Selector
@@ -2391,6 +2421,10 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	}
 
 	if recResult := rc.CheckDcPodDisruptionBudget(); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.CheckPVCResizing(); recResult.Completed() {
 		return recResult.Output()
 	}
 

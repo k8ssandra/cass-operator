@@ -4,9 +4,13 @@
 package reconciliation
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -160,4 +164,40 @@ func (rc *ReconciliationContext) listPVCs() (*corev1.PersistentVolumeClaimList, 
 	}
 
 	return persistentVolumeClaimList, rc.Client.List(rc.Ctx, persistentVolumeClaimList, listOptions)
+}
+
+func storageClass(ctx context.Context, c client.Client, storageClassName string) (*storagev1.StorageClass, error) {
+	if storageClassName == "" {
+		storageClassList := &storagev1.StorageClassList{}
+		if err := c.List(ctx, storageClassList, client.MatchingLabels{"storageclass.kubernetes.io/is-default-class": "true"}); err != nil {
+			return nil, err
+		}
+
+		if len(storageClassList.Items) > 0 {
+			return nil, fmt.Errorf("found multiple default storage classes, please specify StorageClassName in the CassandraDatacenter spec")
+		} else if len(storageClassList.Items) == 0 {
+			return nil, fmt.Errorf("no default storage class found, please specify StorageClassName in the CassandraDatacenter spec")
+		}
+
+		return &storageClassList.Items[0], nil
+	}
+
+	storageClass := &storagev1.StorageClass{}
+	if err := c.Get(ctx, types.NamespacedName{Name: storageClassName}, storageClass); err != nil {
+		return nil, err
+	}
+
+	return storageClass, nil
+}
+
+func (rc *ReconciliationContext) storageExpansion() (bool, error) {
+	storageClassName := rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.StorageClassName
+	storageClass, err := storageClass(rc.Ctx, rc.Client, *storageClassName)
+	if err != nil {
+		return false, err
+	}
+
+	if storageClass.AllowVolumeExpansion != nil && *storageClass.AllowVolumeExpansion {
+		return true, nil
+	}
 }

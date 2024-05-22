@@ -360,7 +360,7 @@ func (client *NodeMgmtClient) CallDrainEndpoint(pod *corev1.Pod) error {
 		host:     podHost,
 		port:     podPort,
 		method:   http.MethodPost,
-		timeout:  time.Minute * 2,
+		timeout:  time.Minute * 5,
 	}
 
 	_, err = callNodeMgmtEndpoint(client, request, "")

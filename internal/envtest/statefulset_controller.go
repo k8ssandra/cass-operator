@@ -105,13 +105,17 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	for i := 0; i < intendedReplicas; i++ {
-		if i <= len(stsPods)-1 {
-			continue
-		}
-
 		podKey := types.NamespacedName{
 			Name:      fmt.Sprintf("%s-%d", sts.Name, i),
 			Namespace: sts.Namespace,
+		}
+
+		if err := r.Client.Get(ctx, podKey, &corev1.Pod{}); err == nil {
+			// Pod already exists
+			continue
+		} else if client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to get the Pod")
+			return ctrl.Result{}, err
 		}
 
 		pod := &corev1.Pod{
@@ -124,7 +128,6 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			Spec: sts.Spec.Template.Spec,
 		}
 
-		// tbh, why do we need to add this here..?
 		pod.Spec.Volumes = append(pod.Spec.Volumes,
 			corev1.Volume{
 				Name: "server-data",

@@ -17,6 +17,7 @@ import (
 	"github.com/go-logr/logr"
 	mock "github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,14 +64,20 @@ func CreateMockReconciliationContext(
 	)
 
 	storageSize := resource.MustParse("1Gi")
-	storageName := "server-data"
+	storageClassName := "standard"
 	storageConfig := api.StorageConfig{
 		CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-			StorageClassName: &storageName,
+			StorageClassName: &storageClassName,
 			AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
 			},
+		},
+	}
+
+	storageClass := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: storageClassName,
 		},
 	}
 
@@ -94,6 +101,7 @@ func CreateMockReconciliationContext(
 
 	trackObjects := []runtime.Object{
 		cassandraDatacenter,
+		storageClass,
 	}
 
 	s := scheme.Scheme

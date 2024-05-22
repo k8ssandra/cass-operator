@@ -121,6 +121,8 @@ func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
 		return errs[0]
 	}
 
+	// TODO Verify if we can expand the PVC or should we reject changes
+
 	claim := dc.Spec.StorageConfig.CassandraDataVolumeClaimSpec
 	if claim == nil {
 		err := fmt.Errorf("storageConfig.cassandraDataVolumeClaimSpec is required")

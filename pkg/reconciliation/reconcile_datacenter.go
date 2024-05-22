@@ -4,9 +4,13 @@
 package reconciliation
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -112,7 +116,7 @@ func (rc *ReconciliationContext) deletePVCs() error {
 		"cassandraDatacenterName", rc.Datacenter.Name,
 	)
 
-	persistentVolumeClaimList, err := rc.listPVCs()
+	persistentVolumeClaimList, err := rc.listPVCs(rc.Datacenter.GetDatacenterLabels())
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Info("No PVCs found for CassandraDatacenter")
@@ -124,9 +128,9 @@ func (rc *ReconciliationContext) deletePVCs() error {
 
 	logger.Info(
 		"Found PVCs for cassandraDatacenter",
-		"numPVCs", len(persistentVolumeClaimList.Items))
+		"numPVCs", len(persistentVolumeClaimList))
 
-	for _, pvc := range persistentVolumeClaimList.Items {
+	for _, pvc := range persistentVolumeClaimList {
 		if err := rc.Client.Delete(rc.Ctx, &pvc); err != nil {
 			logger.Error(err, "Failed to delete PVCs for cassandraDatacenter")
 			return err
@@ -140,12 +144,8 @@ func (rc *ReconciliationContext) deletePVCs() error {
 	return nil
 }
 
-func (rc *ReconciliationContext) listPVCs() (*corev1.PersistentVolumeClaimList, error) {
+func (rc *ReconciliationContext) listPVCs(selector map[string]string) ([]corev1.PersistentVolumeClaim, error) {
 	rc.ReqLogger.Info("reconciler::listPVCs")
-
-	selector := map[string]string{
-		api.DatacenterLabel: api.CleanLabelValue(rc.Datacenter.DatacenterName()),
-	}
 
 	listOptions := &client.ListOptions{
 		Namespace:     rc.Datacenter.Namespace,
@@ -159,5 +159,48 @@ func (rc *ReconciliationContext) listPVCs() (*corev1.PersistentVolumeClaimList, 
 		},
 	}
 
-	return persistentVolumeClaimList, rc.Client.List(rc.Ctx, persistentVolumeClaimList, listOptions)
+	pvcList, err := persistentVolumeClaimList, rc.Client.List(rc.Ctx, persistentVolumeClaimList, listOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return pvcList.Items, nil
+}
+
+func storageClass(ctx context.Context, c client.Client, storageClassName string) (*storagev1.StorageClass, error) {
+	if storageClassName == "" {
+		storageClassList := &storagev1.StorageClassList{}
+		if err := c.List(ctx, storageClassList, client.MatchingLabels{"storageclass.kubernetes.io/is-default-class": "true"}); err != nil {
+			return nil, err
+		}
+
+		if len(storageClassList.Items) > 0 {
+			return nil, fmt.Errorf("found multiple default storage classes, please specify StorageClassName in the CassandraDatacenter spec")
+		} else if len(storageClassList.Items) == 0 {
+			return nil, fmt.Errorf("no default storage class found, please specify StorageClassName in the CassandraDatacenter spec")
+		}
+
+		return &storageClassList.Items[0], nil
+	}
+
+	storageClass := &storagev1.StorageClass{}
+	if err := c.Get(ctx, types.NamespacedName{Name: storageClassName}, storageClass); err != nil {
+		return nil, err
+	}
+
+	return storageClass, nil
+}
+
+func (rc *ReconciliationContext) storageExpansion() (bool, error) {
+	storageClassName := rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.StorageClassName
+	storageClass, err := storageClass(rc.Ctx, rc.Client, *storageClassName)
+	if err != nil {
+		return false, err
+	}
+
+	if storageClass.AllowVolumeExpansion != nil && *storageClass.AllowVolumeExpansion {
+		return true, nil
+	}
+
+	return false, nil
 }

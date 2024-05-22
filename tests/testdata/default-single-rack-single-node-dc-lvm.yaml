@@ -1,0 +1,27 @@
+apiVersion: cassandra.datastax.com/v1beta1
+kind: CassandraDatacenter
+metadata:
+  name: dc1
+  annotations:
+    cassandra.datastax.com/allow-storage-changes: "true"
+spec:
+  clusterName: cluster1
+  serverType: cassandra
+  serverVersion: "4.1.4"
+  managementApiAuth:
+    insecure: {}
+  size: 1
+  storageConfig:
+    cassandraDataVolumeClaimSpec:
+      storageClassName: topolvm-provisioner-thin
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+  racks:
+    - name: r1
+  config:
+    jvm-server-options:
+      initial_heap_size: "512m"
+      max_heap_size: "512m"

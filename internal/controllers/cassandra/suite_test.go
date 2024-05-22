@@ -130,6 +130,8 @@ var _ = BeforeSuite(func() {
 	control.JobRunningRequeue = time.Duration(1 * time.Millisecond)
 	control.TaskRunningRequeue = time.Duration(1 * time.Millisecond)
 
+	createStorageClass(ctx, "default")
+
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)

@@ -364,15 +364,8 @@ func DumpClusterInfo(path string, namespace string) {
 	dumpCmd := DumpLogs(path, namespace)
 	dumpCmd.ExecVPanic()
 
-	// Store the list of pods in an easy to read format.
-	podWide := Get("pods", "-o", "wide", "-n", namespace).OutputPanic()
-	storeOutput(path, "pods", "out", podWide)
-
-	describePods := Describe("pods", "-n", namespace).OutputPanic()
-	storeOutput(path, "pods-describe", "out", describePods)
-
 	// Dump all objects that we need to investigate failures as a flat list and as yaml manifests
-	for _, objectType := range []string{"CassandraDatacenter", "CassandraTask"} {
+	for _, objectType := range []string{"statefulsets", "pvc", "pv", "pods", "CassandraDatacenter", "CassandraTask"} {
 		// Get the list of objects
 		output, _ := Get(objectType, "-o", "wide", "-n", namespace).Output()
 		storeOutput(path, objectType, "out", output)
@@ -380,6 +373,12 @@ func DumpClusterInfo(path string, namespace string) {
 		// Get the yamls for each object
 		output, _ = Get(objectType, "-o", "yaml", "-n", namespace).Output()
 		storeOutput(path, objectType, "yaml", output)
+	}
+
+	// For describe information
+	for _, objectType := range []string{"statefulsets", "pods", "pvc", "pv"} {
+		output, _ := Describe(objectType, "-n", namespace).Output()
+		storeOutput(path, objectType, "out", output)
 	}
 }
 

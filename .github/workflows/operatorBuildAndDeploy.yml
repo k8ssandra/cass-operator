@@ -72,7 +72,7 @@ jobs:
           echo "version=$(make version)" >> $GITHUB_OUTPUT
       - name: Build and push
         id: docker_build_cass_operator
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           file: Dockerfile
           context: .
@@ -83,7 +83,7 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build and push
         id: docker_build_system_logger
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           file: logger.Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
@@ -99,7 +99,7 @@ jobs:
           bin/operator-sdk bundle validate ./bundle --select-optional name=good-practices
       - name: Build and push cass-operator-bundle
         id: docker_build_cass-operator_bundle
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           file: bundle.Dockerfile
           build-args: |

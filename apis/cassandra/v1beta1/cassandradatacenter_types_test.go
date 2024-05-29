@@ -95,6 +95,16 @@ func TestUseClientImage(t *testing.T) {
 		},
 		{
 			serverType: "dse",
+			version:    "6.9.0",
+			should:     false,
+		},
+		{
+			serverType: "hcd",
+			version:    "1.0.0",
+			should:     true,
+		},
+		{
+			serverType: "dse",
 			version:    "4.1.2",
 			should:     false,
 		},

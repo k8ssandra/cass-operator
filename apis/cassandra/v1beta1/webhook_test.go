@@ -22,7 +22,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		errString string
 	}{
 		{
-			name: "Dse Valid",
+			name: "DSE Valid",
 			dc: &CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
@@ -35,7 +35,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 			errString: "",
 		},
 		{
-			name: "Dse 6.8.4 Valid",
+			name: "DSE 6.8.4 Valid",
 			dc: &CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
@@ -48,7 +48,33 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 			errString: "",
 		},
 		{
-			name: "Dse 7.0.0 Valid",
+			name: "DSE 6.9.1 Valid",
+			dc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: CassandraDatacenterSpec{
+					ServerType:    "dse",
+					ServerVersion: "6.9.1",
+				},
+			},
+			errString: "",
+		},
+		{
+			name: "HCD 1.0.0 Valid",
+			dc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: CassandraDatacenterSpec{
+					ServerType:    "hcd",
+					ServerVersion: "1.0.0",
+				},
+			},
+			errString: "",
+		},
+		{
+			name: "DSE 7.0.0 invalid",
 			dc: &CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
@@ -58,10 +84,10 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 					ServerVersion: "7.0.0",
 				},
 			},
-			errString: "",
+			errString: "use unsupported DSE version '7.0.0'",
 		},
 		{
-			name: "Dse Invalid",
+			name: "DSE Invalid",
 			dc: &CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
@@ -74,7 +100,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 			errString: "use unsupported DSE version '4.8.0'",
 		},
 		{
-			name: "Dse 5 Invalid",
+			name: "DSE 5 Invalid",
 			dc: &CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",

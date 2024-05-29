@@ -101,7 +101,7 @@ type CassandraDatacenterSpec struct {
 
 	// Version string for config builder,
 	// used to generate Cassandra server configuration
-	// +kubebuilder:validation:Pattern=(6\.8\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)|(5\.\d+\.\d+)|(7\.\d+\.\d+)
+	// +kubebuilder:validation:Pattern=(6\.[89]\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)|(5\.\d+\.\d+)|(1\.\d+\.\d+)
 	ServerVersion string `json:"serverVersion"`
 
 	// Cassandra server image name. Use of ImageConfig to match ServerVersion is recommended instead of this value.
@@ -109,8 +109,8 @@ type CassandraDatacenterSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/images
 	ServerImage string `json:"serverImage,omitempty"`
 
-	// Server type: "cassandra" or "dse"
-	// +kubebuilder:validation:Enum=cassandra;dse
+	// Server type: "cassandra", "dse" or "hcd"
+	// +kubebuilder:validation:Enum=cassandra;dse;hcd
 	ServerType string `json:"serverType"`
 
 	// DEPRECATED This setting does nothing and defaults to true. Use SecurityContext instead.
@@ -970,7 +970,14 @@ func (dc *CassandraDatacenter) DatacenterName() string {
 }
 
 func (dc *CassandraDatacenter) UseClientImage() bool {
-	return dc.Spec.ServerType == "cassandra" && semver.Compare(fmt.Sprintf("v%s", dc.Spec.ServerVersion), "v4.1.0") >= 0
+	if dc.Spec.ServerType == "hcd" {
+		return true
+	}
+
+	if dc.Spec.ServerType == "cassandra" && semver.Compare(fmt.Sprintf("v%s", dc.Spec.ServerVersion), "v4.1.0") >= 0 {
+		return true
+	}
+	return false
 }
 
 func (dc *CassandraDatacenter) GenerationChanged() bool {

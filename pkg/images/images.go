@@ -24,10 +24,12 @@ var (
 )
 
 const (
-	ValidDseVersionRegexp      = "(6\\.8\\.\\d+)|(7\\.\\d+\\.\\d+)"
+	ValidDseVersionRegexp      = "(6\\.[89]\\.\\d+)"
+	ValidHcdVersionRegexp      = "(1\\.\\d+\\.\\d+)"
 	ValidOssVersionRegexp      = "(3\\.11\\.\\d+)|(4\\.\\d+\\.\\d+)|(5\\.\\d+\\.\\d+)"
 	DefaultCassandraRepository = "k8ssandra/cass-management-api"
-	DefaultDSERepository       = "datastax/dse-server"
+	DefaultDSERepository       = "datastax/dse-mgmtapi-6_8"
+	DefaultHCDRepository       = "datastax/hcd"
 )
 
 func init() {
@@ -68,6 +70,11 @@ func IsDseVersionSupported(version string) bool {
 
 func IsOssVersionSupported(version string) bool {
 	validVersions := regexp.MustCompile(ValidOssVersionRegexp)
+	return validVersions.MatchString(version)
+}
+
+func IsHCDVersionSupported(version string) bool {
+	validVersions := regexp.MustCompile(ValidHcdVersionRegexp)
 	return validVersions.MatchString(version)
 }
 
@@ -133,10 +140,14 @@ func getImageComponents(serverType string) (string, string) {
 	defaults := GetImageConfig().DefaultImages
 	if defaults != nil {
 		var component configv1beta1.ImageComponent
-		if serverType == "dse" {
+		switch serverType {
+		case "dse":
 			component = defaults.DSEImageComponent
-		}
-		if serverType == "cassandra" {
+		case "cassandra":
+			component = defaults.CassandraImageComponent
+		case "hcd":
+			component = defaults.HCDImageComponent
+		default:
 			component = defaults.CassandraImageComponent
 		}
 
@@ -153,14 +164,21 @@ func GetCassandraImage(serverType, version string) (string, error) {
 		return ApplyRegistry(image), nil
 	}
 
-	if serverType == "dse" {
+	switch serverType {
+	case "dse":
 		if !IsDseVersionSupported(version) {
 			return "", fmt.Errorf("server 'dse' and version '%s' do not work together", version)
 		}
-	} else {
+	case "cassandra":
 		if !IsOssVersionSupported(version) {
 			return "", fmt.Errorf("server 'cassandra' and version '%s' do not work together", version)
 		}
+	case "hcd":
+		if !IsHCDVersionSupported(version) {
+			return "", fmt.Errorf("server 'hcd' and version '%s' do not work together", version)
+		}
+	default:
+		return "", fmt.Errorf("server type '%s' is not supported", serverType)
 	}
 
 	prefix, suffix := getImageComponents(serverType)

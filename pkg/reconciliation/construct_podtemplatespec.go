@@ -636,6 +636,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")},
 		{Name: "DS_LICENSE", Value: "accept"},
 		{Name: "DSE_AUTO_CONF_OFF", Value: "all"},
+		{Name: "HCD_AUTO_CONF_OFF", Value: "all"},
 		{Name: "USE_MGMT_API", Value: "true"},
 		{Name: "MGMT_API_EXPLICIT_START", Value: "true"},
 		// TODO remove this post 1.0

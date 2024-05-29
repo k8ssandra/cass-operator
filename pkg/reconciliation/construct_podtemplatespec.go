@@ -635,18 +635,22 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		{Name: "POD_NAME", ValueFrom: selectorFromFieldPath("metadata.name")},
 		{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")},
 		{Name: "DS_LICENSE", Value: "accept"},
-		{Name: "DSE_AUTO_CONF_OFF", Value: "all"},
-		{Name: "HCD_AUTO_CONF_OFF", Value: "all"},
 		{Name: "USE_MGMT_API", Value: "true"},
 		{Name: "MGMT_API_EXPLICIT_START", Value: "true"},
-		// TODO remove this post 1.0
-		{Name: "DSE_MGMT_EXPLICIT_START", Value: "true"},
 	}
 
-	if dc.Spec.ServerType == "dse" && dc.Spec.DseWorkloads != nil {
-		envDefaults = append(
-			envDefaults,
-			corev1.EnvVar{Name: "JVM_EXTRA_OPTS", Value: getJvmExtraOpts(dc)})
+	if dc.Spec.ServerType == "dse" {
+		envDefaults = append(envDefaults, corev1.EnvVar{Name: "DSE_AUTO_CONF_OFF", Value: "all"})
+		envDefaults = append(envDefaults, corev1.EnvVar{Name: "DSE_MGMT_EXPLICIT_START", Value: "true"})
+		if dc.Spec.DseWorkloads != nil {
+			envDefaults = append(
+				envDefaults,
+				corev1.EnvVar{Name: "JVM_EXTRA_OPTS", Value: getJvmExtraOpts(dc)})
+		}
+	}
+
+	if dc.Spec.ServerType == "hcd" {
+		envDefaults = append(envDefaults, corev1.EnvVar{Name: "HCD_AUTO_CONF_OFF", Value: "all"})
 	}
 
 	cassContainer.Env = combineEnvSlices(envDefaults, cassContainer.Env)

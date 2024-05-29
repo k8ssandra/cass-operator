@@ -454,7 +454,11 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 			}
 
 			configContainer.Command = []string{"/bin/sh"}
-			configContainer.Args = []string{"-c", "cp -rf /etc/cassandra/* /cassandra-base-config/"}
+			if dc.Spec.ServerType == "cassandra" {
+				configContainer.Args = []string{"-c", "cp -rf /etc/cassandra/* /cassandra-base-config/"}
+			} else if dc.Spec.ServerType == "hcd" {
+				configContainer.Args = []string{"-c", "cp -rf /opt/hcd/resources/cassandra/conf/* /cassandra-base-config/"}
+			}
 		}
 
 		configContainer.VolumeMounts = []corev1.VolumeMount{configBaseMount}

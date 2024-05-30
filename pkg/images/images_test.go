@@ -69,7 +69,6 @@ func TestCassandraOverride(t *testing.T) {
 }
 
 func TestDefaultImageConfigParsing(t *testing.T) {
-	t.Skip()
 	assert := require.New(t)
 	imageConfigFile := filepath.Join("..", "..", "config", "manager", "image_config.yaml")
 	err := ParseImageConfig(imageConfigFile)
@@ -80,14 +79,22 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 	assert.NotNil(GetImageConfig().Images)
 	assert.True(strings.Contains(GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
 	assert.True(strings.Contains(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
-	assert.True(strings.Contains(GetImageConfig().Images.Client, "datastax/k8ssandra-client:"))
+	assert.True(strings.Contains(GetImageConfig().Images.Client, "k8ssandra/k8ssandra-client:"))
 
 	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.CassandraImageComponent.Repository)
 	assert.Equal("datastax/dse-mgmtapi-6_8", GetImageConfig().DefaultImages.DSEImageComponent.Repository)
 
-	path, err := GetCassandraImage("dse", "6.8.17")
+	path, err := GetCassandraImage("dse", "6.8.47")
 	assert.NoError(err)
-	assert.Equal("datastax/dse-mgmtapi-6_8:6.8.17-ubi8", path)
+	assert.Equal("datastax/dse-mgmtapi-6_8:6.8.47-ubi8", path)
+
+	path, err = GetCassandraImage("hcd", "1.0.0")
+	assert.NoError(err)
+	assert.Equal("datastax/hcd:1.0.0-ubi", path)
+
+	path, err = GetCassandraImage("cassandra", "4.1.4")
+	assert.NoError(err)
+	assert.Equal("k8ssandra/cass-management-api:4.1.4-ubi8", path)
 }
 
 func TestImageConfigParsing(t *testing.T) {
@@ -133,7 +140,7 @@ func TestDefaultRepositories(t *testing.T) {
 
 	path, err = GetCassandraImage("dse", "6.8.17")
 	assert.NoError(err)
-	assert.Equal("datastax/dse-server:6.8.17", path)
+	assert.Equal("datastax/dse-mgmtapi-6_8:6.8.17", path)
 }
 
 func TestOssValidVersions(t *testing.T) {

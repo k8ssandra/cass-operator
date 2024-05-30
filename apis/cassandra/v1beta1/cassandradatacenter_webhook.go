@@ -87,6 +87,12 @@ func ValidateSingleDatacenter(dc CassandraDatacenter) error {
 		}
 	}
 
+	if dc.Spec.ServerType == "hcd" {
+		if !images.IsHCDVersionSupported(dc.Spec.ServerVersion) {
+			return attemptedTo("use unsupported HCD version '%s'", dc.Spec.ServerVersion)
+		}
+	}
+
 	if dc.Spec.ServerType == "cassandra" && dc.Spec.DseWorkloads != nil {
 		if dc.Spec.DseWorkloads.AnalyticsEnabled || dc.Spec.DseWorkloads.GraphEnabled || dc.Spec.DseWorkloads.SearchEnabled {
 			return attemptedTo("enable DSE workloads if server type is Cassandra")

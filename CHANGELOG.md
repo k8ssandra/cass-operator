@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [FEATURE] [#659](https://github.com/k8ssandra/cass-operator/issues/659) Add support for HCD serverType with versions 1.x.x. It will be deployed like Cassandra >= 4.1 for now.
+* [FEATURE] [#660](https://github.com/k8ssandra/cass-operator/issues/660) Add support for DSE version 6.9.x and remove support for DSE 7.x.x. DSE 6.9 will be deployed like DSE 6.8.
 * [BUGFIX] [#652](https://github.com/k8ssandra/cass-operator/issues/652) Update nodeStatuses info when a pod is recreated
 
 ## v1.20.0

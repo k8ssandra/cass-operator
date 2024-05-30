@@ -428,8 +428,11 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 }
 
 func TestCassandraContainerEnvVars(t *testing.T) {
+	assert := assert.New(t)
 	podNameEnvVar := corev1.EnvVar{Name: "POD_NAME", ValueFrom: selectorFromFieldPath("metadata.name")}
 	nodeNameEnvVar := corev1.EnvVar{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")}
+	useMgmtApiEnvVar := corev1.EnvVar{Name: "USE_MGMT_API", Value: "true"}
+	explicitStartEnvVar := corev1.EnvVar{Name: "MGMT_API_EXPLICIT_START", Value: "true"}
 
 	templateSpec := &corev1.PodTemplateSpec{}
 	dc := &api.CassandraDatacenter{
@@ -446,13 +449,90 @@ func TestCassandraContainerEnvVars(t *testing.T) {
 
 	err := buildContainers(dc, templateSpec)
 	require.NoError(t, err)
-	assert.Equal(t, 2, len(templateSpec.Spec.Containers), "expected to find 2 containers, cassandra and server-system-logger")
+	assert.Equal(2, len(templateSpec.Spec.Containers), "expected to find 2 containers, cassandra and server-system-logger")
 
 	cassContainer := findContainer(templateSpec.Spec.Containers, CassandraContainerName)
-	assert.Equal(t, CassandraContainerName, cassContainer.Name)
+	assert.Equal(CassandraContainerName, cassContainer.Name)
 
-	assert.True(t, envVarsContains(cassContainer.Env, podNameEnvVar))
-	assert.True(t, envVarsContains(cassContainer.Env, nodeNameEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, podNameEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, nodeNameEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, nodeNameEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, useMgmtApiEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, explicitStartEnvVar))
+}
+
+func TestHCDContainerEnvVars(t *testing.T) {
+	assert := assert.New(t)
+	podNameEnvVar := corev1.EnvVar{Name: "POD_NAME", ValueFrom: selectorFromFieldPath("metadata.name")}
+	nodeNameEnvVar := corev1.EnvVar{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")}
+	useMgmtApiEnvVar := corev1.EnvVar{Name: "USE_MGMT_API", Value: "true"}
+	explicitStartEnvVar := corev1.EnvVar{Name: "MGMT_API_EXPLICIT_START", Value: "true"}
+	hcdAutoConf := corev1.EnvVar{Name: "HCD_AUTO_CONF_OFF", Value: "all"}
+
+	templateSpec := &corev1.PodTemplateSpec{}
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "test",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "test",
+			ServerType:    "hcd",
+			ServerVersion: "1.0.0",
+		},
+	}
+
+	err := buildContainers(dc, templateSpec)
+	require.NoError(t, err)
+	assert.Equal(2, len(templateSpec.Spec.Containers), "expected to find 2 containers, cassandra and server-system-logger")
+
+	cassContainer := findContainer(templateSpec.Spec.Containers, CassandraContainerName)
+	assert.Equal(CassandraContainerName, cassContainer.Name)
+
+	assert.True(envVarsContains(cassContainer.Env, podNameEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, nodeNameEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, nodeNameEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, useMgmtApiEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, explicitStartEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, hcdAutoConf))
+}
+
+func TestDSEContainerEnvVars(t *testing.T) {
+	assert := assert.New(t)
+	podNameEnvVar := corev1.EnvVar{Name: "POD_NAME", ValueFrom: selectorFromFieldPath("metadata.name")}
+	nodeNameEnvVar := corev1.EnvVar{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")}
+	useMgmtApiEnvVar := corev1.EnvVar{Name: "USE_MGMT_API", Value: "true"}
+	explicitStartEnvVar := corev1.EnvVar{Name: "MGMT_API_EXPLICIT_START", Value: "true"}
+	dseExplicitStartEnvVar := corev1.EnvVar{Name: "DSE_MGMT_EXPLICIT_START", Value: "true"}
+	dseAutoConf := corev1.EnvVar{Name: "DSE_AUTO_CONF_OFF", Value: "all"}
+
+	templateSpec := &corev1.PodTemplateSpec{}
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "test",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "test",
+			ServerType:    "dse",
+			ServerVersion: "6.8.49",
+		},
+	}
+
+	err := buildContainers(dc, templateSpec)
+	require.NoError(t, err)
+	assert.Equal(2, len(templateSpec.Spec.Containers), "expected to find 2 containers, cassandra and server-system-logger")
+
+	cassContainer := findContainer(templateSpec.Spec.Containers, CassandraContainerName)
+	assert.Equal(CassandraContainerName, cassContainer.Name)
+
+	assert.True(envVarsContains(cassContainer.Env, podNameEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, nodeNameEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, nodeNameEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, useMgmtApiEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, explicitStartEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, dseAutoConf))
+	assert.True(envVarsContains(cassContainer.Env, dseExplicitStartEnvVar))
 }
 
 func TestLoggerContainerEnvVars(t *testing.T) {

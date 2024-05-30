@@ -65,6 +65,8 @@ type DefaultImages struct {
 	CassandraImageComponent ImageComponent `json:"cassandra,omitempty"`
 
 	DSEImageComponent ImageComponent `json:"dse,omitempty"`
+
+	HCDImageComponent ImageComponent `json:"hcd,omitempty"`
 }
 
 type ImageComponent struct {

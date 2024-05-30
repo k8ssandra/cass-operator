@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.21.0
 
 * [FEATURE] [#659](https://github.com/k8ssandra/cass-operator/issues/659) Add support for HCD serverType with versions 1.x.x. It will be deployed like Cassandra >= 4.1 for now.

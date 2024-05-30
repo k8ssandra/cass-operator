@@ -6,11 +6,12 @@ package reconciliation
 // This file defines constructors for k8s objects
 
 import (
+	"fmt"
+
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
-	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -48,7 +49,7 @@ func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.
 }
 
 func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressState) error {
-	rc.ReqLogger.Info("reconcile_racks::setOperatorProgressStatus")
+	rc.ReqLogger.Info(fmt.Sprintf("reconcile_racks::setOperatorProgressStatus::%v", newState))
 	currentState := rc.Datacenter.Status.CassandraOperatorProgress
 	if currentState == newState {
 		// early return, no need to ping k8s
@@ -57,13 +58,11 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 
 	patch := client.MergeFrom(rc.Datacenter.DeepCopy())
 	rc.Datacenter.Status.CassandraOperatorProgress = newState
-	// TODO there may be a better place to push status.observedGeneration in the reconcile loop
+
 	if newState == api.ProgressReady {
-		rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
 		if rc.Datacenter.Status.DatacenterName == nil {
 			rc.Datacenter.Status.DatacenterName = &rc.Datacenter.Spec.DatacenterName
 		}
-		rc.setCondition(api.NewDatacenterCondition(api.DatacenterRequiresUpdate, corev1.ConditionFalse))
 	}
 	if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
 		rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")

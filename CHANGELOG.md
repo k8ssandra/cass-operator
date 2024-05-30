@@ -14,6 +14,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [FEATURE] [#659](https://github.com/k8ssandra/cass-operator/issues/659) Add support for HCD serverType with versions 1.x.x. It will be deployed like Cassandra >= 4.1 for now.
 * [FEATURE] [#660](https://github.com/k8ssandra/cass-operator/issues/660) Add support for DSE version 6.9.x and remove support for DSE 7.x.x. DSE 6.9 will be deployed like DSE 6.8.
 * [BUGFIX] [#652](https://github.com/k8ssandra/cass-operator/issues/652) Update nodeStatuses info when a pod is recreated
+* [BUGFIX] [#656](https://github.com/k8ssandra/cass-operator/issues/656) After canary upgrade, it was not possible to continue upgrading rest of the nodes if the only change was removing the canary upgrade
+* [BUGFIX] [#657](https://github.com/k8ssandra/cass-operator/issues/657) If a change did not result in StatefulSet changes, a Ready -> Ready state would lose an ObservedGeneration update in the status
+* [BUGFIX] [#382](https://github.com/k8ssandra/cass-operator/issues/382) If StatefulSet has not caught up yet, do not allow any changes to it. Instead, requeue and wait (does not change behavior of forceRacksUpgrade)
 
 ## v1.20.0
 

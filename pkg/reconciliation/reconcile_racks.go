@@ -186,6 +186,30 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 		}
 		statefulSet := rc.statefulSets[idx]
 
+		status := statefulSet.Status
+
+		updatedReplicas := status.UpdatedReplicas
+		if status.CurrentRevision != status.UpdateRevision {
+			// Previous update was a canary upgrade, so we have pods in different versions
+			updatedReplicas = status.CurrentReplicas + status.UpdatedReplicas
+		}
+
+		if statefulSet.Generation != status.ObservedGeneration ||
+			status.Replicas != status.ReadyReplicas ||
+			status.Replicas != updatedReplicas {
+
+			logger.Info(
+				"waiting for upgrade to finish on statefulset",
+				"statefulset", statefulSet.Name,
+				"replicas", status.Replicas,
+				"readyReplicas", status.ReadyReplicas,
+				"currentReplicas", status.CurrentReplicas,
+				"updatedReplicas", status.UpdatedReplicas,
+			)
+
+			return result.RequeueSoon(10)
+		}
+
 		desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, int(*statefulSet.Spec.Replicas))
 
 		if err != nil {
@@ -232,22 +256,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			// selector must match podTemplate.Labels, those can't be updated either
 			desiredSts.Spec.Selector = statefulSet.Spec.Selector
 
-			if dc.Spec.CanaryUpgrade {
-				var partition int32
-				if dc.Spec.CanaryUpgradeCount == 0 || dc.Spec.CanaryUpgradeCount > int32(rc.desiredRackInformation[idx].NodeCount) {
-					partition = int32(rc.desiredRackInformation[idx].NodeCount)
-				} else {
-					partition = int32(rc.desiredRackInformation[idx].NodeCount) - dc.Spec.CanaryUpgradeCount
-				}
-
-				strategy := appsv1.StatefulSetUpdateStrategy{
-					Type: appsv1.RollingUpdateStatefulSetStrategyType,
-					RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-						Partition: &partition,
-					},
-				}
-				desiredSts.Spec.UpdateStrategy = strategy
-			}
 			stateMeta, err := meta.Accessor(statefulSet)
 			resVersion := stateMeta.GetResourceVersion()
 			if err != nil {
@@ -300,29 +308,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			// we just updated k8s and pods will be knocked out of ready state, so let k8s
 			// call us back when these changes are done and the new pods are back to ready
 			return result.Done()
-		} else {
-
-			// the pod template is right, but if any pods don't match it,
-			// or are missing, we should not move onto the next rack,
-			// because there's an upgrade in progress
-
-			status := statefulSet.Status
-			if statefulSet.Generation != status.ObservedGeneration ||
-				status.Replicas != status.ReadyReplicas ||
-				status.Replicas != status.CurrentReplicas ||
-				status.Replicas != status.UpdatedReplicas {
-
-				logger.Info(
-					"waiting for upgrade to finish on statefulset",
-					"statefulset", statefulSet.Name,
-					"replicas", status.Replicas,
-					"readyReplicas", status.ReadyReplicas,
-					"currentReplicas", status.CurrentReplicas,
-					"updatedReplicas", status.UpdatedReplicas,
-				)
-
-				return result.RequeueSoon(10)
-			}
 		}
 	}
 

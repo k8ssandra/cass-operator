@@ -9,6 +9,7 @@ spec:
   serverVersion: "4.0.10"
   managementApiAuth:
     insecure: {}
+  readOnlyRootFilesystem: true
   size: 2
   storageConfig:
       cassandraDataVolumeClaimSpec:

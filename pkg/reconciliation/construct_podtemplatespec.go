@@ -801,7 +801,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 }
 
 func readOnlyFs(dc *api.CassandraDatacenter) bool {
-	return metav1.HasAnnotation(dc.ObjectMeta, "cassandra.datastax.com/readonly-fs")
+	return dc.Spec.ReadOnlyRootFilesystem && dc.UseClientImage()
 }
 
 func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {
@@ -836,9 +836,10 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 	if baseTemplate.Spec.SecurityContext == nil {
 		var userID int64 = 999
 		baseTemplate.Spec.SecurityContext = &corev1.PodSecurityContext{
-			RunAsUser:  &userID,
-			RunAsGroup: &userID,
-			FSGroup:    &userID,
+			RunAsUser:    &userID,
+			RunAsGroup:   &userID,
+			FSGroup:      &userID,
+			RunAsNonRoot: ptr.To[bool](true),
 		}
 	}
 

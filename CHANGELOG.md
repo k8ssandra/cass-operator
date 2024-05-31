@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#199](https://github.com/k8ssandra/cass-operator/issues/199) If .spec.readOnlyRootFilesystem is set, run the cassandra container with readOnlyRootFilesystem. Also, modify the default SecurityContext to mention runAsNonRoot: true
+
 ## v1.21.0
 
 * [FEATURE] [#659](https://github.com/k8ssandra/cass-operator/issues/659) Add support for HCD serverType with versions 1.x.x. It will be deployed like Cassandra >= 4.1 for now.

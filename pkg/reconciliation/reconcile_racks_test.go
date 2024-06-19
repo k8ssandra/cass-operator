@@ -370,6 +370,13 @@ func TestCheckRackPodTemplate_GenerationCheck(t *testing.T) {
 	assert.True(found)
 	assert.Equal(corev1.ConditionTrue, cond.Status)
 
+	// Verify full reconcile does not remove our updated condition
+	_, err := rc.ReconcileAllRacks()
+	require.NoError(t, err)
+	cond, found = rc.Datacenter.GetCondition(api.DatacenterRequiresUpdate)
+	assert.True(found)
+	assert.Equal(corev1.ConditionTrue, cond.Status)
+
 	// Add annotation
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation, string(api.AllowUpdateAlways))
 	rc.Datacenter.Spec.ServerVersion = "6.8.44" // This needs to be reapplied, since we call Patch in the CheckRackPodTemplate()

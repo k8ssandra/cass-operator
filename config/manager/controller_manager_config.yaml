@@ -9,7 +9,7 @@ metrics:
 webhook:
   port: 9443
 leaderElection:
-  leaderElect: true
+  leaderElect: false
   resourceName: b569adb7.cassandra.datastax.com
 disableWebhooks: true
-imageConfigFile: /configs/image_config.yaml
+imageConfigFile: ./config/manager/image_config.yaml

@@ -12,6 +12,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
+	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -78,6 +79,18 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 			rc.ReqLogger.Error(err, "error removing the allow-upgrade=once annotation")
 			return err
 		}
+	}
+
+	return nil
+}
+
+func setDatacenterStatus(rc *ReconciliationContext) error {
+	patch := client.MergeFrom(rc.Datacenter.DeepCopy())
+	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
+	rc.setCondition(api.NewDatacenterCondition(api.DatacenterRequiresUpdate, corev1.ConditionFalse))
+	if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
+		rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")
+		return err
 	}
 
 	return nil

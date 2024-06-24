@@ -2422,6 +2422,10 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return result.Error(err).Output()
 	}
 
+	if err := setDatacenterStatus(rc); err != nil {
+		return result.Error(err).Output()
+	}
+
 	if err := rc.enableQuietPeriod(5); err != nil {
 		logger.Error(
 			err,

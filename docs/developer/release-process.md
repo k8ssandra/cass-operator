@@ -21,6 +21,8 @@ scripts/post-release-process.sh
 git push upstream master
 ```
 
+If you wish to prepare for the next patch release (such as when releasing from a branch), use: ``PATCH_RELEASE=true scripts/post-release-process.sh``. You can do this after branching the tag but before applying other changes.
+
 The github action will create docker images and push them to DockerHub as well as Red Hat Connect repository. Verify it completes successfully.
 
 # Steps and what they do

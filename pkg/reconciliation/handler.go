@@ -7,11 +7,9 @@ import (
 	"fmt"
 	"sync"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -67,28 +65,7 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 		return result.Error(err).Output()
 	}
 
-	res, err := rc.ReconcileAllRacks()
-	if err != nil {
-		return result.Error(err).Output()
-	}
-
-	if err := rc.updateStatus(); err != nil {
-		return result.Error(err).Output()
-	}
-
-	return res, nil
-}
-
-func (rc *ReconciliationContext) updateStatus() error {
-	patch := client.MergeFrom(rc.Datacenter.DeepCopy())
-	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
-	rc.setCondition(api.NewDatacenterCondition(api.DatacenterRequiresUpdate, corev1.ConditionFalse))
-	if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
-		rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")
-		return err
-	}
-
-	return nil
+	return rc.ReconcileAllRacks()
 }
 
 // This file contains various definitions and plumbing setup used for reconciliation.

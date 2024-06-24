@@ -9,6 +9,11 @@ if [ "$#" -ne 1 ]; then
     exit
 fi
 
+if [[ ! $1 == v* ]]; then
+    echo "Tag must start with 'v'"
+    exit
+fi
+
 TAG=$1
 #PREVTAG=$2
 PREVTAG=$(git describe --abbrev=0 --tags)

@@ -20,12 +20,15 @@ next_version() {
     for i in {1..3}
     do
         local PART=$(echo $CURRENT_VERSION | sed -e "s#$RE#\\$i#")
+        ARRAY_INDEX=$((i-1))
+        NEXT_VERSION_PARTS[$ARRAY_INDEX]=$PART
+
         if [ $i == $VERSION_PART ]
         then
             let PART+=1
+            NEXT_VERSION_PARTS[$ARRAY_INDEX]=$PART
+            break
         fi
-        ARRAY_INDEX=$((i-1))
-        NEXT_VERSION_PARTS[$ARRAY_INDEX]=$PART
     done
 
     NEXT_VERSION=${NEXT_VERSION_PARTS[0]}.${NEXT_VERSION_PARTS[1]}.${NEXT_VERSION_PARTS[2]}

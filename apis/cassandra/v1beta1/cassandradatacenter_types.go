@@ -378,18 +378,19 @@ type CassandraStatusMap map[string]CassandraNodeStatus
 type DatacenterConditionType string
 
 const (
-	DatacenterReady          DatacenterConditionType = "Ready"
-	DatacenterInitialized    DatacenterConditionType = "Initialized"
-	DatacenterReplacingNodes DatacenterConditionType = "ReplacingNodes"
-	DatacenterScalingUp      DatacenterConditionType = "ScalingUp"
-	DatacenterScalingDown    DatacenterConditionType = "ScalingDown"
-	DatacenterUpdating       DatacenterConditionType = "Updating"
-	DatacenterStopped        DatacenterConditionType = "Stopped"
-	DatacenterResuming       DatacenterConditionType = "Resuming"
-	DatacenterRollingRestart DatacenterConditionType = "RollingRestart"
-	DatacenterValid          DatacenterConditionType = "Valid"
-	DatacenterDecommission   DatacenterConditionType = "Decommission"
-	DatacenterRequiresUpdate DatacenterConditionType = "RequiresUpdate"
+	DatacenterReady           DatacenterConditionType = "Ready"
+	DatacenterInitialized     DatacenterConditionType = "Initialized"
+	DatacenterReplacingNodes  DatacenterConditionType = "ReplacingNodes"
+	DatacenterScalingUp       DatacenterConditionType = "ScalingUp"
+	DatacenterScalingDown     DatacenterConditionType = "ScalingDown"
+	DatacenterUpdating        DatacenterConditionType = "Updating"
+	DatacenterStopped         DatacenterConditionType = "Stopped"
+	DatacenterResuming        DatacenterConditionType = "Resuming"
+	DatacenterRollingRestart  DatacenterConditionType = "RollingRestart"
+	DatacenterValid           DatacenterConditionType = "Valid"
+	DatacenterDecommission    DatacenterConditionType = "Decommission"
+	DatacenterRequiresUpdate  DatacenterConditionType = "RequiresUpdate"
+	DatacenterResizingVolumes DatacenterConditionType = "ResizingVolumes"
 
 	// DatacenterHealthy indicates if QUORUM can be reached from all deployed nodes.
 	// If this check fails, certain operations such as scaling up will not proceed.

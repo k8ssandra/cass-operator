@@ -200,4 +200,6 @@ func (rc *ReconciliationContext) storageExpansion() (bool, error) {
 	if storageClass.AllowVolumeExpansion != nil && *storageClass.AllowVolumeExpansion {
 		return true, nil
 	}
+
+	return false, nil
 }

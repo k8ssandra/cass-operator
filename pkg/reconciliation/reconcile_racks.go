@@ -199,6 +199,80 @@ func isPVCStatusConditionTrue(pvc corev1.PersistentVolumeClaim, conditionType co
 	return false
 }
 
+func (rc *ReconciliationContext) CheckVolumeClaimSizes(currentClaims, createdClaims []corev1.PersistentVolumeClaim) result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::CheckVolumeClaims")
+	dc := rc.Datacenter
+
+	current := make(map[string]corev1.PersistentVolumeClaim, len(currentClaims))
+	created := make(map[string]corev1.PersistentVolumeClaim, len(createdClaims))
+
+	for _, claim := range currentClaims {
+		current[claim.Name] = claim
+	}
+
+	for _, claim := range createdClaims {
+		created[claim.Name] = claim
+	}
+
+	supportsExpansion, err := rc.storageExpansion()
+	if err != nil {
+		return result.Error(err)
+	}
+
+	dcPatch := client.MergeFrom(dc.DeepCopy())
+	for name, claim := range current {
+		if _, ok := created[name]; ok {
+			currentSize := claim.Spec.Resources.Requests[corev1.ResourceStorage]
+			createdSize := created[name].Spec.Resources.Requests[corev1.ResourceStorage]
+
+			// TODO This code is a bit repetitive with all the Status patches. Needs a refactoring in cass-operator since this is a known
+			// 		pattern. https://github.com/k8ssandra/cass-operator/issues/669
+			if currentSize.Cmp(createdSize) > 0 {
+				if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterValid, corev1.ConditionFalse)); updated {
+					if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
+						rc.ReqLogger.Error(err, "error patching datacenter status for updating")
+						return result.Error(err)
+					}
+				}
+				return result.Error(fmt.Errorf("shrinking PVC %s is not supported", name))
+			}
+
+			if currentSize.Cmp(createdSize) > 0 {
+				rc.ReqLogger.Info("PVC resize request detected", "pvc", name)
+
+				if !supportsExpansion {
+					rc.ReqLogger.Info("PVC resize requested, but StorageClass does not support expansion", "pvc", name)
+
+					if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterValid, corev1.ConditionFalse)); updated {
+						if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
+							rc.ReqLogger.Error(err, "error patching datacenter status for updating")
+							return result.Error(err)
+						}
+					}
+					return result.Error(fmt.Errorf("PVC resize requested, but StorageClass does not support expansion"))
+				}
+				if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterResizingVolumes, corev1.ConditionTrue)); updated {
+					if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
+						rc.ReqLogger.Error(err, "error patching datacenter status for updating")
+						return result.Error(err)
+					}
+				}
+
+				return result.RequeueSoon(10)
+			}
+		}
+	}
+
+	if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterResizingVolumes, corev1.ConditionFalse)); updated {
+		if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
+			rc.ReqLogger.Error(err, "error patching datacenter status for updating")
+			return result.Error(err)
+		}
+	}
+
+	return result.Continue()
+}
+
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
@@ -261,10 +335,11 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 				WithValues("rackName", rackName).
 				Info("update is blocked, but statefulset needs an update. Marking datacenter as requiring update.")
 			dcPatch := client.MergeFrom(dc.DeepCopy())
-			rc.setCondition(api.NewDatacenterCondition(api.DatacenterRequiresUpdate, corev1.ConditionTrue))
-			if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
-				logger.Error(err, "error patching datacenter status for updating")
-				return result.Error(err)
+			if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterRequiresUpdate, corev1.ConditionTrue)); updated {
+				if err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch); err != nil {
+					logger.Error(err, "error patching datacenter status for updating")
+					return result.Error(err)
+				}
 			}
 			return result.Continue()
 		}
@@ -280,9 +355,12 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			desiredSts.Annotations = utils.MergeMap(map[string]string{}, statefulSet.Annotations, desiredSts.Annotations)
 
 			// copy the stuff that can't be updated
-			// TODO Modifications might change this behavior. Resize here before continuing?
-			// TODO Do not allow reducing the size
-			desiredSts.Spec.VolumeClaimTemplates = statefulSet.Spec.VolumeClaimTemplates
+
+			// TODO Careful with this, we probably only want to allow expanding the server-data at first
+			if res := rc.CheckVolumeClaimSizes(statefulSet.Spec.VolumeClaimTemplates, desiredSts.Spec.VolumeClaimTemplates); res.Completed() {
+				return res
+			}
+			// desiredSts.Spec.VolumeClaimTemplates = statefulSet.Spec.VolumeClaimTemplates
 			// selector must match podTemplate.Labels, those can't be updated either
 			desiredSts.Spec.Selector = statefulSet.Spec.Selector
 

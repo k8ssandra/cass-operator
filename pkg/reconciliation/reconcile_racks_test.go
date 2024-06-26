@@ -405,6 +405,8 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 		},
 	}
 
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
 		nil,
 		"default",
@@ -419,10 +421,7 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	desiredStatefulSet.Status.ObservedGeneration = 1
 	desiredStatefulSet.Status.ReadyReplicas = int32(1)
 
-	trackObjects := []runtime.Object{
-		desiredStatefulSet,
-		rc.Datacenter,
-	}
+	require.NoError(rc.Client.Create(rc.Ctx, desiredStatefulSet))
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = "default"
@@ -435,7 +434,6 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
 	rc.statefulSets[0] = desiredStatefulSet
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter, rc.statefulSets[0]).WithRuntimeObjects(trackObjects...).Build()
 	res := rc.CheckRackPodTemplate()
 	require.Equal(result.Done(), res)
 	rc.statefulSets[0].Status.ObservedGeneration = rc.statefulSets[0].Generation

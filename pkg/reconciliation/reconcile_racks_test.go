@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -2105,4 +2106,88 @@ func TestFindHostIdForIpFromEndpointsData(t *testing.T) {
 	assert.Equal(t, "2", findHostIdForIpFromEndpointsData(endpoints, "0:0:0:0:0:0:0:1"))
 	assert.Equal(t, "3", findHostIdForIpFromEndpointsData(endpoints, "2001:0DB8::8:800:200C:417A"))
 	assert.Equal(t, "", findHostIdForIpFromEndpointsData(endpoints, "192.168.1.0"))
+}
+
+func TestCheckVolumeClaimSizesValidation(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	// No changes test - should not result in any error
+	originalStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
+		"default",
+		rc.Datacenter,
+		2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	require.NoError(rc.Client.Create(rc.Ctx, originalStatefulSet))
+
+	res := rc.CheckVolumeClaimSizes(originalStatefulSet.Spec.VolumeClaimTemplates, originalStatefulSet.Spec.VolumeClaimTemplates)
+	require.Equal(result.Continue(), res, "No changes, we should continue")
+
+	// Use case, we do not have expansion allowed in our StorageClass, should get Valid False state in CassandraDatacenter
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("2Gi")}
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	res = rc.CheckVolumeClaimSizes(originalStatefulSet.Spec.VolumeClaimTemplates, desiredStatefulSet.Spec.VolumeClaimTemplates)
+	require.Equal(result.Error(fmt.Errorf("PVC resize requested, but StorageClass does not support expansion")), res, "We should have an error, shrinking is disabled")
+	cond, found := rc.Datacenter.GetCondition(api.DatacenterValid)
+	require.True(found)
+	require.Equal(corev1.ConditionFalse, cond.Status)
+
+	// Verify we didn't try to shrink either
+	rc.Datacenter.SetCondition(api.DatacenterCondition{
+		Status: corev1.ConditionTrue,
+		Type:   api.DatacenterValid,
+	})
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("0.5Gi")}
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	res = rc.CheckVolumeClaimSizes(originalStatefulSet.Spec.VolumeClaimTemplates, desiredStatefulSet.Spec.VolumeClaimTemplates)
+	require.Equal(result.Error(fmt.Errorf("shrinking PVC %s is not supported", originalStatefulSet.Spec.VolumeClaimTemplates[0].Name)), res, "We should have an error, shrinking is disabled")
+	cond, found = rc.Datacenter.GetCondition(api.DatacenterValid)
+	require.True(found)
+	require.Equal(corev1.ConditionFalse, cond.Status)
+
+	// Verify adding new AdditionalVolumes with size is allowed
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1Gi")}
+	rc.Datacenter.Spec.StorageConfig.AdditionalVolumes = api.AdditionalVolumesSlice{
+		api.AdditionalVolumes{
+			MountPath: "/var/log/cassandra",
+			Name:      "server-logs",
+			PVCSpec: &corev1.PersistentVolumeClaimSpec{
+				StorageClassName: ptr.To[string]("standard"),
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1Gi")},
+				},
+			},
+		},
+	}
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	res = rc.CheckVolumeClaimSizes(originalStatefulSet.Spec.VolumeClaimTemplates, desiredStatefulSet.Spec.VolumeClaimTemplates)
+	require.Equal(result.Continue(), res, "No resize changes, we should continue")
+
+	// Verify adding AdditionalVolumes without sizes are supported
+	rc.Datacenter.Spec.StorageConfig.AdditionalVolumes = append(rc.Datacenter.Spec.StorageConfig.AdditionalVolumes,
+		api.AdditionalVolumes{
+			MountPath: "/configs/metrics",
+			Name:      "metrics-config",
+			VolumeSource: &corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "metrics-config-map",
+					},
+				},
+			},
+		})
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	res = rc.CheckVolumeClaimSizes(originalStatefulSet.Spec.VolumeClaimTemplates, desiredStatefulSet.Spec.VolumeClaimTemplates)
+	require.Equal(result.Continue(), res, "No resize changes, we should continue")
 }

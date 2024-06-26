@@ -258,6 +258,17 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(currentClaims, createdCla
 					}
 				}
 
+				actualClaim := &corev1.PersistentVolumeClaim{}
+				if err := rc.Client.Get(rc.Ctx, types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name}, actualClaim); err != nil {
+					return result.Error(err)
+				}
+
+				patch := client.MergeFrom(actualClaim.DeepCopy())
+				actualClaim.Spec.Resources.Requests[corev1.ResourceStorage] = createdSize
+				if err := rc.Client.Patch(rc.Ctx, actualClaim, patch); err != nil {
+					return result.Error(err)
+				}
+
 				return result.RequeueSoon(10)
 			}
 		}

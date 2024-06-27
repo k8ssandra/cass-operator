@@ -116,7 +116,7 @@ func (rc *ReconciliationContext) deletePVCs() error {
 		"cassandraDatacenterName", rc.Datacenter.Name,
 	)
 
-	persistentVolumeClaimList, err := rc.listPVCs()
+	persistentVolumeClaimList, err := rc.listPVCs(rc.Datacenter.GetDatacenterLabels())
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Info("No PVCs found for CassandraDatacenter")
@@ -128,9 +128,9 @@ func (rc *ReconciliationContext) deletePVCs() error {
 
 	logger.Info(
 		"Found PVCs for cassandraDatacenter",
-		"numPVCs", len(persistentVolumeClaimList.Items))
+		"numPVCs", len(persistentVolumeClaimList))
 
-	for _, pvc := range persistentVolumeClaimList.Items {
+	for _, pvc := range persistentVolumeClaimList {
 		if err := rc.Client.Delete(rc.Ctx, &pvc); err != nil {
 			logger.Error(err, "Failed to delete PVCs for cassandraDatacenter")
 			return err
@@ -144,12 +144,8 @@ func (rc *ReconciliationContext) deletePVCs() error {
 	return nil
 }
 
-func (rc *ReconciliationContext) listPVCs() (*corev1.PersistentVolumeClaimList, error) {
+func (rc *ReconciliationContext) listPVCs(selector map[string]string) ([]corev1.PersistentVolumeClaim, error) {
 	rc.ReqLogger.Info("reconciler::listPVCs")
-
-	selector := map[string]string{
-		api.DatacenterLabel: api.CleanLabelValue(rc.Datacenter.DatacenterName()),
-	}
 
 	listOptions := &client.ListOptions{
 		Namespace:     rc.Datacenter.Namespace,
@@ -163,7 +159,12 @@ func (rc *ReconciliationContext) listPVCs() (*corev1.PersistentVolumeClaimList, 
 		},
 	}
 
-	return persistentVolumeClaimList, rc.Client.List(rc.Ctx, persistentVolumeClaimList, listOptions)
+	pvcList, err := persistentVolumeClaimList, rc.Client.List(rc.Ctx, persistentVolumeClaimList, listOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return pvcList.Items, nil
 }
 
 func storageClass(ctx context.Context, c client.Client, storageClassName string) (*storagev1.StorageClass, error) {

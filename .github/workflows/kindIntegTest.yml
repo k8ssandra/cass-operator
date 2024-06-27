@@ -341,5 +341,11 @@ jobs:
         shell: bash
         run: |
           IMG=${{ steps.load.outputs.operator_img }} LOG_IMG=${{ steps.load.outputs.logger_img }} make integ-test
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-logs-topolvm-test-${{ matrix.version }}
+          path: ./build/kubectl_dump
               
 

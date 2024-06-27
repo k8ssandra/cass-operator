@@ -18,6 +18,10 @@ spec:
       resources:
         requests:
           storage: 1Gi
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 1000m
   racks:
     - name: r1
   config:

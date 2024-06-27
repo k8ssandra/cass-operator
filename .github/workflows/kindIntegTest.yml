@@ -335,8 +335,8 @@ jobs:
       - name: Load image on the nodes of the cluster
         shell: bash
         run: |
-          kind load docker-image --name=kind ${{ steps.load.outputs.operator_img }}
-          kind load docker-image --name=kind ${{ steps.load.outputs.logger_img }}
+          kind load docker-image --name=topolvm-example ${{ steps.load.outputs.operator_img }}
+          kind load docker-image --name=topolvm-example ${{ steps.load.outputs.logger_img }}
       - name: Run integration test
         shell: bash
         run: |

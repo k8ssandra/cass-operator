@@ -11,7 +11,7 @@ spec:
   size: 1
   storageConfig:
     cassandraDataVolumeClaimSpec:
-      storageClassName: standard
+      storageClassName: topolvm-provisioner-thin
       accessModes:
         - ReadWriteOnce
       resources:

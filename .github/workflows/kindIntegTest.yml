@@ -280,7 +280,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
-      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_INTEG_DIR: terminate
       M_SERVER_VERSION: ${{ matrix.version }}
     steps:
       - name: Check out code into the Go module directory
@@ -295,7 +295,6 @@ jobs:
           ref: topolvm-chart-v15.0.0
       - name: Create kind cluster from TopoLVM example
         run: |
-          cp hack/topolvm-cluster.yaml topolvm/example/kind/topolvm-cluster.yaml
           cd topolvm/example
           make setup
           make run
@@ -306,11 +305,11 @@ jobs:
           kubectl get pv
           kubectl get storageclass
           sudo lvscan
-          - name: Set up Go
-          uses: actions/setup-go@v5
-          with:
-            go-version-file: 'go.mod'
-            cache: true
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
         # The runners already have the latest versions of tools, no need to reinstall them
       - name: Link tools
         shell: bash

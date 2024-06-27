@@ -420,6 +420,7 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 		assert.Equal(t, 1, len(got.Spec.Template.Spec.InitContainers[1].VolumeMounts))
 		assert.Equal(t, "server-config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].Name)
 		assert.Equal(t, "/config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].MountPath)
+		assert.Equal(t, int32(5), got.Spec.MinReadySeconds)
 	}
 }
 
@@ -710,4 +711,36 @@ func TestPodTemplateSpecHashAnnotationChanges(t *testing.T) {
 	assert.NoError(err)
 	updatedHash = sts.Annotations[utils.ResourceHashAnnotationKey]
 	assert.NotEqual(currentHash, updatedHash, "expected hash to change when PodTemplateSpec labels change")
+}
+
+func TestMinReadySecondsChange(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "test",
+			ServerType:    "cassandra",
+			ServerVersion: "4.0.7",
+			StorageConfig: api.StorageConfig{
+				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+			},
+			Racks: []api.Rack{
+				{
+					Name: "testrack",
+				},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{},
+		},
+	}
+
+	sts, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3)
+	assert.NoError(err, "failed to build statefulset")
+
+	assert.Equal(int32(5), sts.Spec.MinReadySeconds)
+
+	dc.Spec.MinReadySeconds = ptr.To[int32](10)
+
+	sts, err = newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3)
+	assert.NoError(err, "failed to build statefulset")
+
+	assert.Equal(int32(10), sts.Spec.MinReadySeconds)
 }

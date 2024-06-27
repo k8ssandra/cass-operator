@@ -348,6 +348,12 @@ spec:
                     - serverSecretName
                     type: object
                 type: object
+              minReadySeconds:
+                description: |-
+                  MinReadySeconds sets the minimum number of seconds for which a newly created pod should be ready without any of its containers crashing, for it to be considered available. Defaults to 5 seconds and is set in the StatefulSet spec.
+                  Setting to 0 might cause multiple Cassandra pods to restart at the same time despite PodDisruptionBudget settings.
+                format: int32
+                type: integer
               networking:
                 properties:
                   hostNetwork:

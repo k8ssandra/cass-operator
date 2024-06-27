@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#648](https://github.com/k8ssandra/cass-operator/issues/648) Make MinReadySeconds configurable value in the Spec.
+
 ## v1.21.1
 
 * [BUGFIX] [#665](https://github.com/k8ssandra/cass-operator/issues/665) The RequiresUpdate and ObservedGenerations were updated too often, even when the reconcile was not finished.

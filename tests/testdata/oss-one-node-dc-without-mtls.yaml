@@ -9,6 +9,7 @@ spec:
   managementApiAuth:
     insecure: {}
   size: 1
+  allowMultipleNodesPerWorker: true
   storageConfig:
     cassandraDataVolumeClaimSpec:
       storageClassName: topolvm-provisioner-thin

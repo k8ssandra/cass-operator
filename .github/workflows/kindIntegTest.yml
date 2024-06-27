@@ -269,7 +269,19 @@ jobs:
   #         path: ./build/kubectl_dump
   check_topolvm:
     name: Try TopoLVM kind installation
+    needs: build_docker_images
+    strategy:
+      matrix:
+        version:
+          - "4.1.4"
+        integration_test:
+          - test_all_the_things
+      fail-fast: true
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: ${{ matrix.version }}
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v4
@@ -283,13 +295,52 @@ jobs:
           ref: topolvm-chart-v15.0.0
       - name: Create kind cluster from TopoLVM example
         run: |
+          cp hack/topolvm-cluster.yaml topolvm/example/kind/topolvm-cluster.yaml
           cd topolvm/example
           make setup
           make run
       - name: Verify the output
         run: |
+          kubectl get nodes
           kubectl get pvc
           kubectl get pv
           kubectl get storageclass
           sudo lvscan
+          - name: Set up Go
+          uses: actions/setup-go@v5
+          with:
+            go-version-file: 'go.mod'
+            cache: true
+        # The runners already have the latest versions of tools, no need to reinstall them
+      - name: Link tools
+        shell: bash
+        run: |
+          mkdir bin
+          ln -s /usr/local/bin/kustomize bin/kustomize
+      - name: Download cass-operator image
+        uses: actions/download-artifact@v4
+        with:
+          name: cass-operator
+          path: /tmp
+      - name: Download system-logger image
+        uses: actions/download-artifact@v4
+        with:
+          name: system-logger
+          path: /tmp
+      - name: Load Docker images
+        shell: bash
+        id: load
+        run: |
+          echo "operator_img=$(docker load --input /tmp/k8ssandra-cass-operator.tar | cut -f 3 -d' ')" >> $GITHUB_OUTPUT
+          echo "logger_img=$(docker load --input /tmp/k8ssandra-system-logger.tar | cut -f 3 -d' ')" >> $GITHUB_OUTPUT
+      - name: Load image on the nodes of the cluster
+        shell: bash
+        run: |
+          kind load docker-image --name=kind ${{ steps.load.outputs.operator_img }}
+          kind load docker-image --name=kind ${{ steps.load.outputs.logger_img }}
+      - name: Run integration test
+        shell: bash
+        run: |
+          IMG=${{ steps.load.outputs.operator_img }} LOG_IMG=${{ steps.load.outputs.logger_img }} make integ-test
+              
 

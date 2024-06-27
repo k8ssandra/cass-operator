@@ -2227,7 +2227,7 @@ func TestVolumeClaimSizesExpansion(t *testing.T) {
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
 	require.NoErrorf(err, "error occurred creating statefulset")
 	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
-	require.Equal(result.RequeueSoon(10), res, "We made changes to the PVC size, requeue and wait for the PVC to resize")
+	require.Equal(result.Continue(), res, "We made changes to the PVC size")
 
 	cond, found := rc.Datacenter.GetCondition(api.DatacenterResizingVolumes)
 	require.True(found)
@@ -2314,4 +2314,59 @@ func TestPVCResizingCheck(t *testing.T) {
 	rc.Client.Status().Update(rc.Ctx, pvc)
 	res = rc.CheckPVCResizing()
 	require.Equal(result.Continue(), res, "No resizing in progress, we should simply continue")
+}
+
+func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
+	require := require.New(t)
+	rc, _, cleanpMockSrc := setupTest()
+	defer cleanpMockSrc()
+
+	require.NoError(rc.CalculateRackInformation())
+	res := rc.CheckRackCreation()
+	require.False(res.Completed(), "CheckRackCreation did not complete as expected")
+
+	require.Equal(result.Continue(), rc.CheckRackPodTemplate())
+
+	// Get the current StS
+	sts := &appsv1.StatefulSet{}
+	nsName := newNamespacedNameForStatefulSet(rc.Datacenter, "default")
+	require.NoError(rc.Client.Get(rc.Ctx, nsName, sts))
+	require.Equal(resource.MustParse("1Gi"), sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage])
+
+	// Create the PVCs for the StatefulSet
+	for i := 0; i < int(*sts.Spec.Replicas); i++ {
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("server-data-%s-%d", sts.Name, i),
+				Namespace: "default",
+			},
+		}
+		pvc.Spec = sts.Spec.VolumeClaimTemplates[0].Spec
+		pvc.Labels = sts.Spec.VolumeClaimTemplates[0].Labels
+		require.NoError(rc.Client.Create(rc.Ctx, pvc))
+	}
+
+	require.Equal(result.Continue(), rc.CheckRackPodTemplate())
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("2Gi")}
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	res = rc.CheckRackPodTemplate()
+	require.Equal(result.Error(fmt.Errorf("PVC resize requested, but StorageClass does not support expansion")), res, "We should have an error, shrinking is disabled")
+
+	// Mark the StorageClass as allowing expansion
+	storageClass := &storagev1.StorageClass{}
+	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: "standard"}, storageClass))
+	storageClass.AllowVolumeExpansion = ptr.To[bool](true)
+	require.NoError(rc.Client.Update(rc.Ctx, storageClass))
+
+	res = rc.CheckRackPodTemplate()
+	require.Equal(result.Done(), res, "Recreating StS should throw us to silence period")
+
+	require.NoError(rc.Client.Get(rc.Ctx, nsName, sts))
+	require.Equal(resource.MustParse("2Gi"), sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage])
+
+	// The fakeClient behavior does not prevent us from modifying the StS fields, so this test behaves unlike real world in that sense
+	res = rc.CheckRackPodTemplate()
+	require.Equal(result.Continue(), res, "Recreating StS should throw us to silence period")
+
 }

@@ -179,8 +179,7 @@ func (rc *ReconciliationContext) CheckPVCResizing() result.ReconcileResult {
 	}
 
 	for _, pvc := range pvcList {
-		if isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimResizing) ||
-			isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimFileSystemResizePending) {
+		if isPVCResizing(pvc) {
 			rc.ReqLogger.Info("Waiting for PVC resize to complete",
 				"pvc", pvc.Name)
 			return result.RequeueSoon(10)
@@ -188,6 +187,11 @@ func (rc *ReconciliationContext) CheckPVCResizing() result.ReconcileResult {
 	}
 
 	return result.Continue()
+}
+
+func isPVCResizing(pvc corev1.PersistentVolumeClaim) bool {
+	return isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimResizing) ||
+		isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimFileSystemResizePending)
 }
 
 func isPVCStatusConditionTrue(pvc corev1.PersistentVolumeClaim, conditionType corev1.PersistentVolumeClaimConditionType) bool {
@@ -274,13 +278,16 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 				}
 
 				for _, pvc := range targetPVCs {
+					if isPVCResizing(pvc) {
+						return result.RequeueSoon(10)
+					}
 					patch := client.MergeFrom(pvc.DeepCopy())
 					pvc.Spec.Resources.Requests[corev1.ResourceStorage] = createdSize
 					if err := rc.Client.Patch(rc.Ctx, &pvc, patch); err != nil {
 						return result.Error(err)
 					}
 				}
-				return result.RequeueSoon(10)
+				return result.Continue()
 			}
 		}
 	}
@@ -379,7 +386,7 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 
 			// copy the stuff that can't be updated
 
-			// TODO Careful with this, we probably only want to allow expanding the server-data at first
+			// TODO Add a annotation check for "experimental-feature" here and if not enabled, use old method
 			if res := rc.CheckVolumeClaimSizes(statefulSet, desiredSts); res.Completed() {
 				return res
 			}

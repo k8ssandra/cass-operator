@@ -80,7 +80,7 @@ var _ = Describe(testName, func() {
 			Expect(existingPvSize).To(Equal("1Gi"), "Expected PV size to be 2Gi but got %s", existingPvSize)
 
 			step = "patch CassandraDatacenter to increase the StorageConfig size"
-			patch := fmt.Sprintf(`{"spec":{"storageConfig":{"cassandraDataVolumeClaimSpec":{"resources":{"requests":{"storage":"%s"}}}}}`, "2Gi")
+			patch := fmt.Sprintf(`{"spec":{"storageConfig":{"cassandraDataVolumeClaimSpec":{"resources":{"requests":{"storage":"%s"}}}}}}`, "2Gi")
 			k = kubectl.PatchMerge(dcResource, patch)
 			ns.ExecAndLog(step, k)
 

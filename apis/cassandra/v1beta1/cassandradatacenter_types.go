@@ -68,6 +68,9 @@ const (
 	// UpdateAllowedAnnotation marks the Datacenter to allow upgrades to StatefulSets Spec even if CassandraDatacenter object was not modified. Allowed values are "once" and "always"
 	UpdateAllowedAnnotation = "cassandra.datastax.com/autoupdate-spec"
 
+	// AllowStorageChangesAnnotation indicates the CassandraDatacenter StorageConfig can be modified for existing datacenters
+	AllowStorageChangesAnnotation = "cassandra.datastax.com/allow-storage-changes"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 

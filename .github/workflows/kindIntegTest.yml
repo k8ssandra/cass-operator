@@ -299,13 +299,6 @@ jobs:
           cd topolvm/example
           make setup
           make run
-      - name: Verify the output
-        run: |
-          kubectl get nodes
-          kubectl get pvc
-          kubectl get pv
-          kubectl get storageclass
-          sudo lvscan
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -342,13 +335,8 @@ jobs:
         shell: bash
         run: |
           IMG=${{ steps.load.outputs.operator_img }} LOG_IMG=${{ steps.load.outputs.logger_img }} make integ-test
-      - name: Display the end result output
-        run: |
-          kubectl get pvc
-          kubectl get pv
-          sudo lvscan  
       - name: Archive k8s logs
-        if: ${{ failure() }}
+        # if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: k8s-logs-topolvm-test-${{ matrix.version }}

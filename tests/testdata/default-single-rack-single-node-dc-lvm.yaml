@@ -3,7 +3,7 @@ kind: CassandraDatacenter
 metadata:
   name: dc1
   annotations:
-    cassandra.datastax.com/allow-storage-changes: true
+    cassandra.datastax.com/allow-storage-changes: "true"
 spec:
   clusterName: cluster1
   serverType: cassandra

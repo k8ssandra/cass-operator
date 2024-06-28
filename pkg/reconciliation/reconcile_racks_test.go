@@ -2247,7 +2247,7 @@ func TestVolumeClaimSizesExpansion(t *testing.T) {
 	require.Equal(corev1.ConditionFalse, cond.Status)
 }
 
-func TestPVCResizingCheck(t *testing.T) {
+func TestCheckPVCResizing(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 	require := require.New(t)
@@ -2287,6 +2287,20 @@ func TestPVCResizingCheck(t *testing.T) {
 		Status: corev1.ConditionFalse,
 	}}
 	require.NoError(rc.Client.Status().Update(rc.Ctx, pvc))
+
+	// Verify datacenter status resizing is removed if nothing is being resized anymore
+	rc.Datacenter.SetCondition(api.DatacenterCondition{
+		Status: corev1.ConditionTrue,
+		Type:   api.DatacenterResizingVolumes,
+	})
+	require.NoError(rc.Client.Status().Update(rc.Ctx, rc.Datacenter))
+
+	res = rc.CheckPVCResizing()
+	require.Equal(result.Continue(), res, "No resizing in progress, we should simply continue")
+
+	cond, found := rc.Datacenter.GetCondition(api.DatacenterResizingVolumes)
+	require.True(found)
+	require.Equal(corev1.ConditionFalse, cond.Status)
 
 	// Create another PVC, not related to our Datacenter and check it is ignored
 	pvc2 := &corev1.PersistentVolumeClaim{

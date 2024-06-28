@@ -186,6 +186,14 @@ func (rc *ReconciliationContext) CheckPVCResizing() result.ReconcileResult {
 		}
 	}
 
+	dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
+	if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterResizingVolumes, corev1.ConditionFalse)); updated {
+		if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch); err != nil {
+			rc.ReqLogger.Error(err, "error patching datacenter status for updating")
+			return result.Error(err)
+		}
+	}
+
 	return result.Continue()
 }
 
@@ -289,14 +297,6 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 				}
 				return result.Continue()
 			}
-		}
-	}
-
-	dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
-	if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterResizingVolumes, corev1.ConditionFalse)); updated {
-		if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch); err != nil {
-			rc.ReqLogger.Error(err, "error patching datacenter status for updating")
-			return result.Error(err)
 		}
 	}
 

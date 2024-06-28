@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/k8ssandra/cass-operator/pkg/images"
@@ -175,15 +174,15 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 
 	// CassandraDataVolumeClaimSpec changes are disallowed
 
-	if !reflect.DeepEqual(oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec, newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec) {
-		return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec")
-	}
+	// if !reflect.DeepEqual(oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec, newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec) {
+	// 	return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec")
+	// }
 
-	if oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec != nil {
-		if !reflect.DeepEqual(*oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec, *newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec) {
-			return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec")
-		}
-	}
+	// if oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec != nil {
+	// 	if !reflect.DeepEqual(*oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec, *newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec) {
+	// 		return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec")
+	// 	}
+	// }
 
 	// Topology changes - Racks
 	// - Rack Name and Zone changes are disallowed.

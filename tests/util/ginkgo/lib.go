@@ -503,7 +503,7 @@ func (ns *NsWrapper) EnableGossip(podName string) {
 func (ns *NsWrapper) KillCassandra(podName string) {
 	execArgs := []string{"-c", "cassandra",
 		"--", "bash", "-c",
-		"pkill -f -9 CassandraDaemon",
+		"pkill -f -9 Cassandra",
 	}
 	k := kubectl.ExecOnPod(podName, execArgs...)
 	ns.ExecVPanic(k)

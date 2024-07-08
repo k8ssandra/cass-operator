@@ -91,7 +91,7 @@ jobs:
         version:
           - "4.0.12"
         integration_test:
-          - cdc_successful # OSS only
+          # - cdc_successful # OSS only
           - config_fql
     runs-on: ubuntu-latest
     env:

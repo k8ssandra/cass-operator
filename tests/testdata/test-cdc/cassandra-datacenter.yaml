@@ -23,5 +23,5 @@ spec:
         requests:
           storage: 1Gi
   # Which server version to use. Required.
-  serverVersion: "4.0.7"
+  serverVersion: "4.0.13"
   serverType: "cassandra"

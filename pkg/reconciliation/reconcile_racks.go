@@ -928,13 +928,16 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 	return result.Continue()
 }
 
-func findHostIdForIpFromEndpointsData(endpointsData []httphelper.EndpointState, ip string) string {
+func findHostIdForIpFromEndpointsData(endpointsData []httphelper.EndpointState, ip string) (bool, string) {
 	for _, data := range endpointsData {
 		if net.ParseIP(data.GetRpcAddress()).Equal(net.ParseIP(ip)) {
-			return data.HostID
+			if data.HasStatus(httphelper.StatusNormal) {
+				return true, data.HostID
+			}
+			return false, data.HostID
 		}
 	}
-	return ""
+	return false, ""
 }
 
 func getRpcAddress(dc *api.CassandraDatacenter, pod *corev1.Pod) string {
@@ -984,10 +987,13 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 			if force || nodeStatus.HostID == "" {
 				endpointsResponse, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
 				if err == nil {
-					nodeStatus.HostID = findHostIdForIpFromEndpointsData(
+					ready, hostId := findHostIdForIpFromEndpointsData(
 						endpointsResponse.Entity, ip)
 					if nodeStatus.HostID == "" {
 						logger.Info("Failed to find host ID", "pod", pod.Name)
+					}
+					if ready {
+						nodeStatus.HostID = hostId
 					}
 				}
 			}

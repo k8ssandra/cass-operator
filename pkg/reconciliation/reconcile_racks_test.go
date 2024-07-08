@@ -2088,23 +2088,63 @@ func TestStartOneNodePerRack(t *testing.T) {
 }
 
 func TestFindHostIdForIpFromEndpointsData(t *testing.T) {
+	type result struct {
+		ready  bool
+		hostId string
+	}
+
+	tests := []struct {
+		search string
+		result result
+	}{
+		{
+			search: "127.0.0.1",
+			result: result{true, "1"},
+		},
+		{
+			search: "0:0:0:0:0:0:0:1",
+			result: result{true, "2"},
+		},
+		{
+			search: "2001:0DB8::8:800:200C:417A",
+			result: result{true, "3"},
+		},
+		{
+			search: "192.168.1.0",
+			result: result{false, ""},
+		},
+		{
+			search: "127.0.0.2",
+			result: result{false, "4"},
+		},
+	}
+
 	endpoints := []httphelper.EndpointState{
 		{
 			HostID:     "1",
 			RpcAddress: "127.0.0.1",
+			Status:     "NORMAL",
 		},
 		{
 			HostID:     "2",
 			RpcAddress: "::1",
+			Status:     "NORMAL",
 		},
 		{
 			HostID:     "3",
 			RpcAddress: "2001:0DB8:0:0:8:800:200C:417A",
+			Status:     "NORMAL",
+		},
+		{
+			HostID:     "4",
+			RpcAddress: "127.0.0.2",
+			Status:     "JOINING",
 		},
 	}
 
-	assert.Equal(t, "1", findHostIdForIpFromEndpointsData(endpoints, "127.0.0.1"))
-	assert.Equal(t, "2", findHostIdForIpFromEndpointsData(endpoints, "0:0:0:0:0:0:0:1"))
-	assert.Equal(t, "3", findHostIdForIpFromEndpointsData(endpoints, "2001:0DB8::8:800:200C:417A"))
-	assert.Equal(t, "", findHostIdForIpFromEndpointsData(endpoints, "192.168.1.0"))
+	for i := range tests {
+		ready, hostId := findHostIdForIpFromEndpointsData(endpoints, tests[i].search)
+		assert.Equal(t, tests[i].result.hostId, hostId, "expected hostId to be %v", tests[i].result.hostId)
+		assert.Equal(t, tests[i].result.ready, ready, "expected ready to be %v", tests[i].result.ready)
+	}
 }

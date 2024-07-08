@@ -605,6 +605,19 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 		return result.Error(err)
 	}
 
+	// step 0 - fastpath
+	if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.AllowParallelStartsAnnotations) && rc.Datacenter.Annotations[api.AllowParallelStartsAnnotations] == "true" {
+		notReadyPods, err := rc.startBootstrappedNodes(endpointData)
+		if err != nil {
+			return result.Error(err)
+		}
+
+		// Technically this is checked in the next part, but there could be cache issues
+		if notReadyPods {
+			return result.RequeueSoon(2)
+		}
+	}
+
 	// step 1 - see if any nodes are already coming up
 
 	nodeIsStarting, _, err := rc.findStartingNodes()
@@ -1759,6 +1772,29 @@ func (rc *ReconciliationContext) findStartingNodes() (bool, bool, error) {
 	return false, false, nil
 }
 
+func (rc *ReconciliationContext) startBootstrappedNodes(endpointData httphelper.CassMetadataEndpoints) (bool, error) {
+	rc.ReqLogger.Info("reconcile_racks::startBootstrappedNodes")
+
+	startingNodes := false
+
+	for _, pod := range rc.dcPods {
+		if _, ok := rc.Datacenter.Status.NodeStatuses[pod.Name]; ok {
+			// Verify pod is not going to be replaced
+			if utils.IndexOfString(rc.Datacenter.Status.NodeReplacements, pod.Name) > -1 {
+				continue
+			}
+			notReady, err := rc.startNode(pod, false, endpointData)
+			if err != nil {
+				return startingNodes, err
+			}
+
+			startingNodes = startingNodes || notReady
+		}
+	}
+
+	return startingNodes, nil
+}
+
 func (rc *ReconciliationContext) findStartedNotReadyNodes() (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::findStartedNotReadyNodes")
 
@@ -1928,8 +1964,7 @@ func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart
 					"Labeled pod a seed node %s", pod.Name)
 			}
 
-			err := rc.startCassandra(endpointData, pod)
-			if err != nil {
+			if err := rc.startCassandra(endpointData, pod); err != nil {
 				return true, err
 			}
 		}

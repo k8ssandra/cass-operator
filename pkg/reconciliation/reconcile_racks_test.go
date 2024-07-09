@@ -1923,6 +1923,19 @@ func TestStartBootstrappedNodes(t *testing.T) {
 			wantNotReady: false,
 			replacements: []string{"rack1-1"},
 		},
+		{
+			name: "starting back from stopped state, all the nodes should be started at the same time",
+			racks: racks{
+				"rack1": {false, false},
+				"rack2": {false, false},
+			},
+			nodeStatus: racks{
+				"rack1": {true, true},
+				"rack2": {true, true},
+			},
+			wantNotReady: true,
+			wantEvents:   []string{"Normal StartingCassandra Starting Cassandra for pod rack1-0", "Normal StartingCassandra Starting Cassandra for pod rack1-1", "Normal StartingCassandra Starting Cassandra for pod rack2-0", "Normal StartingCassandra Starting Cassandra for pod rack2-1"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

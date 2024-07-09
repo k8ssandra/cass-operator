@@ -606,7 +606,7 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	}
 
 	// step 0 - fastpath
-	if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.AllowParallelStartsAnnotations) && rc.Datacenter.Annotations[api.AllowParallelStartsAnnotations] == "true" {
+	if seedCount > 0 && metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.AllowParallelStartsAnnotations) && rc.Datacenter.Annotations[api.AllowParallelStartsAnnotations] == "true" {
 		notReadyPods, err := rc.startBootstrappedNodes(endpointData)
 		if err != nil {
 			return result.Error(err)

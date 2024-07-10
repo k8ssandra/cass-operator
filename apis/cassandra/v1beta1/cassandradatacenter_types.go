@@ -68,6 +68,9 @@ const (
 	// UpdateAllowedAnnotation marks the Datacenter to allow upgrades to StatefulSets Spec even if CassandraDatacenter object was not modified. Allowed values are "once" and "always"
 	UpdateAllowedAnnotation = "cassandra.datastax.com/autoupdate-spec"
 
+	// AllowParallelStartsAnnotations allows the operator to start multiple server nodes at the same time if they have already bootstrapped.
+	AllowParallelStartsAnnotations = "cassandra.datastax.com/allow-parallel-starts"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 

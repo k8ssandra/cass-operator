@@ -9,7 +9,9 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1773,6 +1775,303 @@ func TestFailedStart(t *testing.T) {
 	assert.Equal(t, 2, len(fakeRecorder.Events))
 }
 
+func TestStartBootstrappedNodes(t *testing.T) {
+
+	// A boolean representing the state of a pod (started or not).
+	type pod bool
+
+	// racks is a map of rack names to a list of pods in that rack.
+	type racks map[string][]pod
+
+	tests := []struct {
+		name         string
+		racks        racks
+		wantNotReady bool
+		nodeStatus   racks
+		wantEvents   []string
+		replacements []string
+	}{
+		// First check all the normal cases where we have no dead already bootstrapped nodes
+		{
+			name: "balanced racks, all started",
+			racks: racks{
+				"rack1": {true, true, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, true},
+			},
+			nodeStatus: racks{
+				"rack1": {true, true, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, true},
+			},
+			wantNotReady: false,
+		},
+		{
+			name: "balanced racks, some pods not started",
+			racks: racks{
+				"rack1": {true, true, false},
+				"rack2": {true, false, false},
+				"rack3": {true, false, false},
+			},
+			nodeStatus: racks{
+				"rack1": {true, true, false},
+				"rack2": {true, false, false},
+				"rack3": {true, false, false},
+			},
+			wantNotReady: false,
+		},
+		{
+			name: "unbalanced racks, all started",
+			racks: racks{
+				"rack1": {true, true},
+				"rack2": {true},
+				"rack3": {true, true, true},
+			},
+			nodeStatus: racks{
+				"rack1": {true, true},
+				"rack2": {true},
+				"rack3": {true, true, true},
+			},
+			wantNotReady: false,
+		},
+		{
+			name: "unbalanced racks, some pods not started",
+			racks: racks{
+				"rack1": {true, true},
+				"rack2": {true},
+				"rack3": {true, true, false},
+			},
+			nodeStatus: racks{
+				"rack1": {true, true},
+				"rack2": {true},
+				"rack3": {true, true, false},
+			},
+			wantNotReady: false,
+		},
+		{
+			name: "unbalanced racks, part of decommission",
+			racks: racks{
+				"rack1": {},
+				"rack2": {true},
+				"rack3": {true},
+			},
+			nodeStatus: racks{
+				"rack1": {},
+				"rack2": {true},
+				"rack3": {true},
+			},
+			wantNotReady: false,
+		},
+		// Now verify if we have already bootstrapped nodes
+		{
+			name: "balanced racks, one failed already bootstrapped",
+			racks: racks{
+				"rack1": {true, false, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, true},
+			},
+			nodeStatus: racks{
+				"rack1": {true, true, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, true},
+			},
+			wantNotReady: true,
+			wantEvents:   []string{"Normal StartingCassandra Starting Cassandra for pod rack1-1"},
+		},
+		{
+			name: "balanced racks, two failed in different racks already bootstrapped",
+			racks: racks{
+				"rack1": {true, false, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, false},
+			},
+			nodeStatus: racks{
+				"rack1": {true, true, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, true},
+			},
+			wantNotReady: true,
+			wantEvents:   []string{"Normal StartingCassandra Starting Cassandra for pod rack1-1", "Normal StartingCassandra Starting Cassandra for pod rack3-2"},
+		},
+		{
+			name: "balanced racks, failed already bootstrapped and a non-bootstrapped one",
+			racks: racks{
+				"rack1": {true, false, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, false},
+			},
+			nodeStatus: racks{
+				"rack1": {true, true, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, false},
+			},
+			wantNotReady: true,
+			wantEvents:   []string{"Normal StartingCassandra Starting Cassandra for pod rack1-1"},
+		},
+		{
+			name: "balanced racks, failed already bootstrapped to be replaced and a non-bootstrapped one",
+			racks: racks{
+				"rack1": {true, false, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, false},
+			},
+			nodeStatus: racks{
+				"rack1": {true, true, true},
+				"rack2": {true, true, true},
+				"rack3": {true, true, false},
+			},
+			wantNotReady: false,
+			replacements: []string{"rack1-1"},
+		},
+		{
+			name: "starting back from stopped state, all the nodes should be started at the same time",
+			racks: racks{
+				"rack1": {false, false},
+				"rack2": {false, false},
+			},
+			nodeStatus: racks{
+				"rack1": {true, true},
+				"rack2": {true, true},
+			},
+			wantNotReady: true,
+			wantEvents:   []string{"Normal StartingCassandra Starting Cassandra for pod rack1-0", "Normal StartingCassandra Starting Cassandra for pod rack1-1", "Normal StartingCassandra Starting Cassandra for pod rack2-0", "Normal StartingCassandra Starting Cassandra for pod rack2-1"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, _ := setupTest()
+			nodeStatuses := api.CassandraStatusMap{}
+			for rackName, podStatuses := range tt.nodeStatus {
+				for i, ready := range podStatuses {
+					if ready {
+						nodeStatuses[getStatefulSetPodNameForIdx(&appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: rackName}}, int32(i))] = api.CassandraNodeStatus{
+							HostID: strconv.Itoa(i),
+							IP:     "127.0.0.1",
+							Rack:   rackName,
+						}
+					}
+				}
+			}
+			rc.Datacenter.Status.NodeStatuses = nodeStatuses
+			if len(tt.replacements) > 0 {
+				rc.Datacenter.Status.NodeReplacements = tt.replacements
+			}
+
+			for _, rackName := range []string{"rack1", "rack2", "rack3"} {
+				rackPods := tt.racks[rackName]
+				sts := &appsv1.StatefulSet{
+					ObjectMeta: metav1.ObjectMeta{Name: rackName},
+					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
+				}
+				rc.statefulSets = append(rc.statefulSets, sts)
+				for i, started := range rackPods {
+					p := &corev1.Pod{}
+					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
+					p.Labels = map[string]string{}
+					p.Status.ContainerStatuses = []corev1.ContainerStatus{
+						{
+							Name: "cassandra",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{
+									StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
+								},
+							},
+							Ready: bool(started),
+						},
+					}
+					p.Status.PodIP = "127.0.0.1"
+					if started {
+						p.Labels[api.CassNodeState] = stateStarted
+					} else {
+						p.Labels[api.CassNodeState] = stateReadyToStart
+					}
+					rc.dcPods = append(rc.dcPods, p)
+				}
+			}
+
+			mockClient := mocks.NewClient(t)
+			rc.Client = mockClient
+
+			expectedStartCount := 0
+			for i, rackPods := range tt.racks {
+				for j, started := range rackPods {
+					if !started && tt.nodeStatus[i][j] {
+						expectedStartCount++
+					}
+				}
+			}
+
+			done := make(chan struct{})
+			wg := sync.WaitGroup{}
+			wg.Add(expectedStartCount)
+			go func() {
+				defer close(done)
+				wg.Wait()
+			}()
+
+			if tt.wantNotReady {
+				// mock the calls in labelServerPodStarting:
+				// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
+				k8sMockClientPatch(mockClient, nil).Times(expectedStartCount)
+				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
+				k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Times(expectedStartCount)
+
+				res := &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("OK")),
+				}
+
+				mockHttpClient := mocks.NewHttpClient(t)
+				mockHttpClient.On("Do",
+					mock.MatchedBy(
+						func(req *http.Request) bool {
+							return req != nil
+						})).
+					Return(res, nil).
+					Times(expectedStartCount).
+					Run(func(mock.Arguments) { wg.Done() })
+
+				client := httphelper.NodeMgmtClient{
+					Client:   mockHttpClient,
+					Log:      rc.ReqLogger,
+					Protocol: "http",
+				}
+				rc.NodeMgmtClient = client
+
+			}
+
+			epData := httphelper.CassMetadataEndpoints{
+				Entity: []httphelper.EndpointState{},
+			}
+
+			gotNotReady, err := rc.startBootstrappedNodes(epData)
+
+			assert.NoError(t, err)
+			assert.Equalf(t, tt.wantNotReady, gotNotReady, "expected not ready to be %v", tt.wantNotReady)
+
+			if tt.wantNotReady {
+				select {
+				case <-done:
+				case <-time.After(2 * time.Second):
+					assert.Fail(t, "No pod start occurred")
+				}
+			}
+
+			fakeRecorder := rc.Recorder.(*record.FakeRecorder)
+			close(fakeRecorder.Events)
+			if assert.Lenf(t, fakeRecorder.Events, len(tt.wantEvents), "expected %d events, got %d", len(tt.wantEvents), len(fakeRecorder.Events)) {
+				var gotEvents []string
+				for i := range fakeRecorder.Events {
+					gotEvents = append(gotEvents, i)
+				}
+				assert.Equal(t, tt.wantEvents, gotEvents)
+			}
+
+			mockClient.AssertExpectations(t)
+		})
+	}
+}
+
 func TestReconciliationContext_startAllNodes(t *testing.T) {
 
 	// A boolean representing the state of a pod (started or not).
@@ -2088,23 +2387,63 @@ func TestStartOneNodePerRack(t *testing.T) {
 }
 
 func TestFindHostIdForIpFromEndpointsData(t *testing.T) {
+	type result struct {
+		ready  bool
+		hostId string
+	}
+
+	tests := []struct {
+		search string
+		result result
+	}{
+		{
+			search: "127.0.0.1",
+			result: result{true, "1"},
+		},
+		{
+			search: "0:0:0:0:0:0:0:1",
+			result: result{true, "2"},
+		},
+		{
+			search: "2001:0DB8::8:800:200C:417A",
+			result: result{true, "3"},
+		},
+		{
+			search: "192.168.1.0",
+			result: result{false, ""},
+		},
+		{
+			search: "127.0.0.2",
+			result: result{false, "4"},
+		},
+	}
+
 	endpoints := []httphelper.EndpointState{
 		{
 			HostID:     "1",
 			RpcAddress: "127.0.0.1",
+			Status:     "NORMAL",
 		},
 		{
 			HostID:     "2",
 			RpcAddress: "::1",
+			Status:     "NORMAL",
 		},
 		{
 			HostID:     "3",
 			RpcAddress: "2001:0DB8:0:0:8:800:200C:417A",
+			Status:     "NORMAL",
+		},
+		{
+			HostID:     "4",
+			RpcAddress: "127.0.0.2",
+			Status:     "JOINING",
 		},
 	}
 
-	assert.Equal(t, "1", findHostIdForIpFromEndpointsData(endpoints, "127.0.0.1"))
-	assert.Equal(t, "2", findHostIdForIpFromEndpointsData(endpoints, "0:0:0:0:0:0:0:1"))
-	assert.Equal(t, "3", findHostIdForIpFromEndpointsData(endpoints, "2001:0DB8::8:800:200C:417A"))
-	assert.Equal(t, "", findHostIdForIpFromEndpointsData(endpoints, "192.168.1.0"))
+	for i := range tests {
+		ready, hostId := findHostIdForIpFromEndpointsData(endpoints, tests[i].search)
+		assert.Equal(t, tests[i].result.hostId, hostId, "expected hostId to be %v", tests[i].result.hostId)
+		assert.Equal(t, tests[i].result.ready, ready, "expected ready to be %v", tests[i].result.ready)
+	}
 }

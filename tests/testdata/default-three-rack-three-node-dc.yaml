@@ -2,6 +2,8 @@ apiVersion: cassandra.datastax.com/v1beta1
 kind: CassandraDatacenter
 metadata:
   name: dc1
+  annotations:
+    cassandra.datastax.com/allow-parallel-starts: "true"
 spec:
   clusterName: cluster1
   serverType: cassandra

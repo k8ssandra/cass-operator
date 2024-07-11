@@ -89,7 +89,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.12"
+          - "4.0.13"
         integration_test:
           - cdc_successful # OSS only
           - config_fql

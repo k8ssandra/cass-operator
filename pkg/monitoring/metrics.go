@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"fmt"
 	"strings"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -53,7 +54,9 @@ func getPodStatus(pod *corev1.Pod) PodStatus {
 }
 
 var (
-	PodStatusVec *prometheus.GaugeVec
+	PodStatusVec                *prometheus.GaugeVec
+	DatacenterStatusVec         *prometheus.GaugeVec
+	DatacenterOperatorStatusVec *prometheus.GaugeVec
 )
 
 func init() {
@@ -64,8 +67,34 @@ func init() {
 		Help:      "Cassandra pod statuses",
 	}, []string{"namespace", "cluster", "datacenter", "rack", "pod", "status"})
 
+	datacenterConditionVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "cass_operator",
+		Subsystem: "datacenter",
+		Name:      "status",
+		Help:      "CassandraDatacenter conditions",
+	}, []string{"namespace", "cluster", "datacenter", "condition"})
+
+	datacenterOperatorStatusVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "cass_operator",
+		Subsystem: "datacenter",
+		Name:      "progress",
+		Help:      "CassandraDatacenter progress state",
+	}, []string{"namespace", "cluster", "datacenter", "progress"})
+
+	taskVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "cass_operator",
+		Subsystem: "task",
+		Name:      "status",
+		Help:      "Cassandra task statuses",
+	}, []string{"namespace", "cluster", "task", "status"})
+
 	metrics.Registry.MustRegister(podVec)
+	metrics.Registry.MustRegister(datacenterConditionVec)
+	metrics.Registry.MustRegister(datacenterOperatorStatusVec)
+	metrics.Registry.MustRegister(taskVec)
 	PodStatusVec = podVec
+	DatacenterStatusVec = datacenterConditionVec
+	DatacenterOperatorStatusVec = datacenterOperatorStatusVec
 }
 
 func UpdatePodStatusMetric(pod *corev1.Pod) {
@@ -84,4 +113,48 @@ func RemovePodStatusMetric(pod *corev1.Pod) {
 
 func RemoveDatacenterPods(namespace, cluster, datacenter string) {
 	PodStatusVec.DeletePartialMatch(prometheus.Labels{"namespace": namespace, "cluster": cluster, "datacenter": datacenter})
+}
+
+func SetDatacenterConditionMetric(dc *api.CassandraDatacenter, conditionType api.DatacenterConditionType, status corev1.ConditionStatus) {
+	cond := float64(0)
+	if status == corev1.ConditionTrue {
+		cond = 1
+	}
+
+	DatacenterStatusVec.WithLabelValues(dc.Namespace, dc.Spec.ClusterName, dc.DatacenterName(), string(conditionType)).Set(cond)
+}
+
+func UpdateOperatorDatacenterProgressStatusMetric(dc *api.CassandraDatacenter, state api.ProgressState) {
+	// Delete other statuses
+	DatacenterOperatorStatusVec.DeletePartialMatch(prometheus.Labels{"namespace": dc.Namespace, "cluster": dc.Spec.ClusterName, "datacenter": dc.DatacenterName()})
+
+	// Set this one only
+	DatacenterOperatorStatusVec.WithLabelValues(dc.Namespace, dc.Spec.ClusterName, dc.DatacenterName(), string(state)).Set(1)
+}
+
+// Add CassandraTask status also (how many pods done etc) per task
+// Add podnames to the CassandraTask status that are done? Or waiting?
+
+func GetMetricValue(name string, labels map[string]string) (float64, error) {
+	families, err := metrics.Registry.Gather()
+	if err != nil {
+		return 0, err
+	}
+
+	for _, fam := range families {
+		if *fam.Name == name {
+		Metric:
+			for _, m := range fam.Metric {
+				for _, label := range m.Label {
+					if val, ok := labels[*label.Name]; ok {
+						if val != *label.Value {
+							continue Metric
+						}
+					}
+				}
+				return *m.Gauge.Value, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("no metric found")
 }

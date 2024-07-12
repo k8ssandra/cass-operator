@@ -78,7 +78,7 @@ func TestMetricAdder(t *testing.T) {
 	require.Error(err)
 }
 
-func TestNamespaceSeparatation(t *testing.T) {
+func TestNamespaceSeparation(t *testing.T) {
 	require := require.New(t)
 	pods := make([]*corev1.Pod, 2)
 	for i := 0; i < len(pods); i++ {
@@ -150,3 +150,167 @@ func getCurrentPodStatus(podName string) (string, error) {
 	}
 	return "", fmt.Errorf("No pod status found")
 }
+
+func TestOperatorStateMetrics(t *testing.T) {
+	require := require.New(t)
+
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dc1",
+			Namespace: "ns",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "cluster1",
+		},
+		Status: api.CassandraDatacenterStatus{},
+	}
+
+	UpdateOperatorDatacenterProgressStatusMetric(dc, api.ProgressUpdating)
+
+	status, err := getCurrentDatacenterStatus("dc1")
+	require.NoError(err)
+	require.Equal("Updating", status)
+
+	UpdateOperatorDatacenterProgressStatusMetric(dc, api.ProgressReady)
+
+	status, err = getCurrentDatacenterStatus("dc1")
+	require.NoError(err)
+	require.Equal("Ready", status)
+}
+
+func getCurrentDatacenterStatus(dcName string) (string, error) {
+	families, err := metrics.Registry.Gather()
+	if err != nil {
+		return "", err
+	}
+
+	for _, fam := range families {
+		if *fam.Name == "cass_operator_datacenter_progress" {
+		Metric:
+			for _, m := range fam.Metric {
+				status := ""
+				for _, label := range m.Label {
+					if *label.Name == "datacenter" {
+						if *label.Value != dcName {
+							continue Metric
+						}
+					}
+					if *label.Name == "progress" {
+						status = *label.Value
+					}
+				}
+				if *m.Gauge.Value > 0 {
+					return status, nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("No datacenter status found")
+}
+
+func TestDatacenterConditionMetrics(t *testing.T) {
+	require := require.New(t)
+
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dc1",
+			Namespace: "ns",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "cluster1",
+		},
+		Status: api.CassandraDatacenterStatus{
+			Conditions: []api.DatacenterCondition{
+				{
+					Type:   api.DatacenterReady,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	SetDatacenterConditionMetric(dc, api.DatacenterReady, corev1.ConditionTrue)
+
+	status, err := getCurrentDatacenterCondition("dc1", api.DatacenterReady)
+	require.NoError(err)
+	require.Equal(float64(1), status)
+
+	SetDatacenterConditionMetric(dc, api.DatacenterInitialized, corev1.ConditionTrue)
+	SetDatacenterConditionMetric(dc, api.DatacenterReady, corev1.ConditionFalse)
+
+	status, err = getCurrentDatacenterCondition("dc1", api.DatacenterReady)
+	require.NoError(err)
+	require.Equal(float64(0), status)
+
+	status, err = getCurrentDatacenterCondition("dc1", api.DatacenterInitialized)
+	require.NoError(err)
+	require.Equal(float64(1), status)
+}
+
+func getCurrentDatacenterCondition(dcName string, conditionType api.DatacenterConditionType) (float64, error) {
+	return GetMetricValue("cass_operator_datacenter_status", map[string]string{"datacenter": dcName, "condition": string(conditionType)})
+}
+
+/*
+func TestTaskMetrics(t *testing.T) {
+	require := require.New(t)
+
+	task := &api.CassandraClusterTask{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "task1",
+			Namespace: "ns",
+		},
+		Status: api.CassandraClusterTaskStatus{
+			Phase: api.TaskPhaseRunning,
+		},
+	}
+
+	SetTaskStatusMetric(task)
+
+	status, err := getCurrentTaskStatus("task1")
+	require.NoError(err)
+	require.Equal("running", status)
+
+	task.Status.Phase = api.TaskPhaseCompleted
+	SetTaskStatusMetric(task)
+
+	status, err = getCurrentTaskStatus("task1")
+	require.NoError(err)
+	require.Equal("completed", status)
+
+	RemoveTaskStatusMetric(task)
+
+	_, err = getCurrentTaskStatus("task1")
+	require.Error(err)
+}
+
+func getCurrentTaskStatus(taskName string) (string, error) {
+	families, err := metrics.Registry.Gather()
+	if err != nil {
+		return "", err
+	}
+
+	for _, fam := range families {
+		if *fam.Name == "cass_operator_tasks_status" {
+		Metric:
+			for _, m := range fam.Metric {
+				status := ""
+				for _, label := range m.Label {
+					if *label.Name == "task" {
+						if *label.Value != taskName {
+							continue Metric
+						}
+					}
+					if *label.Name == "status" {
+						status = *label.Value
+					}
+				}
+				if *m.Gauge.Value > 0 {
+					return status, nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("No task status found")
+}
+*/

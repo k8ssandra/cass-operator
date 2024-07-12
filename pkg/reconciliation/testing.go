@@ -240,6 +240,20 @@ func k8sMockClientStatusPatch(mockClient *mocks.SubResourceClient, returnArg int
 		Once()
 }
 
+func k8sMockClientStatusUpdate(mockClient *mocks.SubResourceClient, returnArg interface{}) *mock.Call {
+	return mockClient.On("Update",
+		mock.MatchedBy(
+			func(ctx context.Context) bool {
+				return ctx != nil
+			}),
+		mock.MatchedBy(
+			func(obj runtime.Object) bool {
+				return obj != nil
+			})).
+		Return(returnArg).
+		Once()
+}
+
 func k8sMockClientCreate(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
 	return mockClient.On("Create",
 		mock.MatchedBy(

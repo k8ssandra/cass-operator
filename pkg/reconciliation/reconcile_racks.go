@@ -2182,6 +2182,7 @@ func (rc *ReconciliationContext) CheckRollingRestart() result.ReconcileResult {
 	logger := rc.ReqLogger
 
 	if dc.Spec.DeprecatedRollingRestartRequested {
+		dc.Status.LastRollingRestart = metav1.Now()
 		if err := rc.setConditionStatus(api.DatacenterRollingRestart, corev1.ConditionTrue); err != nil {
 			return result.Error(err)
 		}
@@ -2234,6 +2235,8 @@ func (rc *ReconciliationContext) setCondition(condition *api.DatacenterCondition
 	}
 
 	if updated {
+		// Modify the metric also
+		monitoring.SetDatacenterConditionMetric(dc, condition.Type, condition.Status)
 		// We use Update here to avoid removing some other changes to the Status that might have happened,
 		// as well as updating them at the same time
 		return rc.Client.Status().Update(rc.Ctx, dc)

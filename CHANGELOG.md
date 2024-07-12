@@ -14,7 +14,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [FEATURE] [#263]((https://github.com/k8ssandra/cass-operator/issues/263) Allow increasing the size of CassandraDataVolumeClaimSpec if the selected StorageClass supports it. This feature is currently behind a opt-in feature flag and requires an annotation ``cassandra.datastax.com/allow-storage-changes: true`` to be set in the CassandraDatacenter.
 * [FEATURE] [#646](https://github.com/k8ssandra/cass-operator/issues/646) Allow starting multiple parallel pods if they have already previously bootstrapped and not planned for replacement. Set annotation ``cassandra.datastax.com/allow-parallel-starts: true`` to enable this feature.
 * [ENHANCEMENT] [#648](https://github.com/k8ssandra/cass-operator/issues/648) Make MinReadySeconds configurable value in the Spec.
-* [ENHANCEMENT] [#349](https://github.com/k8ssandra/cass-operator/issues/349) Add CassandraDatacenter.Status fields as metrics also
+* [ENHANCEMENT] [#184](https://github.com/k8ssandra/cass-operator/issues/349) Add CassandraDatacenter.Status fields as metrics also
 
 ## v1.21.1
 

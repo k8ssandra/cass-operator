@@ -503,10 +503,10 @@ func (ns *NsWrapper) EnableGossip(podName string) {
 func (ns *NsWrapper) KillCassandra(podName string) {
 	execArgs := []string{"-c", "cassandra",
 		"--", "sh", "-c",
-		"pkill -f -9 datastax-mgmtapi-agent.jar",
+		"pkill -e -f -9 datastax-mgmtapi-agent.jar",
 	}
 	k := kubectl.ExecOnPod(podName, execArgs...)
-	ns.ExecVPanic(k)
+	Expect(ns.OutputPanic(k)).To(Not(BeEmpty()))
 }
 
 func (ns *NsWrapper) GetDatacenterPodNames(dcName string) []string {

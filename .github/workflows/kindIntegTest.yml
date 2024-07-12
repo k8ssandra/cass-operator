@@ -237,12 +237,22 @@ jobs:
           - "4.0.12"
           - "4.1.4"
           - "6.8.46"
+          - "6.9.0"
+          - "1.0.0"
         integration_test:
           - test_all_the_things
         include:
-          - version: 6.8.46
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.46-ubi8 # DSE 6.8.46
+          - version: 6.8.50
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.50-ubi8 # DSE 6.8.50
             serverType: dse
+            integration_test: "test_all_the_things"
+          - version: 6.9.0
+            serverImage: datastax/dse-mgmtapi-6_8:6.9.0-ubi8 # DSE 6.9.0
+            serverType: dse
+            integration_test: "test_all_the_things"
+          - version: 1.0.0
+            serverImage: datastax/hcd:1.0.0-ubi # HCD 1.0.0
+            serverType: hcd
             integration_test: "test_all_the_things"
       fail-fast: true
     runs-on: ubuntu-latest

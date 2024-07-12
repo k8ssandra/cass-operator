@@ -81,17 +81,9 @@ func init() {
 		Help:      "CassandraDatacenter progress state",
 	}, []string{"namespace", "cluster", "datacenter", "progress"})
 
-	taskVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "cass_operator",
-		Subsystem: "task",
-		Name:      "status",
-		Help:      "Cassandra task statuses",
-	}, []string{"namespace", "cluster", "task", "status"})
-
 	metrics.Registry.MustRegister(podVec)
 	metrics.Registry.MustRegister(datacenterConditionVec)
 	metrics.Registry.MustRegister(datacenterOperatorStatusVec)
-	metrics.Registry.MustRegister(taskVec)
 	PodStatusVec = podVec
 	DatacenterStatusVec = datacenterConditionVec
 	DatacenterOperatorStatusVec = datacenterOperatorStatusVec

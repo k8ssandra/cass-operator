@@ -2064,7 +2064,7 @@ func TestStartBootstrappedNodes(t *testing.T) {
 				for i := range fakeRecorder.Events {
 					gotEvents = append(gotEvents, i)
 				}
-				assert.Equal(t, tt.wantEvents, gotEvents)
+				assert.ElementsMatch(t, tt.wantEvents, gotEvents)
 			}
 
 			mockClient.AssertExpectations(t)

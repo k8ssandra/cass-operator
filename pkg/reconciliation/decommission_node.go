@@ -16,6 +16,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/monitoring"
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -82,19 +83,8 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 		if maxReplicas > desiredNodeCount {
 			logger.V(1).Info("reconcile_racks::DecommissionNodes::scaleDownRack", "Rack", rackInfo.RackName, "maxReplicas", maxReplicas, "desiredNodeCount", desiredNodeCount)
 
-			dcPatch := client.MergeFrom(dc.DeepCopy())
-			updated := false
-
-			updated = rc.setCondition(
-				api.NewDatacenterCondition(
-					api.DatacenterScalingDown, corev1.ConditionTrue)) || updated
-
-			if updated {
-				err := rc.Client.Status().Patch(rc.Ctx, dc, dcPatch)
-				if err != nil {
-					logger.Error(err, "error patching datacenter status for scaling down rack started")
-					return result.Error(err)
-				}
+			if err := rc.setConditionStatus(api.DatacenterScalingDown, corev1.ConditionTrue); err != nil {
+				return result.Error(err)
 			}
 
 			rc.ReqLogger.Info(
@@ -219,21 +209,8 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 		}
 	}
 
-	dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
-	updated := false
-
-	updated = rc.setCondition(
-		api.NewDatacenterCondition(
-			api.DatacenterScalingDown, corev1.ConditionFalse)) || updated
-
-	if updated {
-		err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch)
-		if err != nil {
-			rc.ReqLogger.Error(err, "error patching datacenter status for scaling down finished")
-			return result.Error(err)
-		}
-		// Requeue after updating to ensure we verify previous steps with the new size
-		return result.RequeueSoon(0)
+	if err := rc.setConditionStatus(api.DatacenterScalingDown, corev1.ConditionFalse); err != nil {
+		return result.Error(err)
 	}
 
 	return result.Continue()
@@ -424,20 +401,12 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 			rc.ReqLogger.Error(fmt.Errorf(msg), msg)
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
 
-			dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
-			updated := rc.setCondition(
+			if err := rc.setCondition(
 				api.NewDatacenterConditionWithReason(api.DatacenterValid,
 					corev1.ConditionFalse, "notEnoughSpaceToScaleDown", msg,
 				),
-			)
-
-			if updated {
-				patchErr := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch)
-				if patchErr != nil {
-					msg := "error patching condition Valid for failed scale down."
-					rc.ReqLogger.Error(patchErr, msg)
-					return patchErr
-				}
+			); err != nil {
+				return errors.Wrap(err, msg)
 			}
 
 			return fmt.Errorf(msg)

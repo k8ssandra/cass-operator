@@ -85,11 +85,16 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 }
 
 func setDatacenterStatus(rc *ReconciliationContext) error {
-	patch := client.MergeFrom(rc.Datacenter.DeepCopy())
-	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
-	rc.setCondition(api.NewDatacenterCondition(api.DatacenterRequiresUpdate, corev1.ConditionFalse))
-	if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
-		rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")
+	if rc.Datacenter.Status.ObservedGeneration != rc.Datacenter.Generation {
+		patch := client.MergeFrom(rc.Datacenter.DeepCopy())
+		rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
+		if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
+			rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")
+			return err
+		}
+	}
+
+	if err := rc.setConditionStatus(api.DatacenterRequiresUpdate, corev1.ConditionFalse); err != nil {
 		return err
 	}
 

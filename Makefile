@@ -67,7 +67,7 @@ IMG ?= $(IMAGE_TAG_BASE):v$(VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:generateEmbeddedObjectMeta=true"
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.28.x
+ENVTEST_K8S_VERSION = 1.30.x
 
 # Logger image
 LOG_IMG_BASE ?= $(ORG)/system-logger
@@ -139,9 +139,9 @@ test: manifests generate fmt vet lint envtest ## Run tests.
 integ-test: kustomize cert-manager helm ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
 ifeq ($(M_INTEG_DIR), all)
 	# Run all the tests (exclude kustomize & testdata directories)
-	cd tests && go test -v ./... -timeout 300m --ginkgo.show-node-events --ginkgo.v
+	cd tests && go test -v ./... -timeout 60m --ginkgo.show-node-events --ginkgo.v
 else
-	cd tests/${M_INTEG_DIR} && go test -v ./... -timeout 300m --ginkgo.show-node-events --ginkgo.v
+	cd tests/${M_INTEG_DIR} && go test -v ./... -timeout 60m --ginkgo.show-node-events --ginkgo.v
 endif
 
 .PHONY: version
@@ -239,13 +239,13 @@ HELM ?= $(LOCALBIN)/helm
 OPM ?= $(LOCALBIN)/opm
 
 ## Tool Versions
-CERT_MANAGER_VERSION ?= v1.14.3
-KUSTOMIZE_VERSION ?= v5.3.0
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
-OPERATOR_SDK_VERSION ?= 1.34.1
+CERT_MANAGER_VERSION ?= v1.14.7
+KUSTOMIZE_VERSION ?= v5.4.2
+CONTROLLER_TOOLS_VERSION ?= v0.15.0
+OPERATOR_SDK_VERSION ?= 1.35.0
 HELM_VERSION ?= 3.14.2
-OPM_VERSION ?= 1.36.0
-GOLINT_VERSION ?= 1.55.2
+OPM_VERSION ?= 1.38.0
+GOLINT_VERSION ?= 1.59.1
 
 .PHONY: cert-manager
 cert-manager: ## Install cert-manager to the cluster

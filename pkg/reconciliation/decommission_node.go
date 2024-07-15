@@ -422,6 +422,7 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 				pod.Name, free, int64(spaceUsedByDecommPod),
 			)
 			rc.ReqLogger.Error(fmt.Errorf(msg), msg)
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
 
 			dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
 			updated := rc.setCondition(

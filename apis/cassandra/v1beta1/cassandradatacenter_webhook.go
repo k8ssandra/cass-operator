@@ -20,11 +20,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/k8ssandra/cass-operator/pkg/images"
-
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -173,16 +173,18 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 		return attemptedTo("change serviceAccount")
 	}
 
-	// CassandraDataVolumeClaimSpec changes are disallowed
+	oldClaimSpec := oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec.DeepCopy()
+	newClaimSpec := newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec.DeepCopy()
 
-	if !reflect.DeepEqual(oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec, newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec) {
-		return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec")
+	// CassandraDataVolumeClaimSpec changes are disallowed
+	if metav1.HasAnnotation(newDc.ObjectMeta, AllowStorageChangesAnnotation) && newDc.Annotations[AllowStorageChangesAnnotation] == "true" {
+		// If the AllowStorageChangesAnnotation is set, we allow changes to the CassandraDataVolumeClaimSpec sizes, but not other fields
+		oldClaimSpec.Resources.Requests = newClaimSpec.Resources.Requests
 	}
 
-	if oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec != nil {
-		if !reflect.DeepEqual(*oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec, *newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec) {
-			return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec")
-		}
+	if !apiequality.Semantic.DeepEqual(oldClaimSpec, newClaimSpec) {
+		pvcSourceDiff := cmp.Diff(oldClaimSpec, newClaimSpec)
+		return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec, diff: %s", pvcSourceDiff)
 	}
 
 	// Topology changes - Racks

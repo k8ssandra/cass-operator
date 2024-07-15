@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -398,7 +399,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 
 func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 	storageSize := resource.MustParse("1Gi")
-	storageName := "server-data"
+	storageName := ptr.To[string]("server-data")
 
 	tests := []struct {
 		name      string
@@ -419,7 +420,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					DeprecatedServiceAccount:    "admin",
 					StorageConfig: StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-							StorageClassName: &storageName,
+							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
 							Resources: corev1.VolumeResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
@@ -446,7 +447,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					DeprecatedServiceAccount:    "admin",
 					StorageConfig: StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-							StorageClassName: &storageName,
+							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
 							Resources: corev1.VolumeResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
@@ -573,7 +574,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: CassandraDatacenterSpec{
 					StorageConfig: StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-							StorageClassName: &storageName,
+							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
 							Resources: corev1.VolumeResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
@@ -589,7 +590,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: CassandraDatacenterSpec{
 					StorageConfig: StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-							StorageClassName: &storageName,
+							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteMany"},
 							Resources: corev1.VolumeResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
@@ -599,6 +600,84 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				},
 			},
 			errString: "change storageConfig.CassandraDataVolumeClaimSpec",
+		},
+		{
+			name: "StorageClassName changes with storageConfig changes allowed",
+			oldDc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: CassandraDatacenterSpec{
+					StorageConfig: StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
+							},
+						},
+					},
+				},
+			},
+			newDc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+					Annotations: map[string]string{
+						AllowStorageChangesAnnotation: "true",
+					},
+				},
+				Spec: CassandraDatacenterSpec{
+					StorageConfig: StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: ptr.To[string]("new-server-data"),
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
+							},
+						},
+					},
+				},
+			},
+			errString: "change storageConfig.CassandraDataVolumeClaimSpec",
+		},
+		{
+			name: "storage requests size changes with storageConfig changes allowed",
+			oldDc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: CassandraDatacenterSpec{
+					StorageConfig: StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
+							},
+						},
+					},
+				},
+			},
+			newDc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+					Annotations: map[string]string{
+						AllowStorageChangesAnnotation: "true",
+					},
+				},
+				Spec: CassandraDatacenterSpec{
+					StorageConfig: StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("2Gi")},
+							},
+						},
+					},
+				},
+			},
+			errString: "",
 		},
 		{
 			name: "Removing a rack",
@@ -836,7 +915,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 			} else {
 				if tt.errString == "" {
 					t.Errorf("ValidateDatacenterFieldChanges() err = %v, should be valid", err)
-				} else if !strings.HasSuffix(err.Error(), tt.errString) {
+				} else if !strings.Contains(err.Error(), tt.errString) {
 					t.Errorf("ValidateDatacenterFieldChanges() err = %v, want suffix %v", err, tt.errString)
 				}
 			}

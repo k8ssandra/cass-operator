@@ -19,6 +19,7 @@ const (
 	LabeledPodAsSeed                  string = "LabeledPodAsSeed"
 	LabeledPodAsDecommissioning       string = "LabeledPodAsDecommissioning"
 	DeletedPvc                        string = "DeletedPvc"
+	ResizingPVC                       string = "ResizingPVC"
 	UnlabeledPodAsSeed                string = "UnlabeledPodAsSeed"
 	LabeledRackResource               string = "LabeledRackResource"
 	ScalingUpRack                     string = "ScalingUpRack"
@@ -32,6 +33,8 @@ const (
 	DecommissionDatacenter            string = "DecommissionDatacenter"
 	DecommissioningNode               string = "DecommissioningNode"
 	UnhealthyDatacenter               string = "UnhealthyDatacenter"
+	RecreatingStatefulSet             string = "RecreatingStatefulSet"
+	InvalidDatacenterSpec             string = "InvalidDatacenterSpec"
 )
 
 type LoggingEventRecorder struct {

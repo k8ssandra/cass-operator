@@ -29,6 +29,8 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -407,6 +409,8 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 		},
 	}
 
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
 		nil,
 		"default",
@@ -421,10 +425,7 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	desiredStatefulSet.Status.ObservedGeneration = 1
 	desiredStatefulSet.Status.ReadyReplicas = int32(1)
 
-	trackObjects := []runtime.Object{
-		desiredStatefulSet,
-		rc.Datacenter,
-	}
+	require.NoError(rc.Client.Create(rc.Ctx, desiredStatefulSet))
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = "default"
@@ -437,7 +438,6 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
 	rc.statefulSets[0] = desiredStatefulSet
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter, rc.statefulSets[0]).WithRuntimeObjects(trackObjects...).Build()
 	res := rc.CheckRackPodTemplate()
 	require.Equal(result.Done(), res)
 	rc.statefulSets[0].Status.ObservedGeneration = rc.statefulSets[0].Generation
@@ -2446,4 +2446,286 @@ func TestFindHostIdForIpFromEndpointsData(t *testing.T) {
 		assert.Equal(t, tests[i].result.hostId, hostId, "expected hostId to be %v", tests[i].result.hostId)
 		assert.Equal(t, tests[i].result.ready, ready, "expected ready to be %v", tests[i].result.ready)
 	}
+}
+
+func TestCheckVolumeClaimSizesValidation(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	// No changes test - should not result in any error
+	originalStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	require.NoError(rc.Client.Create(rc.Ctx, originalStatefulSet))
+
+	res := rc.CheckVolumeClaimSizes(originalStatefulSet, originalStatefulSet)
+	require.Equal(result.Continue(), res, "No changes, we should continue")
+
+	// Use case, we do not have expansion allowed in our StorageClass, should get Valid False state in CassandraDatacenter
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("2Gi")}
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+
+	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
+	require.Equal(result.Error(fmt.Errorf("PVC resize requested, but cassandra.datastax.com/allow-storage-changes annotation is not set to 'true'")), res, "We should have an error, feature flag is not set")
+
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation, "true")
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+
+	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
+	require.Equal(result.Error(fmt.Errorf("PVC resize requested, but StorageClass standard does not support expansion")), res, "We should have an error, StorageClass does not allow expansion")
+	cond, found := rc.Datacenter.GetCondition(api.DatacenterValid)
+	require.True(found)
+	require.Equal(corev1.ConditionFalse, cond.Status)
+
+	// Verify we didn't try to shrink either
+	rc.Datacenter.SetCondition(api.DatacenterCondition{
+		Status: corev1.ConditionTrue,
+		Type:   api.DatacenterValid,
+	})
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("0.5Gi")}
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
+	require.Equal(result.Error(fmt.Errorf("shrinking PVC %s is not supported", originalStatefulSet.Spec.VolumeClaimTemplates[0].Name)), res, "We should have an error, shrinking is disabled")
+	cond, found = rc.Datacenter.GetCondition(api.DatacenterValid)
+	require.True(found)
+	require.Equal(corev1.ConditionFalse, cond.Status)
+
+	// Verify adding new AdditionalVolumes with size is allowed - even if this doesn't actually add them
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
+	rc.Datacenter.Spec.StorageConfig.AdditionalVolumes = api.AdditionalVolumesSlice{
+		api.AdditionalVolumes{
+			MountPath: "/var/log/cassandra",
+			Name:      "server-logs",
+			PVCSpec: &corev1.PersistentVolumeClaimSpec{
+				StorageClassName: ptr.To[string]("standard"),
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("384Mi")},
+				},
+			},
+		},
+	}
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
+	require.Equal(result.Continue(), res, "No resize changes, we should continue")
+
+	// Verify adding AdditionalVolumes without sizes are supported
+	rc.Datacenter.Spec.StorageConfig.AdditionalVolumes = append(rc.Datacenter.Spec.StorageConfig.AdditionalVolumes,
+		api.AdditionalVolumes{
+			MountPath: "/configs/metrics",
+			Name:      "metrics-config",
+			VolumeSource: &corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "metrics-config-map",
+					},
+				},
+			},
+		})
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
+	require.Equal(result.Continue(), res, "No resize changes, we should continue")
+}
+
+func TestVolumeClaimSizesExpansion(t *testing.T) {
+	// Verify the StatefulSet is also deleted when the PVC size is changed
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	// Sanity check, no changes yet - should not result in any error
+	originalStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	require.NoError(rc.Client.Create(rc.Ctx, originalStatefulSet))
+
+	// Create the PVCs for the StatefulSet
+	for i := 0; i < int(*originalStatefulSet.Spec.Replicas); i++ {
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("server-data-%s-%d", originalStatefulSet.Name, i),
+				Namespace: "default",
+			},
+		}
+		pvc.Spec = originalStatefulSet.Spec.VolumeClaimTemplates[0].Spec
+		pvc.Labels = originalStatefulSet.Spec.VolumeClaimTemplates[0].Labels
+		require.NoError(rc.Client.Create(rc.Ctx, pvc))
+	}
+
+	// Mark the StorageClass as allowing expansion and Datacenter to allow expansion
+	storageClass := &storagev1.StorageClass{}
+	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: "standard"}, storageClass))
+	storageClass.AllowVolumeExpansion = ptr.To[bool](true)
+	require.NoError(rc.Client.Update(rc.Ctx, storageClass))
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation, "true")
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+
+	res := rc.CheckVolumeClaimSizes(originalStatefulSet, originalStatefulSet)
+	require.Equal(result.Continue(), res, "No changes, we should continue")
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("2Gi")}
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
+	require.Equal(result.Continue(), res, "We made changes to the PVC size")
+
+	cond, found := rc.Datacenter.GetCondition(api.DatacenterResizingVolumes)
+	require.True(found)
+	require.Equal(corev1.ConditionTrue, cond.Status)
+
+	pvcs, err := rc.listPVCs(originalStatefulSet.Spec.VolumeClaimTemplates[0].Labels)
+	require.NoError(err)
+	for _, pvc := range pvcs {
+		require.Equal(*rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests.Storage(), pvc.Spec.Resources.Requests[corev1.ResourceStorage], fmt.Sprintf("PVC %s should have been resized", pvc.Name))
+		require.Equal(resource.MustParse("2Gi"), pvc.Spec.Resources.Requests[corev1.ResourceStorage], fmt.Sprintf("PVC %s should have been resized to 2Gi", pvc.Name))
+	}
+}
+
+func TestCheckPVCResizing(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	// Create a PVC for the StatefulSet
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "server-data-cassandra-dc1-default-sts-0",
+			Namespace: "default",
+			Labels:    rc.Datacenter.GetRackLabels("rack1"),
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			StorageClassName: ptr.To[string]("standard"),
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+	require.NoError(rc.Client.Create(rc.Ctx, pvc))
+	res := rc.CheckPVCResizing()
+	require.Equal(result.Continue(), res, "No resizing in progress, we should simply continue")
+
+	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type:   corev1.PersistentVolumeClaimResizing,
+		Status: corev1.ConditionTrue,
+	}}
+	require.NoError(rc.Client.Status().Update(rc.Ctx, pvc))
+
+	res = rc.CheckPVCResizing()
+	require.Equal(result.RequeueSoon(10), res, "PVC resizing is in progress, we should requeue")
+
+	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type:   corev1.PersistentVolumeClaimResizing,
+		Status: corev1.ConditionFalse,
+	}}
+	require.NoError(rc.Client.Status().Update(rc.Ctx, pvc))
+
+	// Verify datacenter status resizing is removed if nothing is being resized anymore
+	rc.Datacenter.SetCondition(api.DatacenterCondition{
+		Status: corev1.ConditionTrue,
+		Type:   api.DatacenterResizingVolumes,
+	})
+	require.NoError(rc.Client.Status().Update(rc.Ctx, rc.Datacenter))
+
+	res = rc.CheckPVCResizing()
+	require.Equal(result.Continue(), res, "No resizing in progress, we should simply continue")
+
+	cond, found := rc.Datacenter.GetCondition(api.DatacenterResizingVolumes)
+	require.True(found)
+	require.Equal(corev1.ConditionFalse, cond.Status)
+
+	// Create another PVC, not related to our Datacenter and check it is ignored
+	pvc2 := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "server-data-cassandra-dc2-default-sts-0",
+			Namespace: "default",
+			Labels:    rc.Datacenter.GetRackLabels("rack1"),
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			StorageClassName: ptr.To[string]("standard"),
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+	pvc2.Labels[api.DatacenterLabel] = "dc2"
+	require.NoError(rc.Client.Create(rc.Ctx, pvc2))
+	pvc2.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type:   corev1.PersistentVolumeClaimResizing,
+		Status: corev1.ConditionTrue,
+	}}
+	require.NoError(rc.Client.Status().Update(rc.Ctx, pvc))
+	res = rc.CheckPVCResizing()
+	require.Equal(result.Continue(), res, "No resizing in progress, we should simply continue")
+}
+
+func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
+	require := require.New(t)
+	rc, _, cleanpMockSrc := setupTest()
+	defer cleanpMockSrc()
+
+	require.NoError(rc.CalculateRackInformation())
+	res := rc.CheckRackCreation()
+	require.False(res.Completed(), "CheckRackCreation did not complete as expected")
+
+	require.Equal(result.Continue(), rc.CheckRackPodTemplate())
+
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation, "true")
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+
+	// Get the current StS
+	sts := &appsv1.StatefulSet{}
+	nsName := newNamespacedNameForStatefulSet(rc.Datacenter, "default")
+	require.NoError(rc.Client.Get(rc.Ctx, nsName, sts))
+	require.Equal(resource.MustParse("1Gi"), sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage])
+
+	// Create the PVCs for the StatefulSet
+	for i := 0; i < int(*sts.Spec.Replicas); i++ {
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("server-data-%s-%d", sts.Name, i),
+				Namespace: "default",
+			},
+		}
+		pvc.Spec = sts.Spec.VolumeClaimTemplates[0].Spec
+		pvc.Labels = sts.Spec.VolumeClaimTemplates[0].Labels
+		require.NoError(rc.Client.Create(rc.Ctx, pvc))
+	}
+
+	require.Equal(result.Continue(), rc.CheckRackPodTemplate())
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("2Gi")}
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	res = rc.CheckRackPodTemplate()
+	require.Equal(result.Error(fmt.Errorf("PVC resize requested, but StorageClass standard does not support expansion")), res, "We should have an error, storageClass does not support expansion")
+
+	// Mark the StorageClass as allowing expansion
+	storageClass := &storagev1.StorageClass{}
+	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: "standard"}, storageClass))
+	storageClass.AllowVolumeExpansion = ptr.To[bool](true)
+	require.NoError(rc.Client.Update(rc.Ctx, storageClass))
+
+	res = rc.CheckRackPodTemplate()
+	require.Equal(result.Done(), res, "Recreating StS should throw us to silence period")
+
+	require.NoError(rc.Client.Get(rc.Ctx, nsName, sts))
+	require.Equal(resource.MustParse("2Gi"), sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage])
+
+	// The fakeClient behavior does not prevent us from modifying the StS fields, so this test behaves unlike real world in that sense
+	res = rc.CheckRackPodTemplate()
+	require.Equal(result.Continue(), res, "Recreating StS should throw us to silence period")
+
 }

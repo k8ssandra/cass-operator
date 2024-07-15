@@ -71,6 +71,9 @@ const (
 	// AllowParallelStartsAnnotations allows the operator to start multiple server nodes at the same time if they have already bootstrapped.
 	AllowParallelStartsAnnotations = "cassandra.datastax.com/allow-parallel-starts"
 
+	// AllowStorageChangesAnnotation indicates the CassandraDatacenter StorageConfig can be modified for existing datacenters
+	AllowStorageChangesAnnotation = "cassandra.datastax.com/allow-storage-changes"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 
@@ -385,18 +388,19 @@ type CassandraStatusMap map[string]CassandraNodeStatus
 type DatacenterConditionType string
 
 const (
-	DatacenterReady          DatacenterConditionType = "Ready"
-	DatacenterInitialized    DatacenterConditionType = "Initialized"
-	DatacenterReplacingNodes DatacenterConditionType = "ReplacingNodes"
-	DatacenterScalingUp      DatacenterConditionType = "ScalingUp"
-	DatacenterScalingDown    DatacenterConditionType = "ScalingDown"
-	DatacenterUpdating       DatacenterConditionType = "Updating"
-	DatacenterStopped        DatacenterConditionType = "Stopped"
-	DatacenterResuming       DatacenterConditionType = "Resuming"
-	DatacenterRollingRestart DatacenterConditionType = "RollingRestart"
-	DatacenterValid          DatacenterConditionType = "Valid"
-	DatacenterDecommission   DatacenterConditionType = "Decommission"
-	DatacenterRequiresUpdate DatacenterConditionType = "RequiresUpdate"
+	DatacenterReady           DatacenterConditionType = "Ready"
+	DatacenterInitialized     DatacenterConditionType = "Initialized"
+	DatacenterReplacingNodes  DatacenterConditionType = "ReplacingNodes"
+	DatacenterScalingUp       DatacenterConditionType = "ScalingUp"
+	DatacenterScalingDown     DatacenterConditionType = "ScalingDown"
+	DatacenterUpdating        DatacenterConditionType = "Updating"
+	DatacenterStopped         DatacenterConditionType = "Stopped"
+	DatacenterResuming        DatacenterConditionType = "Resuming"
+	DatacenterRollingRestart  DatacenterConditionType = "RollingRestart"
+	DatacenterValid           DatacenterConditionType = "Valid"
+	DatacenterDecommission    DatacenterConditionType = "Decommission"
+	DatacenterRequiresUpdate  DatacenterConditionType = "RequiresUpdate"
+	DatacenterResizingVolumes DatacenterConditionType = "ResizingVolumes"
 
 	// DatacenterHealthy indicates if QUORUM can be reached from all deployed nodes.
 	// If this check fails, certain operations such as scaling up will not proceed.

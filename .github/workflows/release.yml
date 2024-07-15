@@ -45,7 +45,7 @@ jobs:
           echo "TARGET_VERSION=$(echo ${GITHUB_REF#refs/tags/} | awk '{print substr($0,2)}')" >> $GITHUB_ENV
       - name: Build system-logger
         id: docker_build_system-logger
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           file: logger.Dockerfile
           build-args: |
@@ -58,7 +58,7 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build cass-operator
         id: docker_build_cass-operator
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           file: Dockerfile
           build-args: |
@@ -71,7 +71,7 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Push system-logger
         id: docker_push_system-logger
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           file: logger.Dockerfile
           build-args: |
@@ -84,7 +84,7 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Push cass-operator
         id: docker_push_cass-operator
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           file: Dockerfile
           build-args: |
@@ -134,7 +134,7 @@ jobs:
       - name: Build and push cass-operator-bundle
         id: docker_build_cass-operator_bundle
         if: ${{ !env.ACT }}
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           file: bundle.Dockerfile
           build-args: |

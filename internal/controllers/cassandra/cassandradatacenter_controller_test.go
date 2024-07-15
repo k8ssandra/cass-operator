@@ -184,64 +184,6 @@ var _ = Describe("CassandraDatacenter tests", func() {
 				verifyDatacenterDeleted(ctx, dcName).Should(Succeed())
 			})
 		})
-		// This isn't functional with envtest at the moment, fails with (only in envtest):
-		/*
-			2024-07-04T17:05:07.636+0300	INFO	PersistentVolumeClaim "server-data-cluster1-dc12-r0-sts-0" is invalid: spec: Forbidden: spec is immutable after creation except resources.requests and volumeAttributesClassName for bound claims
-				core.PersistentVolumeClaimSpec{
-					AccessModes: {"ReadWriteOnce"},
-					Selector:    nil,
-					Resources: core.VolumeResourceRequirements{
-						Limits: nil,
-			- 		Requests: core.ResourceList{
-			- 			s"storage": {i: resource.int64Amount{value: 1073741824}, s: "1Gi", Format: "BinarySI"},
-			- 		},
-			+ 		Requests: core.ResourceList{
-			+ 			s"storage": {i: resource.int64Amount{value: 2147483648}, s: "2Gi", Format: "BinarySI"},
-			+ 		},
-					},
-		*/
-		/*
-			Context("Single datacenter modifications", func() {
-				It("should be able to expand PVC", func(ctx SpecContext) {
-					dcName := "dc12"
-
-					dc := createDatacenter(ctx, dcName, 1, 1)
-					waitForDatacenterReady(ctx, dcName)
-					createStorageClass(ctx, "default")
-
-					verifyStsCount(ctx, dcName, 1, 1)
-					verifyPodCount(ctx, dcName, 1)
-					waitForDatacenterReady(ctx, dcName)
-
-					By("updating the storageSize to 2Gi")
-					refreshDatacenter(ctx, &dc)
-					patch := client.MergeFrom(dc.DeepCopy())
-					metav1.SetMetaDataAnnotation(&dc.ObjectMeta, "cassandra.datastax.com/allow-storage-changes", "true")
-					dc.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-					Expect(k8sClient.Patch(ctx, &dc, patch)).To(Succeed())
-					// Expect(k8sClient.Update(ctx, &dc)).To(Succeed())
-
-					waitForDatacenterCondition(ctx, dcName, cassdcapi.DatacenterResizingVolumes, corev1.ConditionTrue).Should(Succeed())
-					waitForDatacenterReady(ctx, dcName)
-					waitForDatacenterCondition(ctx, dcName, cassdcapi.DatacenterResizingVolumes, corev1.ConditionFalse).Should(Succeed())
-
-					// Verify the StS was updated
-					verifyStsCount(ctx, dcName, 1, 1)
-					stsAll := &appsv1.StatefulSetList{}
-
-					Expect(k8sClient.List(ctx, stsAll, client.MatchingLabels{cassdcapi.DatacenterLabel: dcName}, client.InNamespace(testNamespaceName))).To(Succeed())
-					Expect(len(stsAll.Items)).To(Equal(1))
-
-					for _, sts := range stsAll.Items {
-						claimSize := sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage]
-						Expect("2Gi").To(Equal(claimSize.String()))
-					}
-
-					deleteDatacenter(ctx, dcName)
-					verifyDatacenterDeleted(ctx, dcName)
-				})
-			})
-		*/
 	})
 })
 

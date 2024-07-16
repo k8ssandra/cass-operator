@@ -662,6 +662,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")},
 		{Name: "DS_LICENSE", Value: "accept"},
 		{Name: "USE_MGMT_API", Value: "true"},
+		{Name: "MGMT_API_NO_KEEP_ALIVE", Value: "true"},
 		{Name: "MGMT_API_EXPLICIT_START", Value: "true"},
 	}
 
@@ -677,6 +678,10 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 
 	if dc.Spec.ServerType == "hcd" {
 		envDefaults = append(envDefaults, corev1.EnvVar{Name: "HCD_AUTO_CONF_OFF", Value: "all"})
+	}
+
+	if readOnlyFs(dc) {
+		envDefaults = append(envDefaults, corev1.EnvVar{Name: "$MGMT_API_DISABLE_MCAC", Value: "true"})
 	}
 
 	cassContainer.Env = combineEnvSlices(envDefaults, cassContainer.Env)
@@ -801,7 +806,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 }
 
 func readOnlyFs(dc *api.CassandraDatacenter) bool {
-	return dc.Spec.ReadOnlyRootFilesystem && dc.UseClientImage()
+	return dc.Spec.ReadOnlyRootFilesystem != nil && *dc.Spec.ReadOnlyRootFilesystem && dc.UseClientImage()
 }
 
 func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {

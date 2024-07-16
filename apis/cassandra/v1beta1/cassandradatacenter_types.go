@@ -271,7 +271,7 @@ type CassandraDatacenterSpec struct {
 
 	// ReadOnlyRootFilesystem makes the cassandra container to be run with a read-only root filesystem. Currently only functional when used with the
 	// new k8ssandra-client config builder (Cassandra 4.1 and newer and HCD)
-	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty"`
+	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty"`
 }
 
 type NetworkingConfig struct {

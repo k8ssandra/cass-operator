@@ -155,15 +155,13 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.1.4"
+          - "4.1.5"
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
           - additional_volumes
           # - delete_node_terminated_container # This does not test any operator behavior
           - podspec_simple
-          # - smoke_test_oss # Converted to test_all_the_things, see below job
-          # - smoke_test_dse # Converted to test_all_the_things, see below job
           # - terminate
           # - timeout_prestop_termination
           # - upgrade_operator # See kind_311_tests job, Only works for 3.11 right now
@@ -200,10 +198,17 @@ jobs:
           - scale_up
           - scale_up_stop_resume
           - seed_selection
+          - smoke_test_read_only_fs
           #- config_fql # OSS only
           - decommission_dc
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
-      # let other tests continue to run
+        include:
+          - version: 4.1.5
+            serverImage: michaelburman290/cass-management-api:4.1.5-ubi8 # Modified version of cass-management-api
+            serverType: cassandra
+            integration_test: "smoke_test_read_only_fs"
+
+        # let other tests continue to run
       # even if one fails
       fail-fast: false
     runs-on: ubuntu-latest

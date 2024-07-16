@@ -176,7 +176,6 @@ jobs:
           - additional_volumes
           # - delete_node_terminated_container # This does not test any operator behavior
           - podspec_simple
-          # - smoke_test_oss # Converted to test_all_the_things, see below job
           # - smoke_test_dse # Converted to test_all_the_things, see below job
           # - terminate # test_all_things
           # - timeout_prestop_termination # This is testing a Kubernetes behavior, not interesting to us

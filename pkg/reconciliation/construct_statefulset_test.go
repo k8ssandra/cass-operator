@@ -436,9 +436,10 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 	}
 
 	defaultSecurityContext := &corev1.PodSecurityContext{
-		RunAsUser:  ptr.To(int64(999)),
-		RunAsGroup: ptr.To(int64(999)),
-		FSGroup:    ptr.To(int64(999)),
+		RunAsUser:    ptr.To(int64(999)),
+		RunAsGroup:   ptr.To(int64(999)),
+		FSGroup:      ptr.To(int64(999)),
+		RunAsNonRoot: ptr.To[bool](true),
 	}
 
 	tests := []struct {

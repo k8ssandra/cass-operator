@@ -2003,6 +2003,6 @@ func TestReadOnlyRootFilesystemVolumeChanges(t *testing.T) {
 		}), fmt.Sprintf("Unexpected volume mounts for the cassandra container: %v", containers[0].VolumeMounts))
 
 	// TODO Verify MCAC is disabled since it will fail with ReadOnlyRootFilesystem
-	mcacDisabled := corev1.EnvVar{Name: "$MGMT_API_DISABLE_MCAC", Value: "true"}
+	mcacDisabled := corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"}
 	assert.True(envVarsContains(containers[0].Env, mcacDisabled))
 }

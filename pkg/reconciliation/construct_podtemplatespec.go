@@ -681,7 +681,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	if readOnlyFs(dc) {
-		envDefaults = append(envDefaults, corev1.EnvVar{Name: "$MGMT_API_DISABLE_MCAC", Value: "true"})
+		envDefaults = append(envDefaults, corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"})
 	}
 
 	cassContainer.Env = combineEnvSlices(envDefaults, cassContainer.Env)

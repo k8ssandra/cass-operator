@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
@@ -70,6 +71,8 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 		return err
 	}
 
+	monitoring.UpdateOperatorDatacenterProgressStatusMetric(rc.Datacenter, newState)
+
 	// The allow-upgrade=once annotation is temporary and should be removed after first successful reconcile
 	if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation) && rc.Datacenter.Annotations[api.UpdateAllowedAnnotation] == string(api.AllowUpdateOnce) {
 		// remove the annotation
@@ -85,11 +88,16 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 }
 
 func setDatacenterStatus(rc *ReconciliationContext) error {
-	patch := client.MergeFrom(rc.Datacenter.DeepCopy())
-	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
-	rc.setCondition(api.NewDatacenterCondition(api.DatacenterRequiresUpdate, corev1.ConditionFalse))
-	if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
-		rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")
+	if rc.Datacenter.Status.ObservedGeneration != rc.Datacenter.Generation {
+		patch := client.MergeFrom(rc.Datacenter.DeepCopy())
+		rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
+		if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
+			rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")
+			return err
+		}
+	}
+
+	if err := rc.setConditionStatus(api.DatacenterRequiresUpdate, corev1.ConditionFalse); err != nil {
 		return err
 	}
 

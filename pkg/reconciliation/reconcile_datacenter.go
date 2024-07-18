@@ -66,13 +66,8 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 			}
 
 			if len(dcs) > 1 {
-				dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
-				if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterDecommission, corev1.ConditionTrue)); updated {
-					err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch)
-					if err != nil {
-						rc.ReqLogger.Error(err, "error patching datacenter status for decommissiong started")
-						return result.Error(err)
-					}
+				if err := rc.setConditionStatus(api.DatacenterDecommission, corev1.ConditionTrue); err != nil {
+					return result.Error(err)
 				}
 
 				rc.ReqLogger.V(1).Info("Decommissioning the datacenter to 0 nodes first before deletion")

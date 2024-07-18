@@ -186,12 +186,8 @@ func (rc *ReconciliationContext) CheckPVCResizing() result.ReconcileResult {
 		}
 	}
 
-	dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
-	if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterResizingVolumes, corev1.ConditionFalse)); updated {
-		if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch); err != nil {
-			rc.ReqLogger.Error(err, "error patching datacenter status for updating")
-			return result.Error(err)
-		}
+	if err := rc.setConditionStatus(api.DatacenterResizingVolumes, corev1.ConditionFalse); err != nil {
+		return result.Error(err)
 	}
 
 	return result.Continue()
@@ -232,15 +228,16 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 		// TODO This code is a bit repetitive with all the Status patches. Needs a refactoring in cass-operator since this is a known
 		// 		pattern. https://github.com/k8ssandra/cass-operator/issues/669
 		if currentSize.Cmp(createdSize) > 0 {
-			dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
-			if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterValid, corev1.ConditionFalse)); updated {
-				if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch); err != nil {
-					rc.ReqLogger.Error(err, "error patching datacenter status for updating")
-					return result.Error(err)
-				}
+			msg := fmt.Sprintf("shrinking PVC %s is not supported", claim.Name)
+			if err := rc.setCondition(
+				api.NewDatacenterConditionWithReason(api.DatacenterValid,
+					corev1.ConditionFalse, "shrinkingDataVolumeNotSupported", msg,
+				)); err != nil {
+				return result.Error(err)
 			}
+
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, "Shrinking CassandraDatacenter PVCs is not supported")
-			return result.Error(fmt.Errorf("shrinking PVC %s is not supported", claim.Name))
+			return result.Error(fmt.Errorf(msg))
 		}
 
 		if currentSize.Cmp(createdSize) < 0 {
@@ -254,22 +251,17 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 			if !supportsExpansion {
 				msg := fmt.Sprintf("PVC resize requested, but StorageClass %s does not support expansion", *claim.Spec.StorageClassName)
 				rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
-				dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
-				if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterValid, corev1.ConditionFalse)); updated {
-					if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch); err != nil {
-						rc.ReqLogger.Error(err, "error patching datacenter status for updating")
-						return result.Error(err)
-					}
+				if err := rc.setCondition(
+					api.NewDatacenterConditionWithReason(api.DatacenterValid,
+						corev1.ConditionFalse, "storageClassDoesNotSupportExpansion", msg,
+					)); err != nil {
+					return result.Error(err)
 				}
 				return result.Error(fmt.Errorf(msg))
 			}
 
-			dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
-			if updated := rc.setCondition(api.NewDatacenterCondition(api.DatacenterResizingVolumes, corev1.ConditionTrue)); updated {
-				if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch); err != nil {
-					rc.ReqLogger.Error(err, "error patching datacenter status for updating")
-					return result.Error(err)
-				}
+			if err := rc.setConditionStatus(api.DatacenterResizingVolumes, corev1.ConditionTrue); err != nil {
+				return result.Error(err)
 			}
 
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.ResizingPVC, "Resizing PVCs for %s", statefulSet.Name)

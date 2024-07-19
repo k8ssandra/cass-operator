@@ -10,6 +10,16 @@ metadata:
       Simple provisioning, turn-key operations, and automated remediation of Apache Cassandra clusters
     repository: https://github.com/k8ssandra/cass-operator
     support: DataStax
+    features.operators.openshift.io/disconnected: "false"
+    features.operators.openshift.io/fips-compliant: "false"
+    features.operators.openshift.io/proxy-aware: "false"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
+    features.operators.openshift.io/cnf: "false"
+    features.operators.openshift.io/cni: "false"
+    features.operators.openshift.io/csi: "false"
   name: cass-operator.v0.0.0
   namespace: placeholder
 spec:

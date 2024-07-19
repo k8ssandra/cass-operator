@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 
@@ -433,6 +434,7 @@ func TestCassandraContainerEnvVars(t *testing.T) {
 	nodeNameEnvVar := corev1.EnvVar{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")}
 	useMgmtApiEnvVar := corev1.EnvVar{Name: "USE_MGMT_API", Value: "true"}
 	explicitStartEnvVar := corev1.EnvVar{Name: "MGMT_API_EXPLICIT_START", Value: "true"}
+	noKeepAliveEnvVar := corev1.EnvVar{Name: "MGMT_API_NO_KEEP_ALIVE", Value: "true"}
 
 	templateSpec := &corev1.PodTemplateSpec{}
 	dc := &api.CassandraDatacenter{
@@ -459,6 +461,7 @@ func TestCassandraContainerEnvVars(t *testing.T) {
 	assert.True(envVarsContains(cassContainer.Env, nodeNameEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, useMgmtApiEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, explicitStartEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, noKeepAliveEnvVar))
 }
 
 func TestHCDContainerEnvVars(t *testing.T) {
@@ -468,6 +471,7 @@ func TestHCDContainerEnvVars(t *testing.T) {
 	useMgmtApiEnvVar := corev1.EnvVar{Name: "USE_MGMT_API", Value: "true"}
 	explicitStartEnvVar := corev1.EnvVar{Name: "MGMT_API_EXPLICIT_START", Value: "true"}
 	hcdAutoConf := corev1.EnvVar{Name: "HCD_AUTO_CONF_OFF", Value: "all"}
+	noKeepAliveEnvVar := corev1.EnvVar{Name: "MGMT_API_NO_KEEP_ALIVE", Value: "true"}
 
 	templateSpec := &corev1.PodTemplateSpec{}
 	dc := &api.CassandraDatacenter{
@@ -494,6 +498,7 @@ func TestHCDContainerEnvVars(t *testing.T) {
 	assert.True(envVarsContains(cassContainer.Env, nodeNameEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, useMgmtApiEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, explicitStartEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, noKeepAliveEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, hcdAutoConf))
 }
 
@@ -503,6 +508,7 @@ func TestDSEContainerEnvVars(t *testing.T) {
 	nodeNameEnvVar := corev1.EnvVar{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")}
 	useMgmtApiEnvVar := corev1.EnvVar{Name: "USE_MGMT_API", Value: "true"}
 	explicitStartEnvVar := corev1.EnvVar{Name: "MGMT_API_EXPLICIT_START", Value: "true"}
+	noKeepAliveEnvVar := corev1.EnvVar{Name: "MGMT_API_NO_KEEP_ALIVE", Value: "true"}
 	dseExplicitStartEnvVar := corev1.EnvVar{Name: "DSE_MGMT_EXPLICIT_START", Value: "true"}
 	dseAutoConf := corev1.EnvVar{Name: "DSE_AUTO_CONF_OFF", Value: "all"}
 
@@ -531,6 +537,7 @@ func TestDSEContainerEnvVars(t *testing.T) {
 	assert.True(envVarsContains(cassContainer.Env, nodeNameEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, useMgmtApiEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, explicitStartEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, noKeepAliveEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, dseAutoConf))
 	assert.True(envVarsContains(cassContainer.Env, dseExplicitStartEnvVar))
 }
@@ -1942,4 +1949,60 @@ func TestServiceAccountPrecedence(t *testing.T) {
 		assert.NoError(err)
 		assert.Equal(test.accountName, pds.Spec.ServiceAccountName)
 	}
+}
+
+func TestReadOnlyRootFilesystemVolumeChanges(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:            "bob",
+			ServerType:             "cassandra",
+			ServerVersion:          "4.1.5",
+			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			Racks: []api.Rack{
+				{
+					Name: "r1",
+				},
+			},
+		},
+	}
+
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
+	assert.NoError(err, "failed to build PodTemplateSpec")
+
+	containers := podTemplateSpec.Spec.Containers
+	assert.NotNil(containers, "Unexpected containers containers received")
+	assert.NoError(err, "Unexpected error encountered")
+
+	assert.Len(containers, 2, "Unexpected number of containers containers returned")
+	assert.Equal("cassandra", containers[0].Name)
+	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+
+	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "tmp",
+				MountPath: "/tmp",
+			},
+			{
+				Name:      "etc-cassandra",
+				MountPath: "/etc/cassandra",
+			},
+			{
+				Name:      "server-logs",
+				MountPath: "/var/log/cassandra",
+			},
+			{
+				Name:      "server-data",
+				MountPath: "/var/lib/cassandra",
+			},
+			{
+				Name:      "server-config",
+				MountPath: "/config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the cassandra container: %v", containers[0].VolumeMounts))
+
+	// TODO Verify MCAC is disabled since it will fail with ReadOnlyRootFilesystem
+	mcacDisabled := corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"}
+	assert.True(envVarsContains(containers[0].Env, mcacDisabled))
 }

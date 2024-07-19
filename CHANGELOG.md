@@ -15,6 +15,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [FEATURE] [#646](https://github.com/k8ssandra/cass-operator/issues/646) Allow starting multiple parallel pods if they have already previously bootstrapped and not planned for replacement. Set annotation ``cassandra.datastax.com/allow-parallel-starts: true`` to enable this feature.
 * [ENHANCEMENT] [#648](https://github.com/k8ssandra/cass-operator/issues/648) Make MinReadySeconds configurable value in the Spec.
 * [ENHANCEMENT] [#184](https://github.com/k8ssandra/cass-operator/issues/349) Add CassandraDatacenter.Status fields as metrics also
+* [ENHANCEMENT] [#199](https://github.com/k8ssandra/cass-operator/issues/199) If .spec.readOnlyRootFilesystem is set, run the cassandra container with readOnlyRootFilesystem. Also, modify the default SecurityContext to mention runAsNonRoot: true
 
 ## v1.21.1
 

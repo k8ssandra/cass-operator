@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -303,7 +304,26 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
 	}
+
 	volumeDefaults := []corev1.Volume{vServerConfig, vServerLogs}
+
+	if readOnlyFs(dc) {
+		tmp := corev1.Volume{
+			Name: "tmp",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		}
+
+		etcCass := corev1.Volume{
+			Name: "etc-cassandra",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		}
+
+		volumeDefaults = append(volumeDefaults, tmp, etcCass)
+	}
 
 	if dc.UseClientImage() {
 		vBaseConfig := corev1.Volume{
@@ -435,7 +455,7 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 
 		configMounts = append(configMounts, configBaseMount)
 
-		// Similar to k8ssandra 1.x, use config-container if use new config-builder replacement
+		// Similar to k8ssandra 1.x, use config-container if we use k8ssandra-client to build configs
 		if configContainerIndex < 0 {
 			configContainer = &corev1.Container{
 				Name: ServerBaseConfigContainerName,
@@ -629,6 +649,12 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 	}
 
+	if readOnlyFs(dc) {
+		cassContainer.SecurityContext = &corev1.SecurityContext{
+			ReadOnlyRootFilesystem: ptr.To[bool](true),
+		}
+	}
+
 	// Combine env vars
 
 	envDefaults := []corev1.EnvVar{
@@ -636,6 +662,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		{Name: "NODE_NAME", ValueFrom: selectorFromFieldPath("spec.nodeName")},
 		{Name: "DS_LICENSE", Value: "accept"},
 		{Name: "USE_MGMT_API", Value: "true"},
+		{Name: "MGMT_API_NO_KEEP_ALIVE", Value: "true"},
 		{Name: "MGMT_API_EXPLICIT_START", Value: "true"},
 	}
 
@@ -651,6 +678,10 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 
 	if dc.Spec.ServerType == "hcd" {
 		envDefaults = append(envDefaults, corev1.EnvVar{Name: "HCD_AUTO_CONF_OFF", Value: "all"})
+	}
+
+	if readOnlyFs(dc) {
+		envDefaults = append(envDefaults, corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"})
 	}
 
 	cassContainer.Env = combineEnvSlices(envDefaults, cassContainer.Env)
@@ -704,6 +735,17 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 			})
 			break
 		}
+	}
+
+	if readOnlyFs(dc) {
+		cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+			Name:      "tmp",
+			MountPath: "/tmp",
+		})
+		cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+			Name:      "etc-cassandra",
+			MountPath: "/etc/cassandra",
+		})
 	}
 
 	volumeMounts = combineVolumeMountSlices(volumeMounts, cassContainer.VolumeMounts)
@@ -763,6 +805,10 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	return nil
 }
 
+func readOnlyFs(dc *api.CassandraDatacenter) bool {
+	return dc.Spec.ReadOnlyRootFilesystem != nil && *dc.Spec.ReadOnlyRootFilesystem && dc.UseClientImage()
+}
+
 func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {
 
 	baseTemplate := dc.Spec.PodTemplateSpec.DeepCopy()
@@ -795,9 +841,10 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 	if baseTemplate.Spec.SecurityContext == nil {
 		var userID int64 = 999
 		baseTemplate.Spec.SecurityContext = &corev1.PodSecurityContext{
-			RunAsUser:  &userID,
-			RunAsGroup: &userID,
-			FSGroup:    &userID,
+			RunAsUser:    &userID,
+			RunAsGroup:   &userID,
+			FSGroup:      &userID,
+			RunAsNonRoot: ptr.To[bool](true),
 		}
 	}
 

@@ -1,7 +1,7 @@
 // Copyright DataStax, Inc.
 // Please see the included license file for details.
 
-package smoke_test_dse
+package smoke_test_read_only_fs
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
@@ -17,13 +16,12 @@ import (
 )
 
 var (
-	testName   = "Smoke test of basic functionality for one-node DSE cluster."
-	namespace  = "test-smoke-test-dse"
-	dcName     = "dc2"
-	dcYaml     = "../testdata/smoke-test-dse.yaml"
-	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns         = ginkgo_util.NewWrapper(testName, namespace)
+	testName  = "Smoke test of basic functionality for readOnlyRootFilesystem"
+	namespace = "test-smoke-test-read-only-fs"
+	dcName    = "dc1"
+	dcYaml    = "../testdata/default-single-rack-single-node-dc-with-readonly-fs.yaml"
+	dcLabel   = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns        = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -67,20 +65,6 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReady(dcName)
 			ns.ExpectDoneReconciling(dcName)
-
-			step = "scale up to 2 nodes"
-			json = "{\"spec\": {\"size\": 2}}"
-			k = kubectl.PatchMerge(dcResource, json)
-			ns.ExecAndLog(step, k)
-
-			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionTrue))
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
-			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
-
-			// Ensure that when 'ScaleUp' becomes 'false' that our pods are in fact up and running
-			Expect(len(ns.GetDatacenterReadyPodNames(dcName))).To(Equal(2))
-
-			ns.WaitForDatacenterReady(dcName)
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(dcYaml)

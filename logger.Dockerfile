@@ -3,7 +3,7 @@ ARG VERSION
 ARG TARGETPLATFORM
 
 # Install Vector
-ENV VECTOR_VERSION 0.33.1
+ENV VECTOR_VERSION 0.39.0
 RUN case ${TARGETPLATFORM} in \
          "linux/amd64")  VECTOR_ARCH=x86_64  ;; \
          "linux/arm64")  VECTOR_ARCH=aarch64  ;; \
@@ -33,4 +33,4 @@ COPY ./LICENSE.txt /licenses/
 
 # Non-root user, cassandra as default
 USER cassandra
-ENTRYPOINT ["/usr/bin/vector"]
+ENTRYPOINT ["/usr/bin/vector", "--config", "/etc/vector/vector.toml"]

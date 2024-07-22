@@ -4,15 +4,18 @@ if [[ ! $0 == scripts/* ]]; then
     exit 1
 fi
 
-if [ "$#" -ne 1 ]; then
+if [ "$#" -le 1 ]; then
     echo "Usage: scripts/pre-release-process.sh newTag"
     exit
 fi
 
 TAG=$1
-#PREVTAG=$2
 PREVTAG=$(git describe --abbrev=0 --tags)
 IMG=cr.k8ssandra.io/k8ssandra/cass-operator:${TAG}
+
+if [ ! -z "$2" ]; then
+    PREVTAG=$2
+fi
 
 # Ensure kustomize is installed
 make kustomize

@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.22.0
 
 * [FEATURE] [#263]((https://github.com/k8ssandra/cass-operator/issues/263) Allow increasing the size of CassandraDataVolumeClaimSpec if the selected StorageClass supports it. This feature is currently behind a opt-in feature flag and requires an annotation ``cassandra.datastax.com/allow-storage-changes: true`` to be set in the CassandraDatacenter.

@@ -103,6 +103,7 @@ yq -i '.version = "'"$NEXT_VERSION"'"' $CHART_HOME/Chart.yaml
 # Update appVersion to the same as version
 echo "Setting appVersion to" $VERSION
 yq -i '.appVersion = "'"$VERSION"'"' $CHART_HOME/Chart.yaml
+yq -i '.image.tag = "'v"$VERSION"'"' $CHART_HOME/values.yaml
 
 # Update imageConfig settings to the current one
 echo "Updating .Values.imageConfig to match config/manager/image_config.yaml"

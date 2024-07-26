@@ -7,7 +7,7 @@ metadata:
 spec:
   clusterName: sample-cluster
   serverType: cassandra
-  serverVersion: "3.11.6"
+  serverVersion: "4.1.5"
   managementApiAuth:
     insecure: {}
   racks:
@@ -27,6 +27,6 @@ spec:
       # authenticator: org.apache.cassandra.auth.PasswordAuthenticator
       # authorizer: org.apache.cassandra.auth.CassandraAuthorizer
       # role_manager: org.apache.cassandra.auth.CassandraRoleManager
-    jvm-options:
+    jvm-server-options:
       initial_heap_size: "800M"
       max_heap_size: "800M"

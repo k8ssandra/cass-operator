@@ -600,7 +600,7 @@ func (client *NodeMgmtClient) CallTSReloadEndpoint(pod *corev1.Pod) error {
 		endpoint: "/api/v0/ops/node/reload-truststore",
 		host:     podHost,
 		port:     podPort,
-		method:   http.MethodGet,
+		method:   http.MethodPost,
 		timeout:  60 * time.Second,
 	}
 

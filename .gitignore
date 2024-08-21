@@ -265,4 +265,3 @@ kubeconfig
 # For GHA testing
 .act/
 .actrc
-*/build/

@@ -84,6 +84,8 @@ func FakeServer(cli client.Client, logger logr.Logger, podKey types.NamespacedNa
 				w.WriteHeader(http.StatusOK)
 			case "/api/v0/ops/keyspace/cleanup":
 				w.WriteHeader(http.StatusOK)
+			case "/api/v0/ops/node/reload-truststore":
+				w.WriteHeader(http.StatusOK)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}

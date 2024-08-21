@@ -445,7 +445,7 @@ func (r *CassandraTaskReconciler) refreshDatacenter(ctx context.Context, dc *cas
 
 }
 
-// Compaction functionality
+// ts reload functionality
 
 func tsReload(taskConfig *TaskConfiguration) {
 	taskConfig.PodFilter = genericPodFilter

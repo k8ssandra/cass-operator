@@ -442,6 +442,22 @@ func (r *CassandraTaskReconciler) refreshDatacenter(ctx context.Context, dc *cas
 		}
 	}
 	return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
+
+}
+
+// Compaction functionality
+
+func TSReloadAsync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
+	return nodeMgmtClient.CallCompaction(pod, createCompactRequest(taskConfig))
+}
+
+func tsReload(taskConfig *TaskConfiguration) {
+	taskConfig.PodFilter = genericPodFilter
+	taskConfig.SyncFunc = tsReloadSync
+}
+
+func tsReloadSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
+	return nodeMgmtClient.CallTSReloadEndpoint(pod)
 }
 
 // Common functions

@@ -625,7 +625,20 @@ var _ = Describe("CassandraTask controller tests", func() {
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
 			})
+			It("Runs a ts reload task against a pod", func() {
+				By("Creating a task for tsreload")
+				taskKey, task := buildTask(api.CommandTSReload, testNamespaceName)
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v0/ops/node/reload-truststore"]).To(Equal(1))
+
+				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
 		})
+
 		Context("Task TTL", func() {
 			var testNamespaceName string
 			BeforeEach(func() {

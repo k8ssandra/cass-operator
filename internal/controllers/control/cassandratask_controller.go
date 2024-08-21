@@ -317,6 +317,8 @@ JobDefinition:
 			}
 			completed = taskConfig.Completed
 			break JobDefinition
+		case api.CommandTSReload:
+			tsReload(taskConfig)
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err

@@ -585,6 +585,33 @@ func (client *NodeMgmtClient) CallCompactionEndpoint(pod *corev1.Pod, compactReq
 	return nil
 }
 
+// CallTSReloadEndpoint calls the async version of TSReload
+func (client *NodeMgmtClient) CallTSReloadEndpoint(pod *corev1.Pod) error {
+	client.Log.Info(
+		"calling Management API TS REload endpoint - POST /api/v0/nodes/reload-truststore",
+		"pod", pod.Name,
+	)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/nodes/reload-truststore",
+		host:     podHost,
+		port:     podPort,
+		method:   http.MethodGet,
+		timeout:  60 * time.Second,
+	}
+
+	_, err = callNodeMgmtEndpoint(client, request, "application/json")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type ScrubRequest struct {
 	DisableSnapshot       bool     `json:"disable_snapshot"`
 	SkipCorrupted         bool     `json:"skip_corrupted"`

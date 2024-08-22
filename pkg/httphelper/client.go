@@ -140,6 +140,7 @@ const (
 	Move                    Feature = "async_move_task"
 	AsyncGarbageCollect     Feature = "async_gc_task"
 	AsyncFlush              Feature = "async_flush_task"
+	ReloadInodeTruststore   Feature = "reload_internode_truststore"
 )
 
 func (f *FeatureSet) UnmarshalJSON(b []byte) error {

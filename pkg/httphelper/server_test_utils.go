@@ -81,7 +81,8 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 				r.URL.Path == "/api/v1/ops/tables/compact" ||
 				r.URL.Path == "/api/v1/ops/tables/scrub" ||
 				r.URL.Path == "/api/v1/ops/tables/flush" ||
-				r.URL.Path == "/api/v1/ops/tables/garbagecollect") {
+				r.URL.Path == "/api/v1/ops/tables/garbagecollect" ||
+				r.URL.Path == "/api/v0/ops/node/encryption/internode/truststore/reload") {
 			w.WriteHeader(http.StatusOK)
 			// Write jobId
 			jobId++

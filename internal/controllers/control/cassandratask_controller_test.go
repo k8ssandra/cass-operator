@@ -633,7 +633,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				completedTask := waitForTaskCompletion(taskKey)
 
-				Expect(callDetails.URLCounts["/api/v0/ops/node/reload-truststore"]).To(Equal(1))
+				Expect(callDetails.URLCounts["/api/v0/ops/node/encryption/internode/truststore/reload"]).To(Equal(1))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))

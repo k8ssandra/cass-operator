@@ -311,7 +311,7 @@ jobs:
         with:
           repository: topolvm/topolvm
           path: topolvm
-          ref: topolvm-chart-v15.0.0
+          ref: topolvm-chart-v15.2.0
       - name: Create LVM from TopoLVM's example setup
         run: |
           cd topolvm/example
@@ -367,7 +367,7 @@ jobs:
         run: |
           IMG=${{ steps.load.outputs.operator_img }} LOG_IMG=${{ steps.load.outputs.logger_img }} make integ-test
       - name: Archive k8s logs
-        # if: ${{ failure() }}
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: k8s-logs-topolvm-test-${{ matrix.version }}

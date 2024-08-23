@@ -187,7 +187,7 @@ func storageClass(ctx context.Context, c client.Client, storageClassName *string
 }
 
 func (rc *ReconciliationContext) storageExpansion() (bool, error) {
-	if !(metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation) && rc.Datacenter.ObjectMeta.Annotations[api.AllowStorageChangesAnnotation] == "true") {
+	if !metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation) || rc.Datacenter.ObjectMeta.Annotations[api.AllowStorageChangesAnnotation] != "true" {
 		return false, nil
 	}
 

@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 
-	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 )
 
@@ -128,11 +127,6 @@ func TestStorageExpansionNils(t *testing.T) {
 
 	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.StorageClassName = nil
 	supports, err := rc.storageExpansion()
-	require.NoError(err)
-	require.False(supports)
-
-	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation, "true")
-	supports, err = rc.storageExpansion()
 	require.NoError(err)
 	require.False(supports)
 

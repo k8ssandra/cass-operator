@@ -34,8 +34,7 @@ import (
 )
 
 const (
-	datastaxPrefix  string = "cassandra.datastax.com"
-	k8ssandraPrefix string = "k8ssandra.io"
+	datastaxPrefix string = "cassandra.datastax.com"
 )
 
 var log = logf.Log.WithName("api")
@@ -341,7 +340,7 @@ func ValidateServiceLabelsAndAnnotations(dc CassandraDatacenter) error {
 
 	for svcName, config := range services {
 		if containsReservedAnnotations(config) || containsReservedLabels(config) {
-			return attemptedTo(fmt.Sprintf("configure %s with reserved annotations and/or labels (prefixes %s and/or %s)", svcName, datastaxPrefix, k8ssandraPrefix))
+			return attemptedTo("configure %s with reserved annotations and/or labels (prefix %s)", svcName, datastaxPrefix)
 		}
 	}
 
@@ -365,7 +364,7 @@ func containsReservedLabels(config ServiceConfigAdditions) bool {
 
 func containsReservedPrefixes(config map[string]string) bool {
 	for k := range config {
-		if strings.HasPrefix(k, datastaxPrefix) || strings.HasPrefix(k, k8ssandraPrefix) {
+		if strings.HasPrefix(k, datastaxPrefix) {
 			// reserved prefix found
 			return true
 		}

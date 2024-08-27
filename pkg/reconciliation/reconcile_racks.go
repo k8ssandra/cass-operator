@@ -210,11 +210,6 @@ func isPVCStatusConditionTrue(pvc *corev1.PersistentVolumeClaim, conditionType c
 func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *appsv1.StatefulSet) result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckVolumeClaims")
 
-	supportsExpansion, err := rc.storageExpansion()
-	if err != nil {
-		return result.Error(err)
-	}
-
 	for i, claim := range statefulSet.Spec.VolumeClaimTemplates {
 		// Find the desired one
 		desiredClaim := desiredSts.Spec.VolumeClaimTemplates[i]
@@ -225,8 +220,6 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 		currentSize := claim.Spec.Resources.Requests[corev1.ResourceStorage]
 		createdSize := desiredClaim.Spec.Resources.Requests[corev1.ResourceStorage]
 
-		// TODO This code is a bit repetitive with all the Status patches. Needs a refactoring in cass-operator since this is a known
-		// 		pattern. https://github.com/k8ssandra/cass-operator/issues/669
 		if currentSize.Cmp(createdSize) > 0 {
 			msg := fmt.Sprintf("shrinking PVC %s is not supported", claim.Name)
 			if err := rc.setCondition(
@@ -246,6 +239,11 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 				msg := fmt.Sprintf("PVC resize requested, but %s annotation is not set to 'true'", api.AllowStorageChangesAnnotation)
 				rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
 				return result.Error(fmt.Errorf(msg))
+			}
+
+			supportsExpansion, err := rc.storageExpansion()
+			if err != nil {
+				return result.Error(err)
 			}
 
 			if !supportsExpansion {

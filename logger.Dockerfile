@@ -1,9 +1,9 @@
-FROM redhat/ubi8:latest as builder
+FROM redhat/ubi8:latest AS builder
 ARG VERSION
 ARG TARGETPLATFORM
 
 # Install Vector
-ENV VECTOR_VERSION 0.39.0
+ENV VECTOR_VERSION=0.39.0
 RUN case ${TARGETPLATFORM} in \
          "linux/amd64")  VECTOR_ARCH=x86_64  ;; \
          "linux/arm64")  VECTOR_ARCH=aarch64  ;; \

@@ -9,10 +9,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 )
@@ -114,4 +118,24 @@ func TestDeletePVCs_FailedToDelete(t *testing.T) {
 	}
 
 	assert.EqualError(t, err, "failed to delete")
+}
+
+func TestStorageExpansionNils(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.StorageClassName = nil
+	supports, err := rc.storageExpansion()
+	require.NoError(err)
+	require.False(supports)
+
+	storageClass := &storagev1.StorageClass{}
+	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: "standard"}, storageClass))
+	storageClass.AllowVolumeExpansion = ptr.To[bool](true)
+	require.NoError(rc.Client.Update(rc.Ctx, storageClass))
+
+	supports, err = rc.storageExpansion()
+	require.NoError(err)
+	require.True(supports)
 }

@@ -162,14 +162,14 @@ func (rc *ReconciliationContext) listPVCs(selector map[string]string) ([]corev1.
 	return pvcList.Items, nil
 }
 
-func storageClass(ctx context.Context, c client.Client, storageClassName string) (*storagev1.StorageClass, error) {
-	if storageClassName == "" {
+func storageClass(ctx context.Context, c client.Client, storageClassName *string) (*storagev1.StorageClass, error) {
+	if storageClassName == nil || *storageClassName == "" {
 		storageClassList := &storagev1.StorageClassList{}
 		if err := c.List(ctx, storageClassList, client.MatchingLabels{"storageclass.kubernetes.io/is-default-class": "true"}); err != nil {
 			return nil, err
 		}
 
-		if len(storageClassList.Items) > 0 {
+		if len(storageClassList.Items) > 1 {
 			return nil, fmt.Errorf("found multiple default storage classes, please specify StorageClassName in the CassandraDatacenter spec")
 		} else if len(storageClassList.Items) == 0 {
 			return nil, fmt.Errorf("no default storage class found, please specify StorageClassName in the CassandraDatacenter spec")
@@ -179,7 +179,7 @@ func storageClass(ctx context.Context, c client.Client, storageClassName string)
 	}
 
 	storageClass := &storagev1.StorageClass{}
-	if err := c.Get(ctx, types.NamespacedName{Name: storageClassName}, storageClass); err != nil {
+	if err := c.Get(ctx, types.NamespacedName{Name: *storageClassName}, storageClass); err != nil {
 		return nil, err
 	}
 
@@ -188,7 +188,7 @@ func storageClass(ctx context.Context, c client.Client, storageClassName string)
 
 func (rc *ReconciliationContext) storageExpansion() (bool, error) {
 	storageClassName := rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.StorageClassName
-	storageClass, err := storageClass(rc.Ctx, rc.Client, *storageClassName)
+	storageClass, err := storageClass(rc.Ctx, rc.Client, storageClassName)
 	if err != nil {
 		return false, err
 	}

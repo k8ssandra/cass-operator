@@ -327,7 +327,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 			errString: "use multiple nodes per worker without cpu and memory requests and limits",
 		},
 		{
-			name: "Prevent user specified reserved Service labels and annotations",
+			name: "Prevent user specified cassandra.datastax.com Service labels and annotations",
 			dc: &CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
@@ -337,13 +337,32 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 					ServerVersion: "4.0.4",
 					AdditionalServiceConfig: ServiceConfig{
 						DatacenterService: ServiceConfigAdditions{
-							Labels:      map[string]string{"k8ssandra.io/key1": "val1", "cassandra.datastax.com/key2": "val2"},
-							Annotations: map[string]string{"k8ssandra.io/key3": "val3", "cassandra.datastax.com/key4": "val4"},
+							Labels:      map[string]string{"cassandra.datastax.com/key1": "val1"},
+							Annotations: map[string]string{"cassandra.datastax.com/key2": "val2"},
 						},
 					},
 				},
 			},
-			errString: "configure DatacenterService with reserved annotations and/or labels (prefixes cassandra.datastax.com and/or k8ssandra.io)",
+			errString: "configure DatacenterService with reserved annotations and/or labels (prefix cassandra.datastax.com)",
+		},
+		{
+			name: "Allow user specified k8ssandra.io Service labels and annotations",
+			dc: &CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: CassandraDatacenterSpec{
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.4",
+					AdditionalServiceConfig: ServiceConfig{
+						DatacenterService: ServiceConfigAdditions{
+							Labels:      map[string]string{"k8ssandra.io/key1": "val1"},
+							Annotations: map[string]string{"k8ssandra.io/key2": "val2"},
+						},
+					},
+				},
+			},
+			errString: "",
 		},
 		{
 			name: "Allow upgrade should not accept invalid values",

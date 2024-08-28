@@ -6,6 +6,7 @@ package reconciliation
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"reflect"
@@ -1643,7 +1644,7 @@ func TestStripPassword(t *testing.T) {
 			func(req *http.Request) bool {
 				return req != nil
 			})).
-		Return(nil, fmt.Errorf(password)).
+		Return(nil, errors.New(password)).
 		Once()
 
 	client := httphelper.NodeMgmtClient{

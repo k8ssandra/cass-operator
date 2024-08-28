@@ -212,10 +212,10 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 
 		if int(newSizeDifference) < minSizeAdjustment {
 			return attemptedTo(
-				fmt.Sprintf("add racks without increasing size enough to prevent existing"+
+				"add racks without increasing size enough to prevent existing"+
 					" nodes from moving to new racks to maintain balance.\n"+
 					"New racks added: %d, size increased by: %d. Expected size increase to be at least %d",
-					newRackCount, newSizeDifference, minSizeAdjustment))
+				newRackCount, newSizeDifference, minSizeAdjustment)
 		}
 	}
 

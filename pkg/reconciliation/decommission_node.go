@@ -398,7 +398,7 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 			msg := fmt.Sprintf("Not enough free space available to decommission. %s has %d free space, but %d is needed.",
 				pod.Name, free, int64(spaceUsedByDecommPod),
 			)
-			rc.ReqLogger.Error(fmt.Errorf(msg), msg)
+			rc.ReqLogger.Error(errors.New(msg), msg)
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
 
 			if err := rc.setCondition(
@@ -409,7 +409,7 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 				return errors.Wrap(err, msg)
 			}
 
-			return fmt.Errorf(msg)
+			return errors.New(msg)
 		}
 	}
 

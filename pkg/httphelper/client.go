@@ -318,7 +318,7 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 	if _, err = callNodeMgmtEndpoint(client, request, ""); err != nil {
 		// The error could include a password, strip it
 		strippedErrMsg := strings.ReplaceAll(err.Error(), password, "******")
-		return fmt.Errorf(strippedErrMsg)
+		return errors.New(strippedErrMsg)
 	}
 	return nil
 }

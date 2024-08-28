@@ -5,6 +5,7 @@ package kubectl
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"os"
 	"os/user"
 	"regexp"
@@ -321,7 +322,7 @@ func waitForOutputPattern(k KCmd, pattern string, seconds int) error {
 		if err != nil {
 			msg = fmt.Sprintf("%s\nThe following error occurred while querying k8s: %v", msg, err)
 		}
-		e := fmt.Errorf(msg)
+		e := errors.New(msg)
 		return e
 	case <-c:
 		return nil

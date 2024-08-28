@@ -20,7 +20,8 @@ var featuresReply = `{
 		"async_gc_task",
 		"async_flush_task",
 		"async_scrub_task",
-		"async_compaction_task"
+		"async_compaction_task",
+		"inodetsreload"
 	]
 	}`
 

@@ -818,6 +818,9 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					if !features.Supports(taskConfig.SyncFeature) {
 						logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
 						jobStatus.Status = podJobError
+						failed++
+						errMsg = fmt.Sprintf("Pod %s doesn't support %s feature", pod.Name, taskConfig.SyncFeature)
+						return
 					}
 				}
 

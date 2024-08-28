@@ -450,6 +450,7 @@ func (r *CassandraTaskReconciler) refreshDatacenter(ctx context.Context, dc *cas
 func inodeTsReload(taskConfig *TaskConfiguration) {
 	taskConfig.PodFilter = genericPodFilter
 	taskConfig.SyncFunc = inodeTsReloadSync
+	taskConfig.SyncFeature = httphelper.ReloadInodeTruststore
 }
 
 func inodeTsReloadSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {

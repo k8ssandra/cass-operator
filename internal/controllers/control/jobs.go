@@ -447,13 +447,13 @@ func (r *CassandraTaskReconciler) refreshDatacenter(ctx context.Context, dc *cas
 
 // ts reload functionality
 
-func tsReload(taskConfig *TaskConfiguration) {
+func inodeTsReload(taskConfig *TaskConfiguration) {
 	taskConfig.PodFilter = genericPodFilter
-	taskConfig.SyncFunc = tsReloadSync
+	taskConfig.SyncFunc = inodeTsReloadSync
 }
 
-func tsReloadSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
-	return nodeMgmtClient.CallTSReloadEndpoint(pod)
+func inodeTsReloadSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
+	return nodeMgmtClient.CallinodeTsReloadEndpoint(pod)
 }
 
 // Common functions

@@ -587,7 +587,7 @@ func (client *NodeMgmtClient) CallCompactionEndpoint(pod *corev1.Pod, compactReq
 }
 
 // CallTSReloadEndpoint calls the async version of TSReload
-func (client *NodeMgmtClient) CallTSReloadEndpoint(pod *corev1.Pod) error {
+func (client *NodeMgmtClient) CallinodeTsReloadEndpoint(pod *corev1.Pod) error {
 	client.Log.Info(
 		"calling Management API TS REload endpoint - POST /api/v0/node/encryption/internode/truststore/reload",
 		"pod", pod.Name,

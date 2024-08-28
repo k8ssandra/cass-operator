@@ -81,7 +81,7 @@ const (
 	CommandGarbageCollect  CassandraCommand = "garbagecollect"
 	CommandFlush           CassandraCommand = "flush"
 	CommandRefresh         CassandraCommand = "refresh"
-	CommandTSReload        CassandraCommand = "tsreload"
+	CommandInodeTSReload   CassandraCommand = "inodetsreload"
 )
 
 type CassandraJob struct {

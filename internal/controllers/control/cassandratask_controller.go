@@ -98,6 +98,7 @@ type TaskConfiguration struct {
 	// Execution functionality per pod
 	AsyncFeature httphelper.Feature
 	AsyncFunc    AsyncTaskExecutorFunc
+	SyncFeature  httphelper.Feature
 	SyncFunc     SyncTaskExecutorFunc
 	PodFilter    PodFilterFunc
 
@@ -649,13 +650,9 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 		if !taskConfig.Filter(&pod) {
 			continue
 		}
-
-		features := &httphelper.FeatureSet{}
-		if taskConfig.AsyncFeature != "" {
-			features, err = nodeMgmtClient.FeatureSet(&pod)
-			if err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
-			}
+		features, err := nodeMgmtClient.FeatureSet(&pod)
+		if err != nil {
+			return ctrl.Result{}, failed, completed, errMsg, err
 		}
 
 		if pod.Annotations == nil {
@@ -816,6 +813,13 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					// Remove the value from the jobRunner
 					<-jobRunner
 				}()
+
+				if taskConfig.SyncFeature != "" {
+					if !features.Supports(taskConfig.SyncFeature) {
+						logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
+						jobStatus.Status = podJobError
+					}
+				}
 
 				if err = taskConfig.SyncFunc(nodeMgmtClient, &pod, taskConfig); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod

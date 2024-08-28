@@ -81,8 +81,7 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 				r.URL.Path == "/api/v1/ops/tables/compact" ||
 				r.URL.Path == "/api/v1/ops/tables/scrub" ||
 				r.URL.Path == "/api/v1/ops/tables/flush" ||
-				r.URL.Path == "/api/v1/ops/tables/garbagecollect" ||
-				r.URL.Path == "/api/v0/ops/node/encryption/internode/truststore/reload") {
+				r.URL.Path == "/api/v1/ops/tables/garbagecollect") {
 			w.WriteHeader(http.StatusOK)
 			// Write jobId
 			jobId++
@@ -132,6 +131,8 @@ func FakeExecutorServerWithDetailsFails(callDetails *CallDetails) (*httptest.Ser
 func FakeServerWithoutFeaturesEndpoint(callDetails *CallDetails) (*httptest.Server, error) {
 	return FakeMgmtApiServer(callDetails, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && (r.URL.Path == "/api/v0/ops/keyspace/cleanup" || r.URL.Path == "/api/v0/ops/tables/sstables/upgrade" || r.URL.Path == "/api/v0/ops/node/drain" || r.URL.Path == "/api/v0/ops/tables/flush" || r.URL.Path == "/api/v0/ops/tables/garbagecollect" || r.URL.Path == "/api/v0/ops/tables/compact") {
+			w.WriteHeader(http.StatusOK)
+		} else if r.Method == http.MethodPost && r.URL.Path == "/api/v0/ops/node/encryption/internode/truststore/reload" {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusNotFound)

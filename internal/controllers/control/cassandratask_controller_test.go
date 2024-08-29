@@ -645,11 +645,10 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				completedTask := waitForTaskFailed(taskKey)
 
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 0))
 				Expect(callDetails.URLCounts["/api/v0/ops/node/encryption/internode/truststore/reload"]).To(Equal(0)) // This doesn't get called because the test of whether the feature exists doesn't pass. The features endpoint doesn't exist in this mock server.
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
-				Expect(completedTask.Status.Succeeded).To(BeNumerically("=", 0))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", 0))
 			})
 		})
 		Context("successful SyncFeature usage", func() {

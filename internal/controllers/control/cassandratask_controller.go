@@ -318,7 +318,7 @@ JobDefinition:
 			}
 			completed = taskConfig.Completed
 			break JobDefinition
-		case api.CommandInodeTSReload:
+		case api.CommandTSReload:
 			inodeTsReload(taskConfig)
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)

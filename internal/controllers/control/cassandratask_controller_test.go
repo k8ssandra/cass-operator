@@ -639,7 +639,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 			})
 			It("Runs a ts reload task against a pod and fails", func() {
 				By("Creating a task for tsreload")
-				taskKey, task := buildTask(api.CommandInodeTSReload, testNamespaceName)
+				taskKey, task := buildTask(api.CommandTSReload, testNamespaceName)
 				task.Spec.Jobs[0].Arguments.PodName = fmt.Sprintf("%s-%s-r0-sts-0", clusterName, testDatacenterName)
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
@@ -665,7 +665,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 			})
 			It("Runs a ts reload task against a pod", func() {
 				By("Creating a task for tsreload")
-				taskKey, task := buildTask(api.CommandInodeTSReload, testNamespaceName)
+				taskKey, task := buildTask(api.CommandTSReload, testNamespaceName)
 				task.Spec.Jobs[0].Arguments.PodName = fmt.Sprintf("%s-%s-r0-sts-0", clusterName, testDatacenterName)
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 

@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.22.1
 
 * [BUGFIX] [#687](https://github.com/k8ssandra/cass-operator/issues/687) Prevent a crash when when StorageClassName was not set in the CassandraDataVolumeClaimSpec

@@ -785,6 +785,16 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				return ctrl.Result{}, failed, completed, errMsg, err
 			}
 
+			if taskConfig.SyncFeature != "" {
+				if !features.Supports(taskConfig.SyncFeature) {
+					logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
+					jobStatus.Status = podJobError
+					failed++
+					errMsg = fmt.Sprintf("Pod %s doesn't support %s feature", pod.Name, taskConfig.SyncFeature)
+					return ctrl.Result{}, failed, completed, errMsg, err
+				}
+			}
+
 			jobId := strconv.Itoa(idx)
 
 			// This pod should run next, mark it
@@ -799,16 +809,6 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 			if err != nil {
 				logger.Error(err, "Failed to patch pod's status to indicate its running a local job", "Pod", pod)
 				return ctrl.Result{}, failed, completed, errMsg, err
-			}
-
-			if taskConfig.SyncFeature != "" {
-				if !features.Supports(taskConfig.SyncFeature) {
-					logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
-					jobStatus.Status = podJobError
-					failed++
-					errMsg = fmt.Sprintf("Pod %s doesn't support %s feature", pod.Name, taskConfig.SyncFeature)
-					return ctrl.Result{}, failed, completed, errMsg, err
-				}
 			}
 
 			pod := pod

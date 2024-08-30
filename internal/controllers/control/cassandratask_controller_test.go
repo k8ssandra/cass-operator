@@ -235,7 +235,7 @@ func waitForTaskFailed(taskKey types.NamespacedName) *api.CassandraTask {
 		err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
 		Expect(err).ToNot(HaveOccurred())
 
-		return emptyTask.Status.CompletionTime == nil
+		return emptyTask.Status.Failed > 0
 	}, time.Duration(5*time.Second)).Should(BeTrue())
 	return emptyTask
 }

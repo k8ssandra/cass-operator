@@ -801,6 +801,16 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				return ctrl.Result{}, failed, completed, errMsg, err
 			}
 
+			if taskConfig.SyncFeature != "" {
+				if !features.Supports(taskConfig.SyncFeature) {
+					logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
+					jobStatus.Status = podJobError
+					failed++
+					errMsg = fmt.Sprintf("Pod %s doesn't support %s feature", pod.Name, taskConfig.SyncFeature)
+					return ctrl.Result{}, failed, completed, errMsg, err
+				}
+			}
+
 			pod := pod
 
 			go func() {
@@ -813,16 +823,6 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					// Remove the value from the jobRunner
 					<-jobRunner
 				}()
-
-				if taskConfig.SyncFeature != "" {
-					if !features.Supports(taskConfig.SyncFeature) {
-						logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
-						jobStatus.Status = podJobError
-						failed++
-						errMsg = fmt.Sprintf("Pod %s doesn't support %s feature", pod.Name, taskConfig.SyncFeature)
-						return
-					}
-				}
 
 				if err = taskConfig.SyncFunc(nodeMgmtClient, &pod, taskConfig); err != nil {
 					// We only log, nothing else to do - we won't even retry this pod

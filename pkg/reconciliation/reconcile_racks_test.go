@@ -6,6 +6,7 @@ package reconciliation
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"reflect"
@@ -1643,7 +1644,7 @@ func TestStripPassword(t *testing.T) {
 			func(req *http.Request) bool {
 				return req != nil
 			})).
-		Return(nil, fmt.Errorf(password)).
+		Return(nil, errors.New(password)).
 		Once()
 
 	client := httphelper.NodeMgmtClient{
@@ -2472,13 +2473,15 @@ func TestCheckVolumeClaimSizesValidation(t *testing.T) {
 	require.NoErrorf(err, "error occurred creating statefulset")
 
 	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
-	require.Equal(result.Error(fmt.Errorf("PVC resize requested, but cassandra.datastax.com/allow-storage-changes annotation is not set to 'true'")), res, "We should have an error, feature flag is not set")
+	_, err = res.Output()
+	require.EqualError(err, "PVC resize requested, but cassandra.datastax.com/allow-storage-changes annotation is not set to 'true'", "We should have an error, feature flag is not set")
 
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation, "true")
 	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
 
 	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
-	require.Equal(result.Error(fmt.Errorf("PVC resize requested, but StorageClass standard does not support expansion")), res, "We should have an error, StorageClass does not allow expansion")
+	_, err = res.Output()
+	require.EqualError(err, "PVC resize requested, but StorageClass standard does not support expansion", "We should have an error, StorageClass does not allow expansion")
 	cond, found := rc.Datacenter.GetCondition(api.DatacenterValid)
 	require.True(found)
 	require.Equal(corev1.ConditionFalse, cond.Status)
@@ -2494,7 +2497,8 @@ func TestCheckVolumeClaimSizesValidation(t *testing.T) {
 	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
 	require.NoErrorf(err, "error occurred creating statefulset")
 	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
-	require.Equal(result.Error(fmt.Errorf("shrinking PVC %s is not supported", originalStatefulSet.Spec.VolumeClaimTemplates[0].Name)), res, "We should have an error, shrinking is disabled")
+	_, err = res.Output()
+	require.EqualError(err, fmt.Sprintf("shrinking PVC %s is not supported", originalStatefulSet.Spec.VolumeClaimTemplates[0].Name), "We should have an error, shrinking is disabled")
 	cond, found = rc.Datacenter.GetCondition(api.DatacenterValid)
 	require.True(found)
 	require.Equal(corev1.ConditionFalse, cond.Status)
@@ -2714,7 +2718,8 @@ func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
 	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("2Gi")}
 	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
 	res = rc.CheckRackPodTemplate()
-	require.Equal(result.Error(fmt.Errorf("PVC resize requested, but StorageClass standard does not support expansion")), res, "We should have an error, storageClass does not support expansion")
+	_, err := res.Output()
+	require.EqualError(err, "PVC resize requested, but StorageClass standard does not support expansion", "We should have an error, storageClass does not support expansion")
 
 	// Mark the StorageClass as allowing expansion
 	storageClass := &storagev1.StorageClass{}

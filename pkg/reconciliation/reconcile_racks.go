@@ -30,6 +30,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
+	pkgerrors "github.com/pkg/errors"
 )
 
 var (
@@ -230,7 +231,7 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 			}
 
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, "Shrinking CassandraDatacenter PVCs is not supported")
-			return result.Error(fmt.Errorf(msg))
+			return result.Error(pkgerrors.New(msg))
 		}
 
 		if currentSize.Cmp(createdSize) < 0 {
@@ -238,7 +239,7 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 			if !metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation) || rc.Datacenter.Annotations[api.AllowStorageChangesAnnotation] != "true" {
 				msg := fmt.Sprintf("PVC resize requested, but %s annotation is not set to 'true'", api.AllowStorageChangesAnnotation)
 				rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
-				return result.Error(fmt.Errorf(msg))
+				return result.Error(pkgerrors.New(msg))
 			}
 
 			supportsExpansion, err := rc.storageExpansion()
@@ -255,7 +256,7 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 					)); err != nil {
 					return result.Error(err)
 				}
-				return result.Error(fmt.Errorf(msg))
+				return result.Error(pkgerrors.New(msg))
 			}
 
 			if err := rc.setConditionStatus(api.DatacenterResizingVolumes, corev1.ConditionTrue); err != nil {
@@ -1688,7 +1689,7 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 				"Update rack labels for Pod %s", podName)
 		}
 
-		if pod.Spec.Volumes == nil || len(pod.Spec.Volumes) == 0 || pod.Spec.Volumes[0].PersistentVolumeClaim == nil {
+		if len(pod.Spec.Volumes) == 0 || pod.Spec.Volumes[0].PersistentVolumeClaim == nil {
 			continue
 		}
 

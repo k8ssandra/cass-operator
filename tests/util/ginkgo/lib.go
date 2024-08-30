@@ -6,6 +6,7 @@ package ginkgo_util
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -567,7 +568,7 @@ func (ns NsWrapper) ExpectKeyValue(m map[string]interface{}, key string, expecte
 		tryFloat64, ok := m[key].(float64)
 		if !ok {
 			msg := fmt.Sprintf("Actual value for key %s is not expected type", key)
-			err := fmt.Errorf(msg)
+			err := errors.New(msg)
 			Expect(err).ToNot(HaveOccurred())
 		}
 		actualValue = fmt.Sprintf("%f", tryFloat64)

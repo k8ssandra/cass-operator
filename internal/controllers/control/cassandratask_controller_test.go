@@ -649,6 +649,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", 0))
+				Expect(completedTask.Status.Failed).To(BeNumerically(">", 0))
 			})
 		})
 		Context("successful SyncFeature usage", func() {

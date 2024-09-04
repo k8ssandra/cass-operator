@@ -11221,6 +11221,9 @@ spec:
                   with the management API
                 format: date-time
                 type: string
+              metadataVersion:
+                format: int64
+                type: integer
               nodeReplacements:
                 items:
                   type: string

@@ -488,6 +488,9 @@ type CassandraDatacenterStatus struct {
 	// This field is used to perform validation checks preventing a user from changing the override
 	// +optional
 	DatacenterName *string `json:"datacenterName,omitempty"`
+
+	// +optional
+	MetadataVersion int64 `json:"metadataVersion,omitempty"`
 }
 
 // CassandraDatacenter is the Schema for the cassandradatacenters API
@@ -599,7 +602,7 @@ func (dc *CassandraDatacenter) SetCondition(condition DatacenterCondition) {
 // GetDatacenterLabels ...
 func (dc *CassandraDatacenter) GetDatacenterLabels() map[string]string {
 	labels := dc.GetClusterLabels()
-	labels[DatacenterLabel] = CleanLabelValue(dc.DatacenterName())
+	labels[DatacenterLabel] = CleanLabelValue(dc.Name)
 	return labels
 }
 
@@ -664,19 +667,19 @@ func (dc *CassandraDatacenter) GetSeedServiceName() string {
 }
 
 func (dc *CassandraDatacenter) GetAdditionalSeedsServiceName() string {
-	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.SanitizedName() + "-additional-seed-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.LabelResourceName() + "-additional-seed-service"
 }
 
 func (dc *CassandraDatacenter) GetAllPodsServiceName() string {
-	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.SanitizedName() + "-all-pods-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.LabelResourceName() + "-all-pods-service"
 }
 
 func (dc *CassandraDatacenter) GetDatacenterServiceName() string {
-	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.SanitizedName() + "-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.LabelResourceName() + "-service"
 }
 
 func (dc *CassandraDatacenter) GetNodePortServiceName() string {
-	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.SanitizedName() + "-node-port-service"
+	return CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.LabelResourceName() + "-node-port-service"
 }
 
 func (dc *CassandraDatacenter) ShouldGenerateSuperuserSecret() bool {
@@ -973,9 +976,17 @@ func SplitRacks(nodeCount, rackCount int) []int {
 	return topology
 }
 
-// SanitizedName returns a sanitized version of the name returned by DatacenterName()
-func (dc *CassandraDatacenter) SanitizedName() string {
-	return CleanupForKubernetes(dc.DatacenterName())
+func (dc *CassandraDatacenter) DatacenterNameStatus() bool {
+	return dc.Status.DatacenterName != nil
+}
+
+// LabelResourceName returns a sanitized version of the name returned by DatacenterName()
+func (dc *CassandraDatacenter) LabelResourceName() string {
+	// If existing cluster, return dc.DatacenterName() else return dc.Name
+	if dc.DatacenterNameStatus() {
+		return CleanupForKubernetes(*dc.Status.DatacenterName)
+	}
+	return CleanupForKubernetes(dc.Name)
 }
 
 // DatacenterName returns the Cassandra DC name override if it exists,

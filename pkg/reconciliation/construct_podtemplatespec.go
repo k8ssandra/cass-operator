@@ -379,7 +379,7 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 			Name: "encryption-cred-storage",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: fmt.Sprintf("%s-keystore", dc.SanitizedName()),
+					SecretName: fmt.Sprintf("%s-keystore", dc.LabelResourceName()),
 				},
 			},
 		}
@@ -614,7 +614,7 @@ func getConfigDataEnVars(dc *api.CassandraDatacenter) ([]corev1.EnvVar, error) {
 			return envVars, nil
 		}
 
-		return nil, fmt.Errorf("datacenter %s is missing %s annotation", dc.SanitizedName(), api.ConfigHashAnnotation)
+		return nil, fmt.Errorf("datacenter %s is missing %s annotation", dc.LabelResourceName(), api.ConfigHashAnnotation)
 	}
 
 	configData, err := dc.GetConfigAsJSON(dc.Spec.Config)

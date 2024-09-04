@@ -31,7 +31,7 @@ func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        dc.SanitizedName() + "-pdb",
+			Name:        dc.LabelResourceName() + "-pdb",
 			Namespace:   dc.Namespace,
 			Labels:      labels,
 			Annotations: anns,
@@ -62,8 +62,11 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 	rc.Datacenter.Status.CassandraOperatorProgress = newState
 
 	if newState == api.ProgressReady {
+		if rc.Datacenter.Status.MetadataVersion < 1 {
+			rc.Datacenter.Status.MetadataVersion = 1
+		}
 		if rc.Datacenter.Status.DatacenterName == nil {
-			rc.Datacenter.Status.DatacenterName = &rc.Datacenter.Spec.DatacenterName
+			rc.Datacenter.Status.DatacenterName = &rc.Datacenter.Name
 		}
 	}
 	if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {

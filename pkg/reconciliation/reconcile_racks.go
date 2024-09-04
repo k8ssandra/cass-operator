@@ -34,10 +34,9 @@ import (
 )
 
 var (
-	ResultShouldNotRequeue     reconcile.Result = reconcile.Result{Requeue: false}
-	ResultShouldRequeueNow     reconcile.Result = reconcile.Result{Requeue: true}
-	ResultShouldRequeueSoon    reconcile.Result = reconcile.Result{Requeue: true, RequeueAfter: 2 * time.Second}
-	ResultShouldRequeueTenSecs reconcile.Result = reconcile.Result{Requeue: true, RequeueAfter: 10 * time.Second}
+	ResultShouldNotRequeue  reconcile.Result = reconcile.Result{Requeue: false}
+	ResultShouldRequeueNow  reconcile.Result = reconcile.Result{Requeue: true}
+	ResultShouldRequeueSoon reconcile.Result = reconcile.Result{Requeue: true, RequeueAfter: 2 * time.Second}
 
 	QuietDurationFunc func(int) time.Duration = func(secs int) time.Duration { return time.Duration(secs) * time.Second }
 )
@@ -618,7 +617,7 @@ func (rc *ReconciliationContext) CheckRackStoppedState() result.ReconcileResult 
 				emittedStoppingEvent = true
 			}
 
-			rackPods := FilterPodListByLabels(rc.dcPods, rc.Datacenter.GetRackLabels(rackInfo.RackName))
+			rackPods := rc.rackPods(rackInfo.RackName)
 
 			nodesDrained := 0
 			nodeDrainErrors := 0
@@ -751,7 +750,7 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 		return result.Error(err)
 	}
 	if atLeastOneFirstNodeNotReady {
-		return result.RequeueSoon(2)
+		return result.RequeueSoon(10)
 	}
 
 	// step 3 - if the cluster isn't healthy, that's ok, but go back to step 1
@@ -1432,8 +1431,8 @@ func (rc *ReconciliationContext) isClusterHealthy() bool {
 func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (int, error) {
 	logger := rc.ReqLogger.WithName("labelSeedPods")
 
-	rackLabels := rc.Datacenter.GetRackLabels(rackInfo.RackName)
-	rackPods := FilterPodListByLabels(rc.dcPods, rackLabels)
+	rackPods := rc.rackPods(rackInfo.RackName)
+
 	sort.SliceStable(rackPods, func(i, j int) bool {
 		return rackPods[i].Name < rackPods[j].Name
 	})
@@ -2150,7 +2149,7 @@ func (rc *ReconciliationContext) refreshSeeds() error {
 	return nil
 }
 
-func (rc *ReconciliationContext) listPods(selector map[string]string) (*corev1.PodList, error) {
+func (rc *ReconciliationContext) listPods(selector map[string]string) ([]*corev1.Pod, error) {
 	rc.ReqLogger.Info("reconcile_racks::listPods")
 
 	listOptions := &client.ListOptions{
@@ -2165,7 +2164,11 @@ func (rc *ReconciliationContext) listPods(selector map[string]string) (*corev1.P
 		},
 	}
 
-	return podList, rc.Client.List(rc.Ctx, podList, listOptions)
+	if err := rc.Client.List(rc.Ctx, podList, listOptions); err != nil {
+		return nil, err
+	}
+
+	return PodPtrsFromPodList(podList), nil
 }
 
 func (rc *ReconciliationContext) CheckRollingRestart() result.ReconcileResult {
@@ -2425,21 +2428,40 @@ func (rc *ReconciliationContext) fixMissingPVC() (bool, error) {
 	return false, nil
 }
 
+func (rc *ReconciliationContext) datacenterPods() []*corev1.Pod {
+	if rc.dcPods != nil {
+		return rc.dcPods
+	}
+
+	dcSelector := rc.Datacenter.GetDatacenterLabels()
+	dcPods := FilterPodListByLabels(rc.clusterPods, dcSelector)
+
+	if rc.Datacenter.Status.MetadataVersion < 1 && rc.Datacenter.Status.DatacenterName != nil && *rc.Datacenter.Status.DatacenterName == rc.Datacenter.Spec.DatacenterName {
+		rc.ReqLogger.Info("Fetching with the old metadata version also")
+		dcSelector[api.DatacenterLabel] = api.CleanLabelValue(rc.Datacenter.Spec.DatacenterName)
+		rc.dcPods = append(rc.dcPods, FilterPodListByLabels(rc.clusterPods, dcSelector)...)
+	}
+
+	return dcPods
+}
+
+func (rc *ReconciliationContext) rackPods(rackName string) []*corev1.Pod {
+	return FilterPodListByLabels(rc.datacenterPods(), map[string]string{api.RackLabel: rackName})
+}
+
 // ReconcileAllRacks determines if a rack needs to be reconciled.
 func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	rc.ReqLogger.Info("reconciliationContext::reconcileAllRacks")
 
 	logger := rc.ReqLogger
 
-	podList, err := rc.listPods(rc.Datacenter.GetClusterLabels())
+	pods, err := rc.listPods(rc.Datacenter.GetClusterLabels())
 	if err != nil {
 		logger.Error(err, "error listing all pods in the cluster")
 	}
 
-	rc.clusterPods = PodPtrsFromPodList(podList)
-
-	dcSelector := rc.Datacenter.GetDatacenterLabels()
-	rc.dcPods = FilterPodListByLabels(rc.clusterPods, dcSelector)
+	rc.clusterPods = pods
+	rc.dcPods = rc.datacenterPods()
 
 	endpointData := rc.getCassMetadataEndpoints()
 

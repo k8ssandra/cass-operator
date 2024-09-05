@@ -1548,7 +1548,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "cassandra",
 				serverVersion: "3.11.10",
 			},
-			want:      "localhost:5000/k8ssandra/cass-management-api:3.11.10-ubi8",
+			want:      "localhost:5000/k8ssandra/cass-management-api:3.11.10-ubi",
 			errString: "",
 		},
 		{

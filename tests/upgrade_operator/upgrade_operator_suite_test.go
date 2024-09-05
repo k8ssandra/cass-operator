@@ -80,7 +80,7 @@ var _ = Describe(testName, func() {
 			k := kubectl.ApplyFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1800)
 
 			// Get UID of the cluster pod
 			step = "get Cassandra pods UID"

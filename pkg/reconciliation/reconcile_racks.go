@@ -2437,9 +2437,9 @@ func (rc *ReconciliationContext) datacenterPods() []*corev1.Pod {
 	dcPods := FilterPodListByLabels(rc.clusterPods, dcSelector)
 
 	if rc.Datacenter.Status.MetadataVersion < 1 && rc.Datacenter.Status.DatacenterName != nil && *rc.Datacenter.Status.DatacenterName == rc.Datacenter.Spec.DatacenterName {
-		rc.ReqLogger.Info("Fetching with the old metadata version also")
+		rc.ReqLogger.Info("Fetching datacenter pods with the old metadata version labels")
 		dcSelector[api.DatacenterLabel] = api.CleanLabelValue(rc.Datacenter.Spec.DatacenterName)
-		rc.dcPods = append(rc.dcPods, FilterPodListByLabels(rc.clusterPods, dcSelector)...)
+		dcPods = append(dcPods, FilterPodListByLabels(rc.clusterPods, dcSelector)...)
 	}
 
 	return dcPods

@@ -6,7 +6,6 @@ package reconciliation
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"reflect"
@@ -15,6 +14,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/utils/ptr"
 
@@ -2779,4 +2780,97 @@ func TestDatacenterStatus(t *testing.T) {
 	val, err := monitoring.GetMetricValue("cass_operator_datacenter_status", map[string]string{"datacenter": rc.Datacenter.DatacenterName(), "condition": string(api.DatacenterRequiresUpdate)})
 	assert.NoError(err)
 	assert.Equal(float64(0), val)
+}
+
+func TestDatacenterPods(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	assert := assert.New(t)
+
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
+		"default",
+		rc.Datacenter,
+		3)
+	assert.NoErrorf(err, "error occurred creating statefulset")
+
+	desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
+
+	trackObjects := []runtime.Object{
+		desiredStatefulSet,
+		rc.Datacenter,
+	}
+
+	mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
+	for idx := range mockPods {
+		mp := mockPods[idx]
+		trackObjects = append(trackObjects, mp)
+	}
+
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+
+	nextRack := &RackInformation{}
+	nextRack.RackName = "default"
+	nextRack.NodeCount = 1
+	nextRack.SeedCount = 1
+
+	rackInfo := []*RackInformation{nextRack}
+
+	rc.desiredRackInformation = rackInfo
+	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
+
+	rc.clusterPods = mockPods
+	assert.Equal(int(*desiredStatefulSet.Spec.Replicas), len(rc.datacenterPods()))
+}
+
+func TestDatacenterPodsOldLabels(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	assert := assert.New(t)
+
+	// We fake the process a bit to get old style naming and labels
+	rc.Datacenter.Name = "overrideMe"
+
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
+		"default",
+		rc.Datacenter,
+		3)
+	assert.NoErrorf(err, "error occurred creating statefulset")
+
+	desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
+
+	trackObjects := []runtime.Object{
+		desiredStatefulSet,
+		rc.Datacenter,
+	}
+
+	mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
+	for idx := range mockPods {
+		mp := mockPods[idx]
+		trackObjects = append(trackObjects, mp)
+	}
+
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+
+	nextRack := &RackInformation{}
+	nextRack.RackName = "default"
+	nextRack.NodeCount = 1
+	nextRack.SeedCount = 1
+
+	rackInfo := []*RackInformation{nextRack}
+
+	rc.desiredRackInformation = rackInfo
+	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
+
+	rc.clusterPods = mockPods
+
+	// Lets modify the Datacenter names and set the status like it used to be in some older versions
+	rc.Datacenter.Spec.DatacenterName = "overrideMe"
+	rc.Datacenter.Name = "dc1"
+	rc.Datacenter.Status.DatacenterName = ptr.To[string]("overrideMe")
+	rc.Datacenter.Status.MetadataVersion = 0
+
+	// We should still find the pods
+	assert.Equal(int(*desiredStatefulSet.Spec.Replicas), len(rc.datacenterPods()))
 }

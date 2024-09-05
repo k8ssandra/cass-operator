@@ -20,6 +20,7 @@ var (
 	testName   = "Upgrade Operator"
 	namespace  = "test-upgrade-operator"
 	dcName     = "dc1"
+	podId      = "pod/cluster1-my-super-dc-r1-sts-0"
 	dcYaml     = "../testdata/default-three-rack-three-node-dc-4x.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
@@ -83,7 +84,7 @@ var _ = Describe(testName, func() {
 
 			// Get UID of the cluster pod
 			step = "get Cassandra pods UID"
-			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
+			k = kubectl.Get(podId).FormatOutput("jsonpath={.metadata.uid}")
 			createdPodUID := ns.OutputAndLog(step, k)
 
 			step = "get name of 1.19.1 operator pod"
@@ -106,7 +107,7 @@ var _ = Describe(testName, func() {
 
 			// Verify Pod hasn't restarted
 			step = "get Cassandra pods UID"
-			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
+			k = kubectl.Get(podId).FormatOutput("jsonpath={.metadata.uid}")
 			postUpgradeCassPodUID := ns.OutputAndLog(step, k)
 
 			Expect(createdPodUID).To(Equal(postUpgradeCassPodUID))
@@ -120,7 +121,7 @@ var _ = Describe(testName, func() {
 			// Get current system-logger image
 			// Verify the Pod now has updated system-logger container image
 			step = "get Cassandra pod system-logger"
-			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
+			k = kubectl.Get(podId).FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
 			loggerImage := ns.OutputAndLog(step, k)
 			Expect(loggerImage).To(Equal("cr.k8ssandra.io/k8ssandra/system-logger:v1.19.1"))
 
@@ -137,14 +138,14 @@ var _ = Describe(testName, func() {
 
 			// Verify pod has been restarted
 			step = "get Cassandra pods UID"
-			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.metadata.uid}")
+			k = kubectl.Get(podId).FormatOutput("jsonpath={.metadata.uid}")
 			postAllowUpgradeUID := ns.OutputAndLog(step, k)
 
 			Expect(postUpgradeCassPodUID).ToNot(Equal(postAllowUpgradeUID))
 
 			// Verify the Pod now has updated system-logger container image
 			step = "get Cassandra pod system-logger"
-			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
+			k = kubectl.Get(podId).FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
 			loggerImageNew := ns.OutputAndLog(step, k)
 			Expect(loggerImage).To(Not(Equal(loggerImageNew)))
 

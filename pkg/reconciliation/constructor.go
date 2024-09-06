@@ -76,17 +76,6 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 
 	monitoring.UpdateOperatorDatacenterProgressStatusMetric(rc.Datacenter, newState)
 
-	// The allow-upgrade=once annotation is temporary and should be removed after first successful reconcile
-	if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation) && rc.Datacenter.Annotations[api.UpdateAllowedAnnotation] == string(api.AllowUpdateOnce) {
-		// remove the annotation
-		patch = client.MergeFrom(rc.Datacenter.DeepCopy())
-		delete(rc.Datacenter.ObjectMeta.Annotations, api.UpdateAllowedAnnotation)
-		if err := rc.Client.Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
-			rc.ReqLogger.Error(err, "error removing the allow-upgrade=once annotation")
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -102,6 +91,17 @@ func setDatacenterStatus(rc *ReconciliationContext) error {
 
 	if err := rc.setConditionStatus(api.DatacenterRequiresUpdate, corev1.ConditionFalse); err != nil {
 		return err
+	}
+
+	// The allow-upgrade=once annotation is temporary and should be removed after first successful reconcile
+	if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation) && rc.Datacenter.Annotations[api.UpdateAllowedAnnotation] == string(api.AllowUpdateOnce) {
+		// remove the annotation
+		patch := client.MergeFrom(rc.Datacenter.DeepCopy())
+		delete(rc.Datacenter.ObjectMeta.Annotations, api.UpdateAllowedAnnotation)
+		if err := rc.Client.Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
+			rc.ReqLogger.Error(err, "error removing the allow-upgrade=once annotation")
+			return err
+		}
 	}
 
 	return nil

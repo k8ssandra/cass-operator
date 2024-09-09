@@ -20,7 +20,8 @@ var featuresReply = `{
 		"async_gc_task",
 		"async_flush_task",
 		"async_scrub_task",
-		"async_compaction_task"
+		"async_compaction_task",
+		"reload_internode_truststore"
 	]
 	}`
 
@@ -128,9 +129,31 @@ func FakeExecutorServerWithDetailsFails(callDetails *CallDetails) (*httptest.Ser
 	}))
 }
 
+func FakeServerWithSyncFeaturesEndpoint(callDetails *CallDetails) (*httptest.Server, error) {
+	return FakeMgmtApiServer(callDetails, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := url.ParseQuery(r.URL.RawQuery)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		if r.Method == http.MethodGet && r.RequestURI == "/api/v0/metadata/versions/features" {
+			w.WriteHeader(http.StatusOK)
+			_, err = w.Write([]byte(featuresReply))
+		} else if r.Method == http.MethodPost && r.URL.Path == "/api/v0/ops/node/encryption/internode/truststore/reload" {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+}
+
 func FakeServerWithoutFeaturesEndpoint(callDetails *CallDetails) (*httptest.Server, error) {
 	return FakeMgmtApiServer(callDetails, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && (r.URL.Path == "/api/v0/ops/keyspace/cleanup" || r.URL.Path == "/api/v0/ops/tables/sstables/upgrade" || r.URL.Path == "/api/v0/ops/node/drain" || r.URL.Path == "/api/v0/ops/tables/flush" || r.URL.Path == "/api/v0/ops/tables/garbagecollect" || r.URL.Path == "/api/v0/ops/tables/compact") {
+			w.WriteHeader(http.StatusOK)
+		} else if r.Method == http.MethodPost && r.URL.Path == "/api/v0/ops/node/encryption/internode/truststore/reload" {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusNotFound)

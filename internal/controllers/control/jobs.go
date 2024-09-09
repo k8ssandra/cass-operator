@@ -442,6 +442,19 @@ func (r *CassandraTaskReconciler) refreshDatacenter(ctx context.Context, dc *cas
 		}
 	}
 	return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
+
+}
+
+// ts reload functionality
+
+func inodeTsReload(taskConfig *TaskConfiguration) {
+	taskConfig.PodFilter = genericPodFilter
+	taskConfig.SyncFunc = inodeTsReloadSync
+	taskConfig.SyncFeature = httphelper.ReloadInodeTruststore
+}
+
+func inodeTsReloadSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
+	return nodeMgmtClient.CallinodeTsReloadEndpoint(pod)
 }
 
 // Common functions

@@ -140,6 +140,7 @@ const (
 	Move                    Feature = "async_move_task"
 	AsyncGarbageCollect     Feature = "async_gc_task"
 	AsyncFlush              Feature = "async_flush_task"
+	ReloadInodeTruststore   Feature = "reload_internode_truststore"
 )
 
 func (f *FeatureSet) UnmarshalJSON(b []byte) error {
@@ -578,6 +579,33 @@ func (client *NodeMgmtClient) CallCompactionEndpoint(pod *corev1.Pod, compactReq
 	req.timeout = 60 * time.Second
 
 	_, err = callNodeMgmtEndpoint(client, *req, "application/json")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CallTSReloadEndpoint calls the async version of TSReload
+func (client *NodeMgmtClient) CallinodeTsReloadEndpoint(pod *corev1.Pod) error {
+	client.Log.Info(
+		"calling Management API TS REload endpoint - POST /api/v0/node/encryption/internode/truststore/reload",
+		"pod", pod.Name,
+	)
+	podHost, podPort, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/ops/node/encryption/internode/truststore/reload",
+		host:     podHost,
+		port:     podPort,
+		method:   http.MethodPost,
+		timeout:  60 * time.Second,
+	}
+
+	_, err = callNodeMgmtEndpoint(client, request, "application/json")
 	if err != nil {
 		return err
 	}

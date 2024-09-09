@@ -228,6 +228,18 @@ func waitForTaskCompletion(taskKey types.NamespacedName) *api.CassandraTask {
 	return emptyTask
 }
 
+func waitForTaskFailed(taskKey types.NamespacedName) *api.CassandraTask {
+	var emptyTask *api.CassandraTask
+	Eventually(func() bool {
+		emptyTask = &api.CassandraTask{}
+		err := k8sClient.Get(context.TODO(), taskKey, emptyTask)
+		Expect(err).ToNot(HaveOccurred())
+
+		return emptyTask.Status.Failed > 0
+	}, time.Duration(5*time.Second)).Should(BeTrue())
+	return emptyTask
+}
+
 var _ = Describe("CassandraTask controller tests", func() {
 	Describe("Execute jobs against all pods", func() {
 		JobRunningRequeue = time.Duration(1 * time.Millisecond)
@@ -621,6 +633,47 @@ var _ = Describe("CassandraTask controller tests", func() {
 				Expect(callDetails.URLCounts["/api/v0/ops/tables/garbagecollect"]).To(Equal(nodeCount))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
 				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+
+				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
+			It("Runs a ts reload task against a pod and fails", func() {
+				By("Creating a task for tsreload")
+				taskKey, task := buildTask(api.CommandTSReload, testNamespaceName)
+				task.Spec.Jobs[0].Arguments.PodName = fmt.Sprintf("%s-%s-r0-sts-0", clusterName, testDatacenterName)
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskFailed(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v0/ops/node/encryption/internode/truststore/reload"]).To(Equal(0)) // This doesn't get called because the test of whether the feature exists doesn't pass. The features endpoint doesn't exist in this mock server.
+
+				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
+				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", 0))
+				Expect(completedTask.Status.Failed).To(BeNumerically(">", 0))
+			})
+		})
+		Context("successful SyncFeature usage", func() {
+			var testNamespaceName string
+			BeforeEach(func() {
+				By("Creating fake synchronous mgmt-api server")
+				var err error
+				callDetails = httphelper.NewCallDetails()
+				mockServer, err = httphelper.FakeServerWithSyncFeaturesEndpoint(callDetails)
+				testNamespaceName = fmt.Sprintf("test-sync-task-%d", rand.Int31())
+				Expect(err).ToNot(HaveOccurred())
+				mockServer.Start()
+				By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
+			})
+			It("Runs a ts reload task against a pod", func() {
+				By("Creating a task for tsreload")
+				taskKey, task := buildTask(api.CommandTSReload, testNamespaceName)
+				task.Spec.Jobs[0].Arguments.PodName = fmt.Sprintf("%s-%s-r0-sts-0", clusterName, testDatacenterName)
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(callDetails.URLCounts["/api/v0/ops/node/encryption/internode/truststore/reload"]).To(Equal(1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 0)) // This doesn't get called because the test of whether the feature exists doesn't pass.
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))

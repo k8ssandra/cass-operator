@@ -98,6 +98,7 @@ type TaskConfiguration struct {
 	// Execution functionality per pod
 	AsyncFeature httphelper.Feature
 	AsyncFunc    AsyncTaskExecutorFunc
+	SyncFeature  httphelper.Feature
 	SyncFunc     SyncTaskExecutorFunc
 	PodFilter    PodFilterFunc
 
@@ -317,6 +318,8 @@ JobDefinition:
 			}
 			completed = taskConfig.Completed
 			break JobDefinition
+		case api.CommandTSReload:
+			inodeTsReload(taskConfig)
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
 			return ctrl.Result{}, err
@@ -647,13 +650,9 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 		if !taskConfig.Filter(&pod) {
 			continue
 		}
-
-		features := &httphelper.FeatureSet{}
-		if taskConfig.AsyncFeature != "" {
-			features, err = nodeMgmtClient.FeatureSet(&pod)
-			if err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
-			}
+		features, err := nodeMgmtClient.FeatureSet(&pod)
+		if err != nil {
+			return ctrl.Result{}, failed, completed, errMsg, err
 		}
 
 		if pod.Annotations == nil {
@@ -784,6 +783,16 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				logger.Error(err, "unable to execute requested job against pod", "Pod", pod)
 				failed++
 				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+
+			if taskConfig.SyncFeature != "" {
+				if !features.Supports(taskConfig.SyncFeature) {
+					logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
+					jobStatus.Status = podJobError
+					failed++
+					errMsg = fmt.Sprintf("Pod %s doesn't support %s feature", pod.Name, taskConfig.SyncFeature)
+					return ctrl.Result{}, failed, completed, errMsg, err
+				}
 			}
 
 			jobId := strconv.Itoa(idx)

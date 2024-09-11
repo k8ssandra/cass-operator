@@ -985,6 +985,10 @@ func (dc *CassandraDatacenter) DatacenterName() string {
 }
 
 func (dc *CassandraDatacenter) UseClientImage() bool {
+	if dc.ReadOnlyFs() {
+		return true
+	}
+
 	if dc.Spec.ServerType == "hcd" {
 		return true
 	}
@@ -997,4 +1001,11 @@ func (dc *CassandraDatacenter) UseClientImage() bool {
 
 func (dc *CassandraDatacenter) GenerationChanged() bool {
 	return dc.Status.ObservedGeneration < dc.Generation
+}
+
+func (dc *CassandraDatacenter) ReadOnlyFs() bool {
+	if dc.Spec.ReadOnlyRootFilesystem != nil {
+		return *dc.Spec.ReadOnlyRootFilesystem
+	}
+	return false
 }

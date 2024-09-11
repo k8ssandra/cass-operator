@@ -307,7 +307,7 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 
 	volumeDefaults := []corev1.Volume{vServerConfig, vServerLogs}
 
-	if readOnlyFs(dc) {
+	if dc.ReadOnlyFs() {
 		tmp := corev1.Volume{
 			Name: "tmp",
 			VolumeSource: corev1.VolumeSource{
@@ -649,7 +649,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 	}
 
-	if readOnlyFs(dc) {
+	if dc.ReadOnlyFs() {
 		cassContainer.SecurityContext = &corev1.SecurityContext{
 			ReadOnlyRootFilesystem: ptr.To[bool](true),
 		}
@@ -680,7 +680,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		envDefaults = append(envDefaults, corev1.EnvVar{Name: "HCD_AUTO_CONF_OFF", Value: "all"})
 	}
 
-	if readOnlyFs(dc) {
+	if dc.ReadOnlyFs() {
 		envDefaults = append(envDefaults, corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"})
 	}
 
@@ -737,7 +737,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 	}
 
-	if readOnlyFs(dc) {
+	if dc.ReadOnlyFs() {
 		cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
 			Name:      "tmp",
 			MountPath: "/tmp",
@@ -811,10 +811,6 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	return nil
-}
-
-func readOnlyFs(dc *api.CassandraDatacenter) bool {
-	return dc.Spec.ReadOnlyRootFilesystem != nil && *dc.Spec.ReadOnlyRootFilesystem && dc.UseClientImage()
 }
 
 func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {

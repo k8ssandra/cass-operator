@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/ptr"
 )
 
 var internodeEnabledAll = `
@@ -123,5 +124,63 @@ func TestUseClientImage(t *testing.T) {
 		} else {
 			assert.False(dc.UseClientImage())
 		}
+	}
+}
+
+func TestUseClientImageReadOnlyRootFilesystem(t *testing.T) {
+	assert := assert.New(t)
+
+	tests := []struct {
+		serverType string
+		version    string
+	}{
+		{
+			serverType: "cassandra",
+			version:    "4.1.0",
+		},
+		{
+			serverType: "cassandra",
+			version:    "4.1.2",
+		},
+		{
+			serverType: "cassandra",
+			version:    "5.0.0",
+		},
+		{
+			serverType: "cassandra",
+			version:    "3.11.17",
+		},
+		{
+			serverType: "cassandra",
+			version:    "4.0.8",
+		},
+		{
+			serverType: "dse",
+			version:    "6.8.39",
+		},
+		{
+			serverType: "dse",
+			version:    "6.9.0",
+		},
+		{
+			serverType: "hcd",
+			version:    "1.0.0",
+		},
+		{
+			serverType: "dse",
+			version:    "4.1.2",
+		},
+	}
+
+	for _, tt := range tests {
+		dc := CassandraDatacenter{
+			Spec: CassandraDatacenterSpec{
+				ServerVersion:          tt.version,
+				ServerType:             tt.serverType,
+				ReadOnlyRootFilesystem: ptr.To[bool](true),
+			},
+		}
+
+		assert.True(dc.UseClientImage())
 	}
 }

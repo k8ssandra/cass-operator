@@ -5,8 +5,7 @@ metadata:
 spec:
   clusterName: cluster1
   serverType: cassandra
-  serverVersion: "4.1.5"
-  serverImage: michaelburman290/cass-management-api:4.1.5-ubi8
+  serverVersion: 4.1.6
   managementApiAuth:
     insecure: {}
   readOnlyRootFilesystem: true

@@ -2006,3 +2006,59 @@ func TestReadOnlyRootFilesystemVolumeChanges(t *testing.T) {
 	mcacDisabled := corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"}
 	assert.True(envVarsContains(containers[0].Env, mcacDisabled))
 }
+
+func TestReadOnlyRootFilesystemVolumeChangesHCD(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:            "bob",
+			ServerType:             "hcd",
+			ServerVersion:          "1.0.0",
+			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			Racks: []api.Rack{
+				{
+					Name: "r1",
+				},
+			},
+		},
+	}
+
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
+	assert.NoError(err, "failed to build PodTemplateSpec")
+
+	containers := podTemplateSpec.Spec.Containers
+	assert.NotNil(containers, "Unexpected containers containers received")
+	assert.NoError(err, "Unexpected error encountered")
+
+	assert.Len(containers, 2, "Unexpected number of containers containers returned")
+	assert.Equal("cassandra", containers[0].Name)
+	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+
+	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "tmp",
+				MountPath: "/tmp",
+			},
+			{
+				Name:      "etc-cassandra",
+				MountPath: "/opt/hcd/resources/cassandra/conf",
+			},
+			{
+				Name:      "server-logs",
+				MountPath: "/var/log/cassandra",
+			},
+			{
+				Name:      "server-data",
+				MountPath: "/var/lib/cassandra",
+			},
+			{
+				Name:      "server-config",
+				MountPath: "/config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the cassandra container: %v", containers[0].VolumeMounts))
+
+	// TODO Verify MCAC is disabled since it will fail with ReadOnlyRootFilesystem
+	mcacDisabled := corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"}
+	assert.True(envVarsContains(containers[0].Env, mcacDisabled))
+}

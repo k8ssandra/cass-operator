@@ -9,6 +9,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [BUGFIX] [#703](https://github.com/k8ssandra/cass-operator/issues/703) Fix HCD config path from /etc/cassandra to /opt/hcd/resources/cassandra/conf
+
 ## v1.22.1
 
 * [BUGFIX] [#687](https://github.com/k8ssandra/cass-operator/issues/687) Prevent a crash when when StorageClassName was not set in the CassandraDataVolumeClaimSpec

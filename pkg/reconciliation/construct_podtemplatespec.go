@@ -750,6 +750,11 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 				Name:      "etc-cassandra",
 				MountPath: "/opt/hcd/resources/cassandra/conf",
 			})
+		} else if dc.Spec.ServerType == "dse" {
+			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+				Name:      "etc-cassandra",
+				MountPath: "/opt/dse/resources/cassandra/conf",
+			})
 		} else {
 			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
 				Name:      "etc-cassandra",

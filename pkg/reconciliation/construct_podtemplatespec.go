@@ -340,7 +340,15 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 						EmptyDir: &corev1.EmptyDirVolumeSource{},
 					},
 				}
-				volumeDefaults = append(volumeDefaults, sparkConf)
+
+				collectDConf := corev1.Volume{
+					Name: "collectd-conf",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}
+
+				volumeDefaults = append(volumeDefaults, sparkConf, collectDConf)
 			}
 		}
 	}
@@ -784,6 +792,10 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 				cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
 					Name:      "spark-conf",
 					MountPath: "/opt/dse/resources/spark/conf",
+				})
+				cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+					Name:      "collectd-conf",
+					MountPath: "/opt/dse/resources/dse/collectd/etc/collectd",
 				})
 			}
 		} else {

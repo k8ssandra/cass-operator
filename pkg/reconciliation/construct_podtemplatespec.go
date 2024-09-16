@@ -323,6 +323,26 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 		}
 
 		volumeDefaults = append(volumeDefaults, tmp, etcCass)
+
+		if dc.Spec.ServerType == "dse" {
+			dseConf := corev1.Volume{
+				Name: "dse-conf",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			}
+			volumeDefaults = append(volumeDefaults, dseConf)
+
+			if !dc.UseClientImage() {
+				sparkConf := corev1.Volume{
+					Name: "spark-conf",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}
+				volumeDefaults = append(volumeDefaults, sparkConf)
+			}
+		}
 	}
 
 	if dc.UseClientImage() {
@@ -755,6 +775,17 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 				Name:      "etc-cassandra",
 				MountPath: "/opt/dse/resources/cassandra/conf",
 			})
+			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+				Name:      "dse-conf",
+				MountPath: "/opt/dse/resources/dse/conf",
+			})
+
+			if !dc.UseClientImage() {
+				cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+					Name:      "spark-conf",
+					MountPath: "/opt/dse/resources/spark/conf",
+				})
+			}
 		} else {
 			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
 				Name:      "etc-cassandra",

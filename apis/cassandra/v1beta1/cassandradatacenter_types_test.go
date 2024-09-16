@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
 
@@ -127,7 +128,7 @@ func TestUseClientImage(t *testing.T) {
 	}
 }
 
-func TestUseClientImageReadOnlyRootFilesystem(t *testing.T) {
+func TestUseClientImageEnforce(t *testing.T) {
 	assert := assert.New(t)
 
 	tests := []struct {
@@ -174,6 +175,11 @@ func TestUseClientImageReadOnlyRootFilesystem(t *testing.T) {
 
 	for _, tt := range tests {
 		dc := CassandraDatacenter{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					UseClientBuilderAnnotation: "true",
+				},
+			},
 			Spec: CassandraDatacenterSpec{
 				ServerVersion:          tt.version,
 				ServerType:             tt.serverType,

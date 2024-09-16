@@ -74,6 +74,9 @@ const (
 	// AllowStorageChangesAnnotation indicates the CassandraDatacenter StorageConfig can be modified for existing datacenters
 	AllowStorageChangesAnnotation = "cassandra.datastax.com/allow-storage-changes"
 
+	// UseClientBuilderAnnotation enforces the usage of new config builder from k8ssandra-client for versions that would otherwise use the cass-config-builder
+	UseClientBuilderAnnotation = "cassandra.datastax.com/use-new-config-builder"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 
@@ -985,7 +988,7 @@ func (dc *CassandraDatacenter) DatacenterName() string {
 }
 
 func (dc *CassandraDatacenter) UseClientImage() bool {
-	if dc.ReadOnlyFs() {
+	if metav1.HasAnnotation(dc.ObjectMeta, UseClientBuilderAnnotation) && dc.Annotations[UseClientBuilderAnnotation] == "true" {
 		return true
 	}
 

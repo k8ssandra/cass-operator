@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.22.3
 
 * [FEATURE] [#701](https://github.com/k8ssandra/cass-operator/issues/701) Allow ReadOnlyRootFilesystem for DSE also with extra mounts to provide support for cass-config-builder setups
 

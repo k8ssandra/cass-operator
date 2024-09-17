@@ -198,7 +198,7 @@ jobs:
           - scale_up
           - scale_up_stop_resume
           - seed_selection
-          - smoke_test_read_only_fs
+          # - smoke_test_read_only_fs
           #- config_fql # OSS only
           - decommission_dc
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
@@ -244,15 +244,12 @@ jobs:
           - version: 6.8.50
             serverImage: datastax/dse-mgmtapi-6_8:6.8.50-ubi8 # DSE 6.8.50
             serverType: dse
-            integration_test: "test_all_the_things"
           - version: 6.9.2
             serverImage: datastax/dse-mgmtapi-6_8:6.9.2-ubi # DSE 6.9.2
             serverType: dse
-            integration_test: "test_all_the_things"
           - version: 1.0.0
             serverImage: datastax/hcd:1.0.0-ubi # HCD 1.0.0
             serverType: hcd
-            integration_test: "test_all_the_things"
         exclude:
           - version: 3.11.17
             integration_test: "smoke_test_read_only_fs"

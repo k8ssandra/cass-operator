@@ -307,7 +307,7 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 
 	volumeDefaults := []corev1.Volume{vServerConfig, vServerLogs}
 
-	if readOnlyFs(dc) {
+	if dc.ReadOnlyFs() {
 		tmp := corev1.Volume{
 			Name: "tmp",
 			VolumeSource: corev1.VolumeSource{
@@ -323,6 +323,34 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 		}
 
 		volumeDefaults = append(volumeDefaults, tmp, etcCass)
+
+		if dc.Spec.ServerType == "dse" {
+			dseConf := corev1.Volume{
+				Name: "dse-conf",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			}
+			volumeDefaults = append(volumeDefaults, dseConf)
+
+			if !dc.UseClientImage() {
+				sparkConf := corev1.Volume{
+					Name: "spark-conf",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}
+
+				collectDConf := corev1.Volume{
+					Name: "collectd-conf",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}
+
+				volumeDefaults = append(volumeDefaults, sparkConf, collectDConf)
+			}
+		}
 	}
 
 	if dc.UseClientImage() {
@@ -476,6 +504,8 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 			configContainer.Command = []string{"/bin/sh"}
 			if dc.Spec.ServerType == "cassandra" {
 				configContainer.Args = []string{"-c", "cp -rf /etc/cassandra/* /cassandra-base-config/"}
+			} else if dc.Spec.ServerType == "dse" {
+				configContainer.Args = []string{"-c", "cp -rf /opt/dse/resources/cassandra/conf/* /cassandra-base-config/"}
 			} else if dc.Spec.ServerType == "hcd" {
 				configContainer.Args = []string{"-c", "cp -rf /opt/hcd/resources/cassandra/conf/* /cassandra-base-config/"}
 			}
@@ -649,7 +679,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 	}
 
-	if readOnlyFs(dc) {
+	if dc.ReadOnlyFs() {
 		cassContainer.SecurityContext = &corev1.SecurityContext{
 			ReadOnlyRootFilesystem: ptr.To[bool](true),
 		}
@@ -680,7 +710,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		envDefaults = append(envDefaults, corev1.EnvVar{Name: "HCD_AUTO_CONF_OFF", Value: "all"})
 	}
 
-	if readOnlyFs(dc) {
+	if dc.ReadOnlyFs() {
 		envDefaults = append(envDefaults, corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"})
 	}
 
@@ -737,7 +767,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 	}
 
-	if readOnlyFs(dc) {
+	if dc.ReadOnlyFs() {
 		cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
 			Name:      "tmp",
 			MountPath: "/tmp",
@@ -748,6 +778,26 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 				Name:      "etc-cassandra",
 				MountPath: "/opt/hcd/resources/cassandra/conf",
 			})
+		} else if dc.Spec.ServerType == "dse" {
+			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+				Name:      "etc-cassandra",
+				MountPath: "/opt/dse/resources/cassandra/conf",
+			})
+			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+				Name:      "dse-conf",
+				MountPath: "/opt/dse/resources/dse/conf",
+			})
+
+			if !dc.UseClientImage() {
+				cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+					Name:      "spark-conf",
+					MountPath: "/opt/dse/resources/spark/conf",
+				})
+				cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+					Name:      "collectd-conf",
+					MountPath: "/opt/dse/resources/dse/collectd/etc/collectd",
+				})
+			}
 		} else {
 			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
 				Name:      "etc-cassandra",
@@ -811,10 +861,6 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	return nil
-}
-
-func readOnlyFs(dc *api.CassandraDatacenter) bool {
-	return dc.Spec.ReadOnlyRootFilesystem != nil && *dc.Spec.ReadOnlyRootFilesystem && dc.UseClientImage()
 }
 
 func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {

@@ -155,7 +155,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.1.5"
+          - "4.1.6"
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
@@ -198,7 +198,7 @@ jobs:
           - scale_up
           - scale_up_stop_resume
           - seed_selection
-          - smoke_test_read_only_fs
+          # - smoke_test_read_only_fs
           #- config_fql # OSS only
           - decommission_dc
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
@@ -233,25 +233,28 @@ jobs:
         version:
           - "3.11.17"
           - "4.0.13"
-          - "4.1.5"
+          - "4.1.6"
           - "6.8.50"
-          - "6.9.0"
+          - "6.9.2"
           - "1.0.0"
         integration_test:
           - test_all_the_things
+          - smoke_test_read_only_fs
         include:
           - version: 6.8.50
             serverImage: datastax/dse-mgmtapi-6_8:6.8.50-ubi8 # DSE 6.8.50
             serverType: dse
-            integration_test: "test_all_the_things"
-          - version: 6.9.0
-            serverImage: datastax/dse-mgmtapi-6_8:6.9.0-ubi8 # DSE 6.9.0
+          - version: 6.9.2
+            serverImage: datastax/dse-mgmtapi-6_8:6.9.2-ubi # DSE 6.9.2
             serverType: dse
-            integration_test: "test_all_the_things"
           - version: 1.0.0
             serverImage: datastax/hcd:1.0.0-ubi # HCD 1.0.0
             serverType: hcd
-            integration_test: "test_all_the_things"
+        exclude:
+          - version: 3.11.17
+            integration_test: "smoke_test_read_only_fs"
+          - version: 4.0.13
+            integration_test: "smoke_test_read_only_fs"
       fail-fast: true
     runs-on: ubuntu-latest
     env:
@@ -282,7 +285,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.1.5"
+          - "4.1.6"
         integration_test:
           - pvc_expansion
       fail-fast: true

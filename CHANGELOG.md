@@ -9,6 +9,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [FEATURE] [#701](https://github.com/k8ssandra/cass-operator/issues/701) Allow ReadOnlyRootFilesystem for DSE also with extra mounts to provide support for cass-config-builder setups
+
 ## v1.22.2
 
 * [BUGFIX] [#703](https://github.com/k8ssandra/cass-operator/issues/703) Fix HCD config path from /etc/cassandra to /opt/hcd/resources/cassandra/conf

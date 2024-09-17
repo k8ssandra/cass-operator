@@ -86,6 +86,8 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+BUILDX_OPTIONS ?=
+
 .PHONY: all
 all: build
 
@@ -160,7 +162,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	docker buildx build --build-arg VERSION=${VERSION} -t ${IMG} . --load
+	docker buildx build --build-arg VERSION=${VERSION} -t ${IMG} ${BUILDX_OPTIONS} . --load
 
 .PHONY: docker-kind
 docker-kind: docker-build ## Build docker image and load to kind cluster

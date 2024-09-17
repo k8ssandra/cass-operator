@@ -1970,8 +1970,38 @@ func TestReadOnlyRootFilesystemVolumeChanges(t *testing.T) {
 	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 	assert.NoError(err, "failed to build PodTemplateSpec")
 
+	initContainers := podTemplateSpec.Spec.InitContainers
+	assert.NotNil(initContainers, "No init containers were found")
+	assert.NoError(err, "Unexpected error encountered")
+
+	assert.Len(initContainers, 2, "Unexpected number of init containers returned")
+	assert.Equal(ServerBaseConfigContainerName, initContainers[0].Name)
+	assert.Equal(ServerConfigContainerName, initContainers[1].Name)
+
+	assert.True(reflect.DeepEqual(initContainers[0].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "server-config-base",
+				MountPath: "/cassandra-base-config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the base config container: %v", initContainers[0].VolumeMounts))
+
+	assert.Equal(initContainers[0].Args[1], "cp -rf /etc/cassandra/* /cassandra-base-config/")
+
+	assert.True(reflect.DeepEqual(initContainers[1].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "server-config",
+				MountPath: "/config",
+			},
+			{
+				Name:      "server-config-base",
+				MountPath: "/cassandra-base-config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the base config container: %v", initContainers[0].VolumeMounts))
+
 	containers := podTemplateSpec.Spec.Containers
-	assert.NotNil(containers, "Unexpected containers containers received")
+	assert.NotNil(containers, "No containers were found")
 	assert.NoError(err, "Unexpected error encountered")
 
 	assert.Len(containers, 2, "Unexpected number of containers containers returned")
@@ -2026,8 +2056,38 @@ func TestReadOnlyRootFilesystemVolumeChangesHCD(t *testing.T) {
 	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 	assert.NoError(err, "failed to build PodTemplateSpec")
 
+	initContainers := podTemplateSpec.Spec.InitContainers
+	assert.NotNil(initContainers, "No init containers were found")
+	assert.NoError(err, "Unexpected error encountered")
+
+	assert.Len(initContainers, 2, "Unexpected number of init containers returned")
+	assert.Equal(ServerBaseConfigContainerName, initContainers[0].Name)
+	assert.Equal(ServerConfigContainerName, initContainers[1].Name)
+
+	assert.True(reflect.DeepEqual(initContainers[0].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "server-config-base",
+				MountPath: "/cassandra-base-config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the base config container: %v", initContainers[0].VolumeMounts))
+
+	assert.Equal(initContainers[0].Args[1], "cp -rf /opt/hcd/resources/cassandra/conf/* /cassandra-base-config/")
+
+	assert.True(reflect.DeepEqual(initContainers[1].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "server-config",
+				MountPath: "/config",
+			},
+			{
+				Name:      "server-config-base",
+				MountPath: "/cassandra-base-config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the base config container: %v", initContainers[0].VolumeMounts))
+
 	containers := podTemplateSpec.Spec.Containers
-	assert.NotNil(containers, "Unexpected containers containers received")
+	assert.NotNil(containers, "No containers were found")
 	assert.NoError(err, "Unexpected error encountered")
 
 	assert.Len(containers, 2, "Unexpected number of containers containers returned")
@@ -2058,7 +2118,186 @@ func TestReadOnlyRootFilesystemVolumeChangesHCD(t *testing.T) {
 			},
 		}), fmt.Sprintf("Unexpected volume mounts for the cassandra container: %v", containers[0].VolumeMounts))
 
-	// TODO Verify MCAC is disabled since it will fail with ReadOnlyRootFilesystem
+	mcacDisabled := corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"}
+	assert.True(envVarsContains(containers[0].Env, mcacDisabled))
+}
+
+func TestReadOnlyRootFilesystemVolumeChangesDSE(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:            "bob",
+			ServerType:             "dse",
+			ServerVersion:          "6.9.2",
+			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			Racks: []api.Rack{
+				{
+					Name: "r1",
+				},
+			},
+		},
+	}
+
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
+	assert.NoError(err, "failed to build PodTemplateSpec")
+
+	initContainers := podTemplateSpec.Spec.InitContainers
+	assert.NotNil(initContainers, "No init containers were found")
+	assert.NoError(err, "Unexpected error encountered")
+
+	assert.Len(initContainers, 1, "Unexpected number of init containers returned")
+	assert.Equal(ServerConfigContainerName, initContainers[0].Name)
+
+	assert.True(reflect.DeepEqual(initContainers[0].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "server-config",
+				MountPath: "/config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the base config container: %v", initContainers[0].VolumeMounts))
+
+	containers := podTemplateSpec.Spec.Containers
+	assert.NotNil(containers, "No containers were found")
+	assert.NoError(err, "Unexpected error encountered")
+
+	assert.Len(containers, 2, "Unexpected number of containers containers returned")
+	assert.Equal("cassandra", containers[0].Name)
+	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+
+	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "tmp",
+				MountPath: "/tmp",
+			},
+			{
+				Name:      "etc-cassandra",
+				MountPath: "/opt/dse/resources/cassandra/conf",
+			},
+			{
+				Name:      "dse-conf",
+				MountPath: "/opt/dse/resources/dse/conf",
+			},
+			{
+				Name:      "spark-conf",
+				MountPath: "/opt/dse/resources/spark/conf",
+			},
+			{
+				Name:      "collectd-conf",
+				MountPath: "/opt/dse/resources/dse/collectd/etc/collectd",
+			},
+			{
+				Name:      "server-logs",
+				MountPath: "/var/log/cassandra",
+			},
+			{
+				Name:      "server-data",
+				MountPath: "/var/lib/cassandra",
+			},
+			{
+				Name:      "server-config",
+				MountPath: "/config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the cassandra container: %v", containers[0].VolumeMounts))
+
+	// Test that cassandra-base-config isn't here
+
+	mcacDisabled := corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"}
+	assert.True(envVarsContains(containers[0].Env, mcacDisabled))
+}
+
+func TestReadOnlyRootFilesystemVolumeChangesDSEWithClient(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				api.UseClientBuilderAnnotation: "true",
+			},
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:            "bob",
+			ServerType:             "dse",
+			ServerVersion:          "6.9.2",
+			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			Racks: []api.Rack{
+				{
+					Name: "r1",
+				},
+			},
+		},
+	}
+
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
+	assert.NoError(err, "failed to build PodTemplateSpec")
+
+	initContainers := podTemplateSpec.Spec.InitContainers
+	assert.NotNil(initContainers, "No init containers were found")
+	assert.NoError(err, "Unexpected error encountered")
+
+	assert.Len(initContainers, 2, "Unexpected number of init containers returned")
+	assert.Equal(ServerBaseConfigContainerName, initContainers[0].Name)
+	assert.Equal(ServerConfigContainerName, initContainers[1].Name)
+
+	assert.True(reflect.DeepEqual(initContainers[0].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "server-config-base",
+				MountPath: "/cassandra-base-config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the base config container: %v", initContainers[0].VolumeMounts))
+
+	assert.Equal(initContainers[0].Args[1], "cp -rf /opt/dse/resources/cassandra/conf/* /cassandra-base-config/")
+
+	assert.True(reflect.DeepEqual(initContainers[1].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "server-config",
+				MountPath: "/config",
+			},
+			{
+				Name:      "server-config-base",
+				MountPath: "/cassandra-base-config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the base config container: %v", initContainers[0].VolumeMounts))
+
+	containers := podTemplateSpec.Spec.Containers
+	assert.NotNil(containers, "No containers were found")
+	assert.NoError(err, "Unexpected error encountered")
+
+	assert.Len(containers, 2, "Unexpected number of containers containers returned")
+	assert.Equal("cassandra", containers[0].Name)
+	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+
+	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "tmp",
+				MountPath: "/tmp",
+			},
+			{
+				Name:      "etc-cassandra",
+				MountPath: "/opt/dse/resources/cassandra/conf",
+			},
+			{
+				Name:      "dse-conf",
+				MountPath: "/opt/dse/resources/dse/conf",
+			},
+			{
+				Name:      "server-logs",
+				MountPath: "/var/log/cassandra",
+			},
+			{
+				Name:      "server-data",
+				MountPath: "/var/lib/cassandra",
+			},
+			{
+				Name:      "server-config",
+				MountPath: "/config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the cassandra container: %v", containers[0].VolumeMounts))
+
+	// Test that cassandra-base-config isn't here
+
 	mcacDisabled := corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"}
 	assert.True(envVarsContains(containers[0].Env, mcacDisabled))
 }

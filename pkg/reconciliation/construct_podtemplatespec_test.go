@@ -2310,3 +2310,90 @@ func TestReadOnlyRootFilesystemVolumeChangesDSEWithClient(t *testing.T) {
 	mcacDisabled := corev1.EnvVar{Name: "MGMT_API_DISABLE_MCAC", Value: "true"}
 	assert.True(envVarsContains(containers[0].Env, mcacDisabled))
 }
+
+func TestReadOnlyRootFilesystemWithSecurityContext(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				api.UseClientBuilderAnnotation: "true",
+			},
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "bob",
+			ServerType:    "dse",
+			ServerVersion: "6.9.2",
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name: ServerBaseConfigContainerName,
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+							},
+						},
+						{
+							Name: ServerConfigContainerName,
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+							},
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name: CassandraContainerName,
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+							},
+						},
+						{
+							Name: SystemLoggerContainerName,
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+							},
+						},
+					},
+				},
+			},
+			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			Racks: []api.Rack{
+				{
+					Name: "r1",
+				},
+			},
+		},
+	}
+
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
+	assert.NoError(err, "failed to build PodTemplateSpec")
+
+	initContainers := podTemplateSpec.Spec.InitContainers
+	assert.Len(initContainers, 2, "Unexpected number of init containers returned")
+
+	containers := podTemplateSpec.Spec.Containers
+	assert.Len(containers, 2, "Unexpected number of containers returned")
+
+	// The cassandra container should get readOnlyRootFilesystem from the top-level field, but also retain the
+	// capabilities from the podTemplateSpec.
+	assert.Equal(CassandraContainerName, containers[0].Name)
+	assert.True(reflect.DeepEqual(containers[0].SecurityContext, &corev1.SecurityContext{
+		ReadOnlyRootFilesystem: ptr.To[bool](true),
+		Capabilities:           &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	}))
+
+	// Other containers should just get the podTemplateSpec contents.
+	assert.Equal(ServerBaseConfigContainerName, initContainers[0].Name)
+	assert.True(reflect.DeepEqual(initContainers[0].SecurityContext, &corev1.SecurityContext{
+		Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	}))
+
+	assert.Equal(ServerConfigContainerName, initContainers[1].Name)
+	assert.True(reflect.DeepEqual(initContainers[1].SecurityContext, &corev1.SecurityContext{
+		Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	}))
+
+	assert.Equal(SystemLoggerContainerName, containers[1].Name)
+	assert.True(reflect.DeepEqual(containers[1].SecurityContext, &corev1.SecurityContext{
+		Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	}))
+}

@@ -706,9 +706,10 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	if dc.ReadOnlyFs() {
-		cassContainer.SecurityContext = &corev1.SecurityContext{
-			ReadOnlyRootFilesystem: ptr.To[bool](true),
+		if cassContainer.SecurityContext == nil {
+			cassContainer.SecurityContext = &corev1.SecurityContext{}
 		}
+		cassContainer.SecurityContext.ReadOnlyRootFilesystem = ptr.To[bool](true)
 	}
 
 	// Combine env vars

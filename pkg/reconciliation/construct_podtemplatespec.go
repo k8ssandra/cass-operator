@@ -512,6 +512,29 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		}
 
 		configContainer.VolumeMounts = []corev1.VolumeMount{configBaseMount}
+	} else if !dc.UseClientImage() && dc.ReadOnlyFs() && dc.Spec.ServerType == "dse" {
+		// Similar to k8ssandra 1.x, use config-container if we use k8ssandra-client to build configs
+		if configContainerIndex < 0 {
+			configContainer = &corev1.Container{
+				Name: ServerBaseConfigContainerName,
+			}
+		}
+
+		if configContainer.Image == "" {
+			serverImage, err := makeImage(dc)
+			if err != nil {
+				return err
+			}
+
+			configContainer.Image = serverImage
+			if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
+				configContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
+			}
+
+			configContainer.Command = []string{"/bin/sh"}
+			configContainer.Args = []string{"-c", "cp -rf /opt/dse/resources/cassandra/conf/* /config/"}
+		}
+		configContainer.VolumeMounts = combineVolumeMountSlices(configMounts, configContainer.VolumeMounts)
 	}
 
 	serverCfg.VolumeMounts = combineVolumeMountSlices(configMounts, serverCfg.VolumeMounts)
@@ -556,31 +579,38 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 			baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *configContainer)
 		}
 	} else if !dc.UseClientImage() && configContainerIndex < 0 && dc.ReadOnlyFs() && dc.Spec.ServerType == "dse" {
-		// Workaround for cass-config-builder, copy missing files
-		configContainer = &corev1.Container{
-			Name: ServerBaseConfigContainerName,
-		}
-
-		if configContainer.Image == "" {
-			serverImage, err := makeImage(dc)
-			if err != nil {
-				return err
-			}
-
-			configContainer.Image = serverImage
-			if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
-				configContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
-			}
-
-			configContainer.Command = []string{"/bin/sh"}
-			configContainer.Args = []string{"-c", "cp -rf /opt/dse/resources/cassandra/conf/jvm-dependent.sh /config/"}
-
-			configContainer.VolumeMounts = combineVolumeMountSlices(configMounts, configContainer.VolumeMounts)
-		}
-		baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *serverCfg)
-		serverContainerIndex = len(baseTemplate.Spec.InitContainers) - 1
-		baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *configContainer)
+		// Workaround for cass-config-builder, copy missing files before cass-config-builder processes anything
+		baseTemplate.Spec.InitContainers = append([]corev1.Container{*configContainer}, baseTemplate.Spec.InitContainers...)
 	}
+	// } else if !dc.UseClientImage() && configContainerIndex < 0 && dc.ReadOnlyFs() && dc.Spec.ServerType == "dse" {
+	// 	// Workaround for cass-config-builder, copy missing files
+	// 	configContainer = &corev1.Container{
+	// 		Name: ServerBaseConfigContainerName,
+	// 	}
+
+	// 	if configContainer.Image == "" {
+	// 		serverImage, err := makeImage(dc)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+
+	// 		configContainer.Image = serverImage
+	// 		if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
+	// 			configContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
+	// 		}
+
+	// 		configContainer.Command = []string{"/bin/sh"}
+
+	// 		// TODO Or should we copy everything from cassandra/conf ? Same for dse/conf, since cass-config-builder does not understand immutable filesystem
+
+	// 		configContainer.Args = []string{"-c", "cp -rf /opt/dse/resources/cassandra/conf/jvm-dependent.sh /config/", "&&", "cp -rf /opt/dse/resources/cassandra/conf/jvm.options /config/"}
+
+	// 		configContainer.VolumeMounts = combineVolumeMountSlices(configMounts, configContainer.VolumeMounts)
+	// 	}
+	// 	baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *serverCfg)
+	// 	serverContainerIndex = len(baseTemplate.Spec.InitContainers) - 1
+	// 	baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *configContainer)
+	// }
 
 	if serverContainerIndex < 0 {
 		baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *serverCfg)

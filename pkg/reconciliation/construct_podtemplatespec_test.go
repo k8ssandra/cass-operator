@@ -2146,8 +2146,8 @@ func TestReadOnlyRootFilesystemVolumeChangesDSE(t *testing.T) {
 	assert.NoError(err, "Unexpected error encountered")
 
 	assert.Len(initContainers, 2, "Unexpected number of init containers returned")
-	assert.Equal(ServerConfigContainerName, initContainers[0].Name)
-	assert.Equal(ServerBaseConfigContainerName, initContainers[1].Name)
+	assert.Equal(ServerBaseConfigContainerName, initContainers[0].Name)
+	assert.Equal(ServerConfigContainerName, initContainers[1].Name)
 
 	assert.True(reflect.DeepEqual(initContainers[0].VolumeMounts,
 		[]corev1.VolumeMount{

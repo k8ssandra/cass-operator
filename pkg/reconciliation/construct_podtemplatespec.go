@@ -555,6 +555,31 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		} else {
 			baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *configContainer)
 		}
+	} else if !dc.UseClientImage() && configContainerIndex < 0 && dc.ReadOnlyFs() && dc.Spec.ServerType == "dse" {
+		// Workaround for cass-config-builder, copy missing files
+		configContainer = &corev1.Container{
+			Name: ServerBaseConfigContainerName,
+		}
+
+		if configContainer.Image == "" {
+			serverImage, err := makeImage(dc)
+			if err != nil {
+				return err
+			}
+
+			configContainer.Image = serverImage
+			if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
+				configContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
+			}
+
+			configContainer.Command = []string{"/bin/sh"}
+			configContainer.Args = []string{"-c", "cp -rf /opt/dse/resources/cassandra/conf/jvm-dependent.sh /config/"}
+
+			configContainer.VolumeMounts = combineVolumeMountSlices(configMounts, configContainer.VolumeMounts)
+		}
+		baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *serverCfg)
+		serverContainerIndex = len(baseTemplate.Spec.InitContainers) - 1
+		baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *configContainer)
 	}
 
 	if serverContainerIndex < 0 {

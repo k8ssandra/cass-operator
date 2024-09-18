@@ -2145,10 +2145,19 @@ func TestReadOnlyRootFilesystemVolumeChangesDSE(t *testing.T) {
 	assert.NotNil(initContainers, "No init containers were found")
 	assert.NoError(err, "Unexpected error encountered")
 
-	assert.Len(initContainers, 1, "Unexpected number of init containers returned")
+	assert.Len(initContainers, 2, "Unexpected number of init containers returned")
 	assert.Equal(ServerConfigContainerName, initContainers[0].Name)
+	assert.Equal(ServerBaseConfigContainerName, initContainers[1].Name)
 
 	assert.True(reflect.DeepEqual(initContainers[0].VolumeMounts,
+		[]corev1.VolumeMount{
+			{
+				Name:      "server-config",
+				MountPath: "/config",
+			},
+		}), fmt.Sprintf("Unexpected volume mounts for the base config container: %v", initContainers[0].VolumeMounts))
+
+	assert.True(reflect.DeepEqual(initContainers[1].VolumeMounts,
 		[]corev1.VolumeMount{
 			{
 				Name:      "server-config",

@@ -66,7 +66,7 @@ var _ = Describe(testName, func() {
 			k = kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterReadyWithTimeouts(dcName, 360, 360)
 			ns.ExpectDoneReconciling(dcName)
 
 			step = "deleting the dc"

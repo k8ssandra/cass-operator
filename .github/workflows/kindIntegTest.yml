@@ -95,6 +95,7 @@ jobs:
         with:
           integration_test: ${{ matrix.integration_test }}
       - name: Archive k8s logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: k8s-logs-smoke_test-${{ matrix.version }}

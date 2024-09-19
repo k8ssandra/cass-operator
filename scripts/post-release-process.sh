@@ -10,6 +10,19 @@ KUSTOMIZE=$(pwd)/bin/kustomize
 # Add new ## unreleased after the tagging (post-release-process.sh)
 gawk -i inplace  '/##/ && ++c==1 { print "## unreleased\n"; print; next }1' CHANGELOG.md
 
+CURRENT_BRANCH=$(git branch --show-current)
+
+if [ $CURRENT_BRANCH != "master" ]; then
+    # This is a release branch, we only bump the patch version
+    PATCH_RELEASE=true
+    scripts/update-makefile-version.sh
+    NEXT_VERSION=$(gawk 'match($0, /^VERSION \?= /) { print substr($0, RLENGTH+1)}' Makefile)
+    git add Makefile
+    git add CHANGELOG.md
+    git commit -m "Prepare for next version $NEXT_VERSION"
+    return
+fi
+
 # Modify Makefile for the next VERSION in line
 scripts/update-makefile-version.sh
 
@@ -26,8 +39,6 @@ yq eval -i '.defaults.cassandra.repository |= sub("cr.k8ssandra.io/", "")' confi
 # Remove cr.dstx.io prefixes
 yq eval -i '.images.config-builder |= sub("cr.dtsx.io/", "")' config/manager/image_config.yaml
 yq eval -i '.defaults.dse.repository |= sub("cr.dtsx.io/", "")' config/manager/image_config.yaml
-
-
 
 # Commit to git
 NEXT_VERSION=$(gawk 'match($0, /^VERSION \?= /) { print substr($0, RLENGTH+1)}' Makefile)

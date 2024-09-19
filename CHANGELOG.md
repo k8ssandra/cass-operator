@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.22.4
 
 * [BUGFIX] [#708](https://github.com/k8ssandra/cass-operator/issues/708) Preserve existing SecurityContext when ReadOnlyRootFilesystem is set
 

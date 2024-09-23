@@ -11,6 +11,7 @@ images:
   # dse:
   #   "6.8.999": "datastax/dse-server-prototype:latest"
 # imageRegistry: "localhost:5000"
+# imageNamespace: "internal"
 # imagePullPolicy: Always
 # imagePullSecret:
 #   name: my-secret-pull-registry

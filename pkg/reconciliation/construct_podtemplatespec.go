@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	configapi "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/cdc"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/images"
@@ -452,6 +453,10 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 					"config",
 					"build",
 				}
+				pullPolicy := images.GetImagePullPolicy(configapi.ClientImageComponent)
+				if pullPolicy != "" {
+					serverCfg.ImagePullPolicy = pullPolicy
+				}
 			}
 		} else {
 			// Use older config-builder
@@ -460,10 +465,10 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 			} else {
 				serverCfg.Image = images.GetConfigBuilderImage()
 			}
-		}
-
-		if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
-			serverCfg.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
+			pullPolicy := images.GetImagePullPolicy(configapi.ConfigBuilderImageComponent)
+			if pullPolicy != "" {
+				serverCfg.ImagePullPolicy = pullPolicy
+			}
 		}
 	}
 
@@ -674,8 +679,9 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 
 		cassContainer.Image = serverImage
-		if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
-			cassContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
+		pullPolicy := images.GetImagePullPolicy(dc.Spec.ServerType)
+		if pullPolicy != "" {
+			cassContainer.ImagePullPolicy = pullPolicy
 		}
 	}
 
@@ -858,8 +864,9 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		} else {
 			loggerContainer.Image = images.GetSystemLoggerImage()
 		}
-		if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
-			loggerContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
+		pullPolicy := images.GetImagePullPolicy(configapi.SystemLoggerImageComponent)
+		if pullPolicy != "" {
+			loggerContainer.ImagePullPolicy = pullPolicy
 		}
 	}
 
@@ -931,7 +938,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 
 	// Adds custom registry pull secret if needed
 
-	_ = images.AddDefaultRegistryImagePullSecrets(&baseTemplate.Spec)
+	images.AddDefaultRegistryImagePullSecrets(&baseTemplate.Spec)
 
 	// Labels
 

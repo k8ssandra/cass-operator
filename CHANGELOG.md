@@ -12,8 +12,14 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [FEATURE] [#651](https://github.com/k8ssandra/cass-operator/issues/651) Add tsreload task for DSE deployments and ability to check if sync operation is available on the mgmt-api side
-* [FEATURE] [#701](https://github.com/k8ssandra/cass-operator/issues/701) Allow ReadOnlyRootFilesystem for DSE also with extra mounts to provide support for cass-config-builder setups
+
+## v1.22.4
+
 * [BUGFIX] [#708](https://github.com/k8ssandra/cass-operator/issues/708) Preserve existing SecurityContext when ReadOnlyRootFilesystem is set
+
+## v1.22.3
+
+* [FEATURE] [#701](https://github.com/k8ssandra/cass-operator/issues/701) Allow ReadOnlyRootFilesystem for DSE also with extra mounts to provide support for cass-config-builder setups
 
 ## v1.22.2
 

@@ -44,7 +44,7 @@ type ImagePolicy struct {
 
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
-	ImageNamespace string `json:"imageNamespace,omitempty"`
+	ImageNamespace *string `json:"imageNamespace,omitempty"`
 }
 
 //+kubebuilder:object:root=true

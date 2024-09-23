@@ -78,43 +78,42 @@ func IsHCDVersionSupported(version string) bool {
 	return validVersions.MatchString(version)
 }
 
-func stripRegistry(image string) string {
+func splitRegistry(image string) (registry string, imageNoRegistry string) {
 	comps := strings.Split(image, "/")
 
 	if len(comps) > 1 && (strings.Contains(comps[0], ".") || strings.Contains(comps[0], ":")) {
-		return strings.Join(comps[1:], "/")
+		return comps[0], strings.Join(comps[1:], "/")
 	} else {
-		return image
+		return "", image
 	}
 }
 
-func applyNamespaceOverride(image string) string {
-	namespace := GetImageConfig().ImageNamespace
-
-	if namespace == "" {
-		return image
+// applyNamespaceOverride takes only input without registry
+func applyNamespaceOverride(imageNoRegistry string) string {
+	if GetImageConfig().ImageNamespace == nil {
+		return imageNoRegistry
 	}
 
-	// It can be first or second..
-	imageNoRegistry := stripRegistry(image)
+	namespace := *GetImageConfig().ImageNamespace
+
 	comps := strings.Split(imageNoRegistry, "/")
 	if len(comps) > 1 {
 		noNamespace := strings.Join(comps[1:], "/")
+		if namespace == "" {
+			return noNamespace
+		}
 		return fmt.Sprintf("%s/%s", namespace, noNamespace)
 	} else {
-		return image // We can't process this correctly, we only have 1 component
+		// We can't process this correctly, we only have 1 component. We do not support a case where the original image has no registry and no namespace.
+		return imageNoRegistry
 	}
 }
 
-func applyDefaultRegistryOverride(customRegistry, image string) string {
-	customRegistry = strings.TrimSuffix(customRegistry, "/")
-
+func applyDefaultRegistryOverride(customRegistry, imageNoRegistry string) string {
 	if customRegistry == "" {
-		return image
-	} else {
-		imageNoRegistry := stripRegistry(image)
-		return fmt.Sprintf("%s/%s", customRegistry, imageNoRegistry)
+		return imageNoRegistry
 	}
+	return fmt.Sprintf("%s/%s", customRegistry, imageNoRegistry)
 }
 
 func getRegistryOverride(imageType string) string {
@@ -136,9 +135,23 @@ func getRegistryOverride(imageType string) string {
 }
 
 func applyOverrides(imageType, image string) string {
-	registry := getRegistryOverride(imageType)
+	registryOverride := getRegistryOverride(imageType)
+	registryOverride = strings.TrimSuffix(registryOverride, "/")
+	registry, imageNoRegistry := splitRegistry(image)
 
-	return applyDefaultRegistryOverride(registry, image)
+	if registryOverride == "" && GetImageConfig().ImageNamespace == nil {
+		return image
+	}
+
+	if GetImageConfig().ImageNamespace != nil {
+		imageNoRegistry = applyNamespaceOverride(imageNoRegistry)
+	}
+
+	if registryOverride != "" {
+		return applyDefaultRegistryOverride(registryOverride, imageNoRegistry)
+	}
+
+	return applyDefaultRegistryOverride(registry, imageNoRegistry)
 }
 
 func GetImageConfig() *configv1beta1.ImageConfig {

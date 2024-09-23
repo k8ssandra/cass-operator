@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 )
@@ -203,7 +204,7 @@ func TestRepositoryAndNamespaceOverride(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal("ghcr.io/datastax/dse-mgmtapi-6_8:6.8.44", path)
 
-	imageConfig.ImageNamespace = "enterprise"
+	imageConfig.ImageNamespace = ptr.To[string]("enterprise")
 	path, err = GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
 	assert.Equal("ghcr.io/enterprise/dse-mgmtapi-6_8:6.8.44", path)
@@ -211,7 +212,7 @@ func TestRepositoryAndNamespaceOverride(t *testing.T) {
 	imageConfig = configv1beta1.ImageConfig{}
 	imageConfig.Images = &configv1beta1.Images{}
 	imageConfig.DefaultImages = &configv1beta1.DefaultImages{}
-	imageConfig.ImageNamespace = "enterprise"
+	imageConfig.ImageNamespace = ptr.To[string]("enterprise")
 	path, err = GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
 	assert.Equal("enterprise/dse-mgmtapi-6_8:6.8.44", path)
@@ -228,10 +229,16 @@ func TestRepositoryAndNamespaceOverride(t *testing.T) {
 	path, err = GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
 	assert.Equal("cr.dtsx.io/datastax/dse-mgmtapi-6_8:6.8.44", path)
-	imageConfig.ImageNamespace = "internal"
+
+	imageConfig.ImageNamespace = ptr.To[string]("internal")
 	path, err = GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
 	assert.Equal("cr.dtsx.io/internal/dse-mgmtapi-6_8:6.8.44", path)
+
+	imageConfig.ImageNamespace = ptr.To[string]("")
+	path, err = GetCassandraImage("dse", "6.8.44")
+	assert.NoError(err)
+	assert.Equal("cr.dtsx.io/dse-mgmtapi-6_8:6.8.44", path)
 }
 
 func TestImageConfigByteParsing(t *testing.T) {

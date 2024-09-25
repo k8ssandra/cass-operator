@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [FEATURE] [#583](https://github.com/k8ssandra/cass-operator/issues/583) If there are pods in failed state (CrashLoopBackOff, ImagePullBackOff or ErrImagePull), restartCount of a container/initContainer is more than zero with termination code >0 or we have a SchedulingFailed event, allow StatefulSet updates even if previous ones haven't been rolled yet. ForceUpgradeRacks will no longer remove itself from the CassandraDatacenter to prevent self modifying Spec. 
 * [FEATURE] [#651](https://github.com/k8ssandra/cass-operator/issues/651) Add tsreload task for DSE deployments and ability to check if sync operation is available on the mgmt-api side
 
 ## v1.22.4

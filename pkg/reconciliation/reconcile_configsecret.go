@@ -90,7 +90,7 @@ func (rc *ReconciliationContext) checkDatacenterNameAnnotation(secret *corev1.Se
 	}
 
 	patch := client.MergeFrom(secret.DeepCopy())
-	secret.Annotations[api.DatacenterAnnotation] = rc.Datacenter.Name
+	metav1.SetMetaDataAnnotation(&secret.ObjectMeta, api.DatacenterAnnotation, rc.Datacenter.Name)
 	return rc.Client.Patch(rc.Ctx, secret, patch)
 }
 

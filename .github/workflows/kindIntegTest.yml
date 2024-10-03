@@ -121,7 +121,7 @@ jobs:
         integration_test:
           - cdc_successful
         include:
-          - version: 6.8.49
+          - version: 6.8.51
             serverImage: datastax/dse-mgmtapi-6_8:6.8.51-ubi8 # DSE 6.8.51
             serverType: dse
             integration_test: "cdc_successful"

@@ -88,7 +88,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.13"
+          - "4.0.14"
         integration_test:
           - cdc_successful # OSS only
           - config_fql
@@ -117,12 +117,12 @@ jobs:
     strategy:
       matrix:
         version:
-          - "6.8.49"
+          - "6.8.51"
         integration_test:
           - cdc_successful
         include:
-          - version: 6.8.49
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.49-ubi8 # DSE 6.8.49
+          - version: 6.8.51
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.51-ubi8 # DSE 6.8.51
             serverType: dse
             integration_test: "cdc_successful"
       fail-fast: true
@@ -155,7 +155,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.1.6"
+          - "5.0.1"
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
@@ -231,18 +231,18 @@ jobs:
     strategy:
       matrix:
         version:
-          - "3.11.17"
-          - "4.0.13"
-          - "4.1.6"
-          - "6.8.50"
+          - "4.0.14"
+          - "4.1.7"
+          - "5.0.1"
+          - "6.8.51"
           - "6.9.2"
           - "1.0.0"
         integration_test:
           - test_all_the_things
           - smoke_test_read_only_fs
         include:
-          - version: 6.8.50
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.50-ubi8 # DSE 6.8.50
+          - version: 6.8.51
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.51-ubi8 # DSE 6.8.51
             serverType: dse
           - version: 6.9.2
             serverImage: datastax/dse-mgmtapi-6_8:6.9.2-ubi # DSE 6.9.2
@@ -251,8 +251,6 @@ jobs:
             serverImage: datastax/hcd:1.0.0-ubi # HCD 1.0.0
             serverType: hcd
         exclude:
-          - version: 3.11.17
-            integration_test: "smoke_test_read_only_fs"
           - version: 4.0.13
             integration_test: "smoke_test_read_only_fs"
       fail-fast: true
@@ -285,7 +283,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.1.6"
+          - "5.0.1"
         integration_test:
           - pvc_expansion
       fail-fast: true

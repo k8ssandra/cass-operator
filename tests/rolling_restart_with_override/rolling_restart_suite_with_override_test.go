@@ -20,14 +20,13 @@ import (
 )
 
 var (
-	testName       = "DC override Rolling Restart"
-	namespace      = "test-override-with-rolling-restart"
-	dcName         = "dc1"
-	dcNameOverride = "My_Super_Dc"
-	dcYaml         = "../testdata/default-two-rack-two-node-dc.yaml"
-	taskYaml       = "../testdata/tasks/rolling_restart_override.yaml"
-	dcResource     = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	ns             = ginkgo_util.NewWrapper(testName, namespace)
+	testName   = "DC override Rolling Restart"
+	namespace  = "test-override-with-rolling-restart"
+	dcName     = "dc1"
+	dcYaml     = "../testdata/default-two-rack-two-node-dc.yaml"
+	taskYaml   = "../testdata/tasks/rolling_restart_override.yaml"
+	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -86,7 +85,7 @@ var _ = Describe(testName, func() {
 			step = "get ready pods"
 			json = "jsonpath={.items[*].status.containerStatuses[0].ready}"
 			k = kubectl.Get("pods").
-				WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanLabelValue(dcNameOverride))).
+				WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanLabelValue(dcName))).
 				WithFlag("field-selector", "status.phase=Running").
 				FormatOutput(json)
 
@@ -105,7 +104,7 @@ var _ = Describe(testName, func() {
 			// Verify each pod does have the annotation..
 			json := `jsonpath={.items[0].metadata.annotations.control\.k8ssandra\.io/restartedAt}`
 			k = kubectl.Get("pods").
-				WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanLabelValue(dcNameOverride))).
+				WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanLabelValue(dcName))).
 				WithFlag("field-selector", "status.phase=Running").
 				FormatOutput(json)
 			ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, 360)

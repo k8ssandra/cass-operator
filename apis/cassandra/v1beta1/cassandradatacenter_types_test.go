@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/Jeffail/gabs/v2"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -189,4 +190,51 @@ func TestUseClientImageEnforce(t *testing.T) {
 
 		assert.True(dc.UseClientImage())
 	}
+}
+
+func TestDatacenterNoOverrideConfig(t *testing.T) {
+	assert := assert.New(t)
+	dc := CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: CassandraDatacenterSpec{
+			ClusterName: "cluster1",
+		},
+	}
+
+	config, err := dc.GetConfigAsJSON(dc.Spec.Config)
+	assert.NoError(err)
+
+	container, err := gabs.ParseJSON([]byte(config))
+	assert.NoError(err)
+
+	dataCenterInfo := container.ChildrenMap()["datacenter-info"]
+	assert.NotEmpty(dataCenterInfo)
+	assert.Equal(dc.Name, dataCenterInfo.ChildrenMap()["name"].Data().(string))
+	assert.Equal(dc.DatacenterName(), dc.Name)
+}
+
+func TestDatacenterOverrideInConfig(t *testing.T) {
+	assert := assert.New(t)
+	dc := CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: CassandraDatacenterSpec{
+			ClusterName:    "cluster1",
+			DatacenterName: "Home_Dc",
+		},
+	}
+
+	config, err := dc.GetConfigAsJSON(dc.Spec.Config)
+	assert.NoError(err)
+
+	container, err := gabs.ParseJSON([]byte(config))
+	assert.NoError(err)
+
+	dataCenterInfo := container.ChildrenMap()["datacenter-info"]
+	assert.NotEmpty(dataCenterInfo)
+	assert.Equal(dc.Spec.DatacenterName, dataCenterInfo.ChildrenMap()["name"].Data().(string))
+	assert.Equal(dc.DatacenterName(), dc.Spec.DatacenterName)
 }

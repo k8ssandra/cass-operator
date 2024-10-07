@@ -92,7 +92,7 @@ func CreateReconciliationContext(
 	}
 
 	rc.ReqLogger = rc.ReqLogger.
-		WithValues("datacenterName", dc.SanitizedName()).
+		WithValues("datacenterName", dc.LabelResourceName()).
 		WithValues("clusterName", dc.Spec.ClusterName)
 
 	log.IntoContext(ctx, rc.ReqLogger)
@@ -146,8 +146,8 @@ func (rc *ReconciliationContext) validateDatacenterNameConflicts() []error {
 		errs = append(errs, fmt.Errorf("failed to list CassandraDatacenters in namespace %s: %w", dc.Namespace, err))
 	} else {
 		for _, existingDc := range cassandraDatacenters.Items {
-			if existingDc.SanitizedName() == dc.SanitizedName() && existingDc.Name != dc.Name {
-				errs = append(errs, fmt.Errorf("datacenter name/override %s/%s is already in use by CassandraDatacenter %s/%s", dc.Name, dc.SanitizedName(), existingDc.Name, existingDc.SanitizedName()))
+			if existingDc.LabelResourceName() == dc.LabelResourceName() && existingDc.Name != dc.Name {
+				errs = append(errs, fmt.Errorf("datacenter name/override %s/%s is already in use by CassandraDatacenter %s/%s", dc.Name, dc.LabelResourceName(), existingDc.Name, existingDc.LabelResourceName()))
 			}
 		}
 	}
@@ -164,7 +164,7 @@ func (rc *ReconciliationContext) validateDatacenterNameOverride() []error {
 		return errs
 	} else {
 		if *dc.Status.DatacenterName != dc.Spec.DatacenterName {
-			errs = append(errs, fmt.Errorf("datacenter %s name override '%s' cannot be changed after creation to '%s'.", dc.Name, dc.Spec.DatacenterName, *dc.Status.DatacenterName))
+			errs = append(errs, fmt.Errorf("datacenter %s name override '%s' cannot be changed after creation to '%s'", dc.Name, dc.Spec.DatacenterName, *dc.Status.DatacenterName))
 		}
 	}
 

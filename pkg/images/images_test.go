@@ -94,7 +94,7 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 
 	path, err = GetCassandraImage("cassandra", "4.1.4")
 	assert.NoError(err)
-	assert.Equal("k8ssandra/cass-management-api:4.1.4-ubi8", path)
+	assert.Equal("k8ssandra/cass-management-api:4.1.4-ubi", path)
 }
 
 func TestImageConfigParsing(t *testing.T) {

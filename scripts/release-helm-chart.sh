@@ -6,7 +6,7 @@ if [[ ! $0 == scripts/* ]]; then
 fi
 
 # This script assumes k8ssandra is checked out at ../k8ssandra and is checked out at main
-if [ "$#" -le 1 ]; then
+if [ "$#" -lt 1 ]; then
     echo "Usage: scripts/release-helm-chart.sh version legacy"
     echo "Script assumes you are in the correct branch / tag and that k8ssandra repository"
     echo "has been checked out to ../k8ssandra/. If legacy is set, the script will generate"

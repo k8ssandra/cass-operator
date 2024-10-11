@@ -57,6 +57,8 @@ type Images struct {
 
 	DSEVersions map[string]string `json:"dse,omitempty"`
 
+	HCDVersions map[string]string `json:"hcd,omitempty"`
+
 	SystemLogger string `json:"system-logger,omitempty"`
 
 	Client string `json:"k8ssandra-client,omitempty"`

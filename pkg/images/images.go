@@ -173,6 +173,11 @@ func getCassandraContainerImageOverride(serverType, version string) (bool, strin
 				return true, value
 			}
 		}
+		if serverType == "hcd" {
+			if value, found := images.HCDVersions[version]; found {
+				return true, value
+			}
+		}
 	}
 	return false, ""
 }

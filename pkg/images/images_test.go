@@ -61,14 +61,28 @@ func TestCassandraOverride(t *testing.T) {
 	assert.NoError(err, "getting Cassandra image with overrides should succeed")
 	assert.Equal(fmt.Sprintf("ghcr.io/%s", customImageName), cassImage)
 
-	customImageWithOrg := "k8ssandra/cass-management-api:4.0.0"
+	customImageNamespace := "modified"
 	imageConfig.Images.CassandraVersions = map[string]string{
-		"4.0.0": fmt.Sprintf("us-docker.pkg.dev/%s", customImageWithOrg),
+		"4.0.0": fmt.Sprintf("us-docker.pkg.dev/%s/cass-management-api:4.0.0", customImageNamespace),
+	}
+	imageConfig.Images.DSEVersions = map[string]string{
+		"6.8.0": fmt.Sprintf("us-docker.pkg.dev/%s/dse-mgmtapi-6_8:6.8.0", customImageNamespace),
+	}
+	imageConfig.Images.HCDVersions = map[string]string{
+		"1.0.0": fmt.Sprintf("us-docker.pkg.dev/%s/hcd:1.0.0", customImageNamespace),
 	}
 
 	cassImage, err = GetCassandraImage("cassandra", "4.0.0")
 	assert.NoError(err, "getting Cassandra image with overrides should succeed")
-	assert.Equal(fmt.Sprintf("ghcr.io/%s", customImageWithOrg), cassImage)
+	assert.Equal("ghcr.io/modified/cass-management-api:4.0.0", cassImage)
+
+	cassImage, err = GetCassandraImage("dse", "6.8.0")
+	assert.NoError(err, "getting Cassandra image with overrides should succeed")
+	assert.Equal("ghcr.io/modified/dse-mgmtapi-6_8:6.8.0", cassImage)
+
+	cassImage, err = GetCassandraImage("hcd", "1.0.0")
+	assert.NoError(err, "getting Cassandra image with overrides should succeed")
+	assert.Equal("ghcr.io/modified/hcd:1.0.0", cassImage)
 }
 
 func TestDefaultImageConfigParsing(t *testing.T) {

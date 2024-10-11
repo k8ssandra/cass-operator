@@ -157,6 +157,13 @@ func (in *Images) DeepCopyInto(out *Images) {
 			(*out)[key] = val
 		}
 	}
+	if in.HCDVersions != nil {
+		in, out := &in.HCDVersions, &out.HCDVersions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Others != nil {
 		in, out := &in.Others, &out.Others
 		*out = make(map[string]string, len(*in))

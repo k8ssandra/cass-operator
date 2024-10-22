@@ -9,8 +9,9 @@ images:
   cassandra:
       "4.0.0": "k8ssandra/cassandra-ubi:latest"
   dse:
-    # How to detect between two different formats?
       "6.8.999": "datastax/dse-server-prototype:latest"
+  hcd:
+      "1.0.0": "datastax/hcd:latest"
   medusa: "k8ssandra/medusa:latest"
   reaper: "k8ssandra/reaper:latest"
 imageRegistry: "localhost:5000"

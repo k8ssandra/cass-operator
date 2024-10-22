@@ -84,6 +84,7 @@ func (i *Images) UnmarshalJSON(b []byte) error {
 
 	delete(otherFields, CassandraImageComponent)
 	delete(otherFields, DSEImageComponent)
+	delete(otherFields, HCDImageComponent)
 	delete(otherFields, SystemLoggerImageComponent)
 	delete(otherFields, ConfigBuilderImageComponent)
 	delete(otherFields, ClientImageComponent)

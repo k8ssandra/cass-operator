@@ -25,7 +25,7 @@ func (rc *ReconciliationContext) CheckFullQueryLogging() result.ReconcileResult 
 		rc.ReqLogger.Error(err, "error listing all pods in the cluster to progress full query logging reconciliation")
 		return result.RequeueSoon(2)
 	}
-	for _, podPtr := range PodPtrsFromPodList(podList) {
+	for _, podPtr := range podList {
 		features, err := rc.NodeMgmtClient.FeatureSet(podPtr)
 		if err != nil {
 			rc.ReqLogger.Error(err, "failed to verify featureset for FQL support")

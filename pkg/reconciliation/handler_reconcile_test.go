@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -26,7 +27,7 @@ import (
 
 func TestReconcile(t *testing.T) {
 	var (
-		name            = "cluster-example-cluster"
+		name            = "dc1-example"
 		namespace       = "default"
 		size      int32 = 2
 	)
@@ -74,6 +75,7 @@ func TestReconcile(t *testing.T) {
 		Client:   fakeClient,
 		Scheme:   s,
 		Recorder: record.NewFakeRecorder(100),
+		Log:      ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
 	}
 
 	request := reconcile.Request{
@@ -88,8 +90,8 @@ func TestReconcile(t *testing.T) {
 		t.Fatalf("Reconciliation Failure: (%v)", err)
 	}
 
-	if result != (reconcile.Result{Requeue: true, RequeueAfter: 2 * time.Second}) {
-		t.Error("Reconcile did not return a correct result.")
+	if result != (reconcile.Result{Requeue: true, RequeueAfter: 10 * time.Second}) {
+		t.Errorf("Reconcile did not return a correct result. (%v)", result)
 	}
 }
 

@@ -6,7 +6,6 @@ package ginkgo_util
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -424,16 +425,6 @@ func (ns *NsWrapper) Log(step string) {
 	ginkgo.By(step)
 }
 
-func (ns *NsWrapper) getDcNameWithOverride(dcName string) string {
-	json := "jsonpath={.spec.datacenterName}"
-	k := kubectl.Get("CassandraDatacenter", dcName).FormatOutput(json)
-	dcNameOverride := ns.OutputPanic(k)
-	if dcNameOverride == "" {
-		return dcName
-	}
-	return dcNameOverride
-}
-
 func (ns *NsWrapper) WaitForDatacenterReadyWithTimeouts(dcName string, podCountTimeout int, dcReadyTimeout int) {
 	json := "jsonpath={.spec.size}"
 	k := kubectl.Get("CassandraDatacenter", dcName).FormatOutput(json)
@@ -441,7 +432,7 @@ func (ns *NsWrapper) WaitForDatacenterReadyWithTimeouts(dcName string, podCountT
 	size, err := strconv.Atoi(sizeString)
 	Expect(err).ToNot(HaveOccurred())
 
-	ns.WaitForDatacenterReadyPodCountWithTimeout(ns.getDcNameWithOverride(dcName), size, podCountTimeout)
+	ns.WaitForDatacenterReadyPodCountWithTimeout(dcName, size, podCountTimeout)
 	ns.WaitForDatacenterOperatorProgress(dcName, "Ready", dcReadyTimeout)
 }
 

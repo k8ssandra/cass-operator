@@ -155,8 +155,9 @@ var _ = Describe("CassandraDatacenter tests", func() {
 				refreshDatacenter(ctx, &dc)
 
 				By("Updating the size to 3")
+				patch := client.MergeFrom(dc.DeepCopy())
 				dc.Spec.Size = 3
-				Expect(k8sClient.Update(ctx, &dc)).To(Succeed())
+				Expect(k8sClient.Patch(ctx, &dc, patch)).To(Succeed())
 
 				waitForDatacenterCondition(ctx, dcName, cassdcapi.DatacenterScalingUp, corev1.ConditionTrue).Should(Succeed())
 				waitForDatacenterProgress(ctx, dcName, cassdcapi.ProgressUpdating).Should(Succeed())

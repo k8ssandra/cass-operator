@@ -202,7 +202,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, errors.Wrapf(err, "unable to fetch target CassandraDatacenter: %s", cassTask.Spec.Datacenter)
 	}
 
-	logger = log.FromContext(ctx, "datacenterName", dc.SanitizedName(), "clusterName", dc.Spec.ClusterName)
+	logger = log.FromContext(ctx, "datacenterName", dc.LabelResourceName(), "clusterName", dc.Spec.ClusterName)
 	log.IntoContext(ctx, logger)
 
 	// If we're active, we can proceed - otherwise verify if we're allowed to run

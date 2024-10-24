@@ -50,13 +50,12 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 	}
 
 	if _, found := rc.Datacenter.Annotations[api.DecommissionOnDeleteAnnotation]; found {
-		podList, err := rc.listPods(rc.Datacenter.GetDatacenterLabels())
+		dcPods, err := rc.listPods(rc.Datacenter.GetDatacenterLabels())
 		if err != nil {
 			rc.ReqLogger.Error(err, "Failed to list pods, unable to proceed with deletion")
 			return result.Error(err)
 		}
-		dcPods := PodPtrsFromPodList(podList)
-		if len(podList.Items) > 0 {
+		if len(dcPods) > 0 {
 			rc.ReqLogger.V(1).Info("Deletion is being processed by the decommission check")
 			dcs, err := rc.getClusterDatacenters(dcPods)
 			if err != nil {

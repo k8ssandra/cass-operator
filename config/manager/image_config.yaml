@@ -18,7 +18,7 @@ defaults:
   # Note, postfix is ignored if repository is not set
   cassandra:
     repository: "k8ssandra/cass-management-api"
-    suffix: "-ubi8"
+    suffix: "-ubi"
   dse:
     repository: "datastax/dse-mgmtapi-6_8"
     suffix: "-ubi8"

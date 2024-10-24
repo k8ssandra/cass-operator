@@ -220,7 +220,11 @@ func TestConflictingDcNameOverride(t *testing.T) {
 				Spec: api.CassandraDatacenterSpec{
 					ClusterName:    "cluster1",
 					DatacenterName: "CassandraDatacenter_example",
-				}}}
+				},
+				Status: api.CassandraDatacenterStatus{
+					DatacenterName: ptr.To[string]("CassandraDatacenter_example"),
+				},
+			}}
 		})
 
 	errs := rc.validateDatacenterNameConflicts()

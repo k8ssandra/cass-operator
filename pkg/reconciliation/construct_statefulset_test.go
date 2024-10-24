@@ -641,7 +641,7 @@ func Test_newStatefulSetForCassandraDatacenter_dcNameOverride(t *testing.T) {
 		oplabels.NameLabel:      oplabels.NameLabelValue,
 		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
-		api.DatacenterLabel:     "MySuperDC",
+		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
 		api.RackLabel:           dc.Spec.Racks[0].Name,
 	}
@@ -652,7 +652,7 @@ func Test_newStatefulSetForCassandraDatacenter_dcNameOverride(t *testing.T) {
 		oplabels.NameLabel:      oplabels.NameLabelValue,
 		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
 		oplabels.VersionLabel:   "4.0.1",
-		api.DatacenterLabel:     "MySuperDC",
+		api.DatacenterLabel:     "dc1",
 		api.ClusterLabel:        "piclem",
 		api.RackLabel:           dc.Spec.Racks[0].Name,
 		api.CassNodeState:       stateReadyToStart,

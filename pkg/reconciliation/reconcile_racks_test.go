@@ -1631,6 +1631,49 @@ func TestCleanupAfterScaling(t *testing.T) {
 	r := rc.cleanupAfterScaling()
 	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
 	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
+	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
+}
+
+func TestCleanupAfterScalingWithTracker(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	assert := assert.New(t)
+
+	// Setup annotation
+
+	mockClient := mocks.NewClient(t)
+	rc.Client = mockClient
+
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation, "true")
+
+	var task *taskapi.CassandraTask
+	// 1. Create task - return ok
+	k8sMockClientCreate(rc.Client.(*mocks.Client), nil).
+		Run(func(args mock.Arguments) {
+			arg := args.Get(1).(*taskapi.CassandraTask)
+			task = arg
+		}).
+		Times(1)
+
+	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
+
+	r := rc.cleanupAfterScaling()
+	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
+	assert.Equal(result.RequeueSoon(10), r, "expected result of result.RequeueSoon(10)")
+	assert.Equal(1, len(rc.Datacenter.Status.TrackedTasks))
+	// 3. GET - return completed task
+	k8sMockClientGet(rc.Client.(*mocks.Client), nil).
+		Run(func(args mock.Arguments) {
+			arg := args.Get(2).(*taskapi.CassandraTask)
+			task.DeepCopyInto(arg)
+			timeNow := metav1.Now()
+			arg.Status.CompletionTime = &timeNow
+		}).Once()
+	// 4. Patch to datacenter status
+	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
+	r = rc.cleanupAfterScaling()
+	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
+	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
 }
 
 func TestStripPassword(t *testing.T) {
@@ -2873,4 +2916,39 @@ func TestDatacenterPodsOldLabels(t *testing.T) {
 
 	// We should still find the pods
 	assert.Equal(int(*desiredStatefulSet.Spec.Replicas), len(rc.datacenterPods()))
+}
+
+func TestCheckRackLabels(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+	err := rc.CalculateRackInformation()
+	require.NoError(err)
+
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
+		"default",
+		rc.Datacenter,
+		3)
+	require.NoErrorf(err, "error occurred creating statefulset")
+
+	desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
+
+	trackObjects := []runtime.Object{
+		desiredStatefulSet,
+		rc.Datacenter,
+	}
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+
+	rc.statefulSets = []*appsv1.StatefulSet{desiredStatefulSet}
+
+	res := rc.CheckRackLabels()
+	require.Equal(result.Continue(), res, "Label updates should not cause errors")
+	require.Subset(desiredStatefulSet.Labels, rc.Datacenter.GetRackLabels("default"))
+	desiredStatefulSet.Labels[api.RackLabel] = "r1"
+	require.NotSubset(desiredStatefulSet.Labels, rc.Datacenter.GetRackLabels("default"))
+
+	res = rc.CheckRackLabels()
+	require.Equal(result.Continue(), res, "Label updates should not cause errors")
+	require.Subset(desiredStatefulSet.Labels, rc.Datacenter.GetRackLabels("default"))
 }

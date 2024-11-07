@@ -10,6 +10,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -71,11 +72,17 @@ func WillTheyFit(ctx context.Context, cli client.Client, proposedPods []*corev1.
 		return err
 	}
 
+	tainttolerationPlugin, err := tainttoleration.New(ctx, nil, nil)
+	if err != nil {
+		return err
+	}
+
 	plugins := []framework.FilterPlugin{
 		schedulablePlugin.(framework.FilterPlugin),
 		noderesourcesPlugin.(framework.FilterPlugin),
 		nodeaffinityPlugin.(framework.FilterPlugin),
 		interpodaffinityPlugin.(framework.FilterPlugin),
+		tainttolerationPlugin.(framework.FilterPlugin),
 	}
 
 NextPod:
@@ -95,14 +102,9 @@ NextPod:
 
 			node.AddPod(pod)
 			continue NextPod
-			// Now we need a way to check if the pod was never added to any node
-			// TODO Need more checks like affinities, inter-pod affinities, taints, tolerations
 		}
 		// Pod was never added to any node
 		return errors.New(framework.Unschedulable.String())
 	}
-
-	// Check node condition, will it accept something
-	// Need tolerations, taints, affinities..
 	return nil
 }

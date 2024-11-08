@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+
+	// "k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
@@ -57,20 +59,20 @@ func WillTheyFit(ctx context.Context, cli client.Client, proposedPods []*corev1.
 		return err
 	}
 
-	noderesourcesPlugin, err := noderesources.NewFit(ctx, nil, nil, plfeature.Features{})
+	noderesourcesPlugin, err := noderesources.NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
 	if err != nil {
 		return err
 	}
 
-	nodeaffinityPlugin, err := nodeaffinity.New(ctx, nil, nil)
+	nodeaffinityPlugin, err := nodeaffinity.New(ctx, &config.NodeAffinityArgs{}, nil)
 	if err != nil {
 		return err
 	}
 
-	interpodaffinityPlugin, err := interpodaffinity.New(ctx, nil, nil)
-	if err != nil {
-		return err
-	}
+	// interpodaffinityPlugin, err := interpodaffinity.New(ctx, &config.InterPodAffinityArgs{}, snapshot)
+	// if err != nil {
+	// 	return err
+	// }
 
 	tainttolerationPlugin, err := tainttoleration.New(ctx, nil, nil)
 	if err != nil {
@@ -78,15 +80,16 @@ func WillTheyFit(ctx context.Context, cli client.Client, proposedPods []*corev1.
 	}
 
 	plugins := []framework.FilterPlugin{
-		schedulablePlugin.(framework.FilterPlugin),
 		noderesourcesPlugin.(framework.FilterPlugin),
+		schedulablePlugin.(framework.FilterPlugin),
 		nodeaffinityPlugin.(framework.FilterPlugin),
-		interpodaffinityPlugin.(framework.FilterPlugin),
+		// interpodaffinityPlugin.(framework.FilterPlugin),
 		tainttolerationPlugin.(framework.FilterPlugin),
 	}
 
 NextPod:
 	for _, pod := range proposedPods {
+	NextNode:
 		for _, node := range usableNodes {
 			podInfo, err := framework.NewPodInfo(pod)
 			if err != nil {
@@ -94,9 +97,12 @@ NextPod:
 			}
 
 			for _, plugin := range plugins {
+				if prefilterPlugin, ok := plugin.(framework.PreFilterPlugin); ok {
+					prefilterPlugin.PreFilter(ctx, state, podInfo.Pod)
+				}
 				status := plugin.Filter(ctx, state, podInfo.Pod, node)
-				if status.Code() == framework.Unschedulable {
-					continue
+				if status.Code() != framework.Success {
+					continue NextNode
 				}
 			}
 
@@ -107,4 +113,12 @@ NextPod:
 		return errors.New(framework.Unschedulable.String())
 	}
 	return nil
+}
+
+var defaultScoringStrategy = &config.ScoringStrategy{
+	Type: config.LeastAllocated,
+	Resources: []config.ResourceSpec{
+		{Name: "cpu", Weight: 1},
+		{Name: "memory", Weight: 1},
+	},
 }

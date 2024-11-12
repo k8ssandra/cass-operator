@@ -457,10 +457,54 @@ func TestListRoles(t *testing.T) {
 	require.NoError(err)
 	require.Equal(3, len(roles))
 
-	mgmtClient := newMockMgmtClient(newMockHttpClient(newHttpResponse(payload, http.StatusOK), nil))
+	mockHttpClient := mocks.NewHttpClient(t)
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodGet
+			})).
+		Return(newHttpResponse(payload, http.StatusOK), nil).
+		Once()
+
+	mgmtClient := newMockMgmtClient(mockHttpClient)
 	roles, err = mgmtClient.CallListRolesEndpoint(goodPod)
 	require.NoError(err)
 	require.Equal(3, len(roles))
+}
+
+func TestCreateRole(t *testing.T) {
+	require := require.New(t)
+	mockHttpClient := mocks.NewHttpClient(t)
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodPost && req.URL.Query().Get("username") == "role1" && req.URL.Query().Get("password") == "password1" && req.URL.Query().Get("is_superuser") == "true"
+			})).
+		Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).
+		Once()
+
+	mgmtClient := newMockMgmtClient(mockHttpClient)
+	err := mgmtClient.CallCreateRoleEndpoint(goodPod, "role1", "password1", true)
+	require.NoError(err)
+	require.True(mockHttpClient.AssertExpectations(t))
+}
+
+func TestDropRole(t *testing.T) {
+	require := require.New(t)
+	mockHttpClient := mocks.NewHttpClient(t)
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodDelete
+			})).
+		Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).
+		Once()
+
+	mgmtClient := newMockMgmtClient(mockHttpClient)
+	err := mgmtClient.CallDropRoleEndpoint(goodPod, "role1")
+
+	require.NoError(err)
+	require.True(mockHttpClient.AssertExpectations(t))
 }
 
 func newMockMgmtClient(httpClient *mocks.HttpClient) *NodeMgmtClient {

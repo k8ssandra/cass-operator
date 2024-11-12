@@ -291,12 +291,16 @@ func (client *NodeMgmtClient) CallSchemaVersionsEndpoint(pod *corev1.Pod) (map[s
 	return result, nil
 }
 
-// Create a new superuser with the given username and password
+// CallCreateRoleEndpoint creates a new user with the given username and password
 func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username string, password string, superuser bool) error {
 	client.Log.Info(
 		"calling Management API create role - POST /api/v0/ops/auth/role",
 		"pod", pod.Name,
 	)
+
+	if username == "" || password == "" {
+		return errors.New("username and password cannot be empty")
+	}
 
 	postData := url.Values{}
 	postData.Set("username", username)
@@ -324,12 +328,16 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 	return nil
 }
 
-// Create a new superuser with the given username and password
+// CallDropRoleEndpoint drops an existing role from the cluster
 func (client *NodeMgmtClient) CallDropRoleEndpoint(pod *corev1.Pod, username string) error {
 	client.Log.Info(
 		"calling Management API drop role - DELETE /api/v0/ops/auth/role",
 		"pod", pod.Name,
 	)
+
+	if username == "" {
+		return errors.New("username cannot be empty")
+	}
 
 	postData := url.Values{}
 	postData.Set("username", username)
@@ -368,7 +376,7 @@ func parseListRoles(body []byte) ([]User, error) {
 	return users, nil
 }
 
-// Create a new superuser with the given username and password
+// CallListRolesEndpoint lists existing roles in the cluster
 func (client *NodeMgmtClient) CallListRolesEndpoint(pod *corev1.Pod) ([]User, error) {
 	client.Log.Info(
 		"calling Management API list roles - GET /api/v0/ops/auth/role",

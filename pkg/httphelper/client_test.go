@@ -14,6 +14,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 
@@ -229,7 +230,7 @@ func TestNodeMgmtClient_GetKeyspaceReplication(t *testing.T) {
 			"success",
 			goodPod,
 			"ks1",
-			newMockHttpClient(newHttpResponse(successBody, http.StatusOK), nil),
+			newMockHttpClient(newHttpResponseMarshalled(successBody, http.StatusOK), nil),
 			successBody,
 			nil,
 		},
@@ -261,7 +262,7 @@ func TestNodeMgmtClient_GetKeyspaceReplication(t *testing.T) {
 			"keyspace not found",
 			goodPod,
 			"ks1",
-			newMockHttpClient(newHttpResponse("Keyspace 'ks1' does not exist", http.StatusNotFound), nil),
+			newMockHttpClient(newHttpResponseMarshalled("Keyspace 'ks1' does not exist", http.StatusNotFound), nil),
 			nil,
 			&RequestError{
 				StatusCode: http.StatusNotFound,
@@ -292,7 +293,7 @@ func TestNodeMgmtClient_ListTables(t *testing.T) {
 			"success",
 			goodPod,
 			"ks1",
-			newMockHttpClient(newHttpResponse([]string{"table1", "table2"}, http.StatusOK), nil),
+			newMockHttpClient(newHttpResponseMarshalled([]string{"table1", "table2"}, http.StatusOK), nil),
 			[]string{"table1", "table2"},
 			nil,
 		},
@@ -324,7 +325,7 @@ func TestNodeMgmtClient_ListTables(t *testing.T) {
 			"keyspace not found",
 			goodPod,
 			"ks1",
-			newMockHttpClient(newHttpResponse([]string{}, http.StatusOK), nil),
+			newMockHttpClient(newHttpResponseMarshalled([]string{}, http.StatusOK), nil),
 			[]string{},
 			nil,
 		},
@@ -361,7 +362,7 @@ func TestNodeMgmtClient_CreateTable(t *testing.T) {
 			"success",
 			goodPod,
 			goodTable,
-			newMockHttpClient(newHttpResponse("OK", http.StatusOK), nil),
+			newMockHttpClient(newHttpResponseMarshalled("OK", http.StatusOK), nil),
 			nil,
 		},
 		{
@@ -423,7 +424,7 @@ func TestNodeMgmtClient_CreateTable(t *testing.T) {
 				"table1",
 				NewPartitionKeyColumn("", "int", 0),
 			),
-			newMockHttpClient(newHttpResponse("Table creation failed: 'columns[0].name' must not be empty", http.StatusBadRequest), nil),
+			newMockHttpClient(newHttpResponseMarshalled("Table creation failed: 'columns[0].name' must not be empty", http.StatusBadRequest), nil),
 			&RequestError{
 				StatusCode: http.StatusBadRequest,
 				Err:        errors.New("incorrect status code of 400 when calling endpoint"),
@@ -433,7 +434,7 @@ func TestNodeMgmtClient_CreateTable(t *testing.T) {
 			"keyspace not found",
 			goodPod,
 			goodTable,
-			newMockHttpClient(newHttpResponse("keyspace does not exist", http.StatusInternalServerError), nil),
+			newMockHttpClient(newHttpResponseMarshalled("keyspace does not exist", http.StatusInternalServerError), nil),
 			&RequestError{
 				StatusCode: http.StatusInternalServerError,
 				Err:        errors.New("incorrect status code of 500 when calling endpoint"),
@@ -447,6 +448,63 @@ func TestNodeMgmtClient_CreateTable(t *testing.T) {
 			assert.Equal(t, tt.err, err)
 		})
 	}
+}
+
+func TestListRoles(t *testing.T) {
+	require := require.New(t)
+	payload := []byte(`[{"datacenters":"ALL","login":"false","name":"try","options":"{}","super":"false"},{"datacenters":"ALL","login":"true","name":"cluster2-superuser","options":"{}","super":"true"},{"datacenters":"ALL","login":"false","name":"cassandra","options":"{}","super":"false"}]`)
+	roles, err := parseListRoles(payload)
+	require.NoError(err)
+	require.Equal(3, len(roles))
+
+	mockHttpClient := mocks.NewHttpClient(t)
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodGet
+			})).
+		Return(newHttpResponse(payload, http.StatusOK), nil).
+		Once()
+
+	mgmtClient := newMockMgmtClient(mockHttpClient)
+	roles, err = mgmtClient.CallListRolesEndpoint(goodPod)
+	require.NoError(err)
+	require.Equal(3, len(roles))
+}
+
+func TestCreateRole(t *testing.T) {
+	require := require.New(t)
+	mockHttpClient := mocks.NewHttpClient(t)
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodPost && req.URL.Query().Get("username") == "role1" && req.URL.Query().Get("password") == "password1" && req.URL.Query().Get("is_superuser") == "true"
+			})).
+		Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).
+		Once()
+
+	mgmtClient := newMockMgmtClient(mockHttpClient)
+	err := mgmtClient.CallCreateRoleEndpoint(goodPod, "role1", "password1", true)
+	require.NoError(err)
+	require.True(mockHttpClient.AssertExpectations(t))
+}
+
+func TestDropRole(t *testing.T) {
+	require := require.New(t)
+	mockHttpClient := mocks.NewHttpClient(t)
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodDelete
+			})).
+		Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).
+		Once()
+
+	mgmtClient := newMockMgmtClient(mockHttpClient)
+	err := mgmtClient.CallDropRoleEndpoint(goodPod, "role1")
+
+	require.NoError(err)
+	require.True(mockHttpClient.AssertExpectations(t))
 }
 
 func newMockMgmtClient(httpClient *mocks.HttpClient) *NodeMgmtClient {
@@ -463,7 +521,17 @@ func newMockHttpClient(response *http.Response, err error) *mocks.HttpClient {
 	return httpClient
 }
 
-func newHttpResponse(responseBody interface{}, status int) *http.Response {
+func newHttpResponse(responseBody []byte, status int) *http.Response {
+	body := io.NopCloser(bytes.NewReader(responseBody))
+	bodyLength := int64(len(responseBody))
+	return &http.Response{
+		StatusCode:    status,
+		Body:          body,
+		ContentLength: bodyLength,
+	}
+}
+
+func newHttpResponseMarshalled(responseBody interface{}, status int) *http.Response {
 	marshalled, _ := json.Marshal(responseBody)
 	body := io.NopCloser(bytes.NewReader(marshalled))
 	bodyLength := int64(len(marshalled))

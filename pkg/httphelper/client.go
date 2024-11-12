@@ -291,12 +291,16 @@ func (client *NodeMgmtClient) CallSchemaVersionsEndpoint(pod *corev1.Pod) (map[s
 	return result, nil
 }
 
-// Create a new superuser with the given username and password
+// CallCreateRoleEndpoint creates a new user with the given username and password
 func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username string, password string, superuser bool) error {
 	client.Log.Info(
 		"calling Management API create role - POST /api/v0/ops/auth/role",
 		"pod", pod.Name,
 	)
+
+	if username == "" || password == "" {
+		return errors.New("username and password cannot be empty")
+	}
 
 	postData := url.Values{}
 	postData.Set("username", username)
@@ -322,6 +326,82 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 		return errors.New(strippedErrMsg)
 	}
 	return nil
+}
+
+// CallDropRoleEndpoint drops an existing role from the cluster
+func (client *NodeMgmtClient) CallDropRoleEndpoint(pod *corev1.Pod, username string) error {
+	client.Log.Info(
+		"calling Management API drop role - DELETE /api/v0/ops/auth/role",
+		"pod", pod.Name,
+	)
+
+	if username == "" {
+		return errors.New("username cannot be empty")
+	}
+
+	postData := url.Values{}
+	postData.Set("username", username)
+
+	podHost, podPort, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: fmt.Sprintf("/api/v0/ops/auth/role?%s", postData.Encode()),
+		host:     podHost,
+		port:     podPort,
+		method:   http.MethodDelete,
+		timeout:  60 * time.Second,
+	}
+
+	_, err = callNodeMgmtEndpoint(client, request, "")
+	return err
+}
+
+type User struct {
+	Name        string `json:"name"`
+	Super       string `json:"super"`
+	Login       string `json:"login"`
+	Options     string `json:"options"`
+	Datacenters string `json:"datacenters"`
+}
+
+func parseListRoles(body []byte) ([]User, error) {
+	var users []User
+	if err := json.Unmarshal(body, &users); err != nil {
+		fmt.Printf("Received an error: %v\n", err)
+		return nil, err
+	}
+	return users, nil
+}
+
+// CallListRolesEndpoint lists existing roles in the cluster
+func (client *NodeMgmtClient) CallListRolesEndpoint(pod *corev1.Pod) ([]User, error) {
+	client.Log.Info(
+		"calling Management API list roles - GET /api/v0/ops/auth/role",
+		"pod", pod.Name,
+	)
+
+	podHost, podPort, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/ops/auth/role",
+		host:     podHost,
+		port:     podPort,
+		method:   http.MethodGet,
+		timeout:  60 * time.Second,
+	}
+
+	content, err := callNodeMgmtEndpoint(client, request, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return parseListRoles(content)
 }
 
 func (client *NodeMgmtClient) CallProbeClusterEndpoint(pod *corev1.Pod, consistencyLevel string, rfPerDc int) error {

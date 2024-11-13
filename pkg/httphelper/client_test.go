@@ -5,10 +5,13 @@ package httphelper
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -555,4 +558,45 @@ var badPod = &corev1.Pod{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "pod1",
 	},
+}
+
+func TestCustomTransport(t *testing.T) {
+	require := require.New(t)
+
+	called := false
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v0/ops/auth/role" {
+			w.WriteHeader(http.StatusOK)
+			called = true
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer testServer.Close()
+
+	testServerAddr := testServer.Listener.Addr().String()
+
+	customTransport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return net.Dial(network, testServerAddr)
+		},
+	}
+
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "test-cluster",
+		},
+	}
+
+	mockClient := mocks.NewClient(t)
+
+	mgmtClient, err := NewMgmtClient(context.TODO(), mockClient, dc, customTransport)
+	mgmtClient.Log = logr.Discard()
+	require.NoError(err)
+
+	// This should call http://1.2.3.4:8080/api/v0/ops/auth/role, but the custom transport will override the address
+	err = mgmtClient.CallCreateRoleEndpoint(goodPod, "role1", "password1", true)
+	require.NoError(err)
+	require.True(called)
+
 }

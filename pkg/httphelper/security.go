@@ -41,12 +41,12 @@ func GetManagementApiProtocol(dc *api.CassandraDatacenter) (string, error) {
 	return provider.GetProtocol(), nil
 }
 
-func BuildManagementApiHttpClient(dc *api.CassandraDatacenter, client client.Client, ctx context.Context) (HttpClient, error) {
+func BuildManagementApiHttpClient(ctx context.Context, client client.Client, dc *api.CassandraDatacenter, customTransport *http.Transport) (HttpClient, error) {
 	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
-	return provider.BuildHttpClient(client, ctx)
+	return provider.BuildHttpClient(ctx, client, customTransport)
 }
 
 func AddManagementApiServerSecurity(dc *api.CassandraDatacenter, pod *corev1.PodTemplateSpec) error {
@@ -91,17 +91,17 @@ func ValidateManagementApiConfig(dc *api.CassandraDatacenter, client client.Clie
 		return []error{err}
 	}
 
-	return provider.ValidateConfig(client, ctx)
+	return provider.ValidateConfig(ctx, client)
 }
 
 // SPI for adding new mechanisms for securing the management API
 type ManagementApiSecurityProvider interface {
-	BuildHttpClient(client client.Client, ctx context.Context) (HttpClient, error)
+	BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error)
 	BuildMgmtApiGetAction(endpoint string, timeout int) *corev1.ExecAction
 	BuildMgmtApiPostAction(endpoint string, timeout int) *corev1.ExecAction
 	AddServerSecurity(pod *corev1.PodTemplateSpec) error
 	GetProtocol() string
-	ValidateConfig(client client.Client, ctx context.Context) []error
+	ValidateConfig(ctx context.Context, client client.Client) []error
 }
 
 type InsecureManagementApiSecurityProvider struct {
@@ -119,15 +119,21 @@ func (provider *InsecureManagementApiSecurityProvider) GetProtocol() string {
 	return "http"
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildHttpClient(client client.Client, ctx context.Context) (HttpClient, error) {
-	return http.DefaultClient, nil
+func (provider *InsecureManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error) {
+	c := http.DefaultClient
+
+	if transport != nil {
+		c.Transport = transport
+	}
+
+	return c, nil
 }
 
 func (provider *InsecureManagementApiSecurityProvider) AddServerSecurity(pod *corev1.PodTemplateSpec) error {
 	return nil
 }
 
-func (provider *InsecureManagementApiSecurityProvider) ValidateConfig(client client.Client, ctx context.Context) []error {
+func (provider *InsecureManagementApiSecurityProvider) ValidateConfig(ctx context.Context, client client.Client) []error {
 	return []error{}
 }
 
@@ -634,7 +640,7 @@ func validateSecret(secret *corev1.Secret) []error {
 	return validationErrors
 }
 
-func (provider *ManualManagementApiSecurityProvider) ValidateConfig(client client.Client, ctx context.Context) []error {
+func (provider *ManualManagementApiSecurityProvider) ValidateConfig(ctx context.Context, client client.Client) []error {
 	var validationErrors []error
 
 	if provider.Config.SkipSecretValidation {
@@ -715,7 +721,12 @@ func (provider *ManualManagementApiSecurityProvider) ValidateConfig(client clien
 	return validationErrors
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(client client.Client, ctx context.Context) (HttpClient, error) {
+func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error) {
+	httpClient := &http.Client{Transport: transport}
+	if transport.TLSClientConfig != nil {
+		return httpClient, nil
+	}
+
 	// Get the client Secret
 	secretNamespacedName := types.NamespacedName{
 		Name:      provider.Config.ClientSecretName,
@@ -762,8 +773,14 @@ func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(client clie
 		InsecureSkipVerify:    true,
 		VerifyPeerCertificate: buildVerifyPeerCertificateNoHostCheck(caCertPool),
 	}
-	transport := &http.Transport{TLSClientConfig: tlsConfig}
-	httpClient := &http.Client{Transport: transport}
+
+	if transport != nil && transport.TLSClientConfig == nil {
+		transport.TLSClientConfig = tlsConfig
+	} else if transport == nil {
+		transport = &http.Transport{TLSClientConfig: tlsConfig}
+	}
+
+	httpClient.Transport = transport
 
 	return httpClient, nil
 }

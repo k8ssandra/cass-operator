@@ -98,7 +98,7 @@ func CreateReconciliationContext(
 	log.IntoContext(ctx, rc.ReqLogger)
 
 	var err error
-	rc.NodeMgmtClient, err = httphelper.NewMgmtClient(rc.Ctx, cli, dc)
+	rc.NodeMgmtClient, err = httphelper.NewMgmtClient(rc.Ctx, cli, dc, nil)
 	if err != nil {
 		rc.ReqLogger.Error(err, "failed to build NodeMgmtClient")
 		return nil, err

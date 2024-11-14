@@ -112,7 +112,7 @@ func Test_validatePrivateKey(t *testing.T) {
 // BuildManagementApiHttpClient method
 func TestBuildMTLSClient(t *testing.T) {
 	require := require.New(t)
-	api.AddToScheme(scheme.Scheme)
+	require.NoError(api.AddToScheme(scheme.Scheme))
 	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
 
 	loadYaml := func(path string) (runtime.Object, error) {

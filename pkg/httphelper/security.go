@@ -723,7 +723,7 @@ func (provider *ManualManagementApiSecurityProvider) ValidateConfig(ctx context.
 
 func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error) {
 	httpClient := &http.Client{Transport: transport}
-	if transport.TLSClientConfig != nil {
+	if transport != nil && transport.TLSClientConfig != nil {
 		return httpClient, nil
 	}
 

@@ -6,7 +6,7 @@ spec:
   clusterName: cluster1
   datacenterName: My_Super_Dc
   serverType: cassandra
-  serverVersion: "4.0.10"
+  serverVersion: "4.1.7"
   managementApiAuth:
     insecure: {}
   size: 2

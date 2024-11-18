@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Create a PodDisruptionBudget object for the Datacenter
+// newPodDisruptionBudgetForDatacenter creates a PodDisruptionBudget object for the Datacenter
 func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(int(dc.Spec.Size - 1))
 	labels := dc.GetDatacenterLabels()
@@ -31,7 +31,7 @@ func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        dc.LabelResourceName() + "-pdb",
+			Name:        dc.Name + "-pdb",
 			Namespace:   dc.Namespace,
 			Labels:      labels,
 			Annotations: anns,

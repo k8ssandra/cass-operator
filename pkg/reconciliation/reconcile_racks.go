@@ -672,6 +672,10 @@ func (rc *ReconciliationContext) checkSeedLabels() (int, error) {
 	return seedCount, nil
 }
 
+func shouldUseFastPath(dc *api.CassandraDatacenter, seedCount int) bool {
+	return seedCount > 0 && !(metav1.HasAnnotation(dc.ObjectMeta, api.AllowParallelStartsAnnotations) && dc.Annotations[api.AllowParallelStartsAnnotations] == "false")
+}
+
 // CheckPodsReady loops over all the server pods and starts them
 func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMetadataEndpoints) result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckPodsReady")
@@ -719,7 +723,7 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	}
 
 	// step 0 - fastpath
-	if seedCount > 0 && metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.AllowParallelStartsAnnotations) && rc.Datacenter.Annotations[api.AllowParallelStartsAnnotations] == "true" {
+	if shouldUseFastPath(rc.Datacenter, seedCount) {
 		notReadyPods, err := rc.startBootstrappedNodes(endpointData)
 		if err != nil {
 			return result.Error(err)

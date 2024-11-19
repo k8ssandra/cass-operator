@@ -355,7 +355,7 @@ JobDefinition:
 			if err := r.replacePreProcess(taskConfig); err != nil {
 				return ctrl.Result{}, err
 			}
-			nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc)
+			nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc, nil)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -634,7 +634,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 		return dcPods[i].Name < dcPods[j].Name
 	})
 
-	nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc)
+	nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc, nil)
 	if err != nil {
 		return ctrl.Result{}, 0, 0, "", err
 	}

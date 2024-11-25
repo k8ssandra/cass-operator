@@ -210,19 +210,16 @@ func TestReconcileRacks_ReconcilePods(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	var (
-		one = int32(1)
-	)
-
+	rc.Datacenter.Spec.Size = 1
 	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		1)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
-	desiredStatefulSet.Spec.Replicas = &one
-	desiredStatefulSet.Status.ReadyReplicas = one
+	desiredStatefulSet.Spec.Replicas = ptr.To[int32](1)
+	desiredStatefulSet.Status.ReadyReplicas = 1
 
 	trackObjects := []runtime.Object{
 		desiredStatefulSet,
@@ -238,8 +235,8 @@ func TestReconcileRacks_ReconcilePods(t *testing.T) {
 	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
-	nextRack.RackName = "default"
-	nextRack.NodeCount = 1
+	nextRack.RackName = desiredStatefulSet.Labels[api.RackLabel]
+	nextRack.NodeCount = int(*desiredStatefulSet.Spec.Replicas)
 	nextRack.SeedCount = 1
 
 	rackInfo := []*RackInformation{nextRack}
@@ -1175,9 +1172,12 @@ func mockReadyPodsForStatefulSet(sts *appsv1.StatefulSet, cluster, dc string) []
 		pod.Labels[api.ClusterLabel] = cluster
 		pod.Labels[api.DatacenterLabel] = dc
 		pod.Labels[api.CassNodeState] = "Started"
+		pod.Labels[api.RackLabel] = sts.Labels[api.RackLabel]
 		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+			Name:  "cassandra",
 			Ready: true,
 		}}
+		pod.Status.PodIP = fmt.Sprintf("192.168.1.%d", i)
 		pods = append(pods, pod)
 	}
 	return pods
@@ -2951,4 +2951,100 @@ func TestCheckRackLabels(t *testing.T) {
 	res = rc.CheckRackLabels()
 	require.Equal(result.Continue(), res, "Label updates should not cause errors")
 	require.Subset(desiredStatefulSet.Labels, rc.Datacenter.GetRackLabels("default"))
+}
+
+func TestCheckPodsReadyAllStarted(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	assert := assert.New(t)
+
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
+		"default",
+		rc.Datacenter,
+		3)
+	assert.NoErrorf(err, "error occurred creating statefulset")
+
+	desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
+
+	trackObjects := []runtime.Object{
+		desiredStatefulSet,
+		rc.Datacenter,
+	}
+
+	mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
+	for idx := range mockPods {
+		mp := mockPods[idx]
+		metav1.SetMetaDataLabel(&mp.ObjectMeta, api.SeedNodeLabel, "true")
+		trackObjects = append(trackObjects, mp)
+	}
+
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+
+	nextRack := &RackInformation{}
+	nextRack.RackName = desiredStatefulSet.Labels[api.RackLabel]
+	nextRack.NodeCount = int(*desiredStatefulSet.Spec.Replicas)
+	nextRack.SeedCount = 1
+
+	rackInfo := []*RackInformation{nextRack}
+
+	rc.desiredRackInformation = rackInfo
+	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
+	rc.statefulSets[0] = desiredStatefulSet
+
+	rc.clusterPods = mockPods
+	rc.dcPods = mockPods
+
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{},
+	}
+
+	for i := 0; i < int(*desiredStatefulSet.Spec.Replicas); i++ {
+		ep := httphelper.EndpointState{
+			RpcAddress: fmt.Sprintf("192.168.1.%d", i+1),
+			Status:     "UN",
+		}
+		epData.Entity = append(epData.Entity, ep)
+	}
+
+	res := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("OK")),
+	}
+
+	mockHttpClient := mocks.NewHttpClient(t)
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req != nil
+			})).
+		Return(res, nil).
+		Times(len(epData.Entity) * 2) // reloadSeeds * pods + clusterHealthCheck * pods
+
+	client := httphelper.NodeMgmtClient{
+		Client:   mockHttpClient,
+		Log:      rc.ReqLogger,
+		Protocol: "http",
+	}
+
+	rc.NodeMgmtClient = client
+
+	recRes := rc.CheckPodsReady(epData)
+	assert.Equal(result.Continue(), recRes) // All pods should be up, no need to call anything
+}
+
+func TestShouldUseFastPath(t *testing.T) {
+	dc := &api.CassandraDatacenter{}
+
+	seedCount := 0
+
+	assert := assert.New(t)
+	assert.False(shouldUseFastPath(dc, seedCount))
+	seedCount = 1
+	assert.True(shouldUseFastPath(dc, seedCount))
+
+	metav1.SetMetaDataAnnotation(&dc.ObjectMeta, api.AllowParallelStartsAnnotations, "true")
+	assert.True(shouldUseFastPath(dc, seedCount))
+	metav1.SetMetaDataAnnotation(&dc.ObjectMeta, api.AllowParallelStartsAnnotations, "false")
+	assert.False(shouldUseFastPath(dc, seedCount))
 }

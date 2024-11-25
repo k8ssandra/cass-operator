@@ -1,0 +1,48 @@
+apiVersion: config.k8ssandra.io/v1beta1
+kind: ImageConfig
+metadata:
+  name: image-config
+images:
+  system-logger: "k8ssandra/system-logger:latest"
+  config-builder: "datastax/cass-config-builder:1.0-ubi8"
+  k8ssandra-client: "k8ssandra/k8ssandra-client:v0.2.2"
+  cassandra:
+      "4.0.0": "k8ssandra/cassandra-ubi:latest"
+  dse:
+      "6.8.999": "datastax/dse-server-prototype:latest"
+  hcd:
+      "1.0.0": "datastax/hcd:latest"
+  medusa: "k8ssandra/medusa:latest"
+  reaper: "k8ssandra/reaper:latest"
+imageRegistry: "localhost:5000"
+imagePullPolicy: Always
+imagePullSecret:
+  name: my-secret-pull-registry
+imageNamespace: "enterprise"
+defaults:
+  # Note, suffix is ignored if repository is not set
+  cassandra:
+    repository: "k8ssandra/cass-management-api"
+    imageRegistry: "localhost:5001"
+    imagePullPolicy: IfNotPresent
+    imagePullSecret:
+      name: my-secret-pull-registry-cassandra
+  dse:
+    repository: "datastax/dse-server"
+    imageRegistry: "localhost:5002"
+    imagePullPolicy: IfNotPresent
+    imagePullSecret:
+      name: my-secret-pull-registry-dse
+    suffix: "-ubi7"
+  config-builder:
+    imageRegistry: "localhost:5003"
+    imagePullPolicy: IfNotPresent
+    imagePullSecret:
+      name: my-secret-pull-registry-builder
+  system-logger: 
+    imageRegistry: "localhost:5004"
+    imagePullPolicy: Always
+    imagePullSecret:
+      name: my-secret-pull-registry-logger
+  medusa:
+    imageRegistry: "localhost:5005"

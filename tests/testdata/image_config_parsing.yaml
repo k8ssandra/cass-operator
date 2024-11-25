@@ -4,8 +4,8 @@ metadata:
   name: image-config
 images:
   system-logger: "k8ssandra/system-logger:latest"
-  config-builder: "datastax/cass-config-builder:1.0-ubi7"
-  k8ssandra-client: "k8ssandra/k8ssandra-client:v0.2.1"
+  config-builder: "datastax/cass-config-builder:1.0-ubi8"
+  k8ssandra-client: "k8ssandra/k8ssandra-client:v0.2.2"
   cassandra:
     "4.0.0": "k8ssandra/cassandra-ubi:latest"
   dse:
@@ -17,8 +17,8 @@ imagePullSecret:
 defaults:
   # Note, postfix is ignored if repository is not set
   cassandra:
-    repository: "k8ssandra/cass-management-api"
+    repository: "cr.k8ssandra.io/k8ssandra/cass-management-api"
     suffix: "-ubi"
   dse:
-    repository: "datastax/dse-mgmtapi-6_8"
+    repository: "cr.dtsx.io/datastax/dse-mgmtapi-6_8"
     suffix: "-ubi8"

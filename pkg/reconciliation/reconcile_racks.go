@@ -1502,7 +1502,7 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 	currentStatefulSet := &appsv1.StatefulSet{}
 	err := rc.Client.Get(
 		rc.Ctx,
-		newNamespacedNameForStatefulSet(rc.Datacenter, nextRack.RackName),
+		NewNamespacedNameForStatefulSet(rc.Datacenter, nextRack.RackName),
 		currentStatefulSet)
 
 	if err == nil {

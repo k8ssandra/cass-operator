@@ -2740,7 +2740,7 @@ func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
 
 	// Get the current StS
 	sts := &appsv1.StatefulSet{}
-	nsName := newNamespacedNameForStatefulSet(rc.Datacenter, "default")
+	nsName := NewNamespacedNameForStatefulSet(rc.Datacenter, "default")
 	require.NoError(rc.Client.Get(rc.Ctx, nsName, sts))
 	require.Equal(resource.MustParse("1Gi"), sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage])
 

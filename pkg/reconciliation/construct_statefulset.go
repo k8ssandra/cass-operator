@@ -22,7 +22,7 @@ import (
 
 const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
 
-func newNamespacedNameForStatefulSet(
+func NewNamespacedNameForStatefulSet(
 	dc *api.CassandraDatacenter,
 	rackName string) types.NamespacedName {
 
@@ -115,7 +115,7 @@ func newStatefulSetForCassandraDatacenter(
 		}
 	}
 
-	nsName := newNamespacedNameForStatefulSet(dc, rackName)
+	nsName := NewNamespacedNameForStatefulSet(dc, rackName)
 
 	template, err := buildPodTemplateSpec(dc, rack, legacyInternodeMount(dc, sts))
 	if err != nil {

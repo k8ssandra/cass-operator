@@ -607,7 +607,7 @@ func TestValidSubdomainNames(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		typedName := newNamespacedNameForStatefulSet(dc, tt.name)
+		typedName := NewNamespacedNameForStatefulSet(dc, tt.name)
 		assert.Equal(tt.expected, typedName.Name)
 	}
 }

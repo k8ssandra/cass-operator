@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.23.0
 
 * [CHANGE] [#720](https://github.com/k8ssandra/cass-operator/issues/720) Always use ObjectMeta.Name for the PodDisruptionBudget resource name, not the DatacenterName
 * [CHANGE] [#731](https://github.com/k8ssandra/cass-operator/issues/731) Make the concurrent restart of already bootstrapped nodes the default. If user wishes to revert to older behavior, set annotation ``cassandra.datastax.com/allow-parallel-starts: "false"`` to datacenter.

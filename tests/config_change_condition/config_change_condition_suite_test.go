@@ -18,12 +18,13 @@ import (
 )
 
 var (
-	testName   = "Config change condition"
-	namespace  = "test-config-change-condition"
-	dcName     = "dc2"
-	dcYaml     = "../testdata/default-single-rack-2-node-dc.yaml"
-	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	ns         = ginkgo_util.NewWrapper(testName, namespace)
+	testName    = "Config change condition with failure"
+	namespace   = "test-config-change-condition"
+	dcName      = "dc1"
+	clusterName = "cluster1"
+	dcYaml      = "../testdata/default-three-rack-three-node-dc-zones.yaml"
+	dcResource  = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	ns          = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -55,22 +56,33 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForOperatorReady()
 
-			step := "creating a datacenter resource with 1 racks/2 nodes"
+			step := "creating a datacenter resource with 3 racks/3 nodes using unavailable zones"
 			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
 			Expect(err).ToNot(HaveOccurred())
 
 			k := kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 
-			ns.WaitForDatacenterReady(dcName)
+			// Wait for status to be Unschedulable
+			step = "waiting the nodes to be unschedulable"
+			json := `jsonpath={.status.conditions[?(@.type=="PodScheduled")].status}`
+			k = kubectl.Get(fmt.Sprintf("pod/%s-%s-r1-sts-0", clusterName, dcName)).
+				FormatOutput(json)
+			ns.WaitForOutputContains(k, "False", 30)
 
-			step = "change the config"
-			json := ginkgo_util.CreateTestJson("{\"spec\": {\"config\": {\"cassandra-yaml\": {\"roles_validity\": \"256000ms\"}, \"jvm-server-options\": {\"garbage_collector\": \"CMS\"}}}}")
+			json = `jsonpath={.status.conditions[?(@.type=="PodScheduled")].reason}`
+			k = kubectl.Get(fmt.Sprintf("pod/%s-%s-r1-sts-0", clusterName, dcName)).
+				FormatOutput(json)
+			ns.WaitForOutputContainsAndLog(step, k, "Unschedulable", 30)
+
+			step = "change the config by removing zones"
+			json = `{"spec": { "racks": [{"name": "r1"}, {"name": "r2"}, {"name": "r3"}]}}`
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionFalse))
+			ns.WaitForDatacenterReady(dcName)
 			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1800)
 		})
 	})

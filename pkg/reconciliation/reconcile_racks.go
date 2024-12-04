@@ -174,7 +174,7 @@ func (rc *ReconciliationContext) failureModeDetection() bool {
 			continue
 		}
 		if pod.Status.Phase == corev1.PodPending {
-			if hasBeenXMinutes(5, pod.Status.StartTime.Time) {
+			if pod.Status.StartTime == nil || hasBeenXMinutes(5, pod.Status.StartTime.Time) {
 				// Pod has been over 5 minutes in Pending state. This can be normal, but lets see
 				// if we have some detected failures events like FailedScheduling
 				events := &corev1.EventList{}

@@ -183,7 +183,7 @@ jobs:
           - webhook_validation
           # Three worker tests:
           # - canary_upgrade # See kind_40_tests job
-          # - config_change_condition # config_change takes care of the same testing
+          - config_change_condition
           # - cdc_successful # CDC is OSS only , see kind_311_tests and kind_40_tests jobs
           # - delete_node_lost_readiness # DSE specific behavior see kind_dse_tests job
           - host_network

@@ -168,7 +168,7 @@ jobs:
           - webhook_validation
           # Three worker tests:
           - canary_upgrade
-          # - config_change_condition # config_change takes care of testing the same
+          - config_change_condition
           #- cdc_successful # OSS only
           # - delete_node_lost_readiness # DSE specific behavior
           - host_network

@@ -234,13 +234,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	mgr.GetCache().IndexField(ctx, &corev1.Event{}, "involvedObject.name", func(obj client.Object) []string {
+	if err := mgr.GetCache().IndexField(ctx, &corev1.Event{}, "involvedObject.name", func(obj client.Object) []string {
 		event := obj.(*corev1.Event)
 		if event.InvolvedObject.Kind == "Pod" {
 			return []string{event.InvolvedObject.Name}
 		}
 		return []string{}
-	})
+	}); err != nil {
+		setupLog.Error(err, "unable to set up event index")
+		os.Exit(1)
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {

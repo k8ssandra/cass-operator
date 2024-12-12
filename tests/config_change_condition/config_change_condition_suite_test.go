@@ -68,7 +68,7 @@ var _ = Describe(testName, func() {
 			json := `jsonpath={.status.conditions[?(@.type=="PodScheduled")].status}`
 			k = kubectl.Get(fmt.Sprintf("pod/%s-%s-r1-sts-0", clusterName, dcName)).
 				FormatOutput(json)
-			ns.WaitForOutputContains(k, "False", 30)
+			Expect(ns.WaitForOutputContains(k, "False", 30)).ToNot(HaveOccurred())
 
 			json = `jsonpath={.status.conditions[?(@.type=="PodScheduled")].reason}`
 			k = kubectl.Get(fmt.Sprintf("pod/%s-%s-r1-sts-0", clusterName, dcName)).

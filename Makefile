@@ -242,12 +242,12 @@ OPM ?= $(LOCALBIN)/opm
 
 ## Tool Versions
 CERT_MANAGER_VERSION ?= v1.14.7
-KUSTOMIZE_VERSION ?= v5.4.2
+KUSTOMIZE_VERSION ?= v5.5.0
 CONTROLLER_TOOLS_VERSION ?= v0.15.0
 OPERATOR_SDK_VERSION ?= 1.35.0
 HELM_VERSION ?= 3.14.2
 OPM_VERSION ?= 1.38.0
-GOLINT_VERSION ?= 1.60.3
+GOLINT_VERSION ?= 1.62.2
 
 .PHONY: cert-manager
 cert-manager: ## Install cert-manager to the cluster

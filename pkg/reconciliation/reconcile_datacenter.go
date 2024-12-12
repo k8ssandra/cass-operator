@@ -13,6 +13,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -125,6 +126,14 @@ func (rc *ReconciliationContext) deletePVCs() error {
 		"numPVCs", len(persistentVolumeClaimList))
 
 	for _, pvc := range persistentVolumeClaimList {
+
+		if isBeingUsed, err := rc.isBeingUsed(pvc); err != nil {
+			logger.Error(err, "Failed to check if PVC is being used")
+			return err
+		} else if isBeingUsed {
+			return fmt.Errorf("PersistentVolumeClaim %s is still being used by a pod", pvc.Name)
+		}
+
 		if err := rc.Client.Delete(rc.Ctx, &pvc); err != nil {
 			logger.Error(err, "Failed to delete PVCs for cassandraDatacenter")
 			return err
@@ -136,6 +145,19 @@ func (rc *ReconciliationContext) deletePVCs() error {
 	}
 
 	return nil
+}
+
+func (rc *ReconciliationContext) isBeingUsed(pvc corev1.PersistentVolumeClaim) (bool, error) {
+	rc.ReqLogger.Info("reconciler::isBeingUsed")
+
+	pods := &corev1.PodList{}
+
+	if err := rc.Client.List(rc.Ctx, pods, &client.ListOptions{Namespace: pvc.Namespace, FieldSelector: fields.SelectorFromSet(fields.Set{"spec.volumes.persistentVolumeClaim.claimName": pvc.Name})}); err != nil {
+		rc.ReqLogger.Error(err, "error getting pods for pvc", "pvc", pvc.Name)
+		return false, err
+	}
+
+	return len(pods.Items) > 0, nil
 }
 
 func (rc *ReconciliationContext) listPVCs(selector map[string]string) ([]corev1.PersistentVolumeClaim, error) {

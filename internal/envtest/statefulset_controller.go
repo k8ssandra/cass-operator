@@ -80,7 +80,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// TODO Get existing pods and modify them .
 
 	podList := &corev1.PodList{}
-	if err := r.Client.List(ctx, podList, client.MatchingLabels(sts.Spec.Template.Labels), client.InNamespace(req.Namespace)); err != nil {
+	if err := r.Client.List(ctx, podList, client.MatchingLabels(sts.Labels), client.InNamespace(req.Namespace)); err != nil {
 		logger.Error(err, "Failed to list the pods belonging to this StatefulSet")
 		return ctrl.Result{}, err
 	}
@@ -94,7 +94,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	if len(stsPods) > intendedReplicas {
 		// We need to delete the pods..
-		for i := len(stsPods) - 1; i > intendedReplicas; i-- {
+		for i := len(stsPods) - 1; i >= intendedReplicas; i-- {
 			pod := stsPods[i]
 			if err := r.Client.Delete(ctx, pod); err != nil {
 				logger.Error(err, "Failed to delete extra pod from this StS")

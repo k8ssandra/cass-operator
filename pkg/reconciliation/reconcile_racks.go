@@ -587,6 +587,7 @@ func (rc *ReconciliationContext) CheckRackLabels() result.ReconcileResult {
 
 func (rc *ReconciliationContext) CheckRackStoppedState() result.ReconcileResult {
 	logger := rc.ReqLogger
+	logger.Info("reconcile_racks::CheckRackStoppedState")
 
 	emittedStoppingEvent := false
 	racksUpdated := false

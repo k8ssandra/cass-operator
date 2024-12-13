@@ -207,7 +207,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.volumes.persistentVolumeClaim.claimName", func(obj client.Object) []string {
+	if err := mgr.GetCache().IndexField(ctx, &corev1.Pod{}, "spec.volumes.persistentVolumeClaim.claimName", func(obj client.Object) []string {
 		pod, ok := obj.(*corev1.Pod)
 		if !ok {
 			return nil

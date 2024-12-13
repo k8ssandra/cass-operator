@@ -77,6 +77,30 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 			// How could we have pods if we've decommissioned everything?
 			return result.RequeueSoon(5)
 		}
+	} else {
+		// This is small mini reconcile to make everything 0 sized before we finish deletion, but do not run decommission in Cassandra
+		rc.ReqLogger.Info("Proceeding with deletion, setting all StatefulSets to 0 replicas")
+		if err := rc.CalculateRackInformation(); err != nil {
+			return result.Error(err)
+		}
+
+		if res := rc.CheckRackCreation(); res.Completed() {
+			return res
+		}
+
+		waitingForRackScale := false
+		for _, sts := range rc.statefulSets {
+			currentReplicas := int(*sts.Spec.Replicas)
+			if currentReplicas > 0 {
+				waitingForRackScale = true
+				if err := rc.UpdateRackNodeCount(sts, 0); err != nil {
+					return result.Error(err)
+				}
+			}
+		}
+		if waitingForRackScale {
+			return result.RequeueSoon(5)
+		}
 	}
 
 	// Clean up annotation litter on the user Secrets

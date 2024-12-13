@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap/zapcore"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -97,7 +98,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&CassandraDatacenterReconciler{
-		Client:   k8sClient,
+		Client:   k8sManager.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("cass-operator"),
@@ -115,6 +116,21 @@ var _ = BeforeSuite(func() {
 		Scheme: k8sManager.GetScheme(),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
+
+	Expect(k8sManager.GetCache().IndexField(ctx, &corev1.Pod{}, "spec.volumes.persistentVolumeClaim.claimName", func(obj client.Object) []string {
+		pod, ok := obj.(*corev1.Pod)
+		if !ok {
+			return nil
+		}
+
+		var pvcNames []string
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim != nil {
+				pvcNames = append(pvcNames, volume.PersistentVolumeClaim.ClaimName)
+			}
+		}
+		return pvcNames
+	})).ToNot(HaveOccurred())
 
 	// Reduce the polling times and sleeps to speed up the tests
 	cooldownPeriod = 1 * time.Millisecond

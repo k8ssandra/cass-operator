@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#737](https://github.com/k8ssandra/cass-operator/issues/737) Before issuing PVC deletion when deleting a datacenter, verify the PVCs that match the labels are not actually used by any pods.
+
 ## v1.23.0
 
 * [CHANGE] [#720](https://github.com/k8ssandra/cass-operator/issues/720) Always use ObjectMeta.Name for the PodDisruptionBudget resource name, not the DatacenterName

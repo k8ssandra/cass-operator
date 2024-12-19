@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -270,7 +271,7 @@ func TestCheckRackPodTemplate_SetControllerRefOnStatefulSet(t *testing.T) {
 
 	var actualOwner, actualObject metav1.Object
 	invocations := 0
-	setControllerReference = func(owner, object metav1.Object, scheme *runtime.Scheme) error {
+	setControllerReference = func(owner, object metav1.Object, scheme *runtime.Scheme, opts ...controllerutil.OwnerReferenceOption) error {
 		actualOwner = owner
 		actualObject = object
 		invocations++

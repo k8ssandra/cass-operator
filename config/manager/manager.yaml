@@ -6,6 +6,8 @@ metadata:
   namespace: system
   labels:
     control-plane: controller-manager
+    app.kubernetes.io/name: cass-operator
+    app.kubernetes.io/managed-by: kustomize
 spec:
   selector:
     matchLabels:
@@ -14,22 +16,30 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
       labels:
         name: cass-operator
         control-plane: controller-manager
     spec:
       securityContext:
         runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - command:
         - /manager
         args:
-        - --leader-elect
+          - --leader-elect
+          - --health-probe-bind-address=:8081
         image: controller:latest
         name: manager
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - "ALL"
         livenessProbe:
           httpGet:
             path: /healthz
@@ -44,11 +54,11 @@ spec:
           periodSeconds: 10
         resources:
           limits:
-            cpu: 200m
-            memory: 100Mi
+            cpu: 500m
+            memory: 128Mi
           requests:
             cpu: 100m
-            memory: 20Mi
+            memory: 64Mi
         env:
         - name: WATCH_NAMESPACE
           valueFrom:

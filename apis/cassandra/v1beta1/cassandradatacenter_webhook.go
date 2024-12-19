@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,11 +49,12 @@ func (dc *CassandraDatacenter) SetupWebhookWithManager(mgr ctrl.Manager) error {
 // kubebuilder:webhook:path=/mutate-cassandra-datastax-com-v1beta1-cassandradatacenter,mutating=true,failurePolicy=fail,sideEffects=None,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=mcassandradatacenter.kb.io,admissionReviewVersions={v1,v1beta1}
 // +kubebuilder:webhook:path=/validate-cassandra-datastax-com-v1beta1-cassandradatacenter,mutating=false,failurePolicy=fail,sideEffects=None,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=vcassandradatacenter.kb.io,admissionReviewVersions={v1,v1beta1}
 
-var _ webhook.Defaulter = &CassandraDatacenter{}
+var _ webhook.CustomDefaulter = &CassandraDatacenter{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (dc *CassandraDatacenter) Default() {
+func (dc *CassandraDatacenter) Default(ctx context.Context, obj runtime.Object) error {
 	// No mutations at this point
+	return nil
 }
 
 func attemptedTo(action string, actionStrArgs ...interface{}) error {
@@ -270,9 +272,9 @@ func ValidateAdditionalVolumes(dc CassandraDatacenter) error {
 
 // +kubebuilder:webhook:path=/validate-cassandra-datastax-com-v1beta1-cassandradatacenter,mutating=false,failurePolicy=ignore,sideEffects=None,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=vcassandradatacenter.kb.io,admissionReviewVersions={v1,v1beta1}
 // +kubebuilder:webhook:path=/validate-cassandradatacenter,mutating=false,failurePolicy=ignore,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=validate-cassandradatacenter-webhook
-var _ webhook.Validator = &CassandraDatacenter{}
+var _ webhook.CustomValidator = &CassandraDatacenter{}
 
-func (dc *CassandraDatacenter) ValidateCreate() (admission.Warnings, error) {
+func (dc *CassandraDatacenter) ValidateCreate(ctx context.Context, object runtime.Object) (admission.Warnings, error) {
 	log.Info("Validating webhook called for create")
 	if err := ValidateSingleDatacenter(*dc); err != nil {
 		return admission.Warnings{}, err
@@ -281,7 +283,7 @@ func (dc *CassandraDatacenter) ValidateCreate() (admission.Warnings, error) {
 	return ValidateDeprecatedFieldUsage(*dc), nil
 }
 
-func (dc *CassandraDatacenter) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+func (dc *CassandraDatacenter) ValidateUpdate(ctx context.Context, old runtime.Object, new runtime.Object) (admission.Warnings, error) {
 	log.Info("Validating webhook called for update")
 	oldDc, ok := old.(*CassandraDatacenter)
 	if !ok {
@@ -299,7 +301,7 @@ func (dc *CassandraDatacenter) ValidateUpdate(old runtime.Object) (admission.War
 	return ValidateDeprecatedFieldUsage(*dc), nil
 }
 
-func (dc *CassandraDatacenter) ValidateDelete() (admission.Warnings, error) {
+func (dc *CassandraDatacenter) ValidateDelete(ctx context.Context, object runtime.Object) (admission.Warnings, error) {
 	return nil, nil
 }
 

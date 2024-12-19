@@ -10,9 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Jeffail/gabs/v2"
-	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
-	"github.com/pkg/errors"
 	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -721,80 +718,6 @@ func (dc *CassandraDatacenter) GetSuperuserSecretNamespacedName() types.Namespac
 	}
 }
 
-// GetConfigAsJSON gets a JSON-encoded string suitable for passing to configBuilder
-func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
-
-	// We use the cluster seed-service name here for the seed list as it will
-	// resolve to the seed nodes. This obviates the need to update the
-	// cassandra.yaml whenever the seed nodes change.
-	seeds := []string{dc.GetSeedServiceName(), dc.GetAdditionalSeedsServiceName()}
-
-	graphEnabled := 0
-	solrEnabled := 0
-	sparkEnabled := 0
-
-	if dc.Spec.ServerType == "dse" && dc.Spec.DseWorkloads != nil {
-		if dc.Spec.DseWorkloads.AnalyticsEnabled {
-			sparkEnabled = 1
-		}
-		if dc.Spec.DseWorkloads.GraphEnabled {
-			graphEnabled = 1
-		}
-		if dc.Spec.DseWorkloads.SearchEnabled {
-			solrEnabled = 1
-		}
-	}
-
-	native := 0
-	nativeSSL := 0
-	internode := 0
-	internodeSSL := 0
-	if dc.IsNodePortEnabled() {
-		native = dc.Spec.Networking.NodePort.Native
-		nativeSSL = dc.Spec.Networking.NodePort.NativeSSL
-		internode = dc.Spec.Networking.NodePort.Internode
-		internodeSSL = dc.Spec.Networking.NodePort.InternodeSSL
-	}
-
-	modelValues := serverconfig.GetModelValues(
-		seeds,
-		dc.Spec.ClusterName,
-		dc.DatacenterName(),
-		graphEnabled,
-		solrEnabled,
-		sparkEnabled,
-		native,
-		nativeSSL,
-		internode,
-		internodeSSL)
-
-	var modelBytes []byte
-
-	modelBytes, err := json.Marshal(modelValues)
-	if err != nil {
-		return "", err
-	}
-
-	// Combine the model values with the user-specified values
-	modelParsed, err := gabs.ParseJSON(modelBytes)
-	if err != nil {
-		return "", errors.Wrap(err, "Model information for CassandraDatacenter resource was not properly configured")
-	}
-
-	if config != nil {
-		configParsed, err := gabs.ParseJSON(config)
-		if err != nil {
-			return "", errors.Wrap(err, "Error parsing Spec.Config for CassandraDatacenter resource")
-		}
-
-		if err := modelParsed.Merge(configParsed); err != nil {
-			return "", errors.Wrap(err, "Error merging Spec.Config for CassandraDatacenter resource")
-		}
-	}
-
-	return modelParsed.String(), nil
-}
-
 // GetNodePortNativePort
 // Gets the defined CQL port for NodePort.
 // 0 will be returned if NodePort is not configured.
@@ -949,37 +872,6 @@ func (dc *CassandraDatacenter) DeploymentSupportsFQL() bool {
 	}
 
 	return true
-}
-
-func (dc *CassandraDatacenter) LegacyInternodeEnabled() bool {
-	config, err := gabs.ParseJSON(dc.Spec.Config)
-	if err != nil {
-		return false
-	}
-
-	hasOldKeyStore := func(gobContainer map[string]*gabs.Container) bool {
-		if gobContainer == nil {
-			return false
-		}
-
-		if keystorePath, found := gobContainer["keystore"]; found {
-			if strings.TrimSpace(keystorePath.Data().(string)) == "/etc/encryption/node-keystore.jks" {
-				return true
-			}
-		}
-		return false
-	}
-
-	if config.Exists("cassandra-yaml", "client_encryption_options") || config.Exists("cassandra-yaml", "server_encryption_options") {
-		serverContainer := config.Path("cassandra-yaml.server_encryption_options").ChildrenMap()
-		clientContainer := config.Path("cassandra-yaml.client_encryption_options").ChildrenMap()
-
-		if hasOldKeyStore(clientContainer) || hasOldKeyStore(serverContainer) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func SplitRacks(nodeCount, rackCount int) []int {

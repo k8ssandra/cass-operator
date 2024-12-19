@@ -10,6 +10,7 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/cdc"
+	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -115,7 +116,7 @@ func (rc *ReconciliationContext) updateConfigHashAnnotation(secret *corev1.Secre
 // getConfigFromConfigSecret Generates the JSON with properties added by cass-operator.
 func getConfigFromConfigSecret(dc *api.CassandraDatacenter, secret *corev1.Secret) ([]byte, error) {
 	if b, found := secret.Data["config"]; found {
-		jsonConfig, err := dc.GetConfigAsJSON(b)
+		jsonConfig, err := serverconfig.GetConfigAsJSON(dc, b)
 		if err != nil {
 			return nil, err
 		}

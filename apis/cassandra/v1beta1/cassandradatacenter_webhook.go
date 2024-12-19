@@ -42,6 +42,8 @@ var log = logf.Log.WithName("api")
 
 func (dc *CassandraDatacenter) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
+		WithValidator(dc).
+		WithDefaulter(dc).
 		For(dc).
 		Complete()
 }

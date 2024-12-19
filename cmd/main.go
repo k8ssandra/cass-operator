@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 
@@ -28,6 +29,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -125,7 +127,7 @@ func main() {
 		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
-	operConfig := configv1beta1.OperatorConfig{}
+	operConfig := &configv1beta1.OperatorConfig{}
 	options := ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -134,17 +136,15 @@ func main() {
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "b569adb7.cassandra.datastax.com",
 	}
-	/*
-		if configFile != "" {
-			//nolint:staticcheck
-			options, err = options.AndFrom(ctrl.ConfigFile().AtPath(configFile).OfKind(&operConfig))
-			if err != nil {
-				setupLog.Error(err, "unable to load the config file")
-				os.Exit(1)
-			}
+	if configFile != "" {
+		var err error
+		operConfig, err = readOperConfig(configFile)
+		if err != nil {
+			setupLog.Error(err, "unable to load the config file")
+			os.Exit(1)
 		}
-	*/
-	// TODO operConfig is not parsed right now
+	}
+
 	if operConfig.ImageConfigFile == "" {
 		operConfig.ImageConfigFile = "/configs/image_config.yaml"
 	}
@@ -216,4 +216,24 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func readOperConfig(configFile string) (*configv1beta1.OperatorConfig, error) {
+	operConfig := &configv1beta1.OperatorConfig{}
+	_, err := os.Stat(configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	content, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	codecs := serializer.NewCodecFactory(scheme)
+	if err := runtime.DecodeInto(codecs.UniversalDecoder(), content, operConfig); err != nil {
+		return nil, fmt.Errorf("could not decode file into runtime.Object: %v", err)
+	}
+
+	return operConfig, nil
 }

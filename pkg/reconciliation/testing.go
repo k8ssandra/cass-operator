@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	log2 "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -41,7 +42,8 @@ func MockSetControllerReference() func() {
 	setControllerReference = func(
 		owner,
 		object metav1.Object,
-		scheme *runtime.Scheme) error {
+		scheme *runtime.Scheme,
+		opts ...controllerutil.OwnerReferenceOption) error {
 		return nil
 	}
 

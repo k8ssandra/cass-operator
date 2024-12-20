@@ -4,16 +4,22 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
+    app.kubernetes.io/name: cass-operator
+    app.kubernetes.io/managed-by: kustomize
     control-plane: controller-manager
   name: controller-manager-metrics-monitor
   namespace: system
 spec:
   endpoints:
     - path: /metrics
-      port: https
+      port: https # Ensure this is the name of the port that exposes HTTPS metrics
       scheme: https
       bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       tlsConfig:
+        # Please use the following options for secure configurations:
+        # caFile: /etc/metrics-certs/ca.crt
+        # certFile: /etc/metrics-certs/tls.crt
+        # keyFile: /etc/metrics-certs/tls.key
         insecureSkipVerify: true
   selector:
     matchLabels:

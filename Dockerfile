@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.22 AS builder
+FROM golang:1.23 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -21,7 +21,7 @@ COPY internal/ internal/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 # Build the UBI image
-FROM redhat/ubi8-micro:latest
+FROM redhat/ubi9-micro:latest
 
 ARG VERSION
 

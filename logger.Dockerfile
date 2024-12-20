@@ -1,16 +1,16 @@
-FROM redhat/ubi8:latest AS builder
+FROM redhat/ubi9:latest AS builder
 ARG VERSION
 ARG TARGETPLATFORM
 
 # Install Vector
-ENV VECTOR_VERSION=0.39.0
+ENV VECTOR_VERSION=0.43.1
 RUN case ${TARGETPLATFORM} in \
          "linux/amd64")  VECTOR_ARCH=x86_64  ;; \
          "linux/arm64")  VECTOR_ARCH=aarch64  ;; \
     esac \
  && rpm -i https://packages.timber.io/vector/${VECTOR_VERSION}/vector-${VECTOR_VERSION}-1.${VECTOR_ARCH}.rpm
 
-FROM redhat/ubi8-micro:latest
+FROM redhat/ubi9-micro:latest
 
 ARG VERSION
 ARG TARGETPLATFORM

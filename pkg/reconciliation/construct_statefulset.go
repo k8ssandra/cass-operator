@@ -11,6 +11,7 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -181,7 +182,7 @@ func newStatefulSetForCassandraDatacenter(
 }
 
 func legacyInternodeMount(dc *api.CassandraDatacenter, sts *appsv1.StatefulSet) bool {
-	if dc.LegacyInternodeEnabled() {
+	if serverconfig.LegacyInternodeEnabled(dc) {
 		return true
 	}
 

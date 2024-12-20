@@ -1,36 +1,31 @@
 # Set WATCH_NAMESPACE to "" in the deployment to provide cluster-wide install
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
-patchesJson6902:
-- target:
-    group: apps
-    version: v1
-    name: controller-manager
-    kind: Deployment
-  patch: |-
+patches:
+- patch: |-
     - op: remove
       path: /spec/template/spec/containers/0/env/0/valueFrom
     - op: add
       path: /spec/template/spec/containers/0/env/0/value
       value: ""
-- target:
-    group: rbac.authorization.k8s.io
+  target:
+    group: apps
+    kind: Deployment
+    name: controller-manager
     version: v1
-    kind: Role
-    name: manager-role
-  patch: |-
+- patch: |-
     - op: replace
       path: /metadata/name
       value: cass-operator-manager-crrole
     - op: replace
       path: /kind
       value: ClusterRole
-- target:
+  target:
     group: rbac.authorization.k8s.io
+    kind: Role
+    name: manager-role
     version: v1
-    kind: RoleBinding
-    name: manager-rolebinding
-  patch: |-
+- patch: |-
     - op: replace
       path: /roleRef/kind
       value: ClusterRole
@@ -46,3 +41,8 @@ patchesJson6902:
     - op: replace
       path: /kind
       value: ClusterRoleBinding
+  target:
+    group: rbac.authorization.k8s.io
+    kind: RoleBinding
+    name: manager-rolebinding
+    version: v1

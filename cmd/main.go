@@ -45,6 +45,7 @@ import (
 	controlv1alpha1 "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	controllers "github.com/k8ssandra/cass-operator/internal/controllers/cassandra"
 	controlcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/control"
+	apiwebhook "github.com/k8ssandra/cass-operator/internal/webhooks/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
@@ -189,7 +190,7 @@ func main() {
 	}
 
 	if !operConfig.DisableWebhooks {
-		if err = (&api.CassandraDatacenter{}).SetupWebhookWithManager(mgr); err != nil {
+		if err = apiwebhook.SetupCassandraDatacenterWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
 			os.Exit(1)
 		}

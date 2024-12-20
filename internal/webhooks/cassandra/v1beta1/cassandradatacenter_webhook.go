@@ -1,5 +1,5 @@
 /*
-Copyright 2021.
+Copyright 2024 Just Me.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,12 +19,9 @@ package v1beta1
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/k8ssandra/cass-operator/pkg/images"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,56 +29,96 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/google/go-cmp/cmp"
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/images"
 )
 
+// log is for logging in this package.
 const (
 	datastaxPrefix string = "cassandra.datastax.com"
 )
 
 var log = logf.Log.WithName("api")
 
-func (dc *CassandraDatacenter) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		WithValidator(dc).
-		WithDefaulter(dc).
-		For(dc).
+// SetupCassandraDatacenterWebhookWithManager registers the webhook for CassandraDatacenter in the manager.
+func SetupCassandraDatacenterWebhookWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewWebhookManagedBy(mgr).For(&api.CassandraDatacenter{}).
+		WithValidator(&CassandraDatacenterCustomValidator{}).
+		WithDefaulter(&CassandraDatacenterCustomDefaulter{}).
 		Complete()
 }
 
-// kubebuilder:webhook:path=/mutate-cassandra-datastax-com-v1beta1-cassandradatacenter,mutating=true,failurePolicy=fail,sideEffects=None,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=mcassandradatacenter.kb.io,admissionReviewVersions={v1,v1beta1}
-// +kubebuilder:webhook:path=/validate-cassandra-datastax-com-v1beta1-cassandradatacenter,mutating=false,failurePolicy=fail,sideEffects=None,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=vcassandradatacenter.kb.io,admissionReviewVersions={v1,v1beta1}
+// +kubebuilder:webhook:path=/mutate-cassandra-datastax-com-v1beta1-cassandradatacenter,mutating=true,failurePolicy=fail,sideEffects=None,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=mcassandradatacenter.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-cassandra-datastax-com-v1beta1-cassandradatacenter,mutating=false,failurePolicy=fail,sideEffects=None,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=vcassandradatacenter.kb.io,admissionReviewVersions=v1
 
-var _ webhook.CustomDefaulter = &CassandraDatacenter{}
+// CassandraDatacenterCustomDefaulter struct is responsible for setting default values on the custom resource of the
+// Kind CassandraDatacenter when those are created or updated.
+type CassandraDatacenterCustomDefaulter struct {
+}
 
-// Default implements webhook.Defaulter so a webhook will be registered for the type
-func (dc *CassandraDatacenter) Default(ctx context.Context, obj runtime.Object) error {
-	// No mutations at this point
+var _ webhook.CustomDefaulter = &CassandraDatacenterCustomDefaulter{}
+
+// Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind CassandraDatacenter.
+func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
 	return nil
 }
 
-func attemptedTo(action string, actionStrArgs ...interface{}) error {
-	var msg string
-	if actionStrArgs != nil {
-		msg = fmt.Sprintf(action, actionStrArgs...)
-	} else {
-		msg = action
-	}
-	return fmt.Errorf("CassandraDatacenter write rejected, attempted to %s", msg)
+// CassandraDatacenterCustomValidator struct is responsible for validating the CassandraDatacenter resource
+// when it is created, updated, or deleted.
+type CassandraDatacenterCustomValidator struct {
 }
 
-func deprecatedWarning(field, instead, extra string) string {
-	warning := "CassandraDatacenter is using deprecated field '%s'"
-	if instead != "" {
-		warning += fmt.Sprintf(", use '%s' instead", instead)
+var _ webhook.CustomValidator = &CassandraDatacenterCustomValidator{}
+
+// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
+func (v *CassandraDatacenterCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	dc, ok := obj.(*api.CassandraDatacenter)
+	if !ok {
+		return nil, fmt.Errorf("expected a CassandraDatacenter object but got %T", obj)
 	}
-	if extra != "" {
-		warning += ". %s"
+	log.Info("Validation for CassandraDatacenter upon creation", "name", dc.GetName())
+
+	if err := ValidateSingleDatacenter(dc); err != nil {
+		return admission.Warnings{}, err
 	}
-	return warning
+
+	return ValidateDeprecatedFieldUsage(dc), nil
+}
+
+// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
+func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	dc, ok := newObj.(*api.CassandraDatacenter)
+	if !ok {
+		return nil, fmt.Errorf("expected a CassandraDatacenter object for the newObj but got %T", newObj)
+	}
+
+	oldDc, ok := oldObj.(*api.CassandraDatacenter)
+	if !ok {
+		return nil, fmt.Errorf("expected a CassandraDatacenter object for the oldObj but got %T", oldObj)
+	}
+
+	log.Info("Validation for CassandraDatacenter upon update", "name", dc.GetName())
+
+	if err := ValidateSingleDatacenter(dc); err != nil {
+		return nil, err
+	}
+
+	if err := ValidateDatacenterFieldChanges(oldDc, dc); err != nil {
+		return nil, err
+	}
+
+	return ValidateDeprecatedFieldUsage(dc), nil
+}
+
+// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
+func (v *CassandraDatacenterCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 // ValidateSingleDatacenter checks that no values are improperly set on a CassandraDatacenter
-func ValidateSingleDatacenter(dc CassandraDatacenter) error {
+func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 	// Ensure serverVersion and serverType are compatible
 
 	if dc.Spec.ServerType == "dse" {
@@ -154,7 +191,7 @@ func ValidateSingleDatacenter(dc CassandraDatacenter) error {
 
 // ValidateDatacenterFieldChanges checks that no values are improperly changing while updating
 // a CassandraDatacenter
-func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDatacenter) error {
+func ValidateDatacenterFieldChanges(oldDc *api.CassandraDatacenter, newDc *api.CassandraDatacenter) error {
 
 	if oldDc.Spec.ClusterName != newDc.Spec.ClusterName {
 		return attemptedTo("change clusterName")
@@ -180,7 +217,7 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 	newClaimSpec := newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec.DeepCopy()
 
 	// CassandraDataVolumeClaimSpec changes are disallowed
-	if metav1.HasAnnotation(newDc.ObjectMeta, AllowStorageChangesAnnotation) && newDc.Annotations[AllowStorageChangesAnnotation] == "true" {
+	if metav1.HasAnnotation(newDc.ObjectMeta, api.AllowStorageChangesAnnotation) && newDc.Annotations[api.AllowStorageChangesAnnotation] == "true" {
 		// If the AllowStorageChangesAnnotation is set, we allow changes to the CassandraDataVolumeClaimSpec sizes, but not other fields
 		oldClaimSpec.Resources.Requests = newClaimSpec.Resources.Requests
 	}
@@ -206,7 +243,7 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 	newRackCount := len(newRacks) - len(oldRacks)
 	if newRackCount > 0 {
 		newSizeDifference := newDc.Spec.Size - oldDc.Spec.Size
-		oldRackNodeSplit := SplitRacks(int(oldDc.Spec.Size), len(oldRacks))
+		oldRackNodeSplit := api.SplitRacks(int(oldDc.Spec.Size), len(oldRacks))
 		minNodesFromOldRacks := oldRackNodeSplit[len(oldRackNodeSplit)-1]
 		minSizeAdjustment := minNodesFromOldRacks * newRackCount
 
@@ -243,7 +280,7 @@ func ValidateDatacenterFieldChanges(oldDc CassandraDatacenter, newDc CassandraDa
 }
 
 // ValidateDeprecatedFieldUsage prevents adding fields that are deprecated
-func ValidateDeprecatedFieldUsage(dc CassandraDatacenter) admission.Warnings {
+func ValidateDeprecatedFieldUsage(dc *api.CassandraDatacenter) admission.Warnings {
 	warnings := admission.Warnings{}
 	for _, rack := range dc.GetRacks() {
 		if rack.DeprecatedZone != "" {
@@ -258,7 +295,7 @@ func ValidateDeprecatedFieldUsage(dc CassandraDatacenter) admission.Warnings {
 	return warnings
 }
 
-func ValidateAdditionalVolumes(dc CassandraDatacenter) error {
+func ValidateAdditionalVolumes(dc *api.CassandraDatacenter) error {
 	for _, volume := range dc.Spec.StorageConfig.AdditionalVolumes {
 		if volume.PVCSpec != nil && volume.VolumeSource != nil {
 			return attemptedTo("create a volume with both PVCSpec and VolumeSource")
@@ -272,46 +309,11 @@ func ValidateAdditionalVolumes(dc CassandraDatacenter) error {
 	return nil
 }
 
-// +kubebuilder:webhook:path=/validate-cassandra-datastax-com-v1beta1-cassandradatacenter,mutating=false,failurePolicy=ignore,sideEffects=None,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=vcassandradatacenter.kb.io,admissionReviewVersions={v1,v1beta1}
-// +kubebuilder:webhook:path=/validate-cassandradatacenter,mutating=false,failurePolicy=ignore,groups=cassandra.datastax.com,resources=cassandradatacenters,verbs=create;update,versions=v1beta1,name=validate-cassandradatacenter-webhook
-var _ webhook.CustomValidator = &CassandraDatacenter{}
-
-func (dc *CassandraDatacenter) ValidateCreate(ctx context.Context, object runtime.Object) (admission.Warnings, error) {
-	log.Info("Validating webhook called for create")
-	if err := ValidateSingleDatacenter(*dc); err != nil {
-		return admission.Warnings{}, err
-	}
-
-	return ValidateDeprecatedFieldUsage(*dc), nil
-}
-
-func (dc *CassandraDatacenter) ValidateUpdate(ctx context.Context, old runtime.Object, new runtime.Object) (admission.Warnings, error) {
-	log.Info("Validating webhook called for update")
-	oldDc, ok := old.(*CassandraDatacenter)
-	if !ok {
-		return nil, errors.New("old object in ValidateUpdate cannot be cast to CassandraDatacenter")
-	}
-
-	if err := ValidateSingleDatacenter(*dc); err != nil {
-		return nil, err
-	}
-
-	if err := ValidateDatacenterFieldChanges(*oldDc, *dc); err != nil {
-		return nil, err
-	}
-
-	return ValidateDeprecatedFieldUsage(*dc), nil
-}
-
-func (dc *CassandraDatacenter) ValidateDelete(ctx context.Context, object runtime.Object) (admission.Warnings, error) {
-	return nil, nil
-}
-
 var (
 	ErrFQLNotSupported = fmt.Errorf("full query logging is only supported on OSS Cassandra 4.0+")
 )
 
-func ValidateFQLConfig(dc CassandraDatacenter) error {
+func ValidateFQLConfig(dc *api.CassandraDatacenter) error {
 	if dc.Spec.Config != nil {
 		enabled, err := dc.FullQueryEnabled()
 		if err != nil {
@@ -326,7 +328,7 @@ func ValidateFQLConfig(dc CassandraDatacenter) error {
 	return nil
 }
 
-func ValidateServiceLabelsAndAnnotations(dc CassandraDatacenter) error {
+func ValidateServiceLabelsAndAnnotations(dc *api.CassandraDatacenter) error {
 	// check each service
 	addSeedSvc := dc.Spec.AdditionalServiceConfig.AdditionalSeedService
 	allPodsSvc := dc.Spec.AdditionalServiceConfig.AllPodsService
@@ -334,7 +336,7 @@ func ValidateServiceLabelsAndAnnotations(dc CassandraDatacenter) error {
 	nodePortSvc := dc.Spec.AdditionalServiceConfig.NodePortService
 	seedSvc := dc.Spec.AdditionalServiceConfig.SeedService
 
-	services := map[string]ServiceConfigAdditions{
+	services := map[string]api.ServiceConfigAdditions{
 		"AdditionalSeedService": addSeedSvc,
 		"AllPOdsService":        allPodsSvc,
 		"DatacenterService":     dcSvc,
@@ -348,21 +350,21 @@ func ValidateServiceLabelsAndAnnotations(dc CassandraDatacenter) error {
 		}
 	}
 
-	if metav1.HasAnnotation(dc.ObjectMeta, UpdateAllowedAnnotation) {
-		updateType := AllowUpdateType(dc.Annotations[UpdateAllowedAnnotation])
-		if updateType != AllowUpdateAlways && updateType != AllowUpdateOnce {
-			return attemptedTo("use %s annotation with value other than 'once' or 'always'", UpdateAllowedAnnotation)
+	if metav1.HasAnnotation(dc.ObjectMeta, api.UpdateAllowedAnnotation) {
+		updateType := api.AllowUpdateType(dc.Annotations[api.UpdateAllowedAnnotation])
+		if updateType != api.AllowUpdateAlways && updateType != api.AllowUpdateOnce {
+			return attemptedTo("use %s annotation with value other than 'once' or 'always'", api.UpdateAllowedAnnotation)
 		}
 	}
 
 	return nil
 }
 
-func containsReservedAnnotations(config ServiceConfigAdditions) bool {
+func containsReservedAnnotations(config api.ServiceConfigAdditions) bool {
 	return containsReservedPrefixes(config.Annotations)
 }
 
-func containsReservedLabels(config ServiceConfigAdditions) bool {
+func containsReservedLabels(config api.ServiceConfigAdditions) bool {
 	return containsReservedPrefixes(config.Labels)
 }
 
@@ -374,4 +376,25 @@ func containsReservedPrefixes(config map[string]string) bool {
 		}
 	}
 	return false
+}
+
+func attemptedTo(action string, actionStrArgs ...interface{}) error {
+	var msg string
+	if actionStrArgs != nil {
+		msg = fmt.Sprintf(action, actionStrArgs...)
+	} else {
+		msg = action
+	}
+	return fmt.Errorf("CassandraDatacenter write rejected, attempted to %s", msg)
+}
+
+func deprecatedWarning(field, instead, extra string) string {
+	warning := "CassandraDatacenter is using deprecated field '%s'"
+	if instead != "" {
+		warning += fmt.Sprintf(", use '%s' instead", instead)
+	}
+	if extra != "" {
+		warning += ". %s"
+	}
+	return warning
 }

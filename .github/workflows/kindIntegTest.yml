@@ -88,7 +88,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.14"
+          - "4.0.15"
         integration_test:
           - cdc_successful # OSS only
           - config_fql
@@ -117,12 +117,12 @@ jobs:
     strategy:
       matrix:
         version:
-          - "6.8.51"
+          - "6.8.52"
         integration_test:
           - cdc_successful
         include:
-          - version: 6.8.51
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.51-ubi8 # DSE 6.8.51
+          - version: 6.8.52
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.52-ubi8 # DSE 6.8.51
             serverType: dse
             integration_test: "cdc_successful"
       fail-fast: true
@@ -155,7 +155,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "5.0.1"
+          - "5.0.2"
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
@@ -233,19 +233,19 @@ jobs:
         version:
           - "4.0.14"
           - "4.1.7"
-          - "5.0.1"
-          - "6.8.51"
-          - "6.9.2"
+          - "5.0.2"
+          - "6.8.52"
+          - "6.9.5"
           - "1.0.0"
         integration_test:
           - test_all_the_things
           - smoke_test_read_only_fs
         include:
           - version: 6.8.51
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.51-ubi8 # DSE 6.8.51
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.52-ubi8 # DSE 6.8.52
             serverType: dse
           - version: 6.9.2
-            serverImage: datastax/dse-mgmtapi-6_8:6.9.2-ubi # DSE 6.9.2
+            serverImage: datastax/dse-mgmtapi-6_8:6.9.5-ubi # DSE 6.9.5
             serverType: dse
           - version: 1.0.0
             serverImage: datastax/hcd:1.0.0-ubi # HCD 1.0.0
@@ -283,7 +283,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "5.0.1"
+          - "5.0.2"
         integration_test:
           - pvc_expansion
       fail-fast: true
@@ -306,7 +306,7 @@ jobs:
         with:
           repository: topolvm/topolvm
           path: topolvm
-          ref: topolvm-chart-v15.2.0
+          ref: topolvm-chart-v15.5.0
       - name: Create LVM from TopoLVM's example setup
         run: |
           cd topolvm/example

@@ -21,7 +21,7 @@ COPY internal/ internal/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 # Build the UBI image
-FROM redhat/ubi8-micro:latest
+FROM redhat/ubi9-micro:latest
 
 ARG VERSION
 

@@ -122,7 +122,7 @@ jobs:
           - cdc_successful
         include:
           - version: 6.8.52
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.52-ubi8 # DSE 6.8.51
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.52-ubi8 # DSE 6.8.52
             serverType: dse
             integration_test: "cdc_successful"
       fail-fast: true
@@ -241,10 +241,10 @@ jobs:
           - test_all_the_things
           - smoke_test_read_only_fs
         include:
-          - version: 6.8.51
+          - version: 6.8.52
             serverImage: datastax/dse-mgmtapi-6_8:6.8.52-ubi8 # DSE 6.8.52
             serverType: dse
-          - version: 6.9.2
+          - version: 6.9.5
             serverImage: datastax/dse-mgmtapi-6_8:6.9.5-ubi # DSE 6.9.5
             serverType: dse
           - version: 1.0.0

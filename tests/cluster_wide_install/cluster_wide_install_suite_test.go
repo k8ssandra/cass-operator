@@ -20,7 +20,7 @@ import (
 
 var (
 	testName     = "Cluster-wide install"
-	opNamespace  = "test-cluster-wide-install"
+	opNamespace  = "cass-operator"
 	dcNamespace1 = "test-cluster-wide-install-ns1"
 	dcNamespace2 = "test-cluster-wide-install-ns2"
 	dc1Name      = "dc1"

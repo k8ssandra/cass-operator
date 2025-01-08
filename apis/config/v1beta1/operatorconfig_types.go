@@ -38,6 +38,22 @@ type OperatorConfig struct {
 
 	// ImageConfigFile indicates the path where to load the imageConfig from
 	ImageConfigFile string `json:"imageConfigFile,omitempty"`
+
+	// SecretProvider sets where the Secrets are loaded from. If unset, loads them from Kubernetes
+	SecretProvider SecretProviderConfigSpec `json:"secretProvider,omitempty"`
+}
+
+type SecretProviderConfigSpec struct {
+	Source SecretProviderSource `json:",inline,omitempty"`
+}
+
+type SecretProviderSource struct {
+	Filesystem *SecretProviderFilesystemSource `json:"filesystem,omitempty"`
+}
+
+type SecretProviderFilesystemSource struct {
+	Path            string `json:"path"`
+	NamespacedPaths bool   `json:"namespaced,omitempty"`
 }
 
 func init() {

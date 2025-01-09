@@ -235,7 +235,7 @@ jobs:
           - "4.1.7"
           - "5.0.2"
           - "6.8.52"
-          - "6.9.5"
+          - "6.9.4"
           - "1.0.0"
         integration_test:
           - test_all_the_things
@@ -244,8 +244,8 @@ jobs:
           - version: 6.8.52
             serverImage: datastax/dse-mgmtapi-6_8:6.8.52-ubi8 # DSE 6.8.52
             serverType: dse
-          - version: 6.9.5
-            serverImage: datastax/dse-mgmtapi-6_8:6.9.5-ubi # DSE 6.9.5
+          - version: 6.9.4
+            serverImage: datastax/dse-mgmtapi-6_8:6.9.4-ubi # DSE 6.9.4
             serverType: dse
           - version: 1.0.0
             serverImage: datastax/hcd:1.0.0-ubi # HCD 1.0.0

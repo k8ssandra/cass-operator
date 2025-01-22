@@ -19,6 +19,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -622,7 +623,7 @@ func getConfigDataEnVars(dc *api.CassandraDatacenter) ([]corev1.EnvVar, error) {
 		return nil, fmt.Errorf("datacenter %s is missing %s annotation", dc.LabelResourceName(), api.ConfigHashAnnotation)
 	}
 
-	configData, err := dc.GetConfigAsJSON(dc.Spec.Config)
+	configData, err := serverconfig.GetConfigAsJSON(dc, dc.Spec.Config)
 	if err != nil {
 		return envVars, err
 	}

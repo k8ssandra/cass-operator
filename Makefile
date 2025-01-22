@@ -67,7 +67,7 @@ IMG ?= $(IMAGE_TAG_BASE):v$(VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:generateEmbeddedObjectMeta=true"
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.30.x
+ENVTEST_K8S_VERSION = 1.31.x
 
 # Logger image
 LOG_IMG_BASE ?= $(ORG)/system-logger
@@ -130,12 +130,16 @@ vet: ## Run go vet against code.
 lint: golangci-lint ## Run golangci-lint against code.
 	$(GOLANGCI_LINT) run ./...
 
+.PHONY: lint-fix
+lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
+	$(GOLANGCI_LINT) run --fix
+
 .PHONY: test
 test: manifests generate fmt vet lint envtest ## Run tests.
 	# Old unit tests first - these use mocked client / fakeclient
 	go test ./pkg/... -coverprofile cover-pkg.out
 	# Then the envtest ones
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./apis/... ./internal/controllers/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./apis/... ./internal/... -coverprofile cover.out
 
 .PHONY: integ-test
 integ-test: kustomize cert-manager helm ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
@@ -184,6 +188,12 @@ docker-logger-push: ## Push system-logger-image
 docker-logger-kind: docker-logger-build ## Build system-logger image and load to kind cluster
 	kind load docker-image ${LOG_IMG}
 
+.PHONY: build-installer
+build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
+	mkdir -p dist
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/deployments/cluster > dist/install.yaml
+
 ##@ Deployment
 
 ifndef ignore-not-found
@@ -202,11 +212,11 @@ uninstall: manifests ## Uninstall CRDs from the K8s cluster specified in ~/.kube
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	LOG_IMG=${LOG_IMG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
-	kubectl apply --force-conflicts --server-side -k config/deployments/default
+	kubectl apply --force-conflicts --server-side -k config/deployments/cluster
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	kubectl delete --ignore-not-found=$(ignore-not-found) -k config/deployments/default
+	kubectl delete --ignore-not-found=$(ignore-not-found) -k config/deployments/cluster
 
 .PHONY: deploy-test
 deploy-test: kustomize
@@ -241,13 +251,13 @@ HELM ?= $(LOCALBIN)/helm
 OPM ?= $(LOCALBIN)/opm
 
 ## Tool Versions
-CERT_MANAGER_VERSION ?= v1.14.7
-KUSTOMIZE_VERSION ?= v5.4.2
-CONTROLLER_TOOLS_VERSION ?= v0.15.0
-OPERATOR_SDK_VERSION ?= 1.35.0
-HELM_VERSION ?= 3.14.2
-OPM_VERSION ?= 1.38.0
-GOLINT_VERSION ?= 1.60.3
+CERT_MANAGER_VERSION ?= v1.16.2
+KUSTOMIZE_VERSION ?= v5.5.0
+CONTROLLER_TOOLS_VERSION ?= v0.16.4
+OPERATOR_SDK_VERSION ?= 1.38.0
+HELM_VERSION ?= 3.17.0
+OPM_VERSION ?= 1.48.0
+GOLINT_VERSION ?= 1.62.2
 
 .PHONY: cert-manager
 cert-manager: ## Install cert-manager to the cluster

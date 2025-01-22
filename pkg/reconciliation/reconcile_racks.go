@@ -29,6 +29,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	pkgerrors "github.com/pkg/errors"
 )
@@ -118,7 +119,7 @@ func (rc *ReconciliationContext) CheckSuperuserSecretCreation() result.Reconcile
 func (rc *ReconciliationContext) CheckInternodeCredentialCreation() result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckInternodeCredentialCreation")
 
-	if !rc.Datacenter.LegacyInternodeEnabled() {
+	if !serverconfig.LegacyInternodeEnabled(rc.Datacenter) {
 		return result.Continue()
 	}
 

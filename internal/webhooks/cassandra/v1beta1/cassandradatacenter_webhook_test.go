@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
@@ -19,16 +20,16 @@ import (
 func Test_ValidateSingleDatacenter(t *testing.T) {
 	tests := []struct {
 		name      string
-		dc        *CassandraDatacenter
+		dc        *api.CassandraDatacenter
 		errString string
 	}{
 		{
 			name: "DSE Valid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "dse",
 					ServerVersion: "6.8.0",
 				},
@@ -37,11 +38,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "DSE 6.8.4 Valid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "dse",
 					ServerVersion: "6.8.4",
 				},
@@ -50,11 +51,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "DSE 6.9.1 Valid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "dse",
 					ServerVersion: "6.9.1",
 				},
@@ -63,11 +64,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "HCD 1.0.0 Valid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "hcd",
 					ServerVersion: "1.0.0",
 				},
@@ -76,11 +77,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "DSE 7.0.0 invalid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "dse",
 					ServerVersion: "7.0.0",
 				},
@@ -89,11 +90,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "DSE Invalid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "dse",
 					ServerVersion: "4.8.0",
 				},
@@ -102,11 +103,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "DSE 5 Invalid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "dse",
 					ServerVersion: "5.0.0",
 				},
@@ -115,11 +116,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Cassandra valid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "3.11.7",
 				},
@@ -128,11 +129,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Cassandra 4.0.x must be valid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "4.0.3",
 				},
@@ -141,11 +142,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Cassandra 4.1 must be valid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "4.1.0",
 				},
@@ -154,11 +155,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Cassandra 5.0.0 must be valid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "5.0.0",
 				},
@@ -167,11 +168,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Cassandra Invalid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "6.8.0",
 				},
@@ -180,11 +181,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Cassandra Invalid too",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "7.0.0",
 				},
@@ -193,14 +194,14 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Dse Workloads in Cassandra Invalid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "6.8.0",
-					DseWorkloads: &DseWorkloads{
+					DseWorkloads: &api.DseWorkloads{
 						AnalyticsEnabled: true,
 					},
 				},
@@ -209,14 +210,14 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Dse Workloads in Dse valid",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "dse",
 					ServerVersion: "6.8.4",
-					DseWorkloads: &DseWorkloads{
+					DseWorkloads: &api.DseWorkloads{
 						AnalyticsEnabled: true,
 					},
 				},
@@ -225,11 +226,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Cassandra 3.11 invalid config file dse-yaml",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "3.11.7",
 					Config: json.RawMessage(`
@@ -246,11 +247,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Cassandra 3.11 invalid config file jvm-server-options",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "3.11.7",
 					Config: json.RawMessage(`
@@ -267,11 +268,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "DSE 6.8 invalid config file jvm-options",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "dse",
 					ServerVersion: "6.8.4",
 					Config: json.RawMessage(`
@@ -288,11 +289,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Allow multiple nodes per worker requires resource requests",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:                  "dse",
 					ServerVersion:               "6.8.4",
 					Config:                      json.RawMessage(`{}`),
@@ -313,11 +314,11 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Allow multiple nodes per worker requires resource requests",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:                  "dse",
 					ServerVersion:               "6.8.4",
 					Config:                      json.RawMessage(`{}`),
@@ -328,15 +329,15 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Prevent user specified cassandra.datastax.com Service labels and annotations",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "4.0.4",
-					AdditionalServiceConfig: ServiceConfig{
-						DatacenterService: ServiceConfigAdditions{
+					AdditionalServiceConfig: api.ServiceConfig{
+						DatacenterService: api.ServiceConfigAdditions{
 							Labels:      map[string]string{"cassandra.datastax.com/key1": "val1"},
 							Annotations: map[string]string{"cassandra.datastax.com/key2": "val2"},
 						},
@@ -347,15 +348,15 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Allow user specified k8ssandra.io Service labels and annotations",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "cassandra",
 					ServerVersion: "4.0.4",
-					AdditionalServiceConfig: ServiceConfig{
-						DatacenterService: ServiceConfigAdditions{
+					AdditionalServiceConfig: api.ServiceConfig{
+						DatacenterService: api.ServiceConfigAdditions{
 							Labels:      map[string]string{"k8ssandra.io/key1": "val1"},
 							Annotations: map[string]string{"k8ssandra.io/key2": "val2"},
 						},
@@ -366,14 +367,14 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Allow upgrade should not accept invalid values",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 					Annotations: map[string]string{
 						"cassandra.datastax.com/autoupdate-spec": "invalid",
 					},
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "dse",
 					ServerVersion: "6.8.42",
 				},
@@ -382,14 +383,14 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 		},
 		{
 			name: "Allow upgrade should accept once value",
-			dc: &CassandraDatacenter{
+			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 					Annotations: map[string]string{
 						"cassandra.datastax.com/autoupdate-spec": "once",
 					},
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ServerType:    "dse",
 					ServerVersion: "6.8.42",
 				},
@@ -400,7 +401,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateSingleDatacenter(*tt.dc)
+			err := ValidateSingleDatacenter(tt.dc)
 			if err == nil {
 				if tt.errString != "" {
 					t.Errorf("ValidateSingleDatacenter() err = %v, want %v", err, tt.errString)
@@ -422,22 +423,22 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		oldDc     *CassandraDatacenter
-		newDc     *CassandraDatacenter
+		oldDc     *api.CassandraDatacenter
+		newDc     *api.CassandraDatacenter
 		errString string
 	}{
 		{
 			name: "No significant changes",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ClusterName:                 "oldname",
 					AllowMultipleNodesPerWorker: false,
 					SuperuserSecretName:         "hush",
 					DeprecatedServiceAccount:    "admin",
-					StorageConfig: StorageConfig{
+					StorageConfig: api.StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
@@ -446,7 +447,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 							},
 						},
 					},
-					Racks: []Rack{{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
@@ -455,16 +456,16 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					}},
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ClusterName:                 "oldname",
 					AllowMultipleNodesPerWorker: false,
 					SuperuserSecretName:         "hush",
 					DeprecatedServiceAccount:    "admin",
-					StorageConfig: StorageConfig{
+					StorageConfig: api.StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
@@ -473,7 +474,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 							},
 						},
 					},
-					Racks: []Rack{{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
@@ -486,19 +487,19 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "Clustername changed",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ClusterName: "oldname",
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					ClusterName: "newname",
 				},
 			},
@@ -506,19 +507,19 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "DatacenterName changed",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					DatacenterName: "oldname",
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					DatacenterName: "newname",
 				},
 			},
@@ -526,19 +527,19 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "AllowMultipleNodesPerWorker changed",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					AllowMultipleNodesPerWorker: false,
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					AllowMultipleNodesPerWorker: true,
 				},
 			},
@@ -546,19 +547,19 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "SuperuserSecretName changed",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					SuperuserSecretName: "hush",
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					SuperuserSecretName: "newsecret",
 				},
 			},
@@ -566,19 +567,19 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "ServiceAccount changed",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					DeprecatedServiceAccount: "admin",
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					DeprecatedServiceAccount: "newadmin",
 				},
 			},
@@ -586,12 +587,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "StorageConfig changes",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					StorageConfig: StorageConfig{
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
@@ -602,12 +603,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					},
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					StorageConfig: StorageConfig{
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteMany"},
@@ -622,12 +623,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "StorageClassName changes with storageConfig changes allowed",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					StorageConfig: StorageConfig{
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
@@ -638,15 +639,15 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					},
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 					Annotations: map[string]string{
-						AllowStorageChangesAnnotation: "true",
+						api.AllowStorageChangesAnnotation: "true",
 					},
 				},
-				Spec: CassandraDatacenterSpec{
-					StorageConfig: StorageConfig{
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 							StorageClassName: ptr.To[string]("new-server-data"),
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
@@ -661,12 +662,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "storage requests size changes with storageConfig changes allowed",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					StorageConfig: StorageConfig{
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
@@ -677,15 +678,15 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					},
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 					Annotations: map[string]string{
-						AllowStorageChangesAnnotation: "true",
+						api.AllowStorageChangesAnnotation: "true",
 					},
 				},
-				Spec: CassandraDatacenterSpec{
-					StorageConfig: StorageConfig{
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 							StorageClassName: storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
@@ -700,12 +701,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "Removing a rack",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					Racks: []Rack{{
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
@@ -714,12 +715,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					}},
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					Racks: []Rack{{
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack2",
@@ -730,23 +731,23 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "Scaling down",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					Racks: []Rack{{
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}},
 					Size: 6,
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					Racks: []Rack{{
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}},
 					Size: 3,
@@ -756,12 +757,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "Changed a rack name",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					Racks: []Rack{{
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
@@ -770,12 +771,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					}},
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					Racks: []Rack{{
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
 						Name: "rack0-changed",
 					}, {
 						Name: "rack1",
@@ -788,13 +789,13 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "Adding a rack is allowed if size increases",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					Size: 3,
-					Racks: []Rack{{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
@@ -803,13 +804,13 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					}},
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					Size: 4,
-					Racks: []Rack{{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
@@ -824,12 +825,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "Adding a rack is not allowed if size doesn't increase",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					Racks: []Rack{{
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
@@ -838,12 +839,12 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 					}},
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
-					Racks: []Rack{{
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
@@ -858,26 +859,26 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "Adding a rack is not allowed if size doesn't increase enough to prevent moving nodes from existing racks",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					Size: 9,
-					Racks: []Rack{{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
 					}},
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					Size: 11,
-					Racks: []Rack{{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
@@ -890,26 +891,26 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 		},
 		{
 			name: "Adding multiple racks is not allowed if size doesn't increase enough to prevent moving nodes from existing racks",
-			oldDc: &CassandraDatacenter{
+			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					Size: 9,
-					Racks: []Rack{{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
 					}},
 				},
 			},
-			newDc: &CassandraDatacenter{
+			newDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "exampleDC",
 				},
-				Spec: CassandraDatacenterSpec{
+				Spec: api.CassandraDatacenterSpec{
 					Size: 16,
-					Racks: []Rack{{
+					Racks: []api.Rack{{
 						Name: "rack0",
 					}, {
 						Name: "rack1",
@@ -926,7 +927,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateDatacenterFieldChanges(*tt.oldDc, *tt.newDc)
+			err := ValidateDatacenterFieldChanges(tt.oldDc, tt.newDc)
 			if err == nil {
 				if tt.errString != "" {
 					t.Errorf("ValidateDatacenterFieldChanges() err = %v, want %v", err, tt.errString)
@@ -950,12 +951,12 @@ var fqlEnabledConfig string = `{"cassandra-yaml": {
 }
 `
 
-func CreateCassDc(serverType string) CassandraDatacenter {
-	dc := CassandraDatacenter{
+func CreateCassDc(serverType string) *api.CassandraDatacenter {
+	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "exampleDC",
 		},
-		Spec: CassandraDatacenterSpec{
+		Spec: api.CassandraDatacenterSpec{
 			ServerType: serverType,
 		},
 	}

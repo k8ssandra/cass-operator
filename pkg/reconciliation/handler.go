@@ -14,6 +14,7 @@ import (
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/internal/result"
+	apiwebhook "github.com/k8ssandra/cass-operator/internal/webhooks/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 )
 
@@ -103,10 +104,10 @@ func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
 	errs = append(errs, rc.validateCassandraUserSecrets()...)
 
 	// Validate FQL config
-	errs = append(errs, api.ValidateFQLConfig(*dc))
+	errs = append(errs, apiwebhook.ValidateFQLConfig(dc))
 
 	// Validate Service labels and annotations
-	errs = append(errs, api.ValidateServiceLabelsAndAnnotations(*dc))
+	errs = append(errs, apiwebhook.ValidateServiceLabelsAndAnnotations(dc))
 
 	// Validate Management API config
 	errs = append(errs, httphelper.ValidateManagementApiConfig(dc, rc.Client, rc.Ctx)...)

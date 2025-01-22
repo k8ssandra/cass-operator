@@ -97,7 +97,6 @@ ignore the feature (components enabled in the default installation are marked wi
 | namespace | Create namespace before installation* |
 | webhook | Enable validation webhooks in cass-operator (requires cert-manager) * |
 | clusterscope | Install cass-operator in a cluster scope, monitoring all the namespaces |
-| auth-proxy | Protect Prometheus /metrics endpoint with api-server authentication |
 
 And following resource. Apply ``github.com/k8ssandra/cass-operator/config/`` before resource name if using remote installation:
 

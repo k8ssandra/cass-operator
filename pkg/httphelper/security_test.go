@@ -4,13 +4,22 @@
 package httphelper
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/client-go/kubernetes/scheme"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func helperLoadBytes(t *testing.T, name string) []byte {
@@ -97,4 +106,54 @@ func Test_validatePrivateKey(t *testing.T) {
 	assert.Equal(
 		t, 1, len(errs),
 		"Should consider an empty key as an invalid key")
+}
+
+// Create Datacenter with managementAuth set to manual and TLS enabled, test that the client is created with the correct TLS configuration using
+// BuildManagementApiHttpClient method
+func TestBuildMTLSClient(t *testing.T) {
+	require := require.New(t)
+	require.NoError(api.AddToScheme(scheme.Scheme))
+	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
+
+	loadYaml := func(path string) (runtime.Object, error) {
+		bytes, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		obj, _, err := decode(bytes, nil, nil)
+		return obj, err
+	}
+
+	clientSecret, err := loadYaml(filepath.Join("..", "..", "tests", "testdata", "mtls-certs-client.yaml"))
+	require.NoError(err)
+
+	serverSecret, err := loadYaml(filepath.Join("..", "..", "tests", "testdata", "mtls-certs-server.yaml"))
+	require.NoError(err)
+
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "test-cluster",
+			ManagementApiAuth: api.ManagementApiAuthConfig{
+				Manual: &api.ManagementApiAuthManualConfig{
+					ClientSecretName: "mgmt-api-client-credentials",
+					ServerSecretName: "mgmt-api-server-credentials",
+				},
+			},
+		},
+	}
+
+	trackObjects := []runtime.Object{
+		clientSecret,
+		serverSecret,
+		dc,
+	}
+
+	client := fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
+	ctx := context.TODO()
+
+	httpClient, err := BuildManagementApiHttpClient(ctx, client, dc, nil)
+	require.NoError(err)
+
+	tlsConfig := httpClient.(*http.Client).Transport.(*http.Transport).TLSClientConfig
+	require.NotNil(tlsConfig)
 }

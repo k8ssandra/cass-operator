@@ -117,12 +117,12 @@ jobs:
     strategy:
       matrix:
         version:
-          - "6.8.52"
+          - "6.8.53"
         integration_test:
           - cdc_successful
         include:
-          - version: 6.8.52
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.52-ubi8 # DSE 6.8.52
+          - version: 6.8.53
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.53-ubi8 # DSE 6.8.53
             serverType: dse
             integration_test: "cdc_successful"
       fail-fast: true
@@ -231,27 +231,23 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.14"
+          - "4.0.15"
           - "4.1.7"
           - "5.0.2"
-          - "6.8.52"
-          - "6.9.4"
-          - "1.0.0"
+          - "6.8.53"
+          - "6.9.6"
         integration_test:
           - test_all_the_things
           - smoke_test_read_only_fs
         include:
-          - version: 6.8.52
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.52-ubi8 # DSE 6.8.52
+          - version: 6.8.53
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.53-ubi8 # DSE 6.8.53
             serverType: dse
-          - version: 6.9.4
-            serverImage: datastax/dse-mgmtapi-6_8:6.9.4-ubi # DSE 6.9.4
+          - version: 6.9.6
+            serverImage: datastax/dse-mgmtapi-6_8:6.9.6-ubi # DSE 6.9.6
             serverType: dse
-          - version: 1.0.0
-            serverImage: datastax/hcd:1.0.0-ubi # HCD 1.0.0
-            serverType: hcd
         exclude:
-          - version: 4.0.13
+          - version: 4.0.15
             integration_test: "smoke_test_read_only_fs"
       fail-fast: true
     runs-on: ubuntu-latest

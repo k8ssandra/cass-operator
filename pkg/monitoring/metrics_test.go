@@ -73,6 +73,20 @@ func TestMetricAdder(t *testing.T) {
 	require.NoError(err)
 	require.Equal("ready", status)
 
+	now := metav1.Now()
+	pods[1].SetDeletionTimestamp(&now)
+	UpdatePodStatusMetric(pods[1])
+	status, err = getCurrentPodStatus("pod1")
+	require.NoError(err)
+	require.Equal("terminating", status)
+
+	// Decommissioning should be prefered to Terminating if we are decommissioning the pod
+	pods[5].SetDeletionTimestamp(&now)
+	UpdatePodStatusMetric(pods[1])
+	status, err = getCurrentPodStatus("pod5")
+	require.NoError(err)
+	require.Equal("decommissioning", status)
+
 	RemoveDatacenterPods("ns", "cluster1", "datacenter1")
 	_, err = getCurrentPodStatus("pod4")
 	require.Error(err)

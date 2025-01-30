@@ -19,6 +19,7 @@ const (
 	PodStatusPending         PodStatus = "Pending"
 	PodStatusError           PodStatus = "Error"
 	PodStatusDecommissioning PodStatus = "Decommissioning"
+	PodStatusTerminating     PodStatus = "Terminating"
 )
 
 func getPodStatus(pod *corev1.Pod) PodStatus {
@@ -35,6 +36,9 @@ func getPodStatus(pod *corev1.Pod) PodStatus {
 		return PodStatusError
 	case corev1.PodRunning:
 	default:
+		if pod.GetDeletionTimestamp() != nil {
+			return PodStatusTerminating
+		}
 	}
 
 	allContainersReady := true

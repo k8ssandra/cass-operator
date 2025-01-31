@@ -370,7 +370,7 @@ type ServiceConfigAdditions struct {
 // Rack ...
 type Rack struct {
 	// The rack name
-	// +kubebuilder:validation:MinLength=2
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// Deprecated. Use nodeAffinityLabels instead. DeprecatedZone name to pin the rack, using node affinity

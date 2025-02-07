@@ -2005,11 +2005,8 @@ func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetad
 		for idx := range rc.desiredRackInformation {
 			rackInfo := rc.desiredRackInformation[idx]
 			statefulSet := rc.statefulSets[idx]
-			// for _, statefulSet := range rc.statefulSets {
 
 			maxPodRankInThisRack := rackInfo.NodeCount - 1
-
-			// maxPodRankInThisRack := *statefulSet.Spec.Replicas - 1
 			if podRankWithinRack <= maxPodRankInThisRack {
 
 				podName := getStatefulSetPodNameForIdx(statefulSet, int32(podRankWithinRack))
@@ -2272,12 +2269,14 @@ func (rc *ReconciliationContext) CheckCassandraNodeStatuses() result.ReconcileRe
 	dc := rc.Datacenter
 	logger := rc.ReqLogger
 
-	// Check that we have a HostID for every pod in the datacenter
+	// Check that we have a HostID for every pod in the datacenter that has started
 	for _, pod := range rc.dcPods {
-		nodeStatus, ok := dc.Status.NodeStatuses[pod.Name]
-		if !ok || nodeStatus.HostID == "" {
-			logger.Info("Missing host id", "pod", pod.Name)
-			return result.RequeueSoon(2)
+		if isServerStarted(pod) {
+			nodeStatus, ok := dc.Status.NodeStatuses[pod.Name]
+			if !ok || nodeStatus.HostID == "" {
+				logger.Info("Missing host id", "pod", pod.Name)
+				return result.RequeueSoon(2)
+			}
 		}
 	}
 

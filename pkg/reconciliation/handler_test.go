@@ -5,16 +5,19 @@ package reconciliation
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	v1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/utils/ptr"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -91,16 +94,33 @@ func TestProcessDeletion_FailedDelete(t *testing.T) {
 
 	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
+	rc.Datacenter.Spec.Size = 0
 
 	k8sMockClientList(mockClient, nil).
 		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*v1.PersistentVolumeClaimList)
-			arg.Items = []v1.PersistentVolumeClaim{{
+			_, ok := args.Get(1).(*corev1.PodList)
+			if ok {
+				if strings.HasPrefix(args.Get(2).(*client.ListOptions).FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
+					arg := args.Get(1).(*corev1.PodList)
+					arg.Items = []corev1.Pod{}
+				} else {
+					t.Fail()
+				}
+				return
+			}
+			arg := args.Get(1).(*corev1.PersistentVolumeClaimList)
+			arg.Items = []corev1.PersistentVolumeClaim{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pvc-1",
 				},
 			}}
-		})
+		}).Twice()
+
+	k8sMockClientGet(mockClient, nil).
+		Run(func(args mock.Arguments) {
+			arg := args.Get(2).(*appsv1.StatefulSet)
+			arg.Spec.Replicas = ptr.To[int32](0)
+		}).Once()
 
 	k8sMockClientDelete(mockClient, fmt.Errorf(""))
 
@@ -131,16 +151,31 @@ func TestProcessDeletion(t *testing.T) {
 
 	k8sMockClientList(mockClient, nil).
 		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*v1.PersistentVolumeClaimList)
-			arg.Items = []v1.PersistentVolumeClaim{{
+			_, ok := args.Get(1).(*corev1.PodList)
+			if ok {
+				if strings.HasPrefix(args.Get(2).(*client.ListOptions).FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
+					arg := args.Get(1).(*corev1.PodList)
+					arg.Items = []corev1.Pod{}
+				} else {
+					t.Fail()
+				}
+				return
+			}
+			arg := args.Get(1).(*corev1.PersistentVolumeClaimList)
+			arg.Items = []corev1.PersistentVolumeClaim{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pvc-1",
 				},
 			}}
-		}) // ListPods
+		}).Twice() // ListPods
 
 	k8sMockClientDelete(mockClient, nil) // Delete PVC
 	k8sMockClientUpdate(mockClient, nil) // Remove dc finalizer
+	k8sMockClientGet(mockClient, nil).
+		Run(func(args mock.Arguments) {
+			arg := args.Get(2).(*appsv1.StatefulSet)
+			arg.Spec.Replicas = ptr.To[int32](0)
+		}).Once()
 
 	emptySecretWatcher(t, rc)
 

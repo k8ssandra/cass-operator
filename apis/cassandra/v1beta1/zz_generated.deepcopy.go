@@ -411,6 +411,11 @@ func (in *CassandraDatacenterStatus) DeepCopyInto(out *CassandraDatacenterStatus
 		*out = make([]v1.ObjectReference, len(*in))
 		copy(*out, *in)
 	}
+	if in.FailedStarts != nil {
+		in, out := &in.FailedStarts, &out.FailedStarts
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.DatacenterName != nil {
 		in, out := &in.DatacenterName, &out.DatacenterName
 		*out = new(string)

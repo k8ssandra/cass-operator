@@ -113,6 +113,9 @@ func RemoveValueFromStringArray(a []string, v string) []string {
 }
 
 func AppendValuesToStringArrayIfNotPresent(a []string, values ...string) []string {
+	if a == nil {
+		a = make([]string, 0)
+	}
 	for _, v := range values {
 		idx := IndexOfString(a, v)
 		if idx < 0 {

@@ -1774,7 +1774,7 @@ func TestFailedStart(t *testing.T) {
 
 	// Patch labelStarting, lastNodeStarted..
 	k8sMockClientPatch(mockClient, nil).Once()
-	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
+	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Twice()
 
 	res := &http.Response{
 		StatusCode: http.StatusInternalServerError,
@@ -1823,6 +1823,7 @@ func TestFailedStart(t *testing.T) {
 	close(fakeRecorder.Events)
 	// Should have 2 events, one to indicate Cassandra is starting, one to indicate it failed to start
 	assert.Equal(t, 2, len(fakeRecorder.Events))
+	assert.Equal(t, rc.Datacenter.Status.FailedStarts[0], pod.Name)
 }
 
 func TestStartBootstrappedNodes(t *testing.T) {
@@ -2122,6 +2123,136 @@ func TestStartBootstrappedNodes(t *testing.T) {
 	}
 }
 
+func TestStartingSequenceBuilder(t *testing.T) {
+
+	type podStart struct {
+		started      bool
+		failedStarts int
+	}
+
+	pod := func(started bool) podStart {
+		return podStart{started: started, failedStarts: 0}
+	}
+
+	podFailed := func(started bool, failedStarts int) podStart {
+		return podStart{started: started, failedStarts: failedStarts}
+	}
+
+	type racks map[string][]podStart
+
+	tests := []struct {
+		name  string
+		racks racks
+		want  []string
+	}{
+		{
+			name: "balanced racks, all started",
+			racks: racks{
+				"rack1": {pod(true), pod(true), pod(true)},
+				"rack2": {pod(true), pod(true), pod(true)},
+				"rack3": {pod(true), pod(true), pod(true)},
+			},
+			want: []string{},
+		},
+		{
+			name: "balanced racks, some pods not started",
+			racks: racks{
+				"rack1": {pod(true), pod(true), pod(true)},
+				"rack2": {pod(false), pod(true), pod(true)},
+				"rack3": {pod(false), pod(true), pod(true)},
+			},
+			want: []string{"rack2-0", "rack3-0"},
+		},
+		{
+			name: "balanced racks, some pod have failed after initial start",
+			racks: racks{
+				"rack1": {pod(true), pod(true), pod(true)},
+				"rack2": {pod(true), pod(false), pod(true)},
+				"rack3": {pod(true), pod(true), pod(false)},
+			},
+			want: []string{"rack3-2", "rack2-1"},
+		},
+		{
+			name: "balanced racks, some racks have more unstarted than other racks",
+			racks: racks{
+				"rack1": {pod(true), pod(true), pod(true)},
+				"rack2": {pod(false), pod(true), pod(true)},
+				"rack3": {pod(false), pod(false), pod(true)},
+			},
+			want: []string{"rack3-1", "rack2-0", "rack3-0"},
+		},
+		{
+			name: "balanced racks, some racks have failed starts",
+			racks: racks{
+				"rack1": {pod(true), pod(true), podFailed(false, 1)},
+				"rack2": {pod(false), pod(true), pod(true)},
+				"rack3": {pod(false), pod(true), pod(true)},
+			},
+			want: []string{"rack2-0", "rack3-0", "rack1-2"},
+		},
+		{
+			name: "unbalanced racks, some pods not started",
+			racks: racks{
+				"rack1": {pod(true), pod(true), pod(true)},
+				"rack2": {pod(false), pod(true)},
+				"rack3": {pod(true), pod(false), pod(true)},
+			},
+			want: []string{"rack3-1", "rack2-0"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, _ := setupTest()
+			rc.statefulSets = nil
+			for _, rackName := range []string{"rack1", "rack2", "rack3"} {
+				rackPods := tt.racks[rackName]
+				sts := &appsv1.StatefulSet{
+					ObjectMeta: metav1.ObjectMeta{Name: rackName},
+					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
+				}
+				rc.statefulSets = append(rc.statefulSets, sts)
+				podCount := len(rackPods)
+				rc.desiredRackInformation = append(rc.desiredRackInformation, &RackInformation{
+					NodeCount: podCount,
+					RackName:  rackName,
+				})
+				for i, pod := range rackPods {
+					p := &corev1.Pod{}
+					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
+					p.Labels = map[string]string{}
+					p.Status.ContainerStatuses = []corev1.ContainerStatus{
+						{
+							Name: "cassandra",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{
+									StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
+								},
+							},
+							Ready: bool(pod.started),
+						},
+					}
+					p.Status.PodIP = "127.0.0.1"
+					if pod.started {
+						p.Labels[api.CassNodeState] = stateStarted
+					} else {
+						p.Labels[api.CassNodeState] = stateReadyToStart
+					}
+					if pod.failedStarts > 0 {
+						rc.Datacenter.Status.FailedStarts = append(rc.Datacenter.Status.FailedStarts, p.Name)
+					}
+					rc.dcPods = append(rc.dcPods, p)
+				}
+			}
+			podStartingSeq := rc.createStartSequence()
+			got := []string{}
+			for _, pod := range podStartingSeq {
+				got = append(got, pod.Name)
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestReconciliationContext_startAllNodes(t *testing.T) {
 
 	// A boolean representing the state of a pod (started or not).
@@ -2148,9 +2279,9 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 		{
 			name: "balanced racks, some pods not started",
 			racks: racks{
-				"rack1": {true, true, false},
-				"rack2": {true, false, false},
-				"rack3": {true, false, false},
+				"rack1": {false, true, true},
+				"rack2": {false, false, true},
+				"rack3": {false, false, true},
 			},
 			wantNotReady: true,
 			wantEvents:   []string{"Normal StartingCassandra Starting Cassandra for pod rack2-1"},

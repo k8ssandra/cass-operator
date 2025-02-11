@@ -13,8 +13,11 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#718](https://github.com/k8ssandra/cass-operator/issues/718) Update Kubernetes dependencies to 0.31.0 and controller-runtime to 0.19.x, remove controller-config and instead return command line options as the only way to modify controller-runtime options. cass-operator specific configuration will still remain in the OperatorConfig CRD. Removes kube-auth from the /metrics endpoint from our generated configs and instead adds network-policy generation as one optional module for Kustomize.
 * [CHANGE] [#527](https://github.com/k8ssandra/cass-operator/issues/527) Migrate the Kustomize configuration to Kustomize 5 only. Support for using Kustomize 4.x to generate config is no longer supported.
+* [CHANGE] [#757](https://github.com/k8ssandra/cass-operator/issues/757) Change starting sequence of pods to match StatefulSet controller's behavior. First start the last pod and move towards 0.
 * [ENHANCEMENT] [#729](https://github.com/k8ssandra/cass-operator/issues/729) Modify NewMgmtClient to support additional transport option for the http.Client
 * [ENHANCEMENT] [#737](https://github.com/k8ssandra/cass-operator/issues/737) Before issuing PVC deletion when deleting a datacenter, verify the PVCs that match the labels are not actually used by any pods.
+* [ENHANCEMENT] [#750]((https://github.com/k8ssandra/cass-operator/issues/737) If Pod fails to start, it is moved to the last position in the starting sequence and some other pod is started first. This is to prevent a single failing pod from blocking the start of other pods.
+* [BUGFIX] [#744](https://github.com/k8ssandra/cass-operator/issues/744) If StatefulSet was manually modified outside CassandraDatacenter, do not start such pods as they would need to be decommissioned instantly and could have IP conflict issues when doing so.
 
 ## v1.23.0
 

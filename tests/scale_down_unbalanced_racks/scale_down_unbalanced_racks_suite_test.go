@@ -73,8 +73,8 @@ var _ = Describe(testName, func() {
 
 			extraPod := "cluster1-dc1-r2-sts-2"
 
-			step = "check that the extra pod is ready"
-			json = "jsonpath={.items[*].status.containerStatuses[0].ready}"
+			step = "check that the extra pod is created"
+			json = "jsonpath={.items[*].status.initContainerStatuses[0].ready}"
 			k = kubectl.Get("pod").
 				WithFlag("field-selector", fmt.Sprintf("metadata.name=%s", extraPod)).
 				FormatOutput(json)

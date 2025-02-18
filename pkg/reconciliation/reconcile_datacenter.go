@@ -84,17 +84,24 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 			return result.Error(err)
 		}
 
-		if res := rc.CheckRackCreation(); res.Completed() {
-			return res
-		}
-
 		waitingForRackScale := false
-		for _, sts := range rc.statefulSets {
-			currentReplicas := int(*sts.Spec.Replicas)
-			if currentReplicas > 0 {
-				waitingForRackScale = true
-				if err := rc.UpdateRackNodeCount(sts, 0); err != nil {
-					return result.Error(err)
+		for _, rackInfo := range rc.desiredRackInformation {
+			sts, statefulSetFound, err := rc.GetStatefulSetForRack(rackInfo)
+			if err != nil {
+				rc.ReqLogger.Error(
+					err,
+					"Could not locate statefulSet for",
+					"Rack", rackInfo.RackName)
+				return result.Error(err)
+			}
+
+			if statefulSetFound {
+				currentReplicas := int(*sts.Spec.Replicas)
+				if currentReplicas > 0 {
+					waitingForRackScale = true
+					if err := rc.UpdateRackNodeCount(sts, 0); err != nil {
+						return result.Error(err)
+					}
 				}
 			}
 		}

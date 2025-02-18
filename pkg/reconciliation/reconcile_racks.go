@@ -378,14 +378,15 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 func (rc *ReconciliationContext) CheckRackPodTemplate(force bool) result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
-	logger.Info("reconcile_racks::CheckRackPodTemplate")
+	logger.Info("reconcile_racks::CheckRackPodTemplate", "force", force)
 
 	for idx := range rc.desiredRackInformation {
 		rackName := rc.desiredRackInformation[idx].RackName
 		if force {
 			forceRacks := dc.Spec.ForceUpgradeRacks
 			if len(forceRacks) > 0 {
-				if utils.IndexOfString(forceRacks, rackName) <= 0 {
+				if utils.IndexOfString(forceRacks, rackName) < 0 {
+					logger.Info("Skipping this rack because it isn't defined in the forceUpgradeRacks", "rackName", rackName)
 					continue
 				}
 			}

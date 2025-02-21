@@ -328,6 +328,31 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 	return nil
 }
 
+func (client *NodeMgmtClient) CallLivenessEndpoint(pod *corev1.Pod) error {
+	client.Log.Info("requesting Cassandra liveness from Node Management API", "pod", pod.Name)
+
+	podHost, podPort, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v0/probes/liveness",
+		host:     podHost,
+		port:     podPort,
+		method:   http.MethodGet,
+		timeout:  60 * time.Second,
+	}
+
+	res, err := callNodeMgmtEndpoint(client, request, "")
+	client.Log.Info("requesting Cassandra liveness from Node Management API succeeded ", "pod", pod.Name, "response", res)
+	if err != nil {
+		return err
+
+	}
+	return nil
+}
+
 // CallDropRoleEndpoint drops an existing role from the cluster
 func (client *NodeMgmtClient) CallDropRoleEndpoint(pod *corev1.Pod, username string) error {
 	client.Log.Info(

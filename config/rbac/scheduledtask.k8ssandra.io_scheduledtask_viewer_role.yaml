@@ -1,0 +1,23 @@
+# permissions for end users to view scheduledtasks.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: cass-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: scheduledtask.k8ssandra.io-scheduledtask-viewer-role
+rules:
+- apiGroups:
+  - scheduledtask.k8ssandra.io.cassandra.datastax.com
+  resources:
+  - scheduledtasks
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - scheduledtask.k8ssandra.io.cassandra.datastax.com
+  resources:
+  - scheduledtasks/status
+  verbs:
+  - get

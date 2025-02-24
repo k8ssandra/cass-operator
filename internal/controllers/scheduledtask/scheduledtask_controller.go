@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	controlapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	scheduledtaskv1alpha1 "github.com/k8ssandra/cass-operator/apis/scheduledtask.k8ssandra.io/v1alpha1"
@@ -32,7 +33,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ScheduledTaskReconciler reconciles a ScheduledTask object
@@ -40,6 +40,7 @@ type ScheduledTaskReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	Clock  Clock
+	Log    logr.Logger
 }
 
 type Clock interface {
@@ -56,9 +57,6 @@ func (r *RealClock) Now() time.Time {
 // +kubebuilder:rbac:groups=scheduledtask.k8ssandra.io.cassandra.datastax.com,resources=scheduledtasks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=scheduledtask.k8ssandra.io.cassandra.datastax.com,resources=scheduledtasks/finalizers,verbs=update
 func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-	logger := log.FromContext(ctx).WithValues("medusabackupscheduler", req.NamespacedName)
-
 	scheduledtask := &scheduledtaskv1alpha1.ScheduledTask{}
 	err := r.Get(ctx, req.NamespacedName, scheduledtask)
 	if err != nil {
@@ -74,21 +72,21 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	dcKey := types.NamespacedName{Namespace: scheduledtask.Namespace, Name: scheduledtask.Spec.TaskDetails.Datacenter.Name}
 	dc := &api.CassandraDatacenter{}
 	if err := r.Get(ctx, dcKey, dc); err != nil {
-		logger.Error(err, "failed to get cassandradatacenter", "CassandraDatacenter", dcKey)
+		r.Log.Error(err, "failed to get cassandradatacenter", "CassandraDatacenter", dcKey)
 		return ctrl.Result{}, err
 	}
 
 	// Set an owner reference on the task so that it can be cleaned up when the cassandra datacenter is deleted
 	if scheduledtask.OwnerReferences == nil {
 		if err = controllerutil.SetControllerReference(dc, scheduledtask, r.Scheme); err != nil {
-			logger.Error(err, "failed to set controller reference", "CassandraDatacenter", dcKey)
+			r.Log.Error(err, "failed to set controller reference", "CassandraDatacenter", dcKey)
 			return ctrl.Result{}, err
 		}
 		if err = r.Update(ctx, scheduledtask); err != nil {
-			logger.Error(err, "failed to update task with owner reference", "CassandraDatacenter", dcKey)
+			r.Log.Error(err, "failed to update task with owner reference", "CassandraDatacenter", dcKey)
 			return ctrl.Result{}, err
 		} else {
-			logger.Info("updated task with owner reference", "CassandraDatacenter", dcKey)
+			r.Log.Info("updated task with owner reference", "CassandraDatacenter", dcKey)
 		}
 	}
 
@@ -108,11 +106,11 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if scheduledtask.Spec.TaskDetails.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 			for _, job := range scheduledtask.Spec.TaskDetails.Jobs {
 				if activeTasks, err := r.activeTasks(scheduledtask, dc, job.Command); err != nil {
-					logger.V(1).Info("failed to get activeTasks", "error", err)
+					r.Log.V(1).Info("failed to get activeTasks", "error", err)
 					return ctrl.Result{}, err
 				} else {
 					if activeTasks > 0 {
-						logger.V(1).Info("Postponing backup schedule due to an unfinished existing job", "MedusaBackupSchedule", req.NamespacedName)
+						r.Log.V(1).Info("Postponing backup schedule due to an unfinished existing job", "MedusaBackupSchedule", req.NamespacedName)
 						return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 					}
 				}
@@ -134,7 +132,7 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	generatedName := fmt.Sprintf("%s-%d", scheduledtask.Name, now.Unix())
-	logger.V(1).Info("Scheduled time has been reached, creating a cassandraTask", "CassandraTask name", generatedName)
+	r.Log.V(1).Info("Scheduled time has been reached, creating a cassandraTask", "CassandraTask name", generatedName)
 	cassandraTask := &controlapi.CassandraTask{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      generatedName,
@@ -150,7 +148,7 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	nextRunTime := nextExecution.Sub(now)
-	logger.V(1).Info("Requeing for next scheduled event", "nextRuntime", nextRunTime.String())
+	r.Log.V(1).Info("Requeing for next scheduled event", "nextRuntime", nextRunTime.String())
 	return ctrl.Result{}, nil
 }
 

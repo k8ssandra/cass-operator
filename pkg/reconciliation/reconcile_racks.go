@@ -2062,6 +2062,17 @@ func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart
 					"Labeled pod a seed node %s", pod.Name)
 			}
 
+			// Check if pod is live before starting server
+			isAlive, err := rc.waitForPodLiveness(pod)
+			if err != nil {
+				return true, err
+			}
+			if isAlive {
+				if err := rc.startCassandra(endpointData, pod); err != nil {
+					return true, err
+				}
+			}
+
 			if err := rc.startCassandra(endpointData, pod); err != nil {
 				return true, err
 			}
@@ -2069,6 +2080,29 @@ func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart
 		return true, nil
 	}
 	return false, nil
+}
+
+func (rc *ReconciliationContext) waitForPodLiveness(pod *corev1.Pod) (bool, error) {
+	timeout := time.After(5 * time.Minute)    // Timeout after 5 minutes
+	ticker := time.NewTicker(5 * time.Second) // Retry every 5 seconds
+
+	for {
+		select {
+		case <-timeout:
+			// Timeout reached
+			rc.ReqLogger.Info("Timed out after 15 minutes of retries")
+			return false, nil
+		case <-ticker.C:
+			// Call the Liveness endpoint
+			if err := rc.NodeMgmtClient.CallLivenessEndpoint(pod); err != nil {
+				rc.ReqLogger.Info("Liveness probe failing before starting pod " + pod.Name + " with error " + err.Error())
+				continue
+			}
+			// If no error, return success
+			rc.ReqLogger.Info("Liveness probe succeeded for pod " + pod.Name)
+			return true, nil
+		}
+	}
 }
 
 func (rc *ReconciliationContext) countReadyAndStarted() (int, int) {

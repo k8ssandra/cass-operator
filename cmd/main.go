@@ -47,8 +47,8 @@ import (
 	controlv1alpha1 "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	controllers "github.com/k8ssandra/cass-operator/internal/controllers/cassandra"
 	controlcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/control"
-	apiwebhook "github.com/k8ssandra/cass-operator/internal/webhooks/cassandra/v1beta1"
 	scheduledtaskcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/scheduledtask"
+	apiwebhook "github.com/k8ssandra/cass-operator/internal/webhooks/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
@@ -200,13 +200,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if err = (&controlcontrollers.CassandraTaskReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "CassandraTask")
-		os.Exit(1)
-	}
 
 	if err := mgr.GetCache().IndexField(ctx, &corev1.Pod{}, "spec.volumes.persistentVolumeClaim.claimName", func(obj client.Object) []string {
 		pod, ok := obj.(*corev1.Pod)
@@ -223,28 +216,37 @@ func main() {
 		return pvcNames
 	}); err != nil {
 		setupLog.Error(err, "unable to set up field indexer")
-	if err = (&scheduledtaskcontrollers.ScheduledTaskReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ScheduledTask"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ScheduledTask")
-		os.Exit(1)
-	}
+		if err = (&scheduledtaskcontrollers.ScheduledTaskReconciler{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("ScheduledTask"),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ScheduledTask")
+			os.Exit(1)
+		}
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
-	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
-	}
+		if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+			setupLog.Error(err, "unable to set up health check")
+			os.Exit(1)
+		}
+		if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+			setupLog.Error(err, "unable to set up ready check")
+			os.Exit(1)
+		}
 
-	setupLog.Info("starting manager")
-	if err := mgr.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+		if err = (&controlcontrollers.CassandraTaskReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "CassandraTask")
+			os.Exit(1)
+		}
+
+		setupLog.Info("starting manager")
+		if err := mgr.Start(ctx); err != nil {
+			setupLog.Error(err, "problem running manager")
+			os.Exit(1)
+		}
 	}
 }
 

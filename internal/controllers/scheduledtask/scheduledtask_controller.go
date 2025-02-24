@@ -92,7 +92,7 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	defaults(scheduledtask)
 
-	previousExecution, err := getPreviousExecutionTime(ctx, scheduledtask)
+	previousExecution, err := getPreviousExecutionTime(scheduledtask)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -165,7 +165,7 @@ func defaults(scheduledtask *scheduledtaskv1alpha1.ScheduledTask) {
 	}
 }
 
-func getPreviousExecutionTime(ctx context.Context, scheduledtask *scheduledtaskv1alpha1.ScheduledTask) (time.Time, error) {
+func getPreviousExecutionTime(scheduledtask *scheduledtaskv1alpha1.ScheduledTask) (time.Time, error) {
 	previousExecution := scheduledtask.Status.LastExecution
 
 	if previousExecution.IsZero() {

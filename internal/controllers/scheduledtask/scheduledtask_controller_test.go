@@ -189,10 +189,10 @@ func TestScheduler(t *testing.T) {
 	require.NoError(err)
 	require.Equal(2, len(cassandraTasks.Items))
 
-	cassandraTaskLive := &taskapi.CassandraTask{}
-	err = fakeClient.Get(context.TODO(), nsName, cassandraTaskLive)
+	scheduledTaskLive = &scheduledtaskv1alpha1.ScheduledTask{}
+	err = fakeClient.Get(context.TODO(), nsName, scheduledTaskLive)
 	require.NoError(err)
-	require.Equal(previousExecutionTime, cassandraTaskLive.Status.CompletionTime)
+	require.Equal(previousExecutionTime, scheduledTaskLive.Status.LastExecution)
 }
 
 func TestSchedulerParseError(t *testing.T) {

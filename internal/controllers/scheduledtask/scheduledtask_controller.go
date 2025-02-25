@@ -181,21 +181,17 @@ func getPreviousExecutionTime(scheduledtask *scheduledtaskv1alpha1.ScheduledTask
 }
 
 func (r *ScheduledTaskReconciler) activeTasks(scheduledtask *scheduledtaskv1alpha1.ScheduledTask, dc *api.CassandraDatacenter, command controlapi.CassandraCommand) (int, error) {
-	tasks := &scheduledtaskv1alpha1.ScheduledTaskList{}
+	tasks := &controlapi.CassandraTaskList{}
 	if err := r.Client.List(context.Background(), tasks, client.InNamespace(scheduledtask.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
 		return 0, err
 	}
-	activeJobs := make([]scheduledtaskv1alpha1.ScheduledTask, 0)
+	activeJobs := make([]controlapi.CassandraJob, 0)
 	for _, task := range tasks.Items {
-		cassTask := controlapi.CassandraTask{}
-		if err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: task.Namespace, Name: task.Spec.TaskDetails.Name}, &cassTask); err != nil {
-			return 0, err
-		}
-		for _, job := range cassTask.Spec.Jobs {
+		for _, job := range task.Spec.Jobs {
 			if job.Command != command {
 				continue
 			} else {
-				activeJobs = append(activeJobs, task)
+				activeJobs = append(activeJobs, job)
 			}
 		}
 	}

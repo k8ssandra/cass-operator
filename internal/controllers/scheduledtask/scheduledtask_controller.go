@@ -53,9 +53,6 @@ func (r *RealClock) Now() time.Time {
 	return time.Now()
 }
 
-// +kubebuilder:rbac:groups=scheduledtask.k8ssandra.io,resources=scheduledtasks,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=scheduledtask.k8ssandra.io,resources=scheduledtasks/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=scheduledtask.k8ssandra.io,resources=scheduledtasks/finalizers,verbs=update
 func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	scheduledtask := &scheduledtaskv1alpha1.ScheduledTask{}
 	err := r.Get(ctx, req.NamespacedName, scheduledtask)

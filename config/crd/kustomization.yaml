@@ -4,7 +4,7 @@
 resources:
 - bases/cassandra.datastax.com_cassandradatacenters.yaml
 - bases/control.k8ssandra.io_cassandratasks.yaml
-- bases/scheduledtask.k8ssandra.io.cassandra.datastax.com_scheduledtasks.yaml
+- bases/scheduledtask.k8ssandra.io_scheduledtasks.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 #    name: controller-manager

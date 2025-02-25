@@ -8,7 +8,7 @@ metadata:
   name: scheduledtask.k8ssandra.io-scheduledtask-editor-role
 rules:
 - apiGroups:
-  - scheduledtask.k8ssandra.io.cassandra.datastax.com
+  - scheduledtask.k8ssandra.io
   resources:
   - scheduledtasks
   verbs:
@@ -20,7 +20,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - scheduledtask.k8ssandra.io.cassandra.datastax.com
+  - scheduledtask.k8ssandra.io
   resources:
   - scheduledtasks/status
   verbs:

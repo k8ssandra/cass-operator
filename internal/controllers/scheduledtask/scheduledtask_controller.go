@@ -98,6 +98,7 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	now := r.Clock.Now().UTC()
+	createTask := false
 
 	// Calculate the next execution time
 	nextExecution := sched.Next(previousExecution).UTC()
@@ -118,6 +119,7 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		nextExecution = sched.Next(now)
 		previousExecution = now
+		createTask = true
 	}
 
 	// Update the status if there are modifications
@@ -131,25 +133,27 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	generatedName := fmt.Sprintf("%s-%d", scheduledtask.Name, now.Unix())
-	r.Log.V(1).Info("Scheduled time has been reached, creating a cassandraTask", "CassandraTask name", generatedName)
-	cassandraTask := &controlapi.CassandraTask{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      generatedName,
-			Namespace: scheduledtask.Namespace,
-			Labels:    dc.GetDatacenterLabels(),
-		},
-		Spec: scheduledtask.Spec.TaskDetails.CassandraTaskSpec,
-	}
+	if createTask {
 
-	if err := r.Client.Create(ctx, cassandraTask); err != nil {
-		// We've already updated the Status times.. we'll miss this job now?
-		return ctrl.Result{}, err
-	}
+		generatedName := fmt.Sprintf("%s-%d", scheduledtask.Name, now.Unix())
+		r.Log.V(1).Info("Scheduled time has been reached, creating a cassandraTask", "CassandraTask name", generatedName)
+		cassandraTask := &controlapi.CassandraTask{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      generatedName,
+				Namespace: scheduledtask.Namespace,
+				Labels:    dc.GetDatacenterLabels(),
+			},
+			Spec: scheduledtask.Spec.TaskDetails.CassandraTaskSpec,
+		}
 
+		if err := r.Client.Create(ctx, cassandraTask); err != nil {
+			// We've already updated the Status times.. we'll miss this job now?
+			return ctrl.Result{}, err
+		}
+	}
 	nextRunTime := nextExecution.Sub(now)
 	r.Log.V(1).Info("Requeing for next scheduled event", "nextRuntime", nextRunTime.String())
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: nextRunTime}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -190,7 +190,7 @@ func (r *ScheduledTaskReconciler) activeTasks(scheduledtask *scheduledtaskv1alph
 		for _, job := range task.Spec.Jobs {
 			if job.Command != command {
 				continue
-			} else {
+			} else if task.Status.CompletionTime == nil {
 				activeJobs = append(activeJobs, job)
 			}
 		}

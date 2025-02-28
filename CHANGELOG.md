@@ -9,6 +9,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [BUGFIX] [#765](https://github.com/k8ssandra/cass-operator/issues/765) Fix CheckRackPodLabels to use statefulSet.Spec.Replicas instead of .Status.Replicas to verify all the current pods and their labels
+
 ## v1.23.0
 
 * [CHANGE] [#720](https://github.com/k8ssandra/cass-operator/issues/720) Always use ObjectMeta.Name for the PodDisruptionBudget resource name, not the DatacenterName

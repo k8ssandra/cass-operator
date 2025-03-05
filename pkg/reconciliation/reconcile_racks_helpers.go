@@ -62,8 +62,8 @@ func FindIpForHostId(endpointData httphelper.CassMetadataEndpoints, hostId strin
 
 	// Search for a cassandra node that knows about the given hostId
 	for _, ep := range endpointData.Entity {
-		if ep.HostID == hostId && len(ep.GetRpcAddress()) > 0 {
-			return ep.GetRpcAddress(), nil
+		if ep.HostID == hostId && len(ep.EndpointAddress()) > 0 {
+			return ep.EndpointAddress(), nil
 		}
 	}
 

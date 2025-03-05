@@ -102,6 +102,13 @@ func (x *EndpointState) GetRpcAddress() string {
 	}
 }
 
+func (x *EndpointState) EndpointAddress() string {
+	if x.EndpointIP != "" {
+		return x.EndpointIP
+	}
+	return x.GetRpcAddress()
+}
+
 type CassMetadataEndpoints struct {
 	Entity []EndpointState `json:"entity"`
 }

@@ -13,6 +13,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#718](https://github.com/k8ssandra/cass-operator/issues/718) Update Kubernetes dependencies to 0.31.0 and controller-runtime to 0.19.x, remove controller-config and instead return command line options as the only way to modify controller-runtime options. cass-operator specific configuration will still remain in the OperatorConfig CRD. Removes kube-auth from the /metrics endpoint from our generated configs and instead adds network-policy generation as one optional module for Kustomize.
 * [CHANGE] [#527](https://github.com/k8ssandra/cass-operator/issues/527) Migrate the Kustomize configuration to Kustomize 5 only. Support for using Kustomize 4.x to generate config is no longer supported.
+* [CHANGE] [#763](https://github.com/k8ssandra/cass-operator/issues/763) If gossip information has ENDPOINT_IP, use it as the IP for the replacement job instead of NATIVE_ADDRESS_AND_PORT
 * [ENHANCEMENT] [#729](https://github.com/k8ssandra/cass-operator/issues/729) Modify NewMgmtClient to support additional transport option for the http.Client
 * [ENHANCEMENT] [#737](https://github.com/k8ssandra/cass-operator/issues/737) Before issuing PVC deletion when deleting a datacenter, verify the PVCs that match the labels are not actually used by any pods.
 * [BUGFIX] [#751](https://github.com/k8ssandra/cass-operator/issues/751) If datacenterName == "", do not use it as accepted value, threat it the same way as nil value

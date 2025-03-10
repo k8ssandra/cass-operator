@@ -13,6 +13,32 @@ rules:
   - list
   - watch
 - apiGroups:
+  - scheduledtask.k8ssandra.io
+  resources:
+  - scheduledtask
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - scheduledtask.k8ssandra.io
+  resources:
+  - scheduledtask/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - scheduledtask.k8ssandra.io
+  resources:
+  - scheduledtask/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - storage.k8s.io
   resources:
   - storageclasses
@@ -121,44 +147,6 @@ rules:
   - control.k8ssandra.io
   resources:
   - cassandratasks/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - policy
-  resources:
-  - poddisruptionbudgets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - scheduledtask.k8ssandra.io
-  resources:
-  - scheduledtask
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - scheduledtask.k8ssandra.io
-  resources:
-  - scheduledtask/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - scheduledtask.k8ssandra.io
-  resources:
-  - scheduledtask/status
   verbs:
   - get
   - patch

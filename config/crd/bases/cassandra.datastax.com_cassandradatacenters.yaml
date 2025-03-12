@@ -11757,6 +11757,12 @@ spec:
                   DatacenterName is the name of the override used for the CassandraDatacenter
                   This field is used to perform validation checks preventing a user from changing the override
                 type: string
+              failedStarts:
+                description: FailedStarts tracks the pods that failed to start by
+                  the operator last time it tried
+                items:
+                  type: string
+                type: array
               lastRollingRestart:
                 format: date-time
                 type: string

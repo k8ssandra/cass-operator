@@ -168,77 +168,83 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) failureModeDetection() bool {
-	for _, pod := range rc.dcPods {
-		if pod == nil {
-			continue
-		}
-		if pod.Status.Phase == corev1.PodPending {
-			if pod.Status.StartTime == nil || hasBeenXMinutes(5, pod.Status.StartTime.Time) {
-				// Pod has been over 5 minutes in Pending state. This can be normal, but lets see
-				// if we have some detected failures events like FailedScheduling
-				events := &corev1.EventList{}
-				if err := rc.Client.List(rc.Ctx, events, &client.ListOptions{Namespace: pod.Namespace, FieldSelector: fields.SelectorFromSet(fields.Set{"involvedObject.name": pod.Name})}); err != nil {
-					rc.ReqLogger.Error(err, "error getting events for pod", "pod", pod.Name)
-					return false
-				}
+func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
 
-				for _, event := range events.Items {
-					if event.Reason == "FailedScheduling" {
-						rc.ReqLogger.Info("Found FailedScheduling event for pod", "pod", pod.Name)
-						// We have a failed scheduling event
-						return true
+	for idx := range rc.desiredRackInformation {
+		rackInfo := rc.desiredRackInformation[idx]
+		rackPods := rc.rackPods(rackInfo.RackName)
+		for _, pod := range rackPods {
+			if pod == nil {
+				continue
+			}
+			rackName := pod.Labels[api.RackLabel]
+			if pod.Status.Phase == corev1.PodPending {
+				if pod.Status.StartTime == nil || hasBeenXMinutes(5, pod.Status.StartTime.Time) {
+					// Pod has been over 5 minutes in Pending state. This can be normal, but lets see
+					// if we have some detected failures events like FailedScheduling
+					events := &corev1.EventList{}
+					if err := rc.Client.List(rc.Ctx, events, &client.ListOptions{Namespace: pod.Namespace, FieldSelector: fields.SelectorFromSet(fields.Set{"involvedObject.name": pod.Name})}); err != nil {
+						rc.ReqLogger.Error(err, "error getting events for pod", "pod", pod.Name)
+						return false, ""
+					}
+
+					for _, event := range events.Items {
+						if event.Reason == "FailedScheduling" {
+							rc.ReqLogger.Info("Found FailedScheduling event for pod", "pod", pod.Name)
+							// We have a failed scheduling event, get the rack name
+							return true, rackName
+						}
 					}
 				}
 			}
-		}
 
-		// Pod could also be running / terminated, we need to find if any container is in crashing state
-		// Sadly, this state is ephemeral, so it can change between reconciliations
-		for _, containerStatus := range pod.Status.ContainerStatuses {
-			if containerStatus.State.Waiting != nil {
-				waitingReason := containerStatus.State.Waiting.Reason
-				if waitingReason == "CrashLoopBackOff" ||
-					waitingReason == "ImagePullBackOff" ||
-					waitingReason == "ErrImagePull" {
-					rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "reason", waitingReason)
-					// We have a container in a failing state
-					return true
+			// Pod could also be running / terminated, we need to find if any container is in crashing state
+			// Sadly, this state is ephemeral, so it can change between reconciliations
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				if containerStatus.State.Waiting != nil {
+					waitingReason := containerStatus.State.Waiting.Reason
+					if waitingReason == "CrashLoopBackOff" ||
+						waitingReason == "ImagePullBackOff" ||
+						waitingReason == "ErrImagePull" {
+						rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "reason", waitingReason)
+						// We have a container in a failing state
+						return true, rackName
+					}
 				}
-			}
-			if containerStatus.RestartCount > 2 {
-				if containerStatus.State.Terminated != nil {
-					if containerStatus.State.Terminated.ExitCode != 0 {
-						rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
-						return true
+				if containerStatus.RestartCount > 2 {
+					if containerStatus.State.Terminated != nil {
+						if containerStatus.State.Terminated.ExitCode != 0 {
+							rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
+							return true, rackName
+						}
 					}
 				}
 			}
-		}
-		// Check the same for initContainers
-		for _, containerStatus := range pod.Status.InitContainerStatuses {
-			if containerStatus.State.Waiting != nil {
-				waitingReason := containerStatus.State.Waiting.Reason
-				if waitingReason == "CrashLoopBackOff" ||
-					waitingReason == "ImagePullBackOff" ||
-					waitingReason == "ErrImagePull" {
-					// We have a container in a failing state
-					rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "reason", waitingReason)
-					return true
+			// Check the same for initContainers
+			for _, containerStatus := range pod.Status.InitContainerStatuses {
+				if containerStatus.State.Waiting != nil {
+					waitingReason := containerStatus.State.Waiting.Reason
+					if waitingReason == "CrashLoopBackOff" ||
+						waitingReason == "ImagePullBackOff" ||
+						waitingReason == "ErrImagePull" {
+						// We have a container in a failing state
+						rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "reason", waitingReason)
+						return true, rackName
+					}
 				}
-			}
-			if containerStatus.RestartCount > 2 {
-				if containerStatus.State.Terminated != nil {
-					if containerStatus.State.Terminated.ExitCode != 0 {
-						rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
-						return true
+				if containerStatus.RestartCount > 2 {
+					if containerStatus.State.Terminated != nil {
+						if containerStatus.State.Terminated.ExitCode != 0 {
+							rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
+							return true, rackName
+						}
 					}
 				}
 			}
 		}
 	}
 
-	return false
+	return false, ""
 }
 
 func (rc *ReconciliationContext) UpdateAllowed() bool {
@@ -375,21 +381,20 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) CheckRackPodTemplate(force bool) result.ReconcileResult {
+func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
+	return rc.CheckRackPodTemplateDetails(false, "")
+}
+
+func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedRackName string) result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
 	logger.Info("reconcile_racks::CheckRackPodTemplate", "force", force)
 
 	for idx := range rc.desiredRackInformation {
 		rackName := rc.desiredRackInformation[idx].RackName
-		if force {
-			forceRacks := dc.Spec.ForceUpgradeRacks
-			if len(forceRacks) > 0 {
-				if utils.IndexOfString(forceRacks, rackName) < 0 {
-					logger.Info("Skipping this rack because it isn't defined in the forceUpgradeRacks", "rackName", rackName)
-					continue
-				}
-			}
+		if force && rackName != failedRackName {
+			logger.Info("Skipping this rack because it isn't defined in the forceUpgradeRacks", "rackName", rackName, "failedRackName", failedRackName)
+			continue
 		}
 
 		if dc.Spec.CanaryUpgrade && idx > 0 {
@@ -432,11 +437,10 @@ func (rc *ReconciliationContext) CheckRackPodTemplate(force bool) result.Reconci
 		}
 
 		// Set the CassandraDatacenter as the owner and controller
-		err = setControllerReference(
+		if err := setControllerReference(
 			rc.Datacenter,
 			desiredSts,
-			rc.Scheme)
-		if err != nil {
+			rc.Scheme); err != nil {
 			logger.Error(err, "error calling setControllerReference for statefulset", "desiredSts.Namespace",
 				desiredSts.Namespace, "desireSts.Name", desiredSts.Name)
 			return result.Error(err)
@@ -517,8 +521,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplate(force bool) result.Reconci
 				}
 			}
 
-			// TODO Do we really want to modify spec here?
-
 			// we just updated k8s and pods will be knocked out of ready state, so let k8s
 			// call us back when these changes are done and the new pods are back to ready
 			return result.Done()
@@ -535,17 +537,22 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 	logger.Info("reconcile_racks::CheckRackForceUpgrade")
 
 	// Datacenter configuration isn't healthy, we allow upgrades here before pods start
-	if rc.failureModeDetection() {
+	if failed, rackName := rc.failureModeDetection(); failed {
 		logger.Info("Failure detected, forcing CheckRackPodTemplate()")
-		return rc.CheckRackPodTemplate(true)
+		return rc.CheckRackPodTemplateDetails(true, rackName)
 	}
 
-	forceRacks := dc.Spec.ForceUpgradeRacks
-	if len(forceRacks) == 0 {
-		return result.Continue()
+	for _, rackName := range dc.Spec.ForceUpgradeRacks {
+		if res := rc.CheckRackPodTemplateDetails(true, rackName); res.Completed() {
+			return res
+		}
 	}
+	// if len(forceRacks) == 0 {
+	// 	return result.Continue()
+	// }
+	// Do the rackFiltering here
 
-	return rc.CheckRackPodTemplate(true)
+	return result.Continue()
 }
 
 func (rc *ReconciliationContext) deleteStatefulSet(statefulSet *appsv1.StatefulSet) error {
@@ -2627,7 +2634,7 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 		return recResult.Output()
 	}
 
-	if recResult := rc.CheckRackPodTemplate(false); recResult.Completed() {
+	if recResult := rc.CheckRackPodTemplate(); recResult.Completed() {
 		return recResult.Output()
 	}
 

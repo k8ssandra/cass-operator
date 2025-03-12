@@ -286,7 +286,7 @@ func TestCheckRackPodTemplate_SetControllerRefOnStatefulSet(t *testing.T) {
 	}
 	rc.Datacenter.Spec.PodTemplateSpec = podTemplateSpec
 
-	result = rc.CheckRackPodTemplate(false)
+	result = rc.CheckRackPodTemplate()
 	assert.True(t, result.Completed())
 
 	assert.Equal(t, 1, invocations)
@@ -313,7 +313,7 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 		t.Fatalf("failed to add rack to cassandradatacenter: %s", err)
 	}
 
-	result = rc.CheckRackPodTemplate(false)
+	result = rc.CheckRackPodTemplate()
 	_, err := result.Output()
 
 	assert.True(t, result.Completed())
@@ -324,7 +324,7 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 	rc.Datacenter.Spec.ServerVersion = "6.8.44"
 	partition := rc.Datacenter.Spec.CanaryUpgradeCount
 
-	result = rc.CheckRackPodTemplate(false)
+	result = rc.CheckRackPodTemplate()
 	_, err = result.Output()
 
 	assert.True(t, result.Completed())
@@ -353,7 +353,7 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 
 	rc.Datacenter.Spec.CanaryUpgrade = false
 
-	result = rc.CheckRackPodTemplate(false)
+	result = rc.CheckRackPodTemplate()
 	assert.True(t, result.Completed())
 	assert.NotEqual(t, expectedStrategy, rc.statefulSets[0].Spec.UpdateStrategy)
 }
@@ -368,11 +368,13 @@ func TestCheckRackPodTemplate_GenerationCheck(t *testing.T) {
 	res := rc.CheckRackCreation()
 	assert.False(res.Completed(), "CheckRackCreation did not complete as expected")
 
+	// Verify that setting force will upgrade first rack only even if the statefulset is not healthy
+
 	// Update the generation manually and now verify we won't do updates to StatefulSets if the generation hasn't changed
 	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
 	rc.Datacenter.Spec.ServerVersion = "6.8.44"
 
-	res = rc.CheckRackPodTemplate(false)
+	res = rc.CheckRackPodTemplate()
 	assert.Equal(result.Continue(), res)
 	cond, found := rc.Datacenter.GetCondition(api.DatacenterRequiresUpdate)
 	assert.True(found)
@@ -389,7 +391,7 @@ func TestCheckRackPodTemplate_GenerationCheck(t *testing.T) {
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation, string(api.AllowUpdateAlways))
 	rc.Datacenter.Spec.ServerVersion = "6.8.44" // This needs to be reapplied, since we call Patch in the CheckRackPodTemplate()
 
-	res = rc.CheckRackPodTemplate(false)
+	res = rc.CheckRackPodTemplate()
 	assert.True(res.Completed())
 }
 
@@ -442,7 +444,7 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
 	rc.statefulSets[0] = desiredStatefulSet
 
-	res := rc.CheckRackPodTemplate(false)
+	res := rc.CheckRackPodTemplate()
 	require.Equal(result.Done(), res)
 	rc.statefulSets[0].Status.ObservedGeneration = rc.statefulSets[0].Generation
 
@@ -453,7 +455,7 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	// Now update the template and verify that the StatefulSet is updated
 	rc.Datacenter.Spec.PodTemplateSpec.ObjectMeta.Labels["foo2"] = "baz"
 	rc.Datacenter.Generation++
-	res = rc.CheckRackPodTemplate(false)
+	res = rc.CheckRackPodTemplate()
 	require.Equal(result.Done(), res)
 
 	sts = &appsv1.StatefulSet{}
@@ -2897,7 +2899,7 @@ func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
 	res := rc.CheckRackCreation()
 	require.False(res.Completed(), "CheckRackCreation did not complete as expected")
 
-	require.Equal(result.Continue(), rc.CheckRackPodTemplate(false))
+	require.Equal(result.Continue(), rc.CheckRackPodTemplate())
 
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation, "true")
 	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
@@ -2921,11 +2923,11 @@ func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
 		require.NoError(rc.Client.Create(rc.Ctx, pvc))
 	}
 
-	require.Equal(result.Continue(), rc.CheckRackPodTemplate(false))
+	require.Equal(result.Continue(), rc.CheckRackPodTemplate())
 
 	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("2Gi")}
 	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
-	res = rc.CheckRackPodTemplate(false)
+	res = rc.CheckRackPodTemplate()
 	_, err := res.Output()
 	require.EqualError(err, "PVC resize requested, but StorageClass standard does not support expansion", "We should have an error, storageClass does not support expansion")
 
@@ -2935,14 +2937,14 @@ func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
 	storageClass.AllowVolumeExpansion = ptr.To[bool](true)
 	require.NoError(rc.Client.Update(rc.Ctx, storageClass))
 
-	res = rc.CheckRackPodTemplate(false)
+	res = rc.CheckRackPodTemplate()
 	require.Equal(result.Done(), res, "Recreating StS should throw us to silence period")
 
 	require.NoError(rc.Client.Get(rc.Ctx, nsName, sts))
 	require.Equal(resource.MustParse("2Gi"), sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage])
 
 	// The fakeClient behavior does not prevent us from modifying the StS fields, so this test behaves unlike real world in that sense
-	res = rc.CheckRackPodTemplate(false)
+	res = rc.CheckRackPodTemplate()
 	require.Equal(result.Continue(), res, "Recreating StS should throw us to silence period")
 }
 

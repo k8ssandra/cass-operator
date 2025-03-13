@@ -1645,9 +1645,9 @@ func (rc *ReconciliationContext) UpdateRackNodeCount(statefulSet *appsv1.Statefu
 
 // ReconcilePods ...
 func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) error {
-	rc.ReqLogger.Info("reconcile_racks::ReconcilePods")
+	rc.ReqLogger.Info("reconcile_racks::ReconcilePods", "statefulSet", statefulSet.Name, "replicas", statefulSet.Spec.Replicas)
 
-	for i := int32(0); i < statefulSet.Status.Replicas; i++ {
+	for i := int32(0); i < *statefulSet.Spec.Replicas; i++ {
 		podName := getStatefulSetPodNameForIdx(statefulSet, i)
 
 		pod := &corev1.Pod{}

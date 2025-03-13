@@ -47,6 +47,7 @@ import (
 	controlv1alpha1 "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	controllers "github.com/k8ssandra/cass-operator/internal/controllers/cassandra"
 	controlcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/control"
+	scheduledtaskcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/scheduledtask"
 	apiwebhook "github.com/k8ssandra/cass-operator/internal/webhooks/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
@@ -222,6 +223,15 @@ func main() {
 		return pvcNames
 	}); err != nil {
 		setupLog.Error(err, "unable to set up field indexer")
+		os.Exit(1)
+	}
+
+	if err = (&scheduledtaskcontrollers.ScheduledTaskReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ScheduledTask"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ScheduledTask")
 		os.Exit(1)
 	}
 

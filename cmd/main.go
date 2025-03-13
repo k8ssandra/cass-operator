@@ -200,6 +200,13 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	if err = (&controlcontrollers.CassandraTaskReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "CassandraTask")
+		os.Exit(1)
+	}
 
 	if err := mgr.GetCache().IndexField(ctx, &corev1.Pod{}, "spec.volumes.persistentVolumeClaim.claimName", func(obj client.Object) []string {
 		pod, ok := obj.(*corev1.Pod)
@@ -216,37 +223,31 @@ func main() {
 		return pvcNames
 	}); err != nil {
 		setupLog.Error(err, "unable to set up field indexer")
-		if err = (&scheduledtaskcontrollers.ScheduledTaskReconciler{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controllers").WithName("ScheduledTask"),
-			Scheme: mgr.GetScheme(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ScheduledTask")
-			os.Exit(1)
-		}
+		os.Exit(1)
+	}
 
-		if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-			setupLog.Error(err, "unable to set up health check")
-			os.Exit(1)
-		}
-		if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-			setupLog.Error(err, "unable to set up ready check")
-			os.Exit(1)
-		}
+	if err = (&scheduledtaskcontrollers.ScheduledTaskReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ScheduledTask"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ScheduledTask")
+		os.Exit(1)
+	}
 
-		if err = (&controlcontrollers.CassandraTaskReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "CassandraTask")
-			os.Exit(1)
-		}
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
 
-		setupLog.Info("starting manager")
-		if err := mgr.Start(ctx); err != nil {
-			setupLog.Error(err, "problem running manager")
-			os.Exit(1)
-		}
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctx); err != nil {
+		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -167,6 +168,85 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 	return result.Continue()
 }
 
+func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
+
+	for idx := range rc.desiredRackInformation {
+		rackInfo := rc.desiredRackInformation[idx]
+		rackPods := rc.rackPods(rackInfo.RackName)
+		for _, pod := range rackPods {
+			if pod == nil {
+				continue
+			}
+			rackName := pod.Labels[api.RackLabel]
+			if pod.Status.Phase == corev1.PodPending {
+				if pod.Status.StartTime == nil || hasBeenXMinutes(5, pod.Status.StartTime.Time) {
+					// Pod has been over 5 minutes in Pending state. This can be normal, but lets see
+					// if we have some detected failures events like FailedScheduling
+					events := &corev1.EventList{}
+					if err := rc.Client.List(rc.Ctx, events, &client.ListOptions{Namespace: pod.Namespace, FieldSelector: fields.SelectorFromSet(fields.Set{"involvedObject.name": pod.Name})}); err != nil {
+						rc.ReqLogger.Error(err, "error getting events for pod", "pod", pod.Name)
+						return false, ""
+					}
+
+					for _, event := range events.Items {
+						if event.Reason == "FailedScheduling" {
+							rc.ReqLogger.Info("Found FailedScheduling event for pod", "pod", pod.Name)
+							// We have a failed scheduling event, get the rack name
+							return true, rackName
+						}
+					}
+				}
+			}
+
+			// Pod could also be running / terminated, we need to find if any container is in crashing state
+			// Sadly, this state is ephemeral, so it can change between reconciliations
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				if containerStatus.State.Waiting != nil {
+					waitingReason := containerStatus.State.Waiting.Reason
+					if waitingReason == "CrashLoopBackOff" ||
+						waitingReason == "ImagePullBackOff" ||
+						waitingReason == "ErrImagePull" {
+						rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "reason", waitingReason)
+						// We have a container in a failing state
+						return true, rackName
+					}
+				}
+				if containerStatus.RestartCount > 2 {
+					if containerStatus.State.Terminated != nil {
+						if containerStatus.State.Terminated.ExitCode != 0 {
+							rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
+							return true, rackName
+						}
+					}
+				}
+			}
+			// Check the same for initContainers
+			for _, containerStatus := range pod.Status.InitContainerStatuses {
+				if containerStatus.State.Waiting != nil {
+					waitingReason := containerStatus.State.Waiting.Reason
+					if waitingReason == "CrashLoopBackOff" ||
+						waitingReason == "ImagePullBackOff" ||
+						waitingReason == "ErrImagePull" {
+						// We have a container in a failing state
+						rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "reason", waitingReason)
+						return true, rackName
+					}
+				}
+				if containerStatus.RestartCount > 2 {
+					if containerStatus.State.Terminated != nil {
+						if containerStatus.State.Terminated.ExitCode != 0 {
+							rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
+							return true, rackName
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return false, ""
+}
+
 func (rc *ReconciliationContext) UpdateAllowed() bool {
 	// HasAnnotation might require also checking if it's "once / always".. or then we need to validate those allowed values in the webhook
 	return rc.Datacenter.GenerationChanged() || metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation)
@@ -302,12 +382,21 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 }
 
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
+	return rc.CheckRackPodTemplateDetails(false, "")
+}
+
+func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedRackName string) result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
-	logger.Info("reconcile_racks::CheckRackPodTemplate")
+	logger.Info("reconcile_racks::CheckRackPodTemplate", "force", force)
 
 	for idx := range rc.desiredRackInformation {
 		rackName := rc.desiredRackInformation[idx].RackName
+		if force && rackName != failedRackName {
+			logger.Info("Skipping this rack because it isn't defined in the forceUpgradeRacks", "rackName", rackName, "failedRackName", failedRackName)
+			continue
+		}
+
 		if dc.Spec.CanaryUpgrade && idx > 0 {
 			logger.
 				WithValues("rackName", rackName).
@@ -324,9 +413,9 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			updatedReplicas = status.CurrentReplicas + status.UpdatedReplicas
 		}
 
-		if statefulSet.Generation != status.ObservedGeneration ||
+		if !force && (statefulSet.Generation != status.ObservedGeneration ||
 			status.Replicas != status.ReadyReplicas ||
-			status.Replicas != updatedReplicas {
+			status.Replicas != updatedReplicas) {
 
 			logger.Info(
 				"waiting for upgrade to finish on statefulset",
@@ -348,17 +437,16 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 		}
 
 		// Set the CassandraDatacenter as the owner and controller
-		err = setControllerReference(
+		if err := setControllerReference(
 			rc.Datacenter,
 			desiredSts,
-			rc.Scheme)
-		if err != nil {
+			rc.Scheme); err != nil {
 			logger.Error(err, "error calling setControllerReference for statefulset", "desiredSts.Namespace",
 				desiredSts.Namespace, "desireSts.Name", desiredSts.Name)
 			return result.Error(err)
 		}
 
-		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && !rc.UpdateAllowed() {
+		if !force && !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && !rc.UpdateAllowed() {
 			logger.
 				WithValues("rackName", rackName).
 				Info("update is blocked, but statefulset needs an update. Marking datacenter as requiring update.")
@@ -370,7 +458,7 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			return result.Continue()
 		}
 
-		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && rc.UpdateAllowed() {
+		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && (force || rc.UpdateAllowed()) {
 			logger.
 				WithValues("rackName", rackName).
 				Info("statefulset needs an update")
@@ -398,7 +486,7 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			desiredSts.DeepCopyInto(statefulSet)
 
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.UpdatingRack,
-				"Updating rack %s", rackName)
+				"Updating rack %s", rackName, "force", force)
 
 			if err := rc.setConditionStatus(api.DatacenterUpdating, corev1.ConditionTrue); err != nil {
 				return result.Error(err)
@@ -424,11 +512,13 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 				}
 			}
 
-			if err := rc.enableQuietPeriod(20); err != nil {
-				logger.Error(
-					err,
-					"Error when enabling quiet period")
-				return result.Error(err)
+			if !force {
+				if err := rc.enableQuietPeriod(20); err != nil {
+					logger.Error(
+						err,
+						"Error when enabling quiet period")
+					return result.Error(err)
+				}
 			}
 
 			// we just updated k8s and pods will be knocked out of ready state, so let k8s
@@ -442,85 +532,27 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 }
 
 func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult {
-	// This code is *very* similar to CheckRackPodTemplate(), but it's not an exact
-	// copy. Some 3 to 5 line parts could maybe be extracted into functions.
-	logger := rc.ReqLogger
 	dc := rc.Datacenter
-	logger.Info("starting CheckRackForceUpgrade()")
+	logger := rc.ReqLogger
+	logger.Info("reconcile_racks::CheckRackForceUpgrade")
 
-	forceRacks := dc.Spec.ForceUpgradeRacks
-	if len(forceRacks) == 0 {
-		return result.Continue()
+	// Datacenter configuration isn't healthy, we allow upgrades here before pods start
+	if failed, rackName := rc.failureModeDetection(); failed {
+		logger.Info("Failure detected, forcing CheckRackPodTemplate()")
+		return rc.CheckRackPodTemplateDetails(true, rackName)
 	}
 
-	for idx, nextRack := range rc.desiredRackInformation {
-		rackName := rc.desiredRackInformation[idx].RackName
-		if utils.IndexOfString(forceRacks, rackName) >= 0 {
-			statefulSet := rc.statefulSets[idx]
-
-			// have to use zero here, because each statefulset is created with no replicas
-			// in GetStatefulSetForRack()
-			desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, nextRack.NodeCount)
-			if err != nil {
-				logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
-				return result.Error(err)
-			}
-
-			// Set the CassandraDatacenter as the owner and controller
-			err = setControllerReference(
-				rc.Datacenter,
-				desiredSts,
-				rc.Scheme)
-			if err != nil {
-				logger.Error(err, "error calling setControllerReference for statefulset", "desiredSts.Namespace",
-					desiredSts.Namespace, "desireSts.Name", desiredSts.Name)
-				return result.Error(err)
-			}
-
-			// "fix" the replica count, and maintain labels and annotations the k8s admin may have set
-			desiredSts.Spec.Replicas = statefulSet.Spec.Replicas
-			desiredSts.Labels = utils.MergeMap(map[string]string{}, statefulSet.Labels, desiredSts.Labels)
-			desiredSts.Annotations = utils.MergeMap(map[string]string{}, statefulSet.Annotations, desiredSts.Annotations)
-
-			desiredSts.DeepCopyInto(statefulSet)
-
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.UpdatingRack,
-				"Force updating rack %s", rackName)
-
-			if err := rc.setConditionStatus(api.DatacenterUpdating, corev1.ConditionTrue); err != nil {
-				return result.Error(err)
-			}
-
-			if err := setOperatorProgressStatus(rc, api.ProgressUpdating); err != nil {
-				return result.Error(err)
-			}
-
-			logger.Info("Force updating statefulset pod specs",
-				"statefulSet", statefulSet,
-			)
-
-			if err := rc.Client.Update(rc.Ctx, statefulSet); err != nil {
-				if errors.IsInvalid(err) {
-					if err = rc.deleteStatefulSet(statefulSet); err != nil {
-						return result.Error(err)
-					}
-				} else {
-					return result.Error(err)
-				}
-			}
+	for _, rackName := range dc.Spec.ForceUpgradeRacks {
+		if res := rc.CheckRackPodTemplateDetails(true, rackName); res.Completed() {
+			return res
 		}
 	}
+	// if len(forceRacks) == 0 {
+	// 	return result.Continue()
+	// }
+	// Do the rackFiltering here
 
-	dcPatch := client.MergeFrom(dc.DeepCopy())
-	dc.Spec.ForceUpgradeRacks = nil
-
-	if err := rc.Client.Patch(rc.Ctx, dc, dcPatch); err != nil {
-		logger.Error(err, "error patching datacenter to clear force upgrade")
-		return result.Error(err)
-	}
-
-	logger.Info("done CheckRackForceUpgrade()")
-	return result.Done()
+	return result.Continue()
 }
 
 func (rc *ReconciliationContext) deleteStatefulSet(statefulSet *appsv1.StatefulSet) error {

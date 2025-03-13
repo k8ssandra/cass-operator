@@ -368,6 +368,8 @@ func TestCheckRackPodTemplate_GenerationCheck(t *testing.T) {
 	res := rc.CheckRackCreation()
 	assert.False(res.Completed(), "CheckRackCreation did not complete as expected")
 
+	// Verify that setting force will upgrade first rack only even if the statefulset is not healthy
+
 	// Update the generation manually and now verify we won't do updates to StatefulSets if the generation hasn't changed
 	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
 	rc.Datacenter.Spec.ServerVersion = "6.8.44"

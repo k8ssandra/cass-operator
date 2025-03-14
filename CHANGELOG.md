@@ -17,9 +17,12 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [FEATURE] [#583](https://github.com/k8ssandra/cass-operator/issues/583) If there are pods in failed state (CrashLoopBackOff, ImagePullBackOff or ErrImagePull), restartCount of a container/initContainer is more than zero with termination code >0 or we have a SchedulingFailed event, allow StatefulSet updates even if previous ones haven't been rolled yet. ForceUpgradeRacks will no longer remove itself from the CassandraDatacenter to prevent self modifying Spec. 
 * [ENHANCEMENT] [#729](https://github.com/k8ssandra/cass-operator/issues/729) Modify NewMgmtClient to support additional transport option for the http.Client
 * [ENHANCEMENT] [#737](https://github.com/k8ssandra/cass-operator/issues/737) Before issuing PVC deletion when deleting a datacenter, verify the PVCs that match the labels are not actually used by any pods.
-* [BUGFIX] [#751](https://github.com/k8ssandra/cass-operator/issues/751) If datacenterName == "", do not use it as accepted value, threat it the same way as nil value
 * [BUGFIX] [#744](https://github.com/k8ssandra/cass-operator/issues/744) If StatefulSet was manually modified outside CassandraDatacenter, do not start such pods as they would need to be decommissioned instantly and could have IP conflict issues when doing so.
+
+## v1.23.1
+
 * [BUGFIX] [#765](https://github.com/k8ssandra/cass-operator/issues/765) Fix CheckRackPodLabels to use statefulSet.Spec.Replicas instead of .Status.Replicas to verify all the current pods and their labels
+* [BUGFIX] [#751](https://github.com/k8ssandra/cass-operator/issues/751) If datacenterName == "", do not use it as accepted value, threat it the same way as nil value
 
 ## v1.23.0
 

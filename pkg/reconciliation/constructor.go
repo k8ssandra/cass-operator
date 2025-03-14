@@ -63,7 +63,9 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 
 	if newState == api.ProgressReady {
 		if rc.Datacenter.Status.MetadataVersion < 1 {
-			rc.Datacenter.Status.MetadataVersion = 1
+			if rc.Datacenter.Status.GetConditionStatus(api.DatacenterRequiresUpdate) == corev1.ConditionFalse {
+				rc.Datacenter.Status.MetadataVersion = 1
+			}
 		}
 		if rc.Datacenter.Status.DatacenterName == nil {
 			rc.Datacenter.Status.DatacenterName = &rc.Datacenter.Name

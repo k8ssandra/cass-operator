@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.23.1
 
 * [BUGFIX] [#765](https://github.com/k8ssandra/cass-operator/issues/765) Fix CheckRackPodLabels to use statefulSet.Spec.Replicas instead of .Status.Replicas to verify all the current pods and their labels
 * [BUGFIX] [#751](https://github.com/k8ssandra/cass-operator/issues/751) If datacenterName == "", do not use it as accepted value, threat it the same way as nil value

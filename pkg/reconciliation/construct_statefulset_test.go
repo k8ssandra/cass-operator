@@ -612,6 +612,24 @@ func TestValidSubdomainNames(t *testing.T) {
 	}
 }
 
+func TestEmptyDatacenterStatusName(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "cluster1",
+		},
+		Status: api.CassandraDatacenterStatus{
+			DatacenterName: ptr.To[string](""),
+		},
+	}
+
+	typedName := NewNamespacedNameForStatefulSet(dc, "r1")
+	assert.Equal("cluster1-dc1-r1-sts", typedName.Name)
+}
+
 func Test_newStatefulSetForCassandraDatacenter_dcNameOverride(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{

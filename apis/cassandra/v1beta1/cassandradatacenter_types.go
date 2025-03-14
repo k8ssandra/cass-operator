@@ -999,7 +999,7 @@ func SplitRacks(nodeCount, rackCount int) []int {
 }
 
 func (dc *CassandraDatacenter) DatacenterNameStatus() bool {
-	return dc.Status.DatacenterName != nil
+	return dc.Status.DatacenterName != nil && *dc.Status.DatacenterName != ""
 }
 
 // LabelResourceName returns a sanitized version of the name returned by DatacenterName()

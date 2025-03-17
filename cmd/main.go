@@ -45,6 +45,7 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 	controlv1alpha1 "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
+	scheduledtaskv1alpha1 "github.com/k8ssandra/cass-operator/apis/scheduledtask.k8ssandra.io/v1alpha1"
 	controllers "github.com/k8ssandra/cass-operator/internal/controllers/cassandra"
 	controlcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/control"
 	scheduledtaskcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/scheduledtask"
@@ -64,6 +65,7 @@ func init() {
 	utilruntime.Must(api.AddToScheme(scheme))
 	utilruntime.Must(configv1beta1.AddToScheme(scheme))
 	utilruntime.Must(controlv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(scheduledtaskv1alpha1.AddToScheme(scheme))
 }
 
 func main() {

@@ -1677,7 +1677,7 @@ func (rc *ReconciliationContext) UpdateRackNodeCount(statefulSet *appsv1.Statefu
 	return err
 }
 
-// ReconcilePods ...
+// ReconcilePods ensures that the resources that are named after the StatefulSet are using the correct matching labels
 func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) error {
 	rc.ReqLogger.Info("reconcile_racks::ReconcilePods", "statefulSet", statefulSet.Name, "replicas", statefulSet.Spec.Replicas)
 
@@ -1703,8 +1703,7 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 		podPatch := client.MergeFrom(pod.DeepCopy())
 
 		podLabels := pod.GetLabels()
-		shouldUpdateLabels, updatedLabels := shouldUpdateLabelsForRackResource(podLabels,
-			rc.Datacenter, statefulSet.GetLabels()[api.RackLabel])
+		shouldUpdateLabels, updatedLabels := shouldUpdateLabelsForRackSubResource(podLabels, statefulSet)
 		if shouldUpdateLabels {
 			rc.ReqLogger.Info(
 				"Updating labels",
@@ -1759,8 +1758,7 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 		pvcPatch := client.MergeFrom(pvc.DeepCopy())
 
 		pvcLabels := pvc.GetLabels()
-		shouldUpdateLabels, updatedLabels = shouldUpdateLabelsForRackResource(pvcLabels,
-			rc.Datacenter, statefulSet.GetLabels()[api.RackLabel])
+		shouldUpdateLabels, updatedLabels = shouldUpdateLabelsForRackSubResource(pvcLabels, statefulSet)
 		if shouldUpdateLabels {
 			rc.ReqLogger.Info("Updating labels",
 				"PVC", pvc,
@@ -1828,6 +1826,10 @@ func shouldUpdateLabelsForRackResource(resourceLabels map[string]string, dc *api
 	desired := dc.GetRackLabels(rackName)
 	oplabels.AddOperatorLabels(desired, dc)
 	return mergeInLabelsIfDifferent(resourceLabels, desired)
+}
+
+func shouldUpdateLabelsForRackSubResource(resourceLabels map[string]string, sts *appsv1.StatefulSet) (bool, map[string]string) {
+	return mergeInLabelsIfDifferent(resourceLabels, sts.Spec.Selector.MatchLabels)
 }
 
 func (rc *ReconciliationContext) labelServerPodStarting(pod *corev1.Pod) error {

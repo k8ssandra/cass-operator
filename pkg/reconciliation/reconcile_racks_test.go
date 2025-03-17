@@ -521,7 +521,7 @@ func TestReconcilePods_WithVolumes(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		1)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	statefulSet.Status.Replicas = int32(1)
 
@@ -1503,6 +1503,167 @@ func Test_shouldUpdateLabelsForRackResource(t *testing.T) {
 					t.Errorf("shouldUpdateLabelsForRackResource() = (%v, %v), want (%v, %v)", changed, newLabels, true, tt.want)
 				} else if reflect.ValueOf(tt.args.resourceLabels).Pointer() != reflect.ValueOf(newLabels).Pointer() {
 					t.Error("shouldUpdateLabelsForRackResource() did not return original map")
+				}
+			}
+		})
+	}
+}
+
+func Test_shouldUpdateLabelsForRackSubResource(t *testing.T) {
+	clusterName := "cassandradatacenter-example-cluster"
+	dcName := "cassandradatacenter-example"
+	rackName := "rack1"
+
+	goodRackLabels := map[string]string{
+		api.ClusterLabel:        clusterName,
+		api.DatacenterLabel:     dcName,
+		api.RackLabel:           rackName,
+		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+		oplabels.NameLabel:      oplabels.NameLabelValue,
+		oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
+		oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, clusterName),
+		oplabels.VersionLabel:   "4.0.1",
+	}
+
+	sts := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cassandradatacenter-example-rack1",
+			Namespace: "default",
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: goodRackLabels,
+			},
+		},
+	}
+
+	type args struct {
+		resourceLabels map[string]string
+	}
+
+	type result struct {
+		changed bool
+		labels  map[string]string
+	}
+
+	// cases where label updates are made
+	tests := []struct {
+		name string
+		args args
+		want result
+	}{
+		{
+			name: "Cluster name different",
+			args: args{
+				resourceLabels: map[string]string{
+					api.ClusterLabel:    "some-other-cluster",
+					api.DatacenterLabel: dcName,
+					api.RackLabel:       rackName,
+				},
+			},
+			want: result{
+				changed: true,
+				labels:  goodRackLabels,
+			},
+		},
+		{
+			name: "Rack name different",
+			args: args{
+				resourceLabels: map[string]string{
+					api.ClusterLabel:    clusterName,
+					api.DatacenterLabel: dcName,
+					api.RackLabel:       "some-other-rack",
+				},
+			},
+			want: result{
+				changed: true,
+				labels:  goodRackLabels,
+			},
+		},
+		{
+			name: "Rack name different plus other labels",
+			args: args{
+				resourceLabels: map[string]string{
+					api.ClusterLabel:    clusterName,
+					api.DatacenterLabel: dcName,
+					api.RackLabel:       "some-other-rack",
+					"foo":               "bar",
+				},
+			},
+			want: result{
+				changed: true,
+				labels: utils.MergeMap(
+					map[string]string{},
+					goodRackLabels,
+					map[string]string{"foo": "bar"}),
+			},
+		},
+		{
+			name: "No labels",
+			args: args{
+				resourceLabels: map[string]string{},
+			},
+			want: result{
+				changed: true,
+				labels:  goodRackLabels,
+			},
+		},
+		{
+			name: "Correct labels",
+			args: args{
+				resourceLabels: map[string]string{
+					api.ClusterLabel:        clusterName,
+					api.DatacenterLabel:     dcName,
+					api.RackLabel:           rackName,
+					oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+					oplabels.NameLabel:      oplabels.NameLabelValue,
+					oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
+					oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, clusterName),
+					oplabels.VersionLabel:   "4.0.1",
+				},
+			},
+			want: result{
+				changed: false,
+			},
+		},
+		{
+			name: "Correct labels with some additional labels",
+			args: args{
+				resourceLabels: map[string]string{
+					api.ClusterLabel:        clusterName,
+					api.DatacenterLabel:     dcName,
+					api.RackLabel:           rackName,
+					oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+					oplabels.NameLabel:      oplabels.NameLabelValue,
+					oplabels.CreatedByLabel: oplabels.CreatedByLabelValue,
+					oplabels.InstanceLabel:  fmt.Sprintf("%s-%s", oplabels.NameLabelValue, clusterName),
+					oplabels.VersionLabel:   "4.0.1",
+					"foo":                   "bar",
+				},
+			},
+			want: result{
+				changed: false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.want.changed {
+				changed, newLabels := shouldUpdateLabelsForRackSubResource(tt.args.resourceLabels, sts)
+				if !changed || !reflect.DeepEqual(newLabels, tt.want.labels) {
+					t.Errorf("shouldUpdateLabelsForRackResource() = (%v, %v), want (%v, %v)", changed, newLabels, true, tt.want)
+				}
+			} else {
+				// when the labels aren't supposed to be changed, we want to
+				// make sure that the map returned *is* the map passed in and
+				// that it is unchanged.
+				resourceLabelsCopy := utils.MergeMap(map[string]string{}, tt.args.resourceLabels)
+				changed, newLabels := shouldUpdateLabelsForRackSubResource(tt.args.resourceLabels, sts)
+				if changed || !reflect.DeepEqual(resourceLabelsCopy, newLabels) {
+					t.Errorf("shouldUpdateLabelsForRackSubResource() = (%v, %v), want (%v, %v)", changed, newLabels, true, tt.want)
+				} else if reflect.ValueOf(tt.args.resourceLabels).Pointer() != reflect.ValueOf(newLabels).Pointer() {
+					t.Error("shouldUpdateLabelsForRackSubResource() did not return original map")
 				}
 			}
 		})

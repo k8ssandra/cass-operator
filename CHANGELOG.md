@@ -19,7 +19,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#737](https://github.com/k8ssandra/cass-operator/issues/737) Before issuing PVC deletion when deleting a datacenter, verify the PVCs that match the labels are not actually used by any pods.
 * [BUGFIX] [#744](https://github.com/k8ssandra/cass-operator/issues/744) If StatefulSet was manually modified outside CassandraDatacenter, do not start such pods as they would need to be decommissioned instantly and could have IP conflict issues when doing so.
 
-## v1.23.1
+## v1.23.2
 
 * [BUGFIX] [#765](https://github.com/k8ssandra/cass-operator/issues/765) Fix CheckRackPodLabels to use statefulSet.Spec.Replicas instead of .Status.Replicas to verify all the current pods and their labels
 * [BUGFIX] [#751](https://github.com/k8ssandra/cass-operator/issues/751) If datacenterName == "", do not use it as accepted value, threat it the same way as nil value

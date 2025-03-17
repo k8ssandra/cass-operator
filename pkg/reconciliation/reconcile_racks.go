@@ -2029,11 +2029,16 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 
 	labelSeedBeforeStart := readySeeds == 0 && !rc.hasAdditionalSeeds()
 
-	for _, statefulSet := range rc.statefulSets {
-		if *statefulSet.Spec.Replicas < 1 {
+	for idx := range rc.desiredRackInformation {
+		rackInfo := rc.desiredRackInformation[idx]
+		statefulSet := rc.statefulSets[idx]
+
+		maxPodRankInThisRack := rackInfo.NodeCount - 1
+		if maxPodRankInThisRack < 0 {
 			continue
 		}
-		podName := getStatefulSetPodNameForIdx(statefulSet, 0)
+
+		podName := getStatefulSetPodNameForIdx(statefulSet, int32(maxPodRankInThisRack))
 		pod := rc.getDCPodByName(podName)
 		notReady, err := rc.startNode(pod, labelSeedBeforeStart, endpointData)
 		if notReady || err != nil {

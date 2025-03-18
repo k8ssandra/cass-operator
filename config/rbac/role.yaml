@@ -140,7 +140,7 @@ rules:
 - apiGroups:
   - scheduledtask.k8ssandra.io
   resources:
-  - scheduledtask
+  - scheduledtasks
   verbs:
   - create
   - delete
@@ -152,13 +152,13 @@ rules:
 - apiGroups:
   - scheduledtask.k8ssandra.io
   resources:
-  - scheduledtask/finalizers
+  - scheduledtasks/finalizers
   verbs:
   - update
 - apiGroups:
   - scheduledtask.k8ssandra.io
   resources:
-  - scheduledtask/status
+  - scheduledtasks/status
   verbs:
   - get
   - patch

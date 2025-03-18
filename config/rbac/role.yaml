@@ -137,3 +137,29 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - scheduledtask.k8ssandra.io
+  resources:
+  - scheduledtasks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - scheduledtask.k8ssandra.io
+  resources:
+  - scheduledtasks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - scheduledtask.k8ssandra.io
+  resources:
+  - scheduledtasks/status
+  verbs:
+  - get
+  - patch
+  - update

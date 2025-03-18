@@ -14,13 +14,14 @@ import (
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
 	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var (
 	testName   = "Upgrade Operator"
 	namespace  = "test-upgrade-operator"
 	dcName     = "dc1"
-	podId      = "pod/cluster1-my-super-dc-r1-sts-0"
+	podName    = "cluster1-my-super-dc-r1-sts-0"
 	dcYaml     = "../testdata/default-three-rack-three-node-dc-4x.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
@@ -84,11 +85,21 @@ var _ = Describe(testName, func() {
 
 			// Get UID of the cluster pod
 			step = "get Cassandra pods UID"
-			k = kubectl.Get(podId).FormatOutput("jsonpath={.metadata.uid}")
+			json := "jsonpath={.metadata.uid}"
+			k = kubectl.GetByTypeAndName("pod", podName).
+				FormatOutput(json)
 			createdPodUID := ns.OutputAndLog(step, k)
 
+			step = "get the previous Datacenter label value"
+			json = `jsonpath={.metadata.labels.cassandra\.datastax\.com/datacenter}`
+			k = kubectl.GetByTypeAndName("pod", podName).
+				FormatOutput(json)
+			createdPodDatacenterLabel := ns.OutputAndLog(step, k)
+
+			Expect(createdPodDatacenterLabel).To(Equal("My_Super_Dc"))
+
 			step = "get name of 1.19.1 operator pod"
-			json := "jsonpath={.items[].metadata.name}"
+			json = "jsonpath={.items[].metadata.name}"
 			k = kubectl.Get("pods").WithFlag("selector", "name=cass-operator").FormatOutput(json)
 			oldOperatorName := ns.OutputAndLog(step, k)
 
@@ -102,12 +113,12 @@ var _ = Describe(testName, func() {
 
 			// Let the new operator get the lock and start reconciling if it's going to
 			time.Sleep(60 * time.Second)
-			ns.WaitForDatacenterReady(dcName)
+			ns.WaitForDatacenterCondition(dcName, "Ready", string(corev1.ConditionTrue))
 			ns.ExpectDoneReconciling(dcName)
 
 			// Verify Pod hasn't restarted
 			step = "get Cassandra pods UID"
-			k = kubectl.Get(podId).FormatOutput("jsonpath={.metadata.uid}")
+			k = kubectl.GetByTypeAndName("pod", podName).FormatOutput("jsonpath={.metadata.uid}")
 			postUpgradeCassPodUID := ns.OutputAndLog(step, k)
 
 			Expect(createdPodUID).To(Equal(postUpgradeCassPodUID))
@@ -121,7 +132,7 @@ var _ = Describe(testName, func() {
 			// Get current system-logger image
 			// Verify the Pod now has updated system-logger container image
 			step = "get Cassandra pod system-logger"
-			k = kubectl.Get(podId).FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
+			k = kubectl.GetByTypeAndName("pod", podName).FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
 			loggerImage := ns.OutputAndLog(step, k)
 			Expect(loggerImage).To(Equal("cr.k8ssandra.io/k8ssandra/system-logger:v1.19.1"))
 
@@ -138,14 +149,14 @@ var _ = Describe(testName, func() {
 
 			// Verify pod has been restarted
 			step = "get Cassandra pods UID"
-			k = kubectl.Get(podId).FormatOutput("jsonpath={.metadata.uid}")
+			k = kubectl.GetByTypeAndName("pod", podName).FormatOutput("jsonpath={.metadata.uid}")
 			postAllowUpgradeUID := ns.OutputAndLog(step, k)
 
 			Expect(postUpgradeCassPodUID).ToNot(Equal(postAllowUpgradeUID))
 
 			// Verify the Pod now has updated system-logger container image
 			step = "get Cassandra pod system-logger"
-			k = kubectl.Get(podId).FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
+			k = kubectl.GetByTypeAndName("pod", podName).FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
 			loggerImageNew := ns.OutputAndLog(step, k)
 			Expect(loggerImage).To(Not(Equal(loggerImageNew)))
 
@@ -154,6 +165,15 @@ var _ = Describe(testName, func() {
 			k = kubectl.Get("CassandraDatacenter", dcName).FormatOutput("jsonpath={.metadata.annotations}")
 			annotations := ns.OutputAndLog(step, k)
 			Expect(annotations).To(Not(ContainSubstring("cassandra.datastax.com/autoupdate-spec")))
+
+			// Verify the label is now updated
+			step = "get the updated Datacenter label value"
+			json = `jsonpath={.metadata.labels.cassandra\.datastax\.com/datacenter}`
+			k = kubectl.GetByTypeAndName("pod", podName).
+				FormatOutput(json)
+			updatedPodDatacenterLabel := ns.OutputAndLog(step, k)
+
+			Expect(updatedPodDatacenterLabel).To(Equal("dc1"))
 
 			// Verify delete still works correctly and that we won't leave any resources behind
 			step = "deleting the dc"

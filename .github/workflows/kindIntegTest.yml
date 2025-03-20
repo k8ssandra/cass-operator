@@ -88,7 +88,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.15"
+          - "4.0.17"
         integration_test:
           - cdc_successful # OSS only
           - config_fql
@@ -117,12 +117,12 @@ jobs:
     strategy:
       matrix:
         version:
-          - "6.8.53"
+          - "6.8.54"
         integration_test:
           - cdc_successful
         include:
-          - version: 6.8.53
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.53-ubi8 # DSE 6.8.53
+          - version: 6.8.54
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.54-ubi8 # DSE 6.8.54
             serverType: dse
             integration_test: "cdc_successful"
       fail-fast: true
@@ -155,7 +155,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "5.0.2"
+          - "5.0.3"
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
@@ -231,23 +231,27 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.15"
-          - "4.1.7"
-          - "5.0.2"
-          - "6.8.53"
-          - "6.9.6"
+          - "4.0.17"
+          - "4.1.8"
+          - "5.0.3"
+          - "6.8.54"
+          - "6.9.7"
+          - "nightly"
         integration_test:
           - test_all_the_things
           - smoke_test_read_only_fs
         include:
-          - version: 6.8.53
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.53-ubi8 # DSE 6.8.53
+          - version: 6.8.54
+            serverImage: datastax/dse-mgmtapi-6_8:6.8.54-ubi8 # DSE 6.8.54
             serverType: dse
-          - version: 6.9.6
-            serverImage: datastax/dse-mgmtapi-6_8:6.9.6-ubi # DSE 6.9.6
+          - version: 6.9.7
+            serverImage: datastax/dse-mgmtapi-6_8:6.9.7-ubi # DSE 6.9.7
             serverType: dse
+          - version: nightly
+            serverImage: k8ssandra/cass-management-api:5.1-nightly-latest
+            serverType: cassandra
         exclude:
-          - version: 4.0.15
+          - version: 4.0.17
             integration_test: "smoke_test_read_only_fs"
       fail-fast: true
     runs-on: ubuntu-latest
@@ -279,7 +283,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "5.0.2"
+          - "5.0.3"
         integration_test:
           - pvc_expansion
       fail-fast: true

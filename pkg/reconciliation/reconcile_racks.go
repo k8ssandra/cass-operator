@@ -8,6 +8,7 @@ import (
 	"net"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1938,6 +1939,17 @@ func (rc *ReconciliationContext) findStartedNotReadyNodes() (bool, error) {
 				if err := rc.labelServerPodStarted(pod); err != nil {
 					return false, err
 				}
+
+				if utils.IndexOfString(rc.Datacenter.Status.FailedStarts, pod.Name) > -1 {
+					statusPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
+					rc.Datacenter.Status.FailedStarts = utils.RemoveValueFromStringArray(rc.Datacenter.Status.FailedStarts, pod.Name)
+					err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, statusPatch)
+					if err != nil {
+						// This does not impact the starting process, it only messes up the start sequence the next time this pod is restarted
+						// thus we only log this error
+						rc.ReqLogger.Info("Failed to update CassandraDatacenter status to remove failed start", "Pod", pod.Name)
+					}
+				}
 				return false, nil
 			}
 		}
@@ -1996,6 +2008,13 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 			}
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.StartingCassandra,
 				"Failed to start pod %s, deleting it", pod.Name)
+			// Update rc.Datacenter.Status
+			statusPatch := client.MergeFrom(dc.DeepCopy())
+			rc.Datacenter.Status.FailedStarts = utils.AppendValuesToStringArrayIfNotPresent(rc.Datacenter.Status.FailedStarts, pod.Name)
+			err = rc.Client.Status().Patch(rc.Ctx, dc, statusPatch)
+			if err != nil {
+				rc.ReqLogger.Error(err, "Failed to update CassandraDatacenter status with failed start", "Pod", pod.Name)
+			}
 		}
 	}(pod)
 
@@ -2010,11 +2029,16 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 
 	labelSeedBeforeStart := readySeeds == 0 && !rc.hasAdditionalSeeds()
 
-	for _, statefulSet := range rc.statefulSets {
-		if *statefulSet.Spec.Replicas < 1 {
+	for idx := range rc.desiredRackInformation {
+		rackInfo := rc.desiredRackInformation[idx]
+		statefulSet := rc.statefulSets[idx]
+
+		maxPodRankInThisRack := rackInfo.NodeCount - 1
+		if maxPodRankInThisRack < 0 {
 			continue
 		}
-		podName := getStatefulSetPodNameForIdx(statefulSet, 0)
+
+		podName := getStatefulSetPodNameForIdx(statefulSet, int32(maxPodRankInThisRack))
 		pod := rc.getDCPodByName(podName)
 		notReady, err := rc.startNode(pod, labelSeedBeforeStart, endpointData)
 		if notReady || err != nil {
@@ -2032,31 +2056,61 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetadataEndpoints) (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::startAllNodes")
 
-	for podRankWithinRack := 0; ; podRankWithinRack++ {
-
-		done := true
-
-		for idx := range rc.desiredRackInformation {
-			rackInfo := rc.desiredRackInformation[idx]
-			statefulSet := rc.statefulSets[idx]
-
-			maxPodRankInThisRack := rackInfo.NodeCount - 1
-			if podRankWithinRack <= maxPodRankInThisRack {
-
-				podName := getStatefulSetPodNameForIdx(statefulSet, int32(podRankWithinRack))
-				pod := rc.getDCPodByName(podName)
-				notReady, err := rc.startNode(pod, false, endpointData)
-				if notReady || err != nil {
-					return notReady, err
-				}
-
-				done = done && podRankWithinRack == maxPodRankInThisRack
-			}
-		}
-		if done {
-			return false, nil
+	podsToStart := rc.createStartSequence()
+	for _, pod := range podsToStart {
+		notReady, err := rc.startNode(pod, false, endpointData)
+		if notReady || err != nil {
+			return notReady, err
 		}
 	}
+
+	return false, nil
+}
+
+func (rc *ReconciliationContext) createStartSequence() []*corev1.Pod {
+	rc.ReqLogger.Info("reconcile_racks::createStartSequence")
+
+	pods := make([]*corev1.Pod, 0)
+	failedPods := make([]*corev1.Pod, 0)
+
+	for idx := range rc.desiredRackInformation {
+		rackInfo := rc.desiredRackInformation[idx]
+		statefulSet := rc.statefulSets[idx]
+
+		maxPodRankInThisRack := rackInfo.NodeCount - 1
+		for podRankWithinRack := maxPodRankInThisRack; podRankWithinRack >= 0; podRankWithinRack-- {
+			podName := getStatefulSetPodNameForIdx(statefulSet, int32(podRankWithinRack))
+			pod := rc.getDCPodByName(podName)
+			if !isServerReady(pod) {
+				if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
+					if utils.IndexOfString(rc.Datacenter.Status.FailedStarts, podName) > -1 {
+						failedPods = append(failedPods, pod)
+					} else {
+						pods = append(pods, pod)
+					}
+				}
+			}
+		}
+	}
+
+	getLastPart := func(s string) int {
+		parts := strings.Split(s, "-")
+		lastPart, err := strconv.Atoi(parts[len(parts)-1])
+		if err != nil {
+			return -1
+		}
+		return lastPart
+	}
+
+	podSortFunc := func(i, j int) bool {
+		return getLastPart(pods[i].Name) > getLastPart(pods[j].Name)
+	}
+
+	sort.Slice(pods, podSortFunc)
+	sort.Slice(failedPods, podSortFunc)
+	pods = append(pods, failedPods...)
+
+	return pods
 }
 
 // hasAdditionalSeeds returns true if the datacenter has at least one additional seed.

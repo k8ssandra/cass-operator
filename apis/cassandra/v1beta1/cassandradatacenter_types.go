@@ -484,6 +484,10 @@ type CassandraDatacenterStatus struct {
 	// +optional
 	TrackedTasks []corev1.ObjectReference `json:"trackedTasks,omitempty"`
 
+	// FailedStarts tracks the pods that failed to start by the operator last time it tried
+	// +optional
+	FailedStarts []string `json:"failedStarts,omitempty"`
+
 	// DatacenterName is the name of the override used for the CassandraDatacenter
 	// This field is used to perform validation checks preventing a user from changing the override
 	// +optional

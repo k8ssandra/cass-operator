@@ -236,7 +236,7 @@ jobs:
           - "5.0.3"
           - "6.8.54"
           - "6.9.7"
-          - "nightly"
+          - "trunk"
         integration_test:
           - test_all_the_things
           - smoke_test_read_only_fs
@@ -247,8 +247,9 @@ jobs:
           - version: 6.9.7
             serverImage: datastax/dse-mgmtapi-6_8:6.9.7-ubi # DSE 6.9.7
             serverType: dse
-          - version: nightly
+          - version: trunk
             serverImage: k8ssandra/cass-management-api:5.1-nightly-latest
+            serverVersion: 5.1.0
             serverType: cassandra
         exclude:
           - version: 4.0.17

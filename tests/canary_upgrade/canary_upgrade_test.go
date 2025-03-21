@@ -59,10 +59,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOperatorReady()
 
 			step := "creating a datacenter"
-			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
-			Expect(err).ToNot(HaveOccurred())
-
-			k := kubectl.ApplyFiles(testFile)
+			k := kubectl.ApplyFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForSuperUserUpserted(dcName, 600)

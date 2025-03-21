@@ -134,7 +134,6 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 
 	isDse := dc.Spec.ServerType == "dse"
 	isCassandra3 := dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "3.")
-	isCassandra4 := dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "4.")
 
 	var c map[string]interface{}
 	_ = json.Unmarshal(dc.Spec.Config, &c)
@@ -144,13 +143,13 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 	_, hasDseYaml := c["dse-yaml"]
 
 	serverStr := fmt.Sprintf("%s-%s", dc.Spec.ServerType, dc.Spec.ServerVersion)
-	if hasJvmOptions && (isDse || isCassandra4) {
+	if hasJvmOptions && !isCassandra3 {
 		return attemptedTo("define config jvm-options with %s", serverStr)
 	}
 	if hasJvmServerOptions && isCassandra3 {
 		return attemptedTo("define config jvm-server-options with %s", serverStr)
 	}
-	if hasDseYaml && (isCassandra3 || isCassandra4) {
+	if hasDseYaml && !isDse {
 		return attemptedTo("define config dse-yaml with %s", serverStr)
 	}
 

@@ -415,8 +415,10 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 		}
 
 		if !force && (statefulSet.Generation != status.ObservedGeneration ||
+			status.ReadyReplicas < 1 ||
 			status.Replicas != status.ReadyReplicas ||
-			status.Replicas != updatedReplicas) {
+			status.Replicas != updatedReplicas ||
+			status.Replicas != status.AvailableReplicas) {
 
 			logger.Info(
 				"waiting for upgrade to finish on statefulset",
@@ -1590,7 +1592,8 @@ func (rc *ReconciliationContext) ReconcileNextRack(statefulSet *appsv1.StatefulS
 	rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.CreatedResource,
 		"Created statefulset %s", statefulSet.Name)
 
-	return nil
+	// Reconcile pods that are potentially part of this statefulset (as this could be a modification process requiring delete of StS)
+	return rc.ReconcilePods(statefulSet)
 }
 
 func (rc *ReconciliationContext) CheckDcPodDisruptionBudget() result.ReconcileResult {
@@ -1693,6 +1696,10 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 				Namespace: statefulSet.Namespace},
 			pod)
 		if err != nil {
+			if errors.IsNotFound(err) {
+				// This could be a new StatefulSet, in which case the pods do not exists yet and that's fine
+				continue
+			}
 			rc.ReqLogger.Error(
 				err,
 				"Unable to get pod",

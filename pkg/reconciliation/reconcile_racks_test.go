@@ -286,6 +286,16 @@ func TestCheckRackPodTemplate_SetControllerRefOnStatefulSet(t *testing.T) {
 	}
 	rc.Datacenter.Spec.PodTemplateSpec = podTemplateSpec
 
+	rc.statefulSets[0].Generation = 1
+	rc.statefulSets[0].Status.Replicas = 2
+	rc.statefulSets[0].Status.ReadyReplicas = 2
+	rc.statefulSets[0].Status.CurrentReplicas = 2
+	rc.statefulSets[0].Status.AvailableReplicas = 2
+	rc.statefulSets[0].Status.UpdatedReplicas = 2
+	rc.statefulSets[0].Status.CurrentRevision = "1"
+	rc.statefulSets[0].Status.UpdateRevision = "1"
+	rc.statefulSets[0].Status.ObservedGeneration = 1
+
 	result = rc.CheckRackPodTemplate()
 	assert.True(t, result.Completed())
 
@@ -312,9 +322,24 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 	if err := rc.Client.Update(rc.Ctx, rc.Datacenter); err != nil {
 		t.Fatalf("failed to add rack to cassandradatacenter: %s", err)
 	}
+	rc.statefulSets[0].Generation = 1
+	rc.statefulSets[0].Status.Replicas = 2
+	rc.statefulSets[0].Status.ReadyReplicas = 2
+	rc.statefulSets[0].Status.CurrentReplicas = 2
+	rc.statefulSets[0].Status.AvailableReplicas = 2
+	rc.statefulSets[0].Status.UpdatedReplicas = 2
+	rc.statefulSets[0].Status.ObservedGeneration = 1
 
 	result = rc.CheckRackPodTemplate()
 	_, err := result.Output()
+
+	rc.statefulSets[0].Generation = 1
+	rc.statefulSets[0].Status.Replicas = 2
+	rc.statefulSets[0].Status.ReadyReplicas = 2
+	rc.statefulSets[0].Status.CurrentReplicas = 2
+	rc.statefulSets[0].Status.AvailableReplicas = 2
+	rc.statefulSets[0].Status.UpdatedReplicas = 2
+	rc.statefulSets[0].Status.ObservedGeneration = 1
 
 	assert.True(t, result.Completed())
 	assert.Nil(t, err)
@@ -348,6 +373,7 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 	rc.statefulSets[0].Status.ReadyReplicas = 2
 	rc.statefulSets[0].Status.CurrentReplicas = 1
 	rc.statefulSets[0].Status.UpdatedReplicas = 1
+	rc.statefulSets[0].Status.AvailableReplicas = 2
 	rc.statefulSets[0].Status.CurrentRevision = "1"
 	rc.statefulSets[0].Status.UpdateRevision = "2"
 
@@ -373,6 +399,13 @@ func TestCheckRackPodTemplate_GenerationCheck(t *testing.T) {
 	// Update the generation manually and now verify we won't do updates to StatefulSets if the generation hasn't changed
 	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
 	rc.Datacenter.Spec.ServerVersion = "6.8.44"
+
+	rc.statefulSets[0].Status.Replicas = 2
+	rc.statefulSets[0].Status.ReadyReplicas = 2
+	rc.statefulSets[0].Status.AvailableReplicas = 2
+	rc.statefulSets[0].Status.UpdatedReplicas = 2
+	rc.statefulSets[0].Generation = 1
+	rc.statefulSets[0].Status.ObservedGeneration = 1
 
 	res = rc.CheckRackPodTemplate()
 	assert.Equal(result.Continue(), res)
@@ -430,6 +463,7 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	desiredStatefulSet.Status.UpdatedReplicas = int32(1)
 	desiredStatefulSet.Status.ObservedGeneration = 1
 	desiredStatefulSet.Status.ReadyReplicas = int32(1)
+	desiredStatefulSet.Status.AvailableReplicas = int32(1)
 
 	require.NoError(rc.Client.Create(rc.Ctx, desiredStatefulSet))
 
@@ -3191,6 +3225,13 @@ func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
 	res := rc.CheckRackCreation()
 	require.False(res.Completed(), "CheckRackCreation did not complete as expected")
 
+	rc.statefulSets[0].Status.Replicas = 2
+	rc.statefulSets[0].Status.ReadyReplicas = 2
+	rc.statefulSets[0].Status.AvailableReplicas = 2
+	rc.statefulSets[0].Status.UpdatedReplicas = 2
+	rc.statefulSets[0].Generation = 1
+	rc.statefulSets[0].Status.ObservedGeneration = 1
+
 	require.Equal(result.Continue(), rc.CheckRackPodTemplate())
 
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation, "true")
@@ -3236,6 +3277,13 @@ func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
 	require.Equal(resource.MustParse("2Gi"), sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage])
 
 	// The fakeClient behavior does not prevent us from modifying the StS fields, so this test behaves unlike real world in that sense
+	rc.statefulSets[0].Status.Replicas = 2
+	rc.statefulSets[0].Status.ReadyReplicas = 2
+	rc.statefulSets[0].Status.AvailableReplicas = 2
+	rc.statefulSets[0].Status.UpdatedReplicas = 2
+	rc.statefulSets[0].Generation = 1
+	rc.statefulSets[0].Status.ObservedGeneration = 1
+
 	res = rc.CheckRackPodTemplate()
 	require.Equal(result.Continue(), res, "Recreating StS should throw us to silence period")
 }

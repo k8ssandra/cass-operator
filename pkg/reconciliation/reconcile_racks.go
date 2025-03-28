@@ -427,7 +427,7 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 				"readyReplicas", status.ReadyReplicas,
 				"currentReplicas", status.CurrentReplicas,
 				"updatedReplicas", status.UpdatedReplicas,
-			)
+				"availableReplicas", status.AvailableReplicas)
 
 			return result.RequeueSoon(10)
 		}

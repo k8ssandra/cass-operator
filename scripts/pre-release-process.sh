@@ -50,6 +50,7 @@ CLIENT_VALUE=$(yq '.images.k8ssandra-client' config/manager/image_config.yaml)
 if [[ ! $CLIENT_VALUE == cr.k8ssandra.io* ]]; then
     # Add cr.k8ssandra.io prefixes
     yq eval -i '.images.k8ssandra-client |= "cr.k8ssandra.io/" + .' config/manager/image_config.yaml
+    yq eval -i '.defaults.cassandra.repository |= sub("ghcr.io/", "")' config/manager/image_config.yaml
     yq eval -i '.defaults.cassandra.repository |= "cr.k8ssandra.io/" + .' config/manager/image_config.yaml
 
     # Add cr.dstx.io prefixes

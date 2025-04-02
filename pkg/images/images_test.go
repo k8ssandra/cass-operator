@@ -98,7 +98,7 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 	assert.True(strings.Contains(GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
 	assert.True(strings.Contains(GetImageConfig().Images.Client, "k8ssandra/k8ssandra-client:"))
 
-	assert.Equal("k8ssandra/cass-management-api", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
+	assert.Equal("ghcr.io/k8ssandra/cass-management-api", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
 	assert.Equal("datastax/dse-mgmtapi-6_8", GetImageConfig().DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
 
 	path, err := GetCassandraImage("dse", "6.8.47")
@@ -111,7 +111,7 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 
 	path, err = GetCassandraImage("cassandra", "4.1.4")
 	assert.NoError(err)
-	assert.Equal("k8ssandra/cass-management-api:4.1.4-ubi", path)
+	assert.Equal("ghcr.io/k8ssandra/cass-management-api:4.1.4-ubi", path)
 }
 
 func TestImageConfigParsing(t *testing.T) {

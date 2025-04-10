@@ -9,6 +9,12 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [ENHANCEMENT] [#729](https://github.com/k8ssandra/cass-operator/issues/729) Modify NewMgmtClient to support additional transport option for the http.Client
+
+## v1.23.2
+
 ## v1.23.1
 
 * [BUGFIX] [#765](https://github.com/k8ssandra/cass-operator/issues/765) Fix CheckRackPodLabels to use statefulSet.Spec.Replicas instead of .Status.Replicas to verify all the current pods and their labels

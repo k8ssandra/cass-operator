@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduledtask
+package control
 
 import (
 	"context"
@@ -24,7 +24,6 @@ import (
 	"github.com/go-logr/logr"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	controlapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
-	scheduledtaskv1alpha1 "github.com/k8ssandra/cass-operator/apis/scheduledtask.k8ssandra.io/v1alpha1"
 	"github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,12 +52,12 @@ func (r *RealClock) Now() time.Time {
 	return time.Now()
 }
 
-//+kubebuilder:rbac:groups=scheduledtask.k8ssandra.io,namespace=cass-operator,resources=scheduledtasks,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=scheduledtask.k8ssandra.io,namespace=cass-operator,resources=scheduledtasks/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=scheduledtask.k8ssandra.io,namespace=cass-operator,resources=scheduledtasks/finalizers,verbs=update
+//+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=scheduledtasks,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=scheduledtasks/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=control.k8ssandra.io,namespace=cass-operator,resources=scheduledtasks/finalizers,verbs=update
 
 func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	scheduledtask := &scheduledtaskv1alpha1.ScheduledTask{}
+	scheduledtask := &controlapi.ScheduledTask{}
 	err := r.Get(ctx, req.NamespacedName, scheduledtask)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -160,17 +159,17 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 // SetupWithManager sets up the controller with the Manager.
 func (r *ScheduledTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&scheduledtaskv1alpha1.ScheduledTask{}).
+		For(&controlapi.ScheduledTask{}).
 		Complete(r)
 }
 
-func defaults(scheduledtask *scheduledtaskv1alpha1.ScheduledTask) {
+func defaults(scheduledtask *controlapi.ScheduledTask) {
 	if scheduledtask.Spec.TaskDetails.ConcurrencyPolicy == "" {
 		scheduledtask.Spec.TaskDetails.ConcurrencyPolicy = batchv1.ForbidConcurrent
 	}
 }
 
-func getPreviousExecutionTime(scheduledtask *scheduledtaskv1alpha1.ScheduledTask) (time.Time, error) {
+func getPreviousExecutionTime(scheduledtask *controlapi.ScheduledTask) (time.Time, error) {
 	previousExecution := scheduledtask.Status.LastExecution
 
 	if previousExecution.IsZero() {
@@ -181,7 +180,7 @@ func getPreviousExecutionTime(scheduledtask *scheduledtaskv1alpha1.ScheduledTask
 	return previousExecution.Time.UTC(), nil
 }
 
-func (r *ScheduledTaskReconciler) activeTasks(scheduledtask *scheduledtaskv1alpha1.ScheduledTask, dc *api.CassandraDatacenter, command controlapi.CassandraCommand) (int, error) {
+func (r *ScheduledTaskReconciler) activeTasks(scheduledtask *controlapi.ScheduledTask, dc *api.CassandraDatacenter, command controlapi.CassandraCommand) (int, error) {
 	tasks := &controlapi.CassandraTaskList{}
 	if err := r.Client.List(context.Background(), tasks, client.InNamespace(scheduledtask.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
 		return 0, err

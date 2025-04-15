@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	control "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,7 +30,7 @@ type TaskDetails struct {
 	// Name of the task. Always populated.
 	Name string `json:"name,omitempty"`
 	// +inline
-	control.CassandraTaskSpec `json:"omitempty"`
+	CassandraTaskSpec `json:"omitempty"`
 }
 
 // MedusaTaskStatus defines the observed state of MedusaTask

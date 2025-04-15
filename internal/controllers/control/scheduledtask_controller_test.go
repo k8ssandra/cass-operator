@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduledtask
+package control
 
 import (
 	"context"
@@ -22,7 +22,6 @@ import (
 	"time"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	scheduledtaskv1alpha1 "github.com/k8ssandra/cass-operator/apis/scheduledtask.k8ssandra.io/v1alpha1"
 
 	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	"github.com/stretchr/testify/require"
@@ -47,7 +46,6 @@ var _ Clock = &FakeClock{}
 
 func TestScheduler(t *testing.T) {
 	require := require.New(t)
-	require.NoError(scheduledtaskv1alpha1.AddToScheme(scheme.Scheme))
 	require.NoError(cassdcapi.AddToScheme(scheme.Scheme))
 	require.NoError(taskapi.AddToScheme(scheme.Scheme))
 
@@ -62,14 +60,14 @@ func TestScheduler(t *testing.T) {
 	}
 
 	// To manipulate time and requeue, we use fakeclient here instead of envtest
-	scheduledTask := &scheduledtaskv1alpha1.ScheduledTask{
+	scheduledTask := &taskapi.ScheduledTask{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-scheduled-task",
 			Namespace: "test-ns",
 		},
-		Spec: scheduledtaskv1alpha1.ScheduledTaskSpec{
+		Spec: taskapi.ScheduledTaskSpec{
 			Schedule: "* * * * *",
-			TaskDetails: scheduledtaskv1alpha1.TaskDetails{
+			TaskDetails: taskapi.TaskDetails{
 				Name: "the-operation",
 				CassandraTaskSpec: taskapi.CassandraTaskSpec{
 					Datacenter: corev1.ObjectReference{
@@ -127,7 +125,7 @@ func TestScheduler(t *testing.T) {
 	require.Equal(scheduledTask.Spec.TaskDetails.Jobs[0].Command, task.Spec.Jobs[0].Command)
 
 	// Verify the Status of the scheduledTask is modified and the object is requeued
-	scheduledTaskLive := &scheduledtaskv1alpha1.ScheduledTask{}
+	scheduledTaskLive := &taskapi.ScheduledTask{}
 	err = fakeClient.Get(context.TODO(), nsName, scheduledTaskLive)
 	require.NoError(err)
 
@@ -152,7 +150,7 @@ func TestScheduler(t *testing.T) {
 	task.Status.CompletionTime = &currentTime
 	require.NoError(fakeClient.Update(context.TODO(), &task))
 
-	scheduledTasksLive := &scheduledtaskv1alpha1.ScheduledTaskList{}
+	scheduledTasksLive := &taskapi.ScheduledTaskList{}
 	err = fakeClient.List(context.TODO(), scheduledTasksLive)
 	require.NoError(err)
 	require.Equal(1, len(taskList.Items))
@@ -174,7 +172,7 @@ func TestScheduler(t *testing.T) {
 
 	// Verify that invoking again without reaching the next time does not generate another backup
 	// or modify the Status
-	scheduledTaskLive = &scheduledtaskv1alpha1.ScheduledTask{}
+	scheduledTaskLive = &taskapi.ScheduledTask{}
 	err = fakeClient.Get(context.TODO(), nsName, scheduledTaskLive)
 	require.NoError(err)
 
@@ -189,7 +187,7 @@ func TestScheduler(t *testing.T) {
 	require.NoError(err)
 	require.Equal(2, len(cassandraTasks.Items))
 
-	scheduledTaskLive = &scheduledtaskv1alpha1.ScheduledTask{}
+	scheduledTaskLive = &taskapi.ScheduledTask{}
 	err = fakeClient.Get(context.TODO(), nsName, scheduledTaskLive)
 	require.NoError(err)
 	require.Equal(previousExecutionTime, scheduledTaskLive.Status.LastExecution)
@@ -199,14 +197,14 @@ func TestSchedulerParseError(t *testing.T) {
 	require := require.New(t)
 
 	// To manipulate time and requeue, we use fakeclient here instead of envtest
-	scheduledTask := &scheduledtaskv1alpha1.ScheduledTask{
+	scheduledTask := &taskapi.ScheduledTask{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-schedule",
 			Namespace: "test-ns",
 		},
-		Spec: scheduledtaskv1alpha1.ScheduledTaskSpec{
+		Spec: taskapi.ScheduledTaskSpec{
 			Schedule: "***",
-			TaskDetails: scheduledtaskv1alpha1.TaskDetails{
+			TaskDetails: taskapi.TaskDetails{
 				Name: "the-operation",
 				CassandraTaskSpec: taskapi.CassandraTaskSpec{
 					Datacenter: corev1.ObjectReference{
@@ -223,7 +221,7 @@ func TestSchedulerParseError(t *testing.T) {
 			},
 		},
 	}
-	require.NoError(scheduledtaskv1alpha1.AddToScheme(scheme.Scheme))
+	require.NoError(taskapi.AddToScheme(scheme.Scheme))
 	require.NoError(cassdcapi.AddToScheme(scheme.Scheme))
 	require.NoError(taskapi.AddToScheme(scheme.Scheme))
 

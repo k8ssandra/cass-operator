@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
-  name: scheduledtasks.scheduledtask.k8ssandra.io
+  name: scheduledtasks.control.k8ssandra.io
 spec:
-  group: scheduledtask.k8ssandra.io
+  group: control.k8ssandra.io
   names:
     kind: ScheduledTask
     listKind: ScheduledTaskList

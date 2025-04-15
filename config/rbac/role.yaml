@@ -103,6 +103,7 @@ rules:
   - control.k8ssandra.io
   resources:
   - cassandratasks
+  - scheduledtasks
   verbs:
   - create
   - delete
@@ -115,12 +116,14 @@ rules:
   - control.k8ssandra.io
   resources:
   - cassandratasks/finalizers
+  - scheduledtasks/finalizers
   verbs:
   - update
 - apiGroups:
   - control.k8ssandra.io
   resources:
   - cassandratasks/status
+  - scheduledtasks/status
   verbs:
   - get
   - patch

@@ -1,0 +1,19 @@
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: ScheduledTask
+metadata:
+  labels:
+    app.kubernetes.io/name: cass-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: scheduledtask-sample
+spec:
+  schedule: "*/1 * * * *"
+  taskDetails:
+    name: "my-task"
+    datacenter:
+      name: dc1
+      namespace: cass-operator
+    jobs:
+      - name: replace-run
+        command: replacenode
+        args:
+          pod_name: cluster1-dc1-r2-sts-0

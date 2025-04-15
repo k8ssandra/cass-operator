@@ -2,5 +2,5 @@
 resources:
 - example-cassdc-three-nodes-single-rack.yaml
 - cassandratask-cleanup.yaml
-- scheduledtask.k8ssandra.io_v1alpha1_scheduledtask.yaml
+- scheduledtask.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

@@ -18,7 +18,7 @@ import (
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	mageutil "github.com/k8ssandra/cass-operator/tests/util"

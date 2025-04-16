@@ -16,9 +16,9 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/goccy/go-yaml"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"gopkg.in/yaml.v2"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	mageutil "github.com/k8ssandra/cass-operator/tests/util"
@@ -44,7 +44,7 @@ func duplicate(value string, count int) string {
 // adding the supplied server overrides, to allow for running tests
 // against mutliple Cassandra/DSE versions.
 func CreateTestFile(dcYaml string) (string, error) {
-	var data map[interface{}]interface{}
+	var data map[string]any
 
 	fileInfo, err := os.Stat(dcYaml)
 	if err != nil {
@@ -60,7 +60,7 @@ func CreateTestFile(dcYaml string) (string, error) {
 		return "", err
 	}
 
-	spec := data["spec"].(map[interface{}]interface{})
+	spec := data["spec"].(map[string]any)
 	serverImage := os.Getenv("M_SERVER_IMAGE")
 	if serverImage != "" {
 		spec["serverImage"] = serverImage
@@ -77,7 +77,7 @@ func CreateTestFile(dcYaml string) (string, error) {
 	}
 
 	if spec["config"] != nil {
-		config := spec["config"].(map[interface{}]interface{})
+		config := spec["config"].(map[string]interface{})
 
 		// jvm-options <-> jvm-server-options
 		if strings.HasPrefix(cassandraVersion, "3.") {
@@ -86,7 +86,7 @@ func CreateTestFile(dcYaml string) (string, error) {
 				delete(config, "jvm-server-options")
 			}
 			if config["cassandra-yaml"] != nil {
-				if cassYaml, ok := config["cassandra-yaml"].(map[interface{}]interface{}); ok {
+				if cassYaml, ok := config["cassandra-yaml"].(map[string]any); ok {
 					if cassYaml["allocate_tokens_for_local_replication_factor"] != nil {
 						delete(cassYaml, "allocate_tokens_for_local_replication_factor")
 						config["cassandra-yaml"] = cassYaml
@@ -99,10 +99,10 @@ func CreateTestFile(dcYaml string) (string, error) {
 				delete(config, "jvm-options")
 			}
 			if config["jvm-server-options"] != nil {
-				if serverOpts, ok := config["jvm-server-options"].(map[interface{}]interface{}); ok {
+				if serverOpts, ok := config["jvm-server-options"].(map[string]any); ok {
 					if serverOpts["additional-jvm-opts"] != nil && serverType == "dse" {
-						if opts, ok := serverOpts["additional-jvm-opts"].([]interface{}); ok {
-							modOpts := make([]interface{}, 0, len(opts))
+						if opts, ok := serverOpts["additional-jvm-opts"].([]any); ok {
+							modOpts := make([]any, 0, len(opts))
 							for _, opt := range opts {
 								optStr := opt.(string)
 								if strings.HasPrefix(optStr, "-Dcassandra.system_distributed_replication") {

@@ -66,6 +66,7 @@ jobs:
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_SERVER_VERSION: 3.11.17
       M_SERVER_TYPE: cassandra
+      M_SERVER_IMAGE: docker.io/k8ssandra/cass-management-api:3.11.17-ubi8
     steps:
       - uses: actions/checkout@v4
         if: github.event_name == 'pull_request'
@@ -247,8 +248,8 @@ jobs:
           - version: 6.9.7
             serverImage: datastax/dse-mgmtapi-6_8:6.9.7-ubi # DSE 6.9.7
             serverType: dse
-          - version: 5.1.0
-            serverImage: k8ssandra/cass-management-api:5.1-nightly-latest
+          # - version: 5.1.0
+          #   serverImage: ghcr.io/k8ssandra/cass-management-api:5.1-nightly-latest
         exclude:
           - version: 4.0.17
             integration_test: "smoke_test_read_only_fs"

@@ -23,6 +23,7 @@ require (
 
 require (
 	github.com/Jeffail/gabs/v2 v2.7.0
+	github.com/goccy/go-yaml v1.17.1
 	github.com/google/go-cmp v0.7.0
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/prometheus/client_golang v1.22.0
@@ -30,7 +31,6 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/mod v0.24.0
 	k8s.io/utils v0.0.0-20250321185631-1f6e0b77f77e
-	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
@@ -110,4 +110,5 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
+	sigs.k8s.io/yaml v1.4.0 // indirect
 )

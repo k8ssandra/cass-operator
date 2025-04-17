@@ -2781,10 +2781,11 @@ func TestStartOneNodePerRack(t *testing.T) {
 	type racks map[string][]pod
 
 	tests := []struct {
-		name         string
-		racks        racks
-		wantNotReady bool
-		seedCount    int
+		name          string
+		racks         racks
+		wantNotReady  bool
+		seedCount     int
+		notReadyRacks racks
 	}{
 		{
 			name: "balanced racks, all nodes started",
@@ -2826,6 +2827,21 @@ func TestStartOneNodePerRack(t *testing.T) {
 			wantNotReady: false,
 			seedCount:    2,
 		},
+		{
+			name: "balanced racks, first node from rack1 can't start",
+			racks: racks{
+				"rack1": {false, true, false},
+				"rack2": {false, false, true},
+				"rack3": {false, false, true},
+			},
+			wantNotReady: false,
+			seedCount:    3,
+			notReadyRacks: racks{
+				"rack1": {false, false, true},
+				"rack2": {false, false, false},
+				"rack3": {false, false, false},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2844,16 +2860,22 @@ func TestStartOneNodePerRack(t *testing.T) {
 					p := &corev1.Pod{}
 					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
 					p.Labels = map[string]string{}
-					p.Status.ContainerStatuses = []corev1.ContainerStatus{
-						{
-							Name: "cassandra",
-							State: corev1.ContainerState{
-								Running: &corev1.ContainerStateRunning{
-									StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
+					readyToStart := true
+					if tt.notReadyRacks[rackName] != nil && tt.notReadyRacks[rackName][i] {
+						readyToStart = false
+					}
+					if readyToStart {
+						p.Status.ContainerStatuses = []corev1.ContainerStatus{
+							{
+								Name: "cassandra",
+								State: corev1.ContainerState{
+									Running: &corev1.ContainerStateRunning{
+										StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
+									},
 								},
+								Ready: bool(started),
 							},
-							Ready: bool(started),
-						},
+						}
 					}
 					p.Status.PodIP = "127.0.0.1"
 					if started {

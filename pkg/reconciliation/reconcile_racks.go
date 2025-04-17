@@ -2036,6 +2036,7 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 
 	labelSeedBeforeStart := readySeeds == 0 && !rc.hasAdditionalSeeds()
 
+RackLoop:
 	for idx := range rc.desiredRackInformation {
 		rackInfo := rc.desiredRackInformation[idx]
 		statefulSet := rc.statefulSets[idx]
@@ -2045,11 +2046,24 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 			continue
 		}
 
-		podName := getStatefulSetPodNameForIdx(statefulSet, int32(maxPodRankInThisRack))
-		pod := rc.getDCPodByName(podName)
-		notReady, err := rc.startNode(pod, labelSeedBeforeStart, endpointData)
-		if notReady || err != nil {
-			return notReady, err
+		for podRankWithinRack := maxPodRankInThisRack; podRankWithinRack >= 0; podRankWithinRack-- {
+			podName := getStatefulSetPodNameForIdx(statefulSet, int32(maxPodRankInThisRack))
+			pod := rc.getDCPodByName(podName)
+			if !isServerReady(pod) {
+				if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
+					notReady, err := rc.startNode(pod, labelSeedBeforeStart, endpointData)
+					if notReady || err != nil {
+						return notReady, err
+					}
+					continue RackLoop // This rack had a node running, so we can skip the rest of the rack's pods
+				}
+				fmt.Printf("Pod %s is not ready to start yet\n", pod.Name)
+			} else {
+				// This rack had a node running, so we can skip the rest of the rack's pods
+				continue RackLoop
+			}
+			// Note, it's possible that the rack didn't have any pods that could be started (they could be in Pending state), but
+			// we don't want to interrupt other racks from starting even if this rack is down (such as zone failure)
 		}
 	}
 	return false, nil

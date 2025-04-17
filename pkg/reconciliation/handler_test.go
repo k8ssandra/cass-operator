@@ -15,9 +15,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -27,17 +29,41 @@ import (
 )
 
 func TestCalculateReconciliationActions(t *testing.T) {
+	t.Skip("This does not test current functionality and is covered by envtests")
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
+
+	service := newServiceForCassandraDatacenter(rc.Datacenter)
+
+	// Objects to keep track of
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cassandradatacenter-example-cluster-cassandradatacenter-example-default-sts-1",
+			Namespace: rc.Datacenter.Namespace,
+			Labels:    rc.Datacenter.GetRackLabels("default"),
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "cassandra",
+				},
+			},
+		},
+	}
+
+	trackObjects := []runtime.Object{
+		rc.Datacenter,
+		service,
+		pod,
+	}
+
+	fakeClient := fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter, service).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fakeClient
 
 	result, err := rc.CalculateReconciliationActions()
 	assert.NoErrorf(t, err, "Should not have returned an error while calculating reconciliation actions")
 	assert.NotNil(t, result, "Result should not be nil")
-
-	// Add a service and check the logic
-
-	fakeClient, _ := fakeClientWithService(rc.Datacenter)
-	rc.Client = *fakeClient
 
 	result, err = rc.CalculateReconciliationActions()
 	assert.NoErrorf(t, err, "Should not have returned an error while calculating reconciliation actions")

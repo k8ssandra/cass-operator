@@ -20,6 +20,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#729](https://github.com/k8ssandra/cass-operator/issues/729) Modify NewMgmtClient to support additional transport option for the http.Client
 * [ENHANCEMENT] [#737](https://github.com/k8ssandra/cass-operator/issues/737) Before issuing PVC deletion when deleting a datacenter, verify the PVCs that match the labels are not actually used by any pods.
 * [BUGFIX] [#744](https://github.com/k8ssandra/cass-operator/issues/744) If StatefulSet was manually modified outside CassandraDatacenter, do not start such pods as they would need to be decommissioned instantly and could have IP conflict issues when doing so.
+* [BUGFIX] [#696](https://github.com/k8ssandra/cass-operator/issues/696) If the first pod in the rack was not available to be started (such as in Pending state), the startOneNode would keep waiting for it indefinitely.
 
 ## v1.23.2
 

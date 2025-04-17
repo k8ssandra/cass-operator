@@ -26,6 +26,7 @@ import (
 )
 
 func TestReconcile(t *testing.T) {
+	t.Skip("This test is replaced by the envtests")
 	var (
 		name            = "dc1-example"
 		namespace       = "default"
@@ -58,12 +59,41 @@ func TestReconcile(t *testing.T) {
 			ServerVersion: "6.8.42",
 			StorageConfig: storageConfig,
 			ClusterName:   "cluster-example",
+			Racks: []api.Rack{
+				{
+					Name: "rack1",
+				},
+			},
 		},
 	}
 
 	// Objects to keep track of
 	trackObjects := []runtime.Object{
 		dc,
+	}
+
+	// Prepare pods
+	stsName := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.LabelResourceName() + "-" + api.CleanupSubdomain(dc.Spec.Racks[0].Name) + "-sts"
+	for i := 0; i < int(size); i++ {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%d", stsName, i),
+				Namespace: namespace,
+				Labels:    dc.GetRackLabels(dc.Spec.Racks[0].Name),
+			},
+			Spec: corev1.PodSpec{},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		}
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+			Name:  "cassandra",
+			Ready: true,
+		}}
+		pod.Labels[api.CassNodeState] = "Started"
+		pod.Status.PodIP = fmt.Sprintf("192.168.1.%d", i)
+		fmt.Printf("Adding pod %s\n", pod.Name)
+		trackObjects = append(trackObjects, pod)
 	}
 
 	s := scheme.Scheme

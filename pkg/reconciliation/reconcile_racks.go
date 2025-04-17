@@ -2049,6 +2049,9 @@ RackLoop:
 		for podRankWithinRack := maxPodRankInThisRack; podRankWithinRack >= 0; podRankWithinRack-- {
 			podName := getStatefulSetPodNameForIdx(statefulSet, int32(maxPodRankInThisRack))
 			pod := rc.getDCPodByName(podName)
+			if pod == nil {
+				return false, fmt.Errorf("pod %s not found, most likely statefulset controller has not caught up yet", podName)
+			}
 			if !isServerReady(pod) {
 				if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
 					notReady, err := rc.startNode(pod, labelSeedBeforeStart, endpointData)
@@ -2057,7 +2060,6 @@ RackLoop:
 					}
 					continue RackLoop // This rack had a node running, so we can skip the rest of the rack's pods
 				}
-				fmt.Printf("Pod %s is not ready to start yet\n", pod.Name)
 			} else {
 				// This rack had a node running, so we can skip the rest of the rack's pods
 				continue RackLoop

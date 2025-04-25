@@ -272,8 +272,8 @@ type CassandraDatacenterSpec struct {
 	// Setting to 0 might cause multiple Cassandra pods to restart at the same time despite PodDisruptionBudget settings.
 	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
 
-	// ReadOnlyRootFilesystem makes the cassandra container to be run with a read-only root filesystem. Currently only functional when used with the
-	// new k8ssandra-client config builder (Cassandra 4.1 and newer and HCD)
+	// ReadOnlyRootFilesystem makes the cassandra container to be run with a read-only root filesystem. This is enabled by default when using OSS Cassandra 4.1.0 and or newer, DSE 6.8 and newer (from datastax/dse-mgmtapi-6_8 repository) or HCD.
+	// If serverImage override is used, this setting defaults to false.
 	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty"`
 }
 
@@ -939,5 +939,21 @@ func (dc *CassandraDatacenter) ReadOnlyFs() bool {
 	if dc.Spec.ReadOnlyRootFilesystem != nil {
 		return *dc.Spec.ReadOnlyRootFilesystem
 	}
+
+	if dc.Spec.ServerImage != "" {
+		// Image coordinates override has been used, we do not know if this image is actually capable of running readOnlyRootFilesystem=true
+		return false
+	}
+
+	if dc.Spec.ServerType == "cassandra" && semver.Compare(fmt.Sprintf("v%s", dc.Spec.ServerVersion), "v4.1.0") >= 0 {
+		return true
+	}
+	if dc.Spec.ServerType == "hcd" {
+		return true
+	}
+	if dc.Spec.ServerType == "dse" && (strings.HasPrefix(dc.Spec.ServerVersion, "6.8") || strings.HasPrefix(dc.Spec.ServerVersion, "6.9")) {
+		return true
+	}
+
 	return false
 }

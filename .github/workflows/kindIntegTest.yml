@@ -123,7 +123,7 @@ jobs:
           - cdc_successful
         include:
           - version: 6.8.54
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.54-ubi8 # DSE 6.8.54
+            # serverImage: datastax/dse-mgmtapi-6_8:6.8.54-ubi8 # DSE 6.8.54
             serverType: dse
             integration_test: "cdc_successful"
       fail-fast: true
@@ -243,10 +243,10 @@ jobs:
           - smoke_test_read_only_fs
         include:
           - version: 6.8.54
-            serverImage: datastax/dse-mgmtapi-6_8:6.8.54-ubi8 # DSE 6.8.54
+            # serverImage: datastax/dse-mgmtapi-6_8:6.8.54-ubi8 # DSE 6.8.54
             serverType: dse
           - version: 6.9.7
-            serverImage: datastax/dse-mgmtapi-6_8:6.9.7-ubi # DSE 6.9.7
+            # serverImage: datastax/dse-mgmtapi-6_8:6.9.7-ubi # DSE 6.9.7
             serverType: dse
           # - version: 5.1.0
           #   serverImage: ghcr.io/k8ssandra/cass-management-api:5.1-nightly-latest

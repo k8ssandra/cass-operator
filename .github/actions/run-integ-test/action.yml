@@ -37,6 +37,11 @@ runs:
       shell: bash
       run: |
         hack/cluster.sh
+    - name: Install gatekeeper rules
+      if: ${{ !env.SKIP_GATEKEEPER }}
+      shell: bash
+      run: |
+        hack/gatekeeper.sh
     - name: Download cass-operator image
       uses: actions/download-artifact@v4
       with:

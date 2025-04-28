@@ -86,6 +86,10 @@ spec:
     kinds:
       - apiGroups: [""]
         kinds: ["Pod"]
+    excludedNamespaces:
+      - kube-system
+      - cert-manager
+      - local-path-storage
   parameters:
     runAsUser:
       rule: MustRunAsNonRoot

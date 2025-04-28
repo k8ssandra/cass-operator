@@ -671,6 +671,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_initcontainers_merge(t *testin
 	testContainer.Env = []corev1.EnvVar{
 		{Name: "TEST_VAL", Value: "TEST"},
 	}
+	testContainer.SecurityContext = &corev1.SecurityContext{}
 
 	dc := &api.CassandraDatacenter{
 		Spec: api.CassandraDatacenterSpec{
@@ -694,7 +695,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_initcontainers_merge(t *testin
 	assert.NoError(t, err, "should not have gotten error when building podTemplateSpec")
 	assert.Equal(t, 2, len(got.Spec.InitContainers))
 	if !reflect.DeepEqual(testContainer, got.Spec.InitContainers[0]) {
-		t.Errorf("second init container = %v, want %v", got, testContainer)
+		t.Errorf("second init container = %+v\n, want %+v", got.Spec.InitContainers[0], testContainer)
 	}
 }
 
@@ -1244,6 +1245,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 					Name: "default",
 				},
 			},
+			ReadOnlyRootFilesystem: ptr.To(false),
 		},
 	}
 
@@ -1257,6 +1259,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 					Name: "default",
 				},
 			},
+			ReadOnlyRootFilesystem: ptr.To(false),
 		},
 	}
 
@@ -1320,6 +1323,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage_withContainerOverr
 					Name: "default",
 				},
 			},
+			ReadOnlyRootFilesystem: ptr.To(false),
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
@@ -2355,7 +2359,7 @@ func TestReadOnlyRootFilesystemWithSecurityContext(t *testing.T) {
 					},
 				},
 			},
-			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			ReadOnlyRootFilesystem: ptr.To(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2376,24 +2380,31 @@ func TestReadOnlyRootFilesystemWithSecurityContext(t *testing.T) {
 	// The cassandra container should get readOnlyRootFilesystem from the top-level field, but also retain the
 	// capabilities from the podTemplateSpec.
 	assert.Equal(CassandraContainerName, containers[0].Name)
-	assert.True(reflect.DeepEqual(containers[0].SecurityContext, &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: ptr.To[bool](true),
-		Capabilities:           &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-	}))
+	assert.Equal(containers[0].SecurityContext, &corev1.SecurityContext{
+		ReadOnlyRootFilesystem:   ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	})
 
 	// Other containers should just get the podTemplateSpec contents.
 	assert.Equal(ServerBaseConfigContainerName, initContainers[0].Name)
-	assert.True(reflect.DeepEqual(initContainers[0].SecurityContext, &corev1.SecurityContext{
-		Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-	}))
+	assert.Equal(initContainers[0].SecurityContext, &corev1.SecurityContext{
+		ReadOnlyRootFilesystem:   ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	})
 
 	assert.Equal(ServerConfigContainerName, initContainers[1].Name)
-	assert.True(reflect.DeepEqual(initContainers[1].SecurityContext, &corev1.SecurityContext{
-		Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-	}))
+	assert.Equal(initContainers[1].SecurityContext, &corev1.SecurityContext{
+		ReadOnlyRootFilesystem:   ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	})
 
 	assert.Equal(SystemLoggerContainerName, containers[1].Name)
-	assert.True(reflect.DeepEqual(containers[1].SecurityContext, &corev1.SecurityContext{
-		Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-	}))
+	assert.Equal(containers[1].SecurityContext, &corev1.SecurityContext{
+		ReadOnlyRootFilesystem:   ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	})
 }

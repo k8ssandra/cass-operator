@@ -78,6 +78,9 @@ const (
 	// task has completed.
 	TrackCleanupTasksAnnotation = "cassandra.datastax.com/track-cleanup-tasks"
 
+	// DeletePVCAnnotation determines if the operator should delete the PVCs when the CassandraDatacenter is deleted. Default is true, set to false to skip deletion.
+	DeletePVCAnnotation = "cassandra.datastax.com/delete-pvc"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 

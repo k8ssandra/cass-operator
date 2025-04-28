@@ -20,6 +20,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 )
 
@@ -177,6 +178,25 @@ func TestDeletePVCs_FailedToDeleteBeingUsed(t *testing.T) {
 	err := rc.deletePVCs()
 	assert.Error(err)
 	assert.EqualError(err, "PersistentVolumeClaim pvc-1 is still being used by a pod")
+}
+
+func TestDeletePVCsSkip(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	mockClient := mocks.NewClient(t)
+	rc.Client = mockClient
+
+	rc.Datacenter.Annotations = map[string]string{
+		api.DeletePVCAnnotation: "false",
+	}
+
+	if err := rc.deletePVCs(); err != nil {
+		t.Fatalf("deletePVCs should not have failed")
+	}
+
+	mockClient.AssertNotCalled(t, "List", mock.Anything, mock.Anything, mock.Anything)
+	mockClient.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
 }
 
 func TestStorageExpansionNils(t *testing.T) {

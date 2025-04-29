@@ -38,6 +38,15 @@ spec:
           name: "another-tailing-logger"
           terminationMessagePath: "/dev/termination-log"
           terminationMessagePolicy: "File"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            readOnlyRootFilesystem: true
+            runAsGroup: 999
+            runAsUser: 999
+            runAsNonRoot: true
           volumeMounts:
             - mountPath: "/var/log/cassandra"
               name: "server-logs"

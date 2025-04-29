@@ -593,6 +593,11 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		baseTemplate.Spec.InitContainers = append(baseTemplate.Spec.InitContainers, *serverCfg)
 	}
 
+	for i, container := range baseTemplate.Spec.InitContainers {
+		securityContext(dc, &container)
+		baseTemplate.Spec.InitContainers[i] = container
+	}
+
 	return nil
 }
 
@@ -647,6 +652,17 @@ func makeImage(dc *api.CassandraDatacenter) (string, error) {
 		return images.GetCassandraImage(dc.Spec.ServerType, dc.Spec.ServerVersion)
 	}
 	return dc.GetServerImage(), nil
+}
+
+func securityContext(dc *api.CassandraDatacenter, container *corev1.Container) {
+	if container.SecurityContext == nil {
+		container.SecurityContext = &corev1.SecurityContext{}
+	}
+
+	if dc.ReadOnlyFs() {
+		container.SecurityContext.ReadOnlyRootFilesystem = ptr.To(true)
+		container.SecurityContext.AllowPrivilegeEscalation = ptr.To(false)
+	}
 }
 
 // If values are provided in the matching containers in the
@@ -712,12 +728,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 	}
 
-	if dc.ReadOnlyFs() {
-		if cassContainer.SecurityContext == nil {
-			cassContainer.SecurityContext = &corev1.SecurityContext{}
-		}
-		cassContainer.SecurityContext.ReadOnlyRootFilesystem = ptr.To[bool](true)
-	}
+	securityContext(dc, cassContainer)
 
 	// Combine env vars
 
@@ -882,8 +893,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 
 	loggerContainer.Resources = *getResourcesOrDefault(&dc.Spec.SystemLoggerResources, &DefaultsLoggerContainer)
 
-	// Note that append() can make copies of each element,
-	// so we call it after modifying any existing elements.
+	securityContext(dc, loggerContainer)
 
 	if !foundCass {
 		baseTemplate.Spec.Containers = append(baseTemplate.Spec.Containers, *cassContainer)
@@ -933,7 +943,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 			RunAsUser:    &userID,
 			RunAsGroup:   &userID,
 			FSGroup:      &userID,
-			RunAsNonRoot: ptr.To[bool](true),
+			RunAsNonRoot: ptr.To(true),
 		}
 	}
 
@@ -978,15 +988,13 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 
 	// Init Containers
 
-	err := buildInitContainers(dc, rack.Name, baseTemplate)
-	if err != nil {
+	if err := buildInitContainers(dc, rack.Name, baseTemplate); err != nil {
 		return nil, err
 	}
 
 	// Containers
 
-	err = buildContainers(dc, baseTemplate)
-	if err != nil {
+	if err := buildContainers(dc, baseTemplate); err != nil {
 		return nil, err
 	}
 

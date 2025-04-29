@@ -195,9 +195,10 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 
 	dc := &api.CassandraDatacenter{
 		Spec: api.CassandraDatacenterSpec{
-			ServerType:    "cassandra",
-			ServerVersion: "4.1.0",
-			ClusterName:   "cluster1",
+			ServerType:             "cassandra",
+			ServerVersion:          "4.1.0",
+			ClusterName:            "cluster1",
+			ReadOnlyRootFilesystem: ptr.To(false),
 			StorageConfig: api.StorageConfig{
 				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 					StorageClassName: &storageClassName,

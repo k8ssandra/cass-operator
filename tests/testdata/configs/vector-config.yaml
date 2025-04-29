@@ -5,6 +5,9 @@ metadata:
   namespace: cass-operator
 data:
   vector.toml: |
+    [api]
+    enabled = true
+
     [sources.systemlog]
     type = "file"
     include = [ "/var/log/cassandra/system.log" ]

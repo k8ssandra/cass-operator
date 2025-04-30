@@ -146,23 +146,6 @@ func CreateMockReconciliationContext(
 	return rc
 }
 
-// Create a fake client that is tracking a service
-func fakeClientWithService(cassandraDatacenter *api.CassandraDatacenter) (*client.WithWatch, *corev1.Service) {
-
-	service := newServiceForCassandraDatacenter(cassandraDatacenter)
-
-	// Objects to keep track of
-
-	trackObjects := []runtime.Object{
-		cassandraDatacenter,
-		service,
-	}
-
-	fakeClient := fake.NewClientBuilder().WithStatusSubresource(cassandraDatacenter, service).WithRuntimeObjects(trackObjects...).Build()
-
-	return &fakeClient, service
-}
-
 func setupTest() (*ReconciliationContext, *corev1.Service, func()) {
 	// Set up verbose logging
 	logger := zap.New()

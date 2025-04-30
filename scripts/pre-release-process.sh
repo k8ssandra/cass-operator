@@ -4,7 +4,7 @@ if [[ ! $0 == scripts/* ]]; then
     exit 1
 fi
 
-if [ "$#" -le 1 ]; then
+if [ "$#" -lt 1 ]; then
     echo "Usage: scripts/pre-release-process.sh newTag [prevTag]"
     echo ""
     echo "If prevTag is not set, it will default to the latest tag in the repository"

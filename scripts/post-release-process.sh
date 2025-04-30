@@ -35,6 +35,7 @@ LOG_IMG=k8ssandra/system-logger:latest yq eval -i '.images.system-logger = env(L
 # Remove cr.k8ssandra.io prefixes
 yq eval -i '.images.k8ssandra-client |= sub("cr.k8ssandra.io/", "")' config/manager/image_config.yaml
 yq eval -i '.defaults.cassandra.repository |= sub("cr.k8ssandra.io/", "")' config/manager/image_config.yaml
+yq eval -i '.defaults.cassandra.repository |= "ghcr.io/" + .' config/manager/image_config.yaml
 
 # Remove cr.dstx.io prefixes
 yq eval -i '.images.config-builder |= sub("cr.dtsx.io/", "")' config/manager/image_config.yaml

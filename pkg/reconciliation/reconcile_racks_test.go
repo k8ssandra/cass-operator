@@ -385,6 +385,88 @@ func TestCheckRackPodTemplate_GenerationCheck(t *testing.T) {
 	assert.True(res.Completed())
 }
 
+func TestCheckRackPodTemplate_RackStabilization(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	rc.Datacenter.Spec.Size = 3
+	rc.Datacenter.Spec.Racks = []api.Rack{
+		{Name: "rack1"},
+		{Name: "rack2"},
+		{Name: "rack3"},
+	}
+
+	require.NoError(rc.CalculateRackInformation())
+
+	for idx, rackInfo := range rc.desiredRackInformation {
+		sts, err := newStatefulSetForCassandraDatacenter(
+			nil,
+			rackInfo.RackName,
+			rc.Datacenter,
+			1)
+		require.NoError(err)
+
+		sts.Status.Replicas = 1
+		sts.Status.ReadyReplicas = 1
+		sts.Status.UpdatedReplicas = 1
+		sts.Status.ObservedGeneration = sts.Generation
+
+		rc.statefulSets[idx] = sts
+	}
+
+	for idx, rackInfo := range rc.desiredRackInformation {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("%s-0", rackInfo.RackName),
+				Labels: map[string]string{
+					api.RackLabel: rackInfo.RackName,
+				},
+			},
+			Status: corev1.PodStatus{},
+		}
+
+		if idx == 0 {
+			pod.Status.StartTime = &metav1.Time{Time: time.Now().Add(-10 * time.Minute)}
+		} else {
+			pod.Status.StartTime = &metav1.Time{Time: time.Now().Add(-3 * time.Minute)}
+		}
+
+		rc.dcPods = append(rc.dcPods, pod)
+	}
+
+	result := rc.CheckRackPodTemplate()
+	res, err := result.Output()
+	require.NoError(err)
+	assert.Equal(reconcile.Result{Requeue: true, RequeueAfter: 30 * time.Second}, res, "Should requeue due to recent pod start time in previous rack")
+
+	// Lets make them pass this time
+	rc.dcPods = []*corev1.Pod{}
+
+	for _, rackInfo := range rc.desiredRackInformation {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("%s-0", rackInfo.RackName),
+				Labels: map[string]string{
+					api.RackLabel: rackInfo.RackName,
+				},
+			},
+			Status: corev1.PodStatus{
+				StartTime: &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
+			},
+		}
+		rc.dcPods = append(rc.dcPods, pod)
+	}
+
+	setControllerReference = func(owner, object metav1.Object, scheme *runtime.Scheme) error {
+		return nil
+	}
+
+	result = rc.CheckRackPodTemplate()
+	assert.False(result.Completed())
+}
+
 func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	require := require.New(t)
 	rc, _, cleanupMockScr := setupTest()

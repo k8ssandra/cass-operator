@@ -171,6 +171,10 @@ func (rc *ReconciliationContext) UpdateAllowed() bool {
 	return rc.Datacenter.GenerationChanged() || metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.UpdateAllowedAnnotation)
 }
 
+func (rc *ReconciliationContext) rackPods(rackName string) []*corev1.Pod {
+	return FilterPodListByLabels(rc.dcPods, map[string]string{api.RackLabel: rackName})
+}
+
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
@@ -208,6 +212,37 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 			)
 
 			return result.RequeueSoon(10)
+		}
+
+		if idx > 0 {
+			previousRackPods := rc.rackPods(rc.desiredRackInformation[idx-1].RackName)
+
+			var latestStartTime *metav1.Time
+			for _, pod := range previousRackPods {
+				if pod.Status.StartTime != nil {
+					if latestStartTime == nil || pod.Status.StartTime.After(latestStartTime.Time) {
+						latestStartTime = pod.Status.StartTime
+					}
+				}
+			}
+
+			if latestStartTime != nil {
+				acceptedTime := metav1.NewTime(time.Now().Add(-5 * time.Minute))
+				if latestStartTime.After(acceptedTime.Time) {
+					logger.Info(
+						"Waiting for previous rack to stabilize",
+						"previousRack", rc.desiredRackInformation[idx-1].RackName,
+						"currentRack", rackName,
+						"latestStartTime", latestStartTime,
+					)
+					return result.RequeueSoon(30)
+				}
+			} else {
+				// Something bad happened, we shouldn't ever be here since the previous check for waiting for upgrade to finish
+				// should have caught this
+				logger.Error(fmt.Errorf("failed to fetch startTime of rack %s", rc.desiredRackInformation[idx-1].RackName), "unable to find latest start time for previous rack pods, requeueing")
+				return result.RequeueSoon(10)
+			}
 		}
 
 		desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, int(*statefulSet.Spec.Replicas))

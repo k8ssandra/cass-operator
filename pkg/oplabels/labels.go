@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -19,6 +20,18 @@ const (
 	CreatedByLabel      = "app.kubernetes.io/created-by"
 	CreatedByLabelValue = ManagedByLabelValue
 )
+
+func AddOperatorMetadata(obj *metav1.ObjectMeta, dc *api.CassandraDatacenter) {
+	if obj.Labels == nil {
+		obj.Labels = make(map[string]string)
+	}
+	if obj.Annotations == nil {
+		obj.Annotations = make(map[string]string)
+	}
+
+	AddOperatorLabels(obj.Labels, dc)
+	AddOperatorAnnotations(obj.Annotations, dc)
+}
 
 func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
 	if m == nil {

@@ -2425,15 +2425,12 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 func (rc *ReconciliationContext) createTask(command taskapi.CassandraCommand) error {
 	generatedName := fmt.Sprintf("%s-%d", command, time.Now().Unix())
 	dc := rc.Datacenter
-	anns := make(map[string]string)
 
-	oplabels.AddOperatorAnnotations(anns, dc)
 	task := &taskapi.CassandraTask{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        generatedName,
-			Namespace:   rc.Datacenter.Namespace,
-			Labels:      dc.GetDatacenterLabels(),
-			Annotations: anns,
+			Name:      generatedName,
+			Namespace: rc.Datacenter.Namespace,
+			Labels:    dc.GetDatacenterLabels(),
 		},
 		Spec: taskapi.CassandraTaskSpec{
 			Datacenter: corev1.ObjectReference{
@@ -2452,7 +2449,7 @@ func (rc *ReconciliationContext) createTask(command taskapi.CassandraCommand) er
 		Status: taskapi.CassandraTaskStatus{},
 	}
 
-	oplabels.AddOperatorLabels(task.GetLabels(), dc)
+	oplabels.AddOperatorMetadata(&task.ObjectMeta, dc)
 
 	if err := rc.Client.Create(rc.Ctx, task); err != nil {
 		return err

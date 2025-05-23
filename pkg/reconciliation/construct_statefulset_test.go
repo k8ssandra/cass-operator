@@ -223,25 +223,27 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 	sts, err := newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3)
 	assert.NoError(err)
 
-	assert.Equal(5, len(sts.Spec.Template.Spec.Volumes))
+	assert.Equal(6, len(sts.Spec.Template.Spec.Volumes))
 	assert.Equal("server-config", sts.Spec.Template.Spec.Volumes[0].Name)
 	assert.Equal("server-logs", sts.Spec.Template.Spec.Volumes[1].Name)
-	assert.Equal("server-config-base", sts.Spec.Template.Spec.Volumes[2].Name)
-	assert.Equal("vector-lib", sts.Spec.Template.Spec.Volumes[3].Name)
-	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[4].Name)
-	assert.NotNil(sts.Spec.Template.Spec.Volumes[4].ConfigMap)
-	assert.Equal("metrics-config-map", sts.Spec.Template.Spec.Volumes[4].ConfigMap.Name)
+	assert.Equal("tmp", sts.Spec.Template.Spec.Volumes[2].Name)
+	assert.Equal("server-config-base", sts.Spec.Template.Spec.Volumes[3].Name)
+	assert.Equal("vector-lib", sts.Spec.Template.Spec.Volumes[4].Name)
+	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[5].Name)
+	assert.NotNil(sts.Spec.Template.Spec.Volumes[5].ConfigMap)
+	assert.Equal("metrics-config-map", sts.Spec.Template.Spec.Volumes[5].ConfigMap.Name)
 
 	cassandraContainer := findContainer(sts.Spec.Template.Spec.Containers, CassandraContainerName)
 	assert.NotNil(cassandraContainer)
 
 	cassandraVolumeMounts := cassandraContainer.VolumeMounts
 
-	assert.Equal(4, len(cassandraVolumeMounts))
+	assert.Equal(5, len(cassandraVolumeMounts))
 	assert.True(volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-config")))
 	assert.True(volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-logs")))
 	assert.True(volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("server-data")))
 	assert.True(volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("metrics-config")))
+	assert.True(volumeMountsContains(cassandraVolumeMounts, volumeMountNameMatcher("tmp")))
 
 	// Test that both still work together, one additional PVC and one that overrides server-logs EmptyVolumeSource
 
@@ -296,24 +298,25 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 	assert.Equal("cassandra-commitlogs", sts.Spec.VolumeClaimTemplates[2].Name)
 	assert.Equal(storageClassName, *sts.Spec.VolumeClaimTemplates[2].Spec.StorageClassName)
 
-	assert.Equal(3, len(sts.Spec.Template.Spec.Volumes))
+	assert.Equal(4, len(sts.Spec.Template.Spec.Volumes))
 	assert.Equal("server-config", sts.Spec.Template.Spec.Volumes[0].Name)
-	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[2].Name)
-	assert.NotNil(sts.Spec.Template.Spec.Volumes[2].ConfigMap)
-	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[2].ConfigMap.Name)
+	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[3].Name)
+	assert.NotNil(sts.Spec.Template.Spec.Volumes[3].ConfigMap)
+	assert.Equal("metrics-config", sts.Spec.Template.Spec.Volumes[3].ConfigMap.Name)
 
 	cassandraContainer = findContainer(sts.Spec.Template.Spec.Containers, CassandraContainerName)
 	assert.NotNil(cassandraContainer)
 
 	cassandraVolumeMounts = cassandraContainer.VolumeMounts
-	assert.Equal(5, len(cassandraVolumeMounts))
+	assert.Equal(6, len(cassandraVolumeMounts))
 	assert.Equal("server-logs", cassandraVolumeMounts[0].Name)
 	assert.Equal("cassandra-commitlogs", cassandraVolumeMounts[1].Name)
 	assert.Equal("/var/lib/cassandra/commitlog", cassandraVolumeMounts[1].MountPath)
 	assert.Equal("metrics-config", cassandraVolumeMounts[2].Name)
 	assert.Equal("/configs/metrics", cassandraVolumeMounts[2].MountPath)
-	assert.Equal("server-data", cassandraVolumeMounts[3].Name)
-	assert.Equal("server-config", cassandraVolumeMounts[4].Name)
+	assert.Equal("tmp", cassandraVolumeMounts[3].Name)
+	assert.Equal("server-data", cassandraVolumeMounts[4].Name)
+	assert.Equal("server-config", cassandraVolumeMounts[5].Name)
 }
 
 func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T) {
@@ -396,16 +399,16 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 		assert.Equal(t, "cassandra-commitlogs", got.Spec.VolumeClaimTemplates[2].Name)
 		assert.Equal(t, customCassandraCommitLogsStorageClass, *got.Spec.VolumeClaimTemplates[2].Spec.StorageClassName)
 
-		assert.Equal(t, 2, len(got.Spec.Template.Spec.Volumes))
+		assert.Equal(t, 3, len(got.Spec.Template.Spec.Volumes))
 		assert.Equal(t, "server-config", got.Spec.Template.Spec.Volumes[0].Name)
 
 		assert.Equal(t, 2, len(got.Spec.Template.Spec.Containers))
 
-		assert.Equal(t, 4, len(got.Spec.Template.Spec.Containers[0].VolumeMounts))
+		assert.Equal(t, 5, len(got.Spec.Template.Spec.Containers[0].VolumeMounts))
 		assert.Equal(t, "server-logs", got.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
 		assert.Equal(t, "cassandra-commitlogs", got.Spec.Template.Spec.Containers[0].VolumeMounts[1].Name)
-		assert.Equal(t, "server-data", got.Spec.Template.Spec.Containers[0].VolumeMounts[2].Name)
-		assert.Equal(t, "server-config", got.Spec.Template.Spec.Containers[0].VolumeMounts[3].Name)
+		assert.Equal(t, "server-data", got.Spec.Template.Spec.Containers[0].VolumeMounts[3].Name)
+		assert.Equal(t, "server-config", got.Spec.Template.Spec.Containers[0].VolumeMounts[4].Name)
 
 		assert.Equal(t, 3, len(got.Spec.Template.Spec.Containers[1].VolumeMounts))
 		assert.Equal(t, 2, len(got.Spec.Template.Spec.InitContainers))

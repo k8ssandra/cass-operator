@@ -306,17 +306,16 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
 	}
+	tmp := corev1.Volume{
+		Name: "tmp",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
 
-	volumeDefaults := []corev1.Volume{vServerConfig, vServerLogs}
+	volumeDefaults := []corev1.Volume{vServerConfig, vServerLogs, tmp}
 
 	if dc.ReadOnlyFs() {
-		tmp := corev1.Volume{
-			Name: "tmp",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		}
-
 		etcCass := corev1.Volume{
 			Name: "etc-cassandra",
 			VolumeSource: corev1.VolumeSource{
@@ -324,7 +323,7 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 			},
 		}
 
-		volumeDefaults = append(volumeDefaults, tmp, etcCass)
+		volumeDefaults = append(volumeDefaults, etcCass)
 
 		if dc.Spec.ServerType == "dse" {
 			dseConf := corev1.Volume{
@@ -812,12 +811,12 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		}
 	}
 
-	if dc.ReadOnlyFs() {
-		cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
-			Name:      "tmp",
-			MountPath: "/tmp",
-		})
+	cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
+		Name:      "tmp",
+		MountPath: "/tmp",
+	})
 
+	if dc.ReadOnlyFs() {
 		if dc.Spec.ServerType == "hcd" {
 			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
 				Name:      "etc-cassandra",

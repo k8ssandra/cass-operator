@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#790](https://github.com/k8ssandra/cass-operator/issues/790) Mount /tmp as EmptyDir always, even in installations without readOnlyRootFilesystem
+* [BUGFIX] [#793](https://github.com/k8ssandra/cass-operator/issues/793) Do not check ReadyReplicas <1 if the StatefulSet is configured with less replicas
 
 ## v1.24.0
 

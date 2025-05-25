@@ -154,19 +154,19 @@ var _ = Describe(testName, func() {
 			k = kubectl.Get("CassandraDatacenter").
 				WithLabel(dc2Label).
 				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
+			ns.WaitForOutputAndLog(step, k, "[]", 600)
 
-			// Verify nodetool status has only a single Datacenter
-			podNames = ns.GetDatacenterReadyPodNames(dc1Name)
-
-			if len(podNames) != 2 {
-				// This is to catch why the test sometimes fails on the check (string parsing? or real issue?)
-				fmt.Println(execStatus(podNames[0]))
-			}
-
-			Expect(len(podNames)).To(Equal(2))
-			dcs = findDatacenters(podNames[0])
-			Expect(len(dcs)).To(Equal(1), fmt.Sprintf("Expected to find 1 datacenter in nodetool status but found %v", dcs))
+			Eventually(func() bool {
+				// Verify that the nodetool status has been updated
+				podNames = ns.GetDatacenterReadyPodNames(dc1Name)
+				if len(podNames) != 2 {
+					return false
+				}
+				dcs = findDatacenters(podNames[0])
+				return len(dcs) == 1
+			}, "15s", "100ms").Should(BeTrue(), func() string {
+				return fmt.Sprintf("Expected to find 1 datacenter in nodetool status but found %v", dcs)
+			})
 
 			// Delete the remaining DC and expect it to finish correctly (it should not be decommissioned - that will hang the process and fail)
 			step = "deleting the dc1"

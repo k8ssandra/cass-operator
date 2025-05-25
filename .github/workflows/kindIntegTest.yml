@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - '1.2*'
   pull_request:
     branches: [master]
 jobs:
@@ -58,7 +59,6 @@ jobs:
     strategy:
       matrix:
         integration_test:
-          - additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
           - scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
     runs-on: ubuntu-latest
     env:
@@ -222,7 +222,7 @@ jobs:
           # - upgrade_operator
           # More than 3 workers tests:
           - add_racks
-          #- additional_seeds #TODO: Fails against C* 4.0, fix in https://github.com/k8ssandra/cass-operator/issues/459
+          - additional_seeds
           - cluster_wide_install
           - config_change
           - config_secret

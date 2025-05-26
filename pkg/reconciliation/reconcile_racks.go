@@ -415,7 +415,7 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 		}
 
 		if !force && (statefulSet.Generation != status.ObservedGeneration ||
-			status.ReadyReplicas < 1 ||
+			(*statefulSet.Spec.Replicas > 0 && status.ReadyReplicas < 1) ||
 			status.Replicas != status.ReadyReplicas ||
 			status.Replicas != updatedReplicas ||
 			status.Replicas != status.AvailableReplicas) {

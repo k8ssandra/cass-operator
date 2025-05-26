@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.24.1
 
 * [CHANGE] [#790](https://github.com/k8ssandra/cass-operator/issues/790) Mount /tmp as EmptyDir always, even in installations without readOnlyRootFilesystem

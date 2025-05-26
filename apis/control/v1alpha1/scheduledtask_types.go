@@ -30,7 +30,7 @@ type TaskDetails struct {
 	// Name of the task. Always populated.
 	Name string `json:"name,omitempty"`
 	// +inline
-	CassandraTaskSpec `json:"omitempty"`
+	CassandraTaskSpec `json:",inline"`
 }
 
 // MedusaTaskStatus defines the observed state of MedusaTask

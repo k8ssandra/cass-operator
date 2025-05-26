@@ -375,7 +375,7 @@ func attemptedTo(action string, actionStrArgs ...interface{}) error {
 }
 
 func deprecatedWarning(field, instead, extra string) string {
-	warning := "CassandraDatacenter is using deprecated field '%s'"
+	warning := fmt.Sprintf("CassandraDatacenter is using deprecated field '%s'", field)
 	if instead != "" {
 		warning += fmt.Sprintf(", use '%s' instead", instead)
 	}

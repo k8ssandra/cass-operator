@@ -24,6 +24,7 @@ import (
 	"github.com/go-logr/logr"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	controlapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -145,6 +146,8 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			},
 			Spec: scheduledtask.Spec.TaskDetails.CassandraTaskSpec,
 		}
+
+		oplabels.AddOperatorMetadata(&cassandraTask.ObjectMeta, dc)
 
 		if err := r.Client.Create(ctx, cassandraTask); err != nil {
 			// We've already updated the Status times.. we'll miss this job now?

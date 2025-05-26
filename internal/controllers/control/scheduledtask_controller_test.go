@@ -18,10 +18,13 @@ package control
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	"github.com/stretchr/testify/require"
@@ -332,4 +335,96 @@ func TestSchedulerLabels(t *testing.T) {
 	require.Equal(scheduledTask.Spec.TaskDetails.Jobs[0].Command, task.Spec.Jobs[0].Command)
 	require.Equal("test-value", task.Labels["test-label"])
 	require.Equal("test-value", task.Annotations["test-annotation"])
+}
+
+func TestSchedulerWithJsonForm(t *testing.T) {
+	require := require.New(t)
+	require.NoError(cassdcapi.AddToScheme(scheme.Scheme))
+	require.NoError(taskapi.AddToScheme(scheme.Scheme))
+
+	// Use JSON form to define the ScheduledTask
+	scheduledTaskJson := `{
+        "apiVersion": "control.k8ssandra.io/v1alpha1",
+        "kind": "ScheduledTask",
+        "metadata": {
+            "name": "json-scheduled-task",
+            "namespace": "test-ns"
+        },
+        "spec": {
+            "schedule": "*/5 * * * *",
+            "taskDetails": {
+                "name": "json-operation",
+                "datacenter": {
+                    "name": "dc1"
+                },
+                "jobs": [
+                    {
+                        "command": "cleanup"
+                    }
+                ]
+            }
+        }
+    }`
+
+	// Create a datacenter for the task to reference
+	dc := cassdcapi.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dc1",
+			Namespace: "test-ns",
+		},
+		Spec: cassdcapi.CassandraDatacenterSpec{},
+	}
+
+	// Parse JSON into an unstructured object
+	scheduledTaskObj := &unstructured.Unstructured{}
+	err := json.Unmarshal([]byte(scheduledTaskJson), scheduledTaskObj)
+	require.NoError(err)
+
+	// Create fake clock for testing
+	fClock := &FakeClock{}
+
+	// Setup fake client with the JSON-based ScheduledTask
+	fakeClient := fake.NewClientBuilder().
+		WithObjects(&dc).
+		WithRuntimeObjects(scheduledTaskObj).
+		WithStatusSubresource(&taskapi.ScheduledTask{}).
+		WithScheme(scheme.Scheme).
+		Build()
+
+	r := &ScheduledTaskReconciler{
+		Client: fakeClient,
+		Scheme: scheme.Scheme,
+		Clock:  fClock,
+		Log:    ctrl.Log.WithName("controllers").WithName("ScheduledTask"),
+	}
+
+	nsName := types.NamespacedName{
+		Name:      "json-scheduled-task",
+		Namespace: "test-ns",
+	}
+
+	// Initial reconcile
+	res, err := r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
+	require.NoError(err)
+	require.True(res.RequeueAfter > 0)
+
+	// Advance time to trigger task creation
+	fClock.currentTime = fClock.currentTime.Add(6 * time.Minute)
+
+	// Reconcile again to create the task
+	res, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
+	require.NoError(err)
+	require.True(res.RequeueAfter > 0)
+
+	// Verify task was created
+	tasks := taskapi.CassandraTaskList{}
+	err = fakeClient.List(context.TODO(), &tasks)
+	require.NoError(err)
+	require.Equal(1, len(tasks.Items))
+
+	// Verify task details
+	task := tasks.Items[0]
+	require.Equal("dc1", task.Spec.Datacenter.Name)
+	require.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
+	require.True(strings.HasPrefix(task.Name, "json-scheduled-task-"))
 }

@@ -68,8 +68,7 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 				Annotations: make(map[string]string),
 			},
 		}
-		oplabels.AddOperatorLabels(secret.Labels, dc)
-		oplabels.AddOperatorAnnotations(secret.Annotations, dc)
+		oplabels.AddOperatorMetadata(&secret.ObjectMeta, dc)
 		username := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-superuser"
 		password, err := generateUtf8Password()
 		if err != nil {
@@ -156,8 +155,7 @@ func (rc *ReconciliationContext) createInternodeCACredential() (*corev1.Secret, 
 		},
 	}
 
-	oplabels.AddOperatorLabels(secret.Labels, rc.Datacenter)
-	oplabels.AddOperatorAnnotations(secret.Annotations, rc.Datacenter)
+	oplabels.AddOperatorMetadata(&secret.ObjectMeta, rc.Datacenter)
 
 	if keypem, certpem, err := utils.GetNewCAandKey(fmt.Sprintf("%s-ca-keystore", rc.Datacenter.Name), rc.Datacenter.Namespace); err == nil {
 		secret.Data = map[string][]byte{
@@ -194,8 +192,7 @@ func (rc *ReconciliationContext) createCABootstrappingSecret(jksBlob []byte) err
 		"node-keystore.jks": jksBlob,
 	}
 
-	oplabels.AddOperatorLabels(secret.Labels, rc.Datacenter)
-	oplabels.AddOperatorAnnotations(secret.Annotations, rc.Datacenter)
+	oplabels.AddOperatorMetadata(&secret.ObjectMeta, rc.Datacenter)
 
 	return rc.Client.Create(rc.Ctx, secret)
 }

@@ -109,7 +109,7 @@ func TestScheduler(t *testing.T) {
 
 	fClock.currentTime = fClock.currentTime.Add(1 * time.Minute).Add(1 * time.Second)
 
-	_, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
+	res, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
 	require.NoError(err)
 	require.True(res.RequeueAfter > 0)
 
@@ -135,7 +135,7 @@ func TestScheduler(t *testing.T) {
 	// Test that next invocation also works
 	fClock.currentTime = fClock.currentTime.Add(1 * time.Minute)
 
-	_, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
+	res, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
 	require.NoError(err)
 	require.True(res.RequeueAfter > 0)
 
@@ -155,7 +155,7 @@ func TestScheduler(t *testing.T) {
 	require.NoError(err)
 	require.Equal(1, len(taskList.Items))
 
-	_, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
+	res, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
 	require.NoError(err)
 	require.True(res.RequeueAfter > 0)
 
@@ -178,7 +178,7 @@ func TestScheduler(t *testing.T) {
 
 	previousExecutionTime := scheduledTaskLive.Status.LastExecution
 	fClock.currentTime = fClock.currentTime.Add(30 * time.Second)
-	_, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
+	res, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
 	require.NoError(err)
 	require.True(res.RequeueAfter > 0)
 
@@ -246,4 +246,90 @@ func TestSchedulerParseError(t *testing.T) {
 
 	_, err := r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
 	require.Error(err)
+}
+
+func TestSchedulerLabels(t *testing.T) {
+	require := require.New(t)
+	require.NoError(cassdcapi.AddToScheme(scheme.Scheme))
+	require.NoError(taskapi.AddToScheme(scheme.Scheme))
+
+	fClock := &FakeClock{}
+
+	dc := cassdcapi.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dc1",
+			Namespace: "test-ns",
+		},
+		Spec: cassdcapi.CassandraDatacenterSpec{
+			AdditionalLabels: map[string]string{
+				"test-label": "test-value",
+			},
+			AdditionalAnnotations: map[string]string{
+				"test-annotation": "test-value",
+			},
+		},
+	}
+
+	// To manipulate time and requeue, we use fakeclient here instead of envtest
+	scheduledTask := &taskapi.ScheduledTask{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-scheduled-task",
+			Namespace: "test-ns",
+		},
+		Spec: taskapi.ScheduledTaskSpec{
+			Schedule: "* * * * *",
+			TaskDetails: taskapi.TaskDetails{
+				Name: "the-operation",
+				CassandraTaskSpec: taskapi.CassandraTaskSpec{
+					Datacenter: corev1.ObjectReference{
+						Name: "dc1",
+					},
+					CassandraTaskTemplate: taskapi.CassandraTaskTemplate{
+						Jobs: []taskapi.CassandraJob{
+							{
+								Command: taskapi.CommandCleanup,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithObjects(scheduledTask, &dc).
+		WithStatusSubresource(scheduledTask).
+		WithScheme(scheme.Scheme).
+		Build()
+
+	nsName := types.NamespacedName{
+		Name:      scheduledTask.Name,
+		Namespace: scheduledTask.Namespace,
+	}
+
+	r := &ScheduledTaskReconciler{
+		Client: fakeClient,
+		Scheme: scheme.Scheme,
+		Clock:  fClock,
+		Log:    ctrl.Log.WithName("controllers").WithName("ScheduledTask"),
+	}
+
+	fClock.currentTime = fClock.currentTime.Add(1 * time.Minute).Add(1 * time.Second)
+
+	res, err := r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsName})
+	require.NoError(err)
+	require.True(res.RequeueAfter > 0)
+
+	// We should have a task now..
+	tasks := taskapi.CassandraTaskList{}
+	err = fakeClient.List(context.TODO(), &tasks)
+	require.NoError(err)
+	require.Equal(1, len(tasks.Items))
+
+	// Ensure the task object is created correctly
+	task := tasks.Items[0]
+	require.Equal(scheduledTask.Spec.TaskDetails.Datacenter, task.Spec.Datacenter)
+	require.Equal(scheduledTask.Spec.TaskDetails.Jobs[0].Command, task.Spec.Jobs[0].Command)
+	require.Equal("test-value", task.Labels["test-label"])
+	require.Equal("test-value", task.Annotations["test-annotation"])
 }

@@ -1,0 +1,14 @@
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: ScheduledTask
+metadata:
+  name: scheduled-cleanup-task
+spec:
+  schedule: "*/1 * * * *"  # Every minute for testing
+  taskDetails:
+    name: "test-cleanup-task"
+    datacenter:
+      name: dc1
+      namespace: test-scheduled-task
+    jobs:
+      - name: cleanup-run
+        command: cleanup 

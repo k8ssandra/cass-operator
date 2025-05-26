@@ -229,6 +229,7 @@ func main() {
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("ScheduledTask"),
 		Scheme: mgr.GetScheme(),
+		Clock:  &controlcontrollers.RealClock{},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledTask")
 		os.Exit(1)

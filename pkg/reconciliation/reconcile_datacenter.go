@@ -142,6 +142,11 @@ func (rc *ReconciliationContext) deletePVCs() error {
 		"cassandraDatacenterName", rc.Datacenter.Name,
 	)
 
+	if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.DeletePVCAnnotation) && rc.Datacenter.Annotations[api.DeletePVCAnnotation] == "false" {
+		logger.Info("Skipping PVC deletion since annotation is set to false")
+		return nil
+	}
+
 	persistentVolumeClaimList, err := rc.listPVCs(rc.Datacenter.GetDatacenterLabels())
 	if err != nil {
 		if errors.IsNotFound(err) {

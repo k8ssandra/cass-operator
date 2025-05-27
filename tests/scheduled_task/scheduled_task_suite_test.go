@@ -80,11 +80,12 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReady(dcName)
 
 			step = "creating a ScheduledTask for cleanup"
-			scheduledTaskFile, err := ginkgo_util.CreateTestFile(scheduledTaskYaml)
-			Expect(err).ToNot(HaveOccurred())
 
-			k = kubectl.ApplyFiles(scheduledTaskFile)
-			ns.ExecAndLog(step, k)
+			k = kubectl.ApplyFiles(scheduledTaskYaml)
+			stdout, stderr, err := ns.ExecVCapture(k)
+			Expect(err).ToNot(HaveOccurred())
+			fmt.Println(stdout)
+			fmt.Println(stderr)
 
 			step = "verify ScheduledTask is created"
 			json = "jsonpath={.metadata.name}"
@@ -210,7 +211,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "CassandraDatacenter", 60)
 
 			step = "deleting the ScheduledTask"
-			k = kubectl.DeleteFromFiles(scheduledTaskFile)
+			k = kubectl.DeleteFromFiles(scheduledTaskYaml)
 			ns.ExecAndLog(step, k)
 
 			step = "verify ScheduledTask is deleted"

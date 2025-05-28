@@ -20,8 +20,8 @@ import (
 var (
 	testName              = "ScheduledTask"
 	namespace             = "test-scheduled-task"
-	dcName                = "dc1"
-	dcYaml                = "../testdata/default-scheduled-task-dc.yaml"
+	dcName                = "dc2"
+	dcYaml                = "../testdata/default-single-rack-2-node-dc.yaml"
 	scheduledTaskYaml     = "../testdata/tasks/scheduled_cleanup_task.yaml"
 	scheduledTaskName     = "scheduled-cleanup-task"
 	dcResource            = fmt.Sprintf("CassandraDatacenter/%s", dcName)

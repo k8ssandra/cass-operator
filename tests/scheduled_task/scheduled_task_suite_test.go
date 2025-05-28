@@ -136,6 +136,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, dcName, 60)
 
 			step = "wait for first CassandraTask to complete"
+			ns.Log(step)
 			json = "jsonpath={.items[0].status.completionTime}"
 			k = kubectl.Get("CassandraTask").
 				WithLabel(dcLabel).
@@ -150,6 +151,7 @@ var _ = Describe(testName, func() {
 			}, time.Minute*5, time.Second*10).ShouldNot(BeEmpty())
 
 			step = "verify LastExecution is updated after task completion"
+			ns.Log(step)
 			json = "jsonpath={.status.lastExecution}"
 			k = kubectl.Get(scheduledTaskResource).FormatOutput(json)
 
@@ -162,6 +164,7 @@ var _ = Describe(testName, func() {
 			}, time.Minute*2, time.Second*5).ShouldNot(BeEmpty())
 
 			step = "verify multiple CassandraTasks are created over time with ForbidConcurrent policy"
+			ns.Log(step)
 			// Wait a bit more for the next scheduled execution
 
 			// Should have at least 2 tasks created by now

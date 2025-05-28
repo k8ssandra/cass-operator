@@ -24,7 +24,6 @@ var (
 	dcYaml                = "../testdata/default-single-rack-2-node-dc.yaml"
 	scheduledTaskYaml     = "../testdata/tasks/scheduled_cleanup_task.yaml"
 	scheduledTaskName     = "scheduled-cleanup-task"
-	dcResource            = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	scheduledTaskResource = fmt.Sprintf("ScheduledTask/%s", scheduledTaskName)
 	dcLabel               = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns                    = ginkgo_util.NewWrapper(testName, namespace)

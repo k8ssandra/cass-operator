@@ -79,6 +79,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReady(dcName)
 
 			step = "creating a ScheduledTask for cleanup"
+			ns.Log(step)
 
 			k = kubectl.ApplyFiles(scheduledTaskYaml)
 			stdout, stderr, err := ns.ExecVCapture(k)
@@ -92,6 +93,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, scheduledTaskName, 60)
 
 			step = "verify ScheduledTask status fields are populated"
+			ns.Log(step)
 			json = "jsonpath={.status.nextSchedule}"
 			k = kubectl.Get(scheduledTaskResource).FormatOutput(json)
 			// Wait for nextSchedule to be set (non-empty)
@@ -104,6 +106,7 @@ var _ = Describe(testName, func() {
 			}, time.Minute*2, time.Second*5).ShouldNot(BeEmpty())
 
 			step = "verify ScheduledTask creates CassandraTasks"
+			ns.Log(step)
 			json = "jsonpath={.items[*].metadata.name}"
 			k = kubectl.Get("CassandraTask").
 				WithLabel(dcLabel).
@@ -144,7 +147,7 @@ var _ = Describe(testName, func() {
 					return ""
 				}
 				return output
-			}, time.Minute*10, time.Second*10).ShouldNot(BeEmpty())
+			}, time.Minute*5, time.Second*10).ShouldNot(BeEmpty())
 
 			step = "verify LastExecution is updated after task completion"
 			json = "jsonpath={.status.lastExecution}"
@@ -160,15 +163,13 @@ var _ = Describe(testName, func() {
 
 			step = "verify multiple CassandraTasks are created over time with ForbidConcurrent policy"
 			// Wait a bit more for the next scheduled execution
-			time.Sleep(70 * time.Second)
-
-			json = "jsonpath={.items[*].metadata.name}"
-			k = kubectl.Get("CassandraTask").
-				WithLabel(dcLabel).
-				FormatOutput(json)
 
 			// Should have at least 2 tasks created by now
 			Eventually(func() int {
+				json = "jsonpath={.items[*].metadata.name}"
+				k = kubectl.Get("CassandraTask").
+					WithLabel(dcLabel).
+					FormatOutput(json)
 				output, err := ns.Output(k)
 				if err != nil {
 					return 0
@@ -190,7 +191,7 @@ var _ = Describe(testName, func() {
 			Consistently(func() int {
 				output, err := ns.Output(k)
 				if err != nil {
-					return -1
+					return 1000
 				}
 				if output == "" {
 					return 0

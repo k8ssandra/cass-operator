@@ -7,7 +7,7 @@ spec:
   taskDetails:
     name: "test-cleanup-task"
     datacenter:
-      name: dc1
+      name: dc2
       namespace: test-scheduled-task
     jobs:
       - name: cleanup-run

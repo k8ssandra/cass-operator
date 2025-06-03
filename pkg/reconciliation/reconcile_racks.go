@@ -2036,6 +2036,8 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 
 	labelSeedBeforeStart := readySeeds == 0 && !rc.hasAdditionalSeeds()
 
+	runningPods := 0
+
 RackLoop:
 	for idx := range rc.desiredRackInformation {
 		rackInfo := rc.desiredRackInformation[idx]
@@ -2062,11 +2064,15 @@ RackLoop:
 				}
 			} else {
 				// This rack had a node running, so we can skip the rest of the rack's pods
+				runningPods++
 				continue RackLoop
 			}
 			// Note, it's possible that the rack didn't have any pods that could be started (they could be in Pending state), but
 			// we don't want to interrupt other racks from starting even if this rack is down (such as zone failure)
 		}
+	}
+	if runningPods < 1 {
+		return true, fmt.Errorf("no pods were ready to be started in any rack")
 	}
 	return false, nil
 }

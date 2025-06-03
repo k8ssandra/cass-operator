@@ -73,23 +73,38 @@ rm -fr $CRD_TMP_DIR
 echo "Updating role.yaml"
 ROLE_FILE_NAME=$TEMPLATE_HOME/role.yaml
 cat <<'EOF' > $ROLE_FILE_NAME
+{{- /*
+This is generated file from cass-operator/scripts/release-helm-chart.sh
+*/ -}}
+{{- if .Values.global.clusterScopedResources }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ include "k8ssandra-common.fullname" . }}
   labels: {{ include "k8ssandra-common.labels" . | indent 4 }}
+  {{- with include "k8ssandra-common.annotations" . }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 {{- if .Values.global.clusterScoped }}
 EOF
 yq -N eval-all '.rules = (.rules as $item ireduce ([]; . *+ $item)) | select(di == 0) | with_entries(select(.key | test("rules")))' config/rbac/role.yaml >> $ROLE_FILE_NAME
 echo '{{- else }}' >> $ROLE_FILE_NAME
 yq -N 'select(di == 0) | with_entries(select(.key | test("rules")))' config/rbac/role.yaml >> $ROLE_FILE_NAME
 cat <<'EOF' >> $ROLE_FILE_NAME
+{{- end }}
+{{- end }}
+{{- if (not .Values.global.clusterScoped) }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ template "k8ssandra-common.fullname" . }}
   labels: {{ include "k8ssandra-common.labels" . | indent 4 }}
+  {{- with include "k8ssandra-common.annotations" . }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 EOF
 yq -N 'select(di == 1) | with_entries(select(.key | test("rules")))' config/rbac/role.yaml >> $ROLE_FILE_NAME
 echo '{{- end }}' >> $ROLE_FILE_NAME

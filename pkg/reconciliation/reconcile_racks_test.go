@@ -2938,13 +2938,97 @@ func TestStartOneNodePerRack(t *testing.T) {
 			if tt.wantNotReady {
 				select {
 				case <-done:
-				case <-time.After(2 * time.Second):
+				case <-time.After(1 * time.Second):
 					assert.Fail(t, "No pod start occurred")
 				}
 			}
 
 			assert.NoError(t, err)
 			assert.Equalf(t, tt.wantNotReady, gotNotReady, "expected not ready to be %v", tt.wantNotReady)
+		})
+	}
+}
+
+func TestStartOneNodePerRackFailed(t *testing.T) {
+	// A boolean representing the state of a pod (started or not).
+	type pod bool
+
+	// racks is a map of rack names to a list of pods in that rack.
+	type racks map[string][]pod
+
+	tests := []struct {
+		name          string
+		racks         racks
+		seedCount     int
+		expectedError string
+	}{
+		{
+			name: "balanced racks, no pods to start",
+			racks: racks{
+				"rack1": {},
+			},
+			seedCount:     0,
+			expectedError: "no pods were ready to be started in any rack",
+		},
+		{
+			name: "balanced racks, no pod can start",
+			racks: racks{
+				"rack1": {false, false, false},
+				"rack2": {false, false, false},
+				"rack3": {false, false, false},
+			},
+			seedCount:     0,
+			expectedError: "no pods were ready to be started in any rack",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, _ := setupTest()
+			for rackName, rackPods := range tt.racks {
+				sts := &appsv1.StatefulSet{
+					ObjectMeta: metav1.ObjectMeta{Name: rackName},
+					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
+				}
+				rc.statefulSets = append(rc.statefulSets, sts)
+				rc.desiredRackInformation = append(rc.desiredRackInformation, &RackInformation{
+					NodeCount: len(rackPods),
+					RackName:  rackName,
+				})
+				for i, started := range rackPods {
+					p := &corev1.Pod{}
+					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
+					p.Labels = map[string]string{}
+					p.Status.PodIP = "127.0.0.1"
+					if started {
+						p.Labels[api.CassNodeState] = stateStarted
+					} else {
+						p.Labels[api.CassNodeState] = stateReadyToStart
+					}
+					rc.dcPods = append(rc.dcPods, p)
+				}
+			}
+
+			mockClient := mocks.NewClient(t)
+			rc.Client = mockClient
+
+			mockHttpClient := mocks.NewHttpClient(t)
+			k8sMockClientGet(mockClient, nil)
+
+			client := httphelper.NodeMgmtClient{
+				Client:   mockHttpClient,
+				Log:      rc.ReqLogger,
+				Protocol: "http",
+			}
+			rc.NodeMgmtClient = client
+
+			epData := httphelper.CassMetadataEndpoints{
+				Entity: []httphelper.EndpointState{},
+			}
+
+			gotNotReady, err := rc.startOneNodePerRack(epData, tt.seedCount)
+			assert.True(t, gotNotReady)
+			assert.Error(t, err)
+			assert.EqualError(t, err, tt.expectedError)
 		})
 	}
 }

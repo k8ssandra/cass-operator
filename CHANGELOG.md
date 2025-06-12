@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.25.0
 
 * [ENHANCEMENT] [#664](https://github.com/k8ssandra/cass-operator/issues/664) Allow skipping deletion of PVCs when the CassandraDatacenter is deleted. Set annotation cassandra.datastax.com/delete-pvc: "false" to prevent deletion, default is still to delete.
 * [BUGFIX] [#798](https://github.com/k8ssandra/cass-operator/issues/798) If all the pods are in the Pending state, we would skip the startOneNodeRack and might start a pod in the startAllRacks phase which would lead to 0 seeds in a new cluster.

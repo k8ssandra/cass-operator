@@ -12,7 +12,7 @@ gawk -i inplace  '/##/ && ++c==1 { print "## unreleased\n"; print; next }1' CHAN
 
 CURRENT_BRANCH=$(git branch --show-current)
 
-if [ $CURRENT_BRANCH != "master" ]; then
+if [ "$CURRENT_BRANCH" != "master" ]; then
     # This is a release branch, we only bump the patch version
     export PATCH_RELEASE=true
     scripts/update-makefile-version.sh

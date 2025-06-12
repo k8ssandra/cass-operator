@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.25.0
 
 * [ENHANCEMENT] [#664](https://github.com/k8ssandra/cass-operator/issues/664) Allow skipping deletion of PVCs when the CassandraDatacenter is deleted. Set annotation cassandra.datastax.com/delete-pvc: "false" to prevent deletion, default is still to delete.

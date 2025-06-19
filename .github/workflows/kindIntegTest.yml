@@ -195,6 +195,7 @@ jobs:
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
+          - scheduled_task
           - additional_volumes
           # - delete_node_terminated_container # This does not test any operator behavior
           # - podspec_simple

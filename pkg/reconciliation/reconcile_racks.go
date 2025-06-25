@@ -170,7 +170,6 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 }
 
 func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
-
 	for idx := range rc.desiredRackInformation {
 		rackInfo := rc.desiredRackInformation[idx]
 		rackPods := rc.rackPods(rackInfo.RackName)
@@ -419,7 +418,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 			status.Replicas != status.ReadyReplicas ||
 			status.Replicas != updatedReplicas ||
 			status.Replicas != status.AvailableReplicas) {
-
 			logger.Info(
 				"waiting for upgrade to finish on statefulset",
 				"statefulset", statefulSet.Name,
@@ -1185,7 +1183,6 @@ func (rc *ReconciliationContext) updateCurrentReplacePodsProgress() error {
 		for _, pod := range startedPods {
 			// Since pod is labeled as started, it should be done being replaced
 			if utils.IndexOfString(dc.Status.NodeReplacements, pod.Name) > -1 {
-
 				// Ensure the pod is not only started but created _after_ we
 				// started replacing nodes. This is because the Pod may have
 				// been ready, marked for replacement, and then deleted, so we
@@ -1532,7 +1529,6 @@ func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (int, 
 // and whether it currently exists and whether an error occurred
 func (rc *ReconciliationContext) GetStatefulSetForRack(
 	nextRack *RackInformation) (*appsv1.StatefulSet, bool, error) {
-
 	rc.ReqLogger.Info("reconcile_racks::getStatefulSetForRack")
 
 	// Check if the desiredStatefulSet already exists
@@ -1573,7 +1569,6 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 
 // ReconcileNextRack ensures that the resources for a rack have been properly created
 func (rc *ReconciliationContext) ReconcileNextRack(statefulSet *appsv1.StatefulSet) error {
-
 	rc.ReqLogger.Info("reconcile_racks::reconcileNextRack")
 
 	if err := setOperatorProgressStatus(rc, api.ProgressUpdating); err != nil {
@@ -2166,7 +2161,6 @@ func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart
 
 	if !isServerReady(pod) {
 		if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
-
 			// this is the one exception to all seed labelling happening in labelSeedPods()
 			if labelSeedBeforeStart {
 				patch := client.MergeFrom(pod.DeepCopy())
@@ -2402,7 +2396,6 @@ func (rc *ReconciliationContext) CheckCassandraNodeStatuses() result.ReconcileRe
 
 func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	if !metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.NoAutomatedCleanupAnnotation) {
-
 		if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation) {
 			// Verify if the cleanup task has completed before moving on the with ScalingUp finished
 			task, err := rc.findActiveTask(taskapi.CommandCleanup)

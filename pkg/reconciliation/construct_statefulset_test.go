@@ -133,7 +133,6 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 			volumeClaim.Annotations,
 			"Add")
 	}
-
 }
 
 func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing.T) {

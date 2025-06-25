@@ -241,7 +241,6 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(endp
 }
 
 func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *corev1.PodTemplateSpec) error {
-
 	// find the container
 	var container *corev1.Container = nil
 	for i := range pod.Spec.Containers {

@@ -90,7 +90,7 @@ var _ = Describe(testName, func() {
 			Expect(passwordBase64).ToNot(Equal(""), "Expected secret to specify a password")
 			passwordDecoded, err := base64.StdEncoding.DecodeString(passwordBase64)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(passwordDecoded) <= 55).To(BeTrue(), "bcrypt requires passwords to be 55 bytes or less in size")
+			Expect(len(passwordDecoded)).To(BeNumerically("<=", 55), "bcrypt requires passwords to be 55 bytes or less in size")
 
 			step = "check superuser credentials work"
 			k = kubectl.ExecOnPod(

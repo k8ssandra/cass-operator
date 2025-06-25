@@ -26,7 +26,6 @@ const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
 func NewNamespacedNameForStatefulSet(
 	dc *api.CassandraDatacenter,
 	rackName string) types.NamespacedName {
-
 	name := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.LabelResourceName() + "-" + api.CleanupSubdomain(rackName) + "-sts"
 	ns := dc.Namespace
 
@@ -66,7 +65,6 @@ func newStatefulSetForCassandraDatacenter(
 	rackName string,
 	dc *api.CassandraDatacenter,
 	replicaCount int) (*appsv1.StatefulSet, error) {
-
 	replicaCountInt32 := int32(replicaCount)
 
 	// see https://github.com/kubernetes/kubernetes/pull/74941

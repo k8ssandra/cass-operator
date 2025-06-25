@@ -55,7 +55,6 @@ func CreateReconciliationContext(
 	scheme *runtime.Scheme,
 	rec record.EventRecorder,
 	secretWatches dynamicwatch.DynamicWatches) (*ReconciliationContext, error) {
-
 	reqLogger := log.FromContext(ctx)
 	rc := &ReconciliationContext{}
 	rc.Request = req

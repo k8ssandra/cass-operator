@@ -30,29 +30,24 @@ func Test_newCA(t *testing.T) {
 			}
 			if _, err = cert.Verify(verify_opts); err != nil {
 				t.Errorf("Error: %e", err)
-
 			}
 			var untyped_verify_key interface{}
 			untyped_verify_key, err = x509.ParsePKCS8PrivateKey(key.Bytes)
 			if err != nil {
 				t.Errorf("Parsing key failed: %e", err)
-
 			}
 			var ok bool
 			if verify_key, ok = untyped_verify_key.(*rsa.PrivateKey); !ok {
 				t.Errorf("Error: couldn't typecast key")
-
 			}
 			if verify_cert_key, ok := cert.PublicKey.(*rsa.PublicKey); !ok {
 				t.Errorf("Error: couldn't typecast cert key")
-
 			} else {
 				verify_key_public, _ := verify_key.Public().(*rsa.PublicKey)
 				if fmt.Sprintf("%+v", verify_key_public) != fmt.Sprintf("%+v", verify_cert_key) {
 					t.Errorf("Error: cert key public part mismatch: %+v %+v", verify_key_public, *verify_cert_key)
 				}
 			}
-
 		}
 	}
 }

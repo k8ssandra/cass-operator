@@ -10,15 +10,15 @@ linters:
     # - dupl
     - errcheck
     - ginkgolinter
-    - goconst
+    # - goconst
     - gocyclo
-    - govet
+    # - govet
     - ineffassign
     # - lll
     - misspell
     - nakedret
     - nolintlint
-    - prealloc
+    # - prealloc
     # - revive
     - staticcheck
     - unconvert

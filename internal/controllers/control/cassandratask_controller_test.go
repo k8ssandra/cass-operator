@@ -131,7 +131,7 @@ func createStatefulSets(namespace string) {
 
 		Expect(k8sClient.Get(context.TODO(), stsKey, sts)).Should(Succeed())
 		sts.Status.CurrentRevision = "0"
-		Expect(k8sClient.Status().Update(context.TODO(), sts))
+		Expect(k8sClient.Status().Update(context.TODO(), sts)).To(Succeed())
 	}
 }
 
@@ -241,8 +241,10 @@ func waitForTaskFailed(taskKey types.NamespacedName) *api.CassandraTask {
 
 var _ = Describe("CassandraTask controller tests", func() {
 	Describe("Execute jobs against all pods", func() {
-		JobRunningRequeue = time.Duration(1 * time.Millisecond)
-		TaskRunningRequeue = time.Duration(1 * time.Millisecond)
+		BeforeEach(func() {
+			JobRunningRequeue = time.Duration(1 * time.Millisecond)
+			TaskRunningRequeue = time.Duration(1 * time.Millisecond)
+		})
 		Context("Async jobs", func() {
 			var testNamespaceName string
 			BeforeEach(func() {
@@ -275,7 +277,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 					// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 					Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount))
 
-					Expect(len(completedTask.Status.Conditions)).To(Equal(2))
+					Expect(completedTask.Status.Conditions).To(HaveLen(2))
 					for _, cond := range completedTask.Status.Conditions {
 						switch cond.Type {
 						case string(api.JobComplete):
@@ -431,7 +433,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				Expect(json.Unmarshal(callDetails.Payloads[0], &req)).Should(Succeed())
 				Expect(req.KeyspaceName).To(Equal("ks1"))
 				Expect(req.SplitOutput).To(BeTrue())
-				Expect(len(req.Tables)).To(BeNumerically("==", 1))
+				Expect(req.Tables).To(HaveLen(1))
 			})
 
 			When("Running cleanup twice in the same datacenter", func() {
@@ -775,7 +777,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				// Verify other racks haven't been modified
 				var stsAll appsv1.StatefulSetList
 				Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
-				Expect(len(stsAll.Items)).To(Equal(rackCount))
+				Expect(stsAll.Items).To(HaveLen(rackCount))
 
 				for _, sts := range stsAll.Items {
 					if sts.Name == stsKey.Name {
@@ -788,7 +790,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 			It("Restarts datacenter", func() {
 				var stsAll appsv1.StatefulSetList
 				Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
-				Expect(len(stsAll.Items)).To(Equal(rackCount))
+				Expect(stsAll.Items).To(HaveLen(rackCount))
 
 				// Create task to restart all
 				taskKey, task := buildTask(api.CommandRestart, testNamespaceName)

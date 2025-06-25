@@ -423,7 +423,6 @@ func symmetricDifference(list1 []corev1.Volume, list2 []corev1.Volume) []corev1.
 
 // This ensure that the server-config-builder init container is properly configured.
 func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTemplate *corev1.PodTemplateSpec) error {
-
 	serverCfg := &corev1.Container{}
 	configContainer := &corev1.Container{}
 
@@ -445,7 +444,6 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 	serverCfg.Name = ServerConfigContainerName
 
 	if serverCfg.Image == "" {
-
 		if dc.UseClientImage() {
 			if images.GetClientImage() != "" {
 				serverCfg.Image = images.GetClientImage()
@@ -480,7 +478,6 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 	configMounts := []corev1.VolumeMount{serverCfgMount}
 
 	if dc.UseClientImage() {
-
 		configBaseMount := corev1.VolumeMount{
 			Name:      "server-config-base",
 			MountPath: "/cassandra-base-config",
@@ -668,7 +665,6 @@ func securityContext(dc *api.CassandraDatacenter, container *corev1.Container) {
 // If values are provided in the matching containers in the
 // PodTemplateSpec field of the dc, they will override defaults.
 func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpec) error {
-
 	// Create new Container structs or get references to existing ones
 
 	cassContainer := &corev1.Container{}
@@ -911,7 +907,6 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 }
 
 func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {
-
 	baseTemplate := dc.Spec.PodTemplateSpec.DeepCopy()
 
 	if baseTemplate == nil {

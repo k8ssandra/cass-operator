@@ -94,7 +94,6 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-
 	}))
 }
 
@@ -125,7 +124,6 @@ func FakeExecutorServerWithDetailsFails(callDetails *CallDetails) (*httptest.Ser
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-
 	}))
 }
 

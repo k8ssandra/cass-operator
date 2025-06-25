@@ -442,7 +442,6 @@ func (r *CassandraTaskReconciler) refreshDatacenter(ctx context.Context, dc *cas
 		}
 	}
 	return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
-
 }
 
 // ts reload functionality

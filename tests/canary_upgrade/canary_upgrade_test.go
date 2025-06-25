@@ -67,7 +67,7 @@ var _ = Describe(testName, func() {
 			step = "check recorded host IDs"
 			ns.Log(step)
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
-			Expect(len(nodeStatusesHostIds), 3)
+			Expect(nodeStatusesHostIds).To(HaveLen(3))
 
 			ns.WaitForDatacenterReady(dcName)
 			ns.WaitForDatacenterCondition(dcName, "Initialized", string(corev1.ConditionTrue))

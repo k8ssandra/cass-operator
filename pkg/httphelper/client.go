@@ -253,7 +253,6 @@ func (client *NodeMgmtClient) CallMetadataEndpointsEndpoint(pod *corev1.Pod) (Ca
 	bytes, err := callNodeMgmtEndpoint(client, request, "")
 	if err != nil {
 		return CassMetadataEndpoints{}, err
-
 	}
 
 	endpoints, err := parseMetadataEndpointsResponseBody(bytes)
@@ -1361,7 +1360,6 @@ func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod)
 }
 
 func (client *NodeMgmtClient) CallSetFullQueryLog(pod *corev1.Pod, enableFullQueryLogging bool) error {
-
 	client.Log.Info("client::callIsFullQueryLogEnabledEndpoint")
 	podHost, podPort, err := BuildPodHostFromPod(pod)
 	if err != nil {

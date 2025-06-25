@@ -42,7 +42,6 @@ func DatacentersForNode(nodeName string) []types.NamespacedName {
 // request will be requeued for the next reconciler to handle in the subsequent reconcile loop, otherwise the next reconciler
 // will be called.
 func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Result, error) {
-
 	rc.ReqLogger.Info("handler::calculateReconciliationActions")
 
 	// Check if the CassandraDatacenter was marked to be deleted

@@ -107,7 +107,7 @@ func verifyAllPodsAreCorrect() {
 	By(step)
 	for _, podName := range podNames {
 		nodeInfos := ns.RetrieveStatusFromNodetool(podName)
-		Expect(len(nodeInfos)).To(Equal(len(podNames)), "Expect nodetool to return info on exactly %d nodes", len(podNames))
+		Expect(nodeInfos).To(HaveLen(len(podNames)), "Expect nodetool to return info on exactly %d nodes", len(podNames))
 
 		for _, nodeInfo := range nodeInfos {
 			Expect(nodeInfo.Status).To(Equal("up"), "Expected all nodes to be up, but node %s was down", nodeInfo.HostId)
@@ -197,7 +197,7 @@ var _ = Describe(testName, func() {
 
 			// Ensure that all pods up and running when ReplacingNodes gets unset
 			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionFalse))
-			Expect(len(ns.GetDatacenterReadyPodNames(dcName))).To(Equal(3))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(3))
 
 			step = "wait for the pod to return to life"
 			json = "jsonpath={.status.containerStatuses[?(.name=='cassandra')].ready}"
@@ -235,7 +235,7 @@ var _ = Describe(testName, func() {
 			// Wait for the task to be completed
 			ns.WaitForCompleteTask("replace-node")
 			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionFalse))
-			Expect(len(ns.GetDatacenterReadyPodNames(dcName))).To(Equal(3))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(3))
 
 			step = "wait for the pod to return to life"
 			json = "jsonpath={.status.containerStatuses[?(.name=='cassandra')].ready}"

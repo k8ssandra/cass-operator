@@ -63,5 +63,4 @@ func TestPodPrtsFromPodList(t *testing.T) {
 		actualNames = append(actualNames, p.Name)
 	}
 	assert.ElementsMatch(t, expectedNames, actualNames)
-
 }

@@ -143,7 +143,6 @@ func TestLabelsWithNewSeedServiceForCassandraDatacenter(t *testing.T) {
 			"Add": "annotation",
 		})
 	}
-
 }
 
 func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T) {

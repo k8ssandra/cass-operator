@@ -27,7 +27,6 @@ func GetModelValues(
 	nativeSSLPort int,
 	internodePort int,
 	internodeSSLPort int) NodeConfig {
-
 	seedsString := strings.Join(seeds, ",")
 
 	// Note: the operator does not currently support graph, solr, and spark

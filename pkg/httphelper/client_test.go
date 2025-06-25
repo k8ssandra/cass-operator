@@ -598,5 +598,4 @@ func TestCustomTransport(t *testing.T) {
 	err = mgmtClient.CallCreateRoleEndpoint(goodPod, "role1", "password1", true)
 	require.NoError(err)
 	require.True(called)
-
 }

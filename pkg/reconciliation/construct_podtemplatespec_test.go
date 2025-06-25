@@ -1122,7 +1122,6 @@ func TestCassandraDatacenter_buildContainers_additional_labels(t *testing.T) {
 	if !reflect.DeepEqual(expectedAnnotations, gotAnns) {
 		t.Errorf("labels = %v, want %v", gotAnns, expectedAnnotations)
 	}
-
 }
 
 func TestCassandraDatacenter_buildPodTemplateSpec_overrideSecurityContext(t *testing.T) {

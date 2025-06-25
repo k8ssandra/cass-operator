@@ -136,7 +136,6 @@ func CreateTestFile(dcYaml string) (string, error) {
 }
 
 func CreateTestSecretsConfig(configFile string) (string, error) {
-
 	fileInfo, err := os.Stat(configFile)
 	if err != nil {
 		return "", err

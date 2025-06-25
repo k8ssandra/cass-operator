@@ -162,7 +162,6 @@ func (rc *ReconciliationContext) deletePVCs() error {
 		"numPVCs", len(persistentVolumeClaimList))
 
 	for _, pvc := range persistentVolumeClaimList {
-
 		if isBeingUsed, err := rc.isBeingUsed(pvc); err != nil {
 			logger.Error(err, "Failed to check if PVC is being used")
 			return err

@@ -74,7 +74,7 @@ var _ = Describe(testName, func() {
 			json = "jsonpath={.spec.volumeName}"
 			k = kubectl.Get("pvc", pvcName).FormatOutput(json)
 			pvName := ns.OutputAndLog(step, k)
-			Expect(len(pvName) > 1).To(BeTrue())
+			Expect(len(pvName)).To(BeNumerically(">", 1))
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)

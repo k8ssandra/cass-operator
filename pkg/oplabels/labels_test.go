@@ -15,7 +15,6 @@ A valid label must be an empty string or consist of alphanumeric characters,
 '-', '_' or '.', and must start and end with an alphanumeric.
 */
 func TestLabelValueClean(t *testing.T) {
-
 	var cleaned = CleanLabelValue("TestCluster")
 	require.EqualValues(t, "TestCluster", cleaned,
 		"expect label name to not be cleaned as no need")
@@ -54,7 +53,6 @@ func TestLabelValueClean(t *testing.T) {
 }
 
 func TestWhitelistRegex(t *testing.T) {
-
 	var whitelistRegex = regexp.MustCompile(`(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?`)
 	var unclean = "+!*(-_)cor @#$%^&rect _ LABEL.name-1=<>_?,."
 	var regexpResult = whitelistRegex.FindAllString(strings.ReplaceAll(unclean, " ", ""), -1)

@@ -159,7 +159,6 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 			dc.Spec.Resources.Limits.Cpu().IsZero() ||
 			dc.Spec.Resources.Requests.Memory().IsZero() ||
 			dc.Spec.Resources.Limits.Memory().IsZero() {
-
 			return attemptedTo("use multiple nodes per worker without cpu and memory requests and limits")
 		}
 	}
@@ -178,7 +177,6 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 // ValidateDatacenterFieldChanges checks that no values are improperly changing while updating
 // a CassandraDatacenter
 func ValidateDatacenterFieldChanges(oldDc *api.CassandraDatacenter, newDc *api.CassandraDatacenter) error {
-
 	if oldDc.Spec.ClusterName != newDc.Spec.ClusterName {
 		return attemptedTo("change clusterName")
 	}

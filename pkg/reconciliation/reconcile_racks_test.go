@@ -625,7 +625,6 @@ func TestReconcileNextRack(t *testing.T) {
 	// 2. Creates a PodDisruptionBudget for the StatefulSet.
 	//
 	// TODO: check if Create() has been called on the fake client
-
 }
 
 func TestReconcileNextRack_CreateError(t *testing.T) {
@@ -672,7 +671,6 @@ func TestCalculateRackInformation(t *testing.T) {
 	assert.Equal(t, 2, rackInfo.NodeCount, "Should have correct node count")
 
 	// TODO add more RackInformation validation
-
 }
 
 func TestCalculateRackInformation_MultiRack(t *testing.T) {
@@ -2024,7 +2022,6 @@ func TestFailedStart(t *testing.T) {
 }
 
 func TestStartBootstrappedNodes(t *testing.T) {
-
 	// A boolean representing the state of a pod (started or not).
 	type pod bool
 
@@ -2285,7 +2282,6 @@ func TestStartBootstrappedNodes(t *testing.T) {
 					Protocol: "http",
 				}
 				rc.NodeMgmtClient = client
-
 			}
 
 			epData := httphelper.CassMetadataEndpoints{
@@ -2321,7 +2317,6 @@ func TestStartBootstrappedNodes(t *testing.T) {
 }
 
 func TestStartingSequenceBuilder(t *testing.T) {
-
 	type podStart struct {
 		started      bool
 		failedStarts int
@@ -2451,7 +2446,6 @@ func TestStartingSequenceBuilder(t *testing.T) {
 }
 
 func TestReconciliationContext_startAllNodes(t *testing.T) {
-
 	// A boolean representing the state of a pod (started or not).
 	type pod bool
 
@@ -2584,7 +2578,6 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 					Protocol: "http",
 				}
 				rc.NodeMgmtClient = client
-
 			}
 
 			epData := httphelper.CassMetadataEndpoints{
@@ -2620,7 +2613,6 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 }
 
 func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
-
 	// A boolean representing the state of a pod (started or not).
 	type pod bool
 
@@ -2738,7 +2730,6 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 					Protocol: "http",
 				}
 				rc.NodeMgmtClient = client
-
 			}
 
 			epData := httphelper.CassMetadataEndpoints{

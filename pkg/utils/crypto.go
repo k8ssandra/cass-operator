@@ -30,7 +30,6 @@ func setupKey() (*big.Int, time.Time, *rsa.PrivateKey, string, time.Time, error)
 			if privBytes, err = x509.MarshalPKCS8PrivateKey(priv); err == nil {
 				if err = pem.Encode(buffer, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes}); err == nil {
 					return serialNumber, notBefore, priv, buffer.String(), notAfter, err
-
 				}
 			}
 		}
@@ -138,7 +137,6 @@ func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err
 		return buffer.Bytes(), err
 	}
 	return nil, err
-
 }
 
 type pkcs8Key struct {

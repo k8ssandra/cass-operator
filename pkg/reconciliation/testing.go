@@ -55,7 +55,6 @@ func MockSetControllerReference() func() {
 // CreateMockReconciliationContext ...
 func CreateMockReconciliationContext(
 	reqLogger logr.Logger) *ReconciliationContext {
-
 	// These defaults may need to be settable via arguments
 
 	var (

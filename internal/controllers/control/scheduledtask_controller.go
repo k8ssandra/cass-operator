@@ -135,7 +135,6 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	if createTask {
-
 		generatedName := fmt.Sprintf("%s-%d", scheduledtask.Name, now.Unix())
 		r.Log.V(1).Info("Scheduled time has been reached, creating a cassandraTask", "CassandraTask name", generatedName)
 		cassandraTask := &controlapi.CassandraTask{

@@ -151,10 +151,8 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	}
 
 	// Prevent immediate requeue
-	if res.Requeue {
-		if res.RequeueAfter < minimumRequeueTime {
-			res.RequeueAfter = minimumRequeueTime
-		}
+	if res.RequeueAfter < minimumRequeueTime {
+		res.RequeueAfter = minimumRequeueTime
 	}
 	return res, err
 }

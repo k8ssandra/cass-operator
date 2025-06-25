@@ -91,7 +91,7 @@ func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err
 	newCert := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			CommonName:   fmt.Sprintf("%s.%s.cassdc", podname, ca.ObjectMeta.Namespace),
+			CommonName:   fmt.Sprintf("%s.%s.cassdc", podname, ca.Namespace),
 			Organization: []string{"Cassandra Kubernetes Operator By Datastax"},
 		},
 		NotBefore: notBefore,
@@ -101,7 +101,7 @@ func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
-		DNSNames:              []string{fmt.Sprintf("%s.%s.cassdc", podname, ca.ObjectMeta.Namespace)},
+		DNSNames:              []string{fmt.Sprintf("%s.%s.cassdc", podname, ca.Namespace)},
 	}
 	var derBytes []byte
 	ca_cert_bytes, ca_certificate, ca_key, err := prepare_ca(ca)
@@ -116,7 +116,7 @@ func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err
 		}
 		buffer := bytes.NewBufferString("")
 		store := keystore.KeyStore{
-			fmt.Sprintf("%s.%s.cassdc", podname, ca.ObjectMeta.Namespace): &keystore.PrivateKeyEntry{
+			fmt.Sprintf("%s.%s.cassdc", podname, ca.Namespace): &keystore.PrivateKeyEntry{
 				Entry:   keystore.Entry{CreationDate: time.Now()},
 				PrivKey: asn1_bytes,
 				CertChain: []keystore.Certificate{{

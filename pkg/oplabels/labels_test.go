@@ -1,11 +1,12 @@
 package oplabels
 
 import (
-	. "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/stretchr/testify/require"
 	"regexp"
 	"strings"
 	"testing"
+
+	. "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/stretchr/testify/require"
 )
 
 /*
@@ -56,10 +57,10 @@ func TestWhitelistRegex(t *testing.T) {
 
 	var whitelistRegex = regexp.MustCompile(`(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?`)
 	var unclean = "+!*(-_)cor @#$%^&rect _ LABEL.name-1=<>_?,."
-	var regexpResult = whitelistRegex.FindAllString(strings.Replace(unclean, " ", "", -1), -1)
+	var regexpResult = whitelistRegex.FindAllString(strings.ReplaceAll(unclean, " ", ""), -1)
 	require.EqualValues(t, "correct_LABEL.name-1", strings.Join(regexpResult, ""))
 
 	unclean = "+!*(-_)cor @#$   %^&re _c-t-.LABEL.name-1=<>_?,."
-	regexpResult = whitelistRegex.FindAllString(strings.Replace(unclean, " ", "", -1), -1)
+	regexpResult = whitelistRegex.FindAllString(strings.ReplaceAll(unclean, " ", ""), -1)
 	require.EqualValues(t, "corre_c-t-.LABEL.name-1", strings.Join(regexpResult, ""))
 }

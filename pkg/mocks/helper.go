@@ -32,7 +32,7 @@ type mockConstructorTestingTNewClient interface {
 func NewClient(t mockConstructorTestingTNewClient) *Client {
 	subclient := NewSubResourceClient(t)
 	mock := &Client{subResourceClient: subclient}
-	mock.Mock.Test(t)
+	mock.Test(t)
 
 	t.Cleanup(func() { mock.AssertExpectations(t) })
 

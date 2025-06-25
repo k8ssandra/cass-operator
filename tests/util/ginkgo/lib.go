@@ -21,7 +21,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	mageutil "github.com/k8ssandra/cass-operator/tests/util"
 	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
 )
 
@@ -56,7 +55,7 @@ func CreateTestFile(dcYaml string) (string, error) {
 		return "", err
 	}
 
-	if err = yaml.Unmarshal(d, &data); err != nil {
+	if err := yaml.Unmarshal(d, &data); err != nil {
 		return "", err
 	}
 
@@ -122,14 +121,14 @@ func CreateTestFile(dcYaml string) (string, error) {
 
 	// Marshal back to temp file and return it
 	testFilename := filepath.Join(os.TempDir(), fileInfo.Name())
-	os.Remove(testFilename) // Ignore the error
+	_ = os.Remove(testFilename) // Ignore the error
 
 	updated, err := yaml.Marshal(data)
 	if err != nil {
 		return "", err
 	}
 
-	if err = os.WriteFile(testFilename, updated, os.ModePerm); err != nil {
+	if err := os.WriteFile(testFilename, updated, os.ModePerm); err != nil {
 		return "", err
 	}
 
@@ -152,13 +151,14 @@ func CreateTestSecretsConfig(configFile string) (string, error) {
 	cassandraVersion := os.Getenv("M_SERVER_VERSION")
 	// jvm-options <-> jvm-server-options
 	if strings.HasPrefix(cassandraVersion, "3.") {
-		configString = strings.Replace(configString, "jvm-server-options", "jvm-options", -1)
+		configString = strings.ReplaceAll(configString, "jvm-server-options", "jvm-options")
 	} else if cassandraVersion != "" {
-		configString = strings.Replace(configString, "jvm-options", "jvm-server-options", -1)
+		configString = strings.ReplaceAll(configString, "jvm-options", "jvm-server-options")
 	}
 
 	testConfigFilename := filepath.Join(os.TempDir(), fileInfo.Name())
-	os.Remove(testConfigFilename) // Ignore the error
+	// Ignore the error as this is just a cleanup attempt before writing
+	_ = os.Remove(testConfigFilename)
 
 	if err = os.WriteFile(testConfigFilename, []byte(configString), os.ModePerm); err != nil {
 		return "", err
@@ -171,9 +171,9 @@ func CreateTestJson(jsonString string) string {
 	cassandraVersion := os.Getenv("M_SERVER_VERSION")
 	// jvm-options <-> jvm-server-options
 	if strings.HasPrefix(cassandraVersion, "3.") {
-		return strings.Replace(jsonString, "jvm-server-options", "jvm-options", -1)
+		return strings.ReplaceAll(jsonString, "jvm-server-options", "jvm-options")
 	} else if cassandraVersion != "" {
-		return strings.Replace(jsonString, "jvm-options", "jvm-server-options", -1)
+		return strings.ReplaceAll(jsonString, "jvm-options", "jvm-server-options")
 	}
 	return jsonString
 }
@@ -287,7 +287,9 @@ func (ns NsWrapper) Terminate() {
 // ====================================
 func sanitizeForLogDirs(s string) string {
 	reg, err := regexp.Compile(`[\s\\\/\-\.,]`)
-	mageutil.PanicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 	return reg.ReplaceAllLiteralString(s, "_")
 }
 

@@ -507,11 +507,12 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 			}
 
 			configContainer.Command = []string{"/bin/sh"}
-			if dc.Spec.ServerType == "cassandra" {
+			switch dc.Spec.ServerType {
+			case "cassandra":
 				configContainer.Args = []string{"-c", "cp -rf /etc/cassandra/* /cassandra-base-config/"}
-			} else if dc.Spec.ServerType == "dse" {
+			case "dse":
 				configContainer.Args = []string{"-c", "cp -rf /opt/dse/resources/cassandra/conf/* /cassandra-base-config/"}
-			} else if dc.Spec.ServerType == "hcd" {
+			case "hcd":
 				configContainer.Args = []string{"-c", "cp -rf /opt/hcd/resources/cassandra/conf/* /cassandra-base-config/"}
 			}
 		}
@@ -676,10 +677,11 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	foundCass := false
 	foundLogger := false
 	for i, c := range baseTemplate.Spec.Containers {
-		if c.Name == CassandraContainerName {
+		switch c.Name {
+		case CassandraContainerName:
 			foundCass = true
 			cassContainer = &baseTemplate.Spec.Containers[i]
-		} else if c.Name == SystemLoggerContainerName {
+		case SystemLoggerContainerName:
 			foundLogger = true
 			loggerContainer = &baseTemplate.Spec.Containers[i]
 		}
@@ -817,12 +819,13 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	})
 
 	if dc.ReadOnlyFs() {
-		if dc.Spec.ServerType == "hcd" {
+		switch dc.Spec.ServerType {
+		case "hcd":
 			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
 				Name:      "etc-cassandra",
 				MountPath: "/opt/hcd/resources/cassandra/conf",
 			})
-		} else if dc.Spec.ServerType == "dse" {
+		case "dse":
 			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
 				Name:      "etc-cassandra",
 				MountPath: "/opt/dse/resources/cassandra/conf",
@@ -842,7 +845,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 					MountPath: "/opt/dse/resources/dse/collectd/etc/collectd",
 				})
 			}
-		} else {
+		default:
 			cassContainer.VolumeMounts = append(cassContainer.VolumeMounts, corev1.VolumeMount{
 				Name:      "etc-cassandra",
 				MountPath: "/etc/cassandra",

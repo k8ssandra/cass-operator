@@ -45,7 +45,6 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		logger.Info("StatefulSet has been marked for deletion")
 		// Delete the pods
 		for i := 0; i < intendedReplicas; i++ {
-
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-%d", sts.Name, i),
@@ -53,14 +52,14 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				},
 			}
 
-			if err := r.Client.Delete(ctx, pod); err != nil {
+			if err := r.Delete(ctx, pod); err != nil {
 				logger.Error(err, "Failed to delete the pod")
 				return ctrl.Result{}, err
 			}
 		}
 
 		if controllerutil.RemoveFinalizer(&sts, "test.k8ssandra.io/sts-finalizer") {
-			if err := r.Client.Update(ctx, &sts); err != nil {
+			if err := r.Update(ctx, &sts); err != nil {
 				logger.Error(err, "Failed to remove finalizer from StatefulSet")
 				return ctrl.Result{}, err
 			}
@@ -70,7 +69,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if controllerutil.AddFinalizer(&sts, "test.k8ssandra.io/sts-finalizer") {
-		if err := r.Client.Update(ctx, &sts); err != nil {
+		if err := r.Update(ctx, &sts); err != nil {
 			logger.Error(err, "Failed to set finalizer to StatefulSet")
 			return ctrl.Result{}, err
 		}
@@ -80,7 +79,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// TODO Get existing pods and modify them .
 
 	podList := &corev1.PodList{}
-	if err := r.Client.List(ctx, podList, client.MatchingLabels(sts.Labels), client.InNamespace(req.Namespace)); err != nil {
+	if err := r.List(ctx, podList, client.MatchingLabels(sts.Labels), client.InNamespace(req.Namespace)); err != nil {
 		logger.Error(err, "Failed to list the pods belonging to this StatefulSet")
 		return ctrl.Result{}, err
 	}
@@ -96,7 +95,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		// We need to delete the pods..
 		for i := len(stsPods) - 1; i >= intendedReplicas; i-- {
 			pod := stsPods[i]
-			if err := r.Client.Delete(ctx, pod); err != nil {
+			if err := r.Delete(ctx, pod); err != nil {
 				logger.Error(err, "Failed to delete extra pod from this StS")
 				return ctrl.Result{}, err
 			}
@@ -110,7 +109,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			Namespace: sts.Namespace,
 		}
 
-		if err := r.Client.Get(ctx, podKey, &corev1.Pod{}); err == nil {
+		if err := r.Get(ctx, podKey, &corev1.Pod{}); err == nil {
 			// Pod already exists
 			continue
 		} else if client.IgnoreNotFound(err) != nil {
@@ -175,7 +174,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, err
 		}
 
-		if err := r.Client.Create(context.TODO(), pod); err != nil {
+		if err := r.Create(context.TODO(), pod); err != nil {
 			logger.Error(err, "Failed to create a Pod")
 			return ctrl.Result{}, err
 		}
@@ -196,7 +195,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			Phase:  corev1.PodRunning,
 			PodIP:  podIP,
 			PodIPs: []corev1.PodIP{{IP: podIP}}}
-		if err := r.Client.Status().Patch(ctx, pod, patchPod); err != nil {
+		if err := r.Status().Patch(ctx, pod, patchPod); err != nil {
 			logger.Error(err, "Failed to patch the Pod")
 			return ctrl.Result{}, err
 		}
@@ -211,7 +210,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	sts.Status.Replicas = int32(intendedReplicas)
 	sts.Status.ObservedGeneration = sts.Generation
 
-	if err := r.Client.Status().Patch(ctx, &sts, patchSts); err != nil {
+	if err := r.Status().Patch(ctx, &sts, patchSts); err != nil {
 		logger.Error(err, "Failed to patch StatefulSet status")
 		return ctrl.Result{}, err
 	}

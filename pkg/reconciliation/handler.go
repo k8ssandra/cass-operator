@@ -93,7 +93,7 @@ func (rc *ReconciliationContext) addFinalizer() error {
 }
 
 func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
-	var errs []error = []error{}
+	var errs = []error{}
 
 	// Basic validation up here
 

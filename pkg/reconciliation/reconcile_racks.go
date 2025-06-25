@@ -710,7 +710,7 @@ func (rc *ReconciliationContext) checkSeedLabels() (int, error) {
 }
 
 func shouldUseFastPath(dc *api.CassandraDatacenter, seedCount int) bool {
-	return seedCount > 0 && !(metav1.HasAnnotation(dc.ObjectMeta, api.AllowParallelStartsAnnotations) && dc.Annotations[api.AllowParallelStartsAnnotations] == "false")
+	return seedCount > 0 && (!metav1.HasAnnotation(dc.ObjectMeta, api.AllowParallelStartsAnnotations) || dc.Annotations[api.AllowParallelStartsAnnotations] != "false")
 }
 
 // CheckPodsReady loops over all the server pods and starts them
@@ -801,7 +801,7 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 		return result.Error(err)
 	}
 
-	if !clusterHealthy && !(rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionTrue) {
+	if !clusterHealthy && rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionFalse {
 		rc.ReqLogger.Info(
 			"cluster isn't healthy",
 		)

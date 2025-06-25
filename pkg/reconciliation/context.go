@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -27,7 +26,7 @@ import (
 // ReconciliationContext contains all of the input necessary to calculate a list of ReconciliationActions
 type ReconciliationContext struct {
 	Request        *reconcile.Request
-	Client         runtimeClient.Client
+	Client         client.Client
 	Scheme         *runtime.Scheme
 	Datacenter     *api.CassandraDatacenter
 	NodeMgmtClient httphelper.NodeMgmtClient
@@ -52,7 +51,7 @@ type ReconciliationContext struct {
 func CreateReconciliationContext(
 	ctx context.Context,
 	req *reconcile.Request,
-	cli runtimeClient.Client,
+	cli client.Client,
 	scheme *runtime.Scheme,
 	rec record.EventRecorder,
 	secretWatches dynamicwatch.DynamicWatches) (*ReconciliationContext, error) {
@@ -119,7 +118,7 @@ func (rc *ReconciliationContext) GetLogger() logr.Logger {
 	return rc.ReqLogger
 }
 
-func (rc *ReconciliationContext) GetClient() runtimeClient.Client {
+func (rc *ReconciliationContext) GetClient() client.Client {
 	return rc.Client
 }
 

@@ -57,7 +57,7 @@ func (rc *ReconciliationContext) CheckConfigSecret() result.ReconcileResult {
 	}
 
 	storedConfig, found := dcConfigSecret.Data["config"]
-	if !(found && bytes.Equal(storedConfig, config)) {
+	if !found || !bytes.Equal(storedConfig, config) {
 		if err := rc.updateConfigHashAnnotation(dcConfigSecret); err != nil {
 			rc.ReqLogger.Error(err, "failed to update config hash annotation")
 			return result.Error(err)

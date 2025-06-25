@@ -149,7 +149,7 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		oplabels.AddOperatorMetadata(&cassandraTask.ObjectMeta, dc)
 
-		if err := r.Client.Create(ctx, cassandraTask); err != nil {
+		if err := r.Create(ctx, cassandraTask); err != nil {
 			// We've already updated the Status times.. we'll miss this job now?
 			return ctrl.Result{}, err
 		}
@@ -180,12 +180,12 @@ func getPreviousExecutionTime(scheduledtask *controlapi.ScheduledTask) (time.Tim
 		previousExecution = scheduledtask.CreationTimestamp
 	}
 
-	return previousExecution.Time.UTC(), nil
+	return previousExecution.UTC(), nil
 }
 
 func (r *ScheduledTaskReconciler) activeTasks(scheduledtask *controlapi.ScheduledTask, dc *api.CassandraDatacenter, command controlapi.CassandraCommand) (int, error) {
 	tasks := &controlapi.CassandraTaskList{}
-	if err := r.Client.List(context.Background(), tasks, client.InNamespace(scheduledtask.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
+	if err := r.List(context.Background(), tasks, client.InNamespace(scheduledtask.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
 		return 0, err
 	}
 	activeJobs := make([]controlapi.CassandraJob, 0)

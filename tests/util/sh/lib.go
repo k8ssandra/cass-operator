@@ -11,8 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
-	mageutil "github.com/k8ssandra/cass-operator/tests/util"
 )
 
 // Run command.
@@ -38,7 +36,9 @@ func RunWithEnv(env map[string]string, cmd string, args ...string) error {
 // Will automatically panic on error
 func RunPanic(cmd string, args ...string) {
 	err := Run(cmd, args...)
-	mageutil.PanicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Run command and print any output to stdout/stderr
@@ -59,7 +59,9 @@ func RunVPanic(cmd string, args ...string) {
 
 func RunVPanicWithEnv(env map[string]string, cmd string, args ...string) {
 	err := RunVWithEnv(env, cmd, args...)
-	mageutil.PanicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Run command and print any output to stdout/stderr
@@ -92,7 +94,9 @@ func OutputWithEnv(env map[string]string, cmd string, args ...string) (string, e
 // stderr gets used as normal here
 func OutputPanic(cmd string, args ...string) string {
 	out, err := Output(cmd, args...)
-	mageutil.PanicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 	return out
 }
 

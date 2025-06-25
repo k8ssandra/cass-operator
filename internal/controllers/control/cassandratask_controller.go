@@ -244,7 +244,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// Starting the run, set the Active label so we can quickly fetch the active ones
 		cassTask.GetLabels()[taskStatusLabel] = activeTaskLabelValue
 
-		if err := r.Client.Update(ctx, &cassTask); err != nil {
+		if err := r.Update(ctx, &cassTask); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -344,7 +344,7 @@ JobDefinition:
 		}
 
 		if modified := SetCondition(&cassTask, api.JobRunning, metav1.ConditionTrue, ""); modified {
-			if err = r.Client.Status().Update(ctx, &cassTask); err != nil {
+			if err = r.Status().Update(ctx, &cassTask); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -360,7 +360,7 @@ JobDefinition:
 			}
 
 			pod := &corev1.Pod{}
-			if err := r.Client.Get(taskConfig.Context, types.NamespacedName{Name: taskConfig.Arguments.PodName, Namespace: dc.Namespace}, pod); err != nil {
+			if err := r.Get(taskConfig.Context, types.NamespacedName{Name: taskConfig.Arguments.PodName, Namespace: dc.Namespace}, pod); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err := r.replacePod(nodeMgmtClient, pod, taskConfig); err != nil {
@@ -388,7 +388,7 @@ JobDefinition:
 	if res.RequeueAfter == 0 && !res.Requeue {
 		// Job has been completed
 		cassTask.GetLabels()[taskStatusLabel] = completedTaskLabelValue
-		if errUpdate := r.Client.Update(ctx, &cassTask); errUpdate != nil {
+		if errUpdate := r.Update(ctx, &cassTask); errUpdate != nil {
 			return res, errUpdate
 		}
 
@@ -419,7 +419,7 @@ JobDefinition:
 	cassTask.Status.Succeeded = completed
 	cassTask.Status.Failed = failed
 
-	if err = r.Client.Status().Update(ctx, &cassTask); err != nil {
+	if err = r.Status().Update(ctx, &cassTask); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -505,7 +505,7 @@ func calculateDeletionTime(cassTask *api.CassandraTask) time.Time {
 func (r *CassandraTaskReconciler) activeTasks(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]api.CassandraTask, error) {
 	var taskList api.CassandraTaskList
 	matcher := client.MatchingLabels(utils.MergeMap(dc.GetDatacenterLabels(), map[string]string{taskStatusLabel: activeTaskLabelValue}))
-	if err := r.Client.List(ctx, &taskList, client.InNamespace(dc.Namespace), matcher); err != nil {
+	if err := r.List(ctx, &taskList, client.InNamespace(dc.Namespace), matcher); err != nil {
 		return nil, err
 	}
 
@@ -573,7 +573,7 @@ var (
 func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]corev1.Pod, error) {
 	var pods corev1.PodList
 
-	if err := r.Client.List(ctx, &pods, client.InNamespace(dc.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
+	if err := r.List(ctx, &pods, client.InNamespace(dc.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
 		return nil, err
 	}
 
@@ -583,7 +583,7 @@ func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cas
 func (r *CassandraTaskReconciler) getDatacenterStatefulSets(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]appsv1.StatefulSet, error) {
 	var sts appsv1.StatefulSetList
 
-	if err := r.Client.List(ctx, &sts, client.InNamespace(dc.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
+	if err := r.List(ctx, &sts, client.InNamespace(dc.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
 		return nil, err
 	}
 
@@ -603,7 +603,7 @@ func (r *CassandraTaskReconciler) cleanupJobAnnotations(ctx context.Context, dc 
 		podPatch := client.MergeFrom(pod.DeepCopy())
 		annotationKey := getJobAnnotationKey(taskId)
 		delete(pod.GetAnnotations(), annotationKey)
-		err = r.Client.Patch(ctx, &pod, podPatch)
+		err = r.Patch(ctx, &pod, podPatch)
 		if err != nil {
 			logger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
 			return err
@@ -685,7 +685,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				if details.Id == "" {
 					// This job was not found, pod most likely restarted. Let's retry..
 					delete(pod.Annotations, getJobAnnotationKey(taskConfig.Id))
-					err = r.Client.Update(ctx, &pod)
+					err = r.Update(ctx, &pod)
 					if err != nil {
 						return ctrl.Result{}, failed, completed, errMsg, err
 					}
@@ -708,7 +708,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 						return ctrl.Result{}, failed, completed, errMsg, err
 					}
 
-					if err = r.Client.Update(ctx, &pod); err != nil {
+					if err = r.Update(ctx, &pod); err != nil {
 						return ctrl.Result{}, failed, completed, errMsg, err
 					}
 
@@ -723,7 +723,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 						return ctrl.Result{}, failed, completed, errMsg, err
 					}
 
-					if err = r.Client.Update(ctx, &pod); err != nil {
+					if err = r.Update(ctx, &pod); err != nil {
 						return ctrl.Result{}, failed, completed, errMsg, err
 					}
 					completed++
@@ -744,7 +744,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					return ctrl.Result{}, failed, completed, errMsg, err
 				}
 
-				if err = r.Client.Update(ctx, &pod); err != nil {
+				if err = r.Update(ctx, &pod); err != nil {
 					return ctrl.Result{}, failed, completed, errMsg, err
 				}
 				completed++
@@ -765,7 +765,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				return ctrl.Result{}, failed, completed, errMsg, err
 			}
 
-			err = r.Client.Update(ctx, &pod)
+			err = r.Update(ctx, &pod)
 			if err != nil {
 				logger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
 				return ctrl.Result{}, failed, completed, errMsg, err
@@ -804,7 +804,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				return ctrl.Result{}, failed, completed, errMsg, err
 			}
 
-			err = r.Client.Update(ctx, &pod)
+			err = r.Update(ctx, &pod)
 			if err != nil {
 				logger.Error(err, "Failed to patch pod's status to indicate its running a local job", "Pod", pod)
 				return ctrl.Result{}, failed, completed, errMsg, err
@@ -831,7 +831,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					jobStatus.Status = podJobCompleted
 				}
 
-				if err := r.Client.Get(context.Background(), podKey, &pod); err != nil {
+				if err := r.Get(context.Background(), podKey, &pod); err != nil {
 					logger.Error(err, "Failed to get pod for annotation update", "Pod", pod)
 				}
 
@@ -844,8 +844,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					logger.Error(err, "Failed to update local job's status", "Pod", pod)
 				}
 
-				if err = r.Client.Patch(ctx, &pod, podPatch); err != nil {
-					// err = r.Client.Update(ctx, &pod)
+				if err = r.Patch(ctx, &pod, podPatch); err != nil {
 					logger.Error(err, "Failed to update local job's status", "Pod", pod)
 				}
 			}()

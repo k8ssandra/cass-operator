@@ -73,7 +73,7 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 		} else if r.Method == http.MethodGet && r.URL.Path == "/api/v0/ops/executor/job" {
 			w.WriteHeader(http.StatusOK)
 			jobId := query.Get("job_id")
-			_, err = w.Write([]byte(fmt.Sprintf(jobDetailsCompleted, jobId)))
+			_, err = fmt.Fprintf(w, jobDetailsCompleted, jobId)
 		} else if r.Method == http.MethodPost &&
 			(r.URL.Path == "/api/v1/ops/keyspace/cleanup" ||
 				r.URL.Path == "/api/v1/ops/node/rebuild" ||
@@ -113,7 +113,7 @@ func FakeExecutorServerWithDetailsFails(callDetails *CallDetails) (*httptest.Ser
 		} else if r.Method == http.MethodGet && r.URL.Path == "/api/v0/ops/executor/job" {
 			w.WriteHeader(http.StatusOK)
 			jobId := query.Get("job_id")
-			_, err = w.Write([]byte(fmt.Sprintf(jobDetailsFailed, jobId)))
+			_, err = fmt.Fprintf(w, jobDetailsFailed, jobId)
 		} else if r.Method == http.MethodPost && (r.URL.Path == "/api/v1/ops/keyspace/cleanup" || r.URL.Path == "/api/v1/ops/node/rebuild" || r.URL.Path == "/api/v1/ops/tables/sstables/upgrade" || r.URL.Path == "/api/v0/ops/node/move") {
 			w.WriteHeader(http.StatusOK)
 			// Write jobId
@@ -182,7 +182,9 @@ func FakeMgmtApiServer(callDetails *CallDetails, handlerFunc http.HandlerFunc) (
 		handlerFunc(w, r)
 	})
 	managementMockServer := httptest.NewUnstartedServer(callerFunc)
-	managementMockServer.Listener.Close()
+	if err := managementMockServer.Listener.Close(); err != nil {
+		return nil, err
+	}
 	managementMockServer.Listener = mgmtApiListener
 
 	return managementMockServer, nil

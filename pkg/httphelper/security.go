@@ -146,7 +146,7 @@ func buildManualApiSecurityProvider(dc *api.CassandraDatacenter) (ManagementApiS
 	if dc.Spec.ManagementApiAuth.Manual != nil {
 		provider := &ManualManagementApiSecurityProvider{}
 		provider.Config = dc.Spec.ManagementApiAuth.Manual
-		provider.Namespace = dc.ObjectMeta.Namespace
+		provider.Namespace = dc.Namespace
 		return provider, nil
 	}
 	return nil, nil
@@ -331,9 +331,9 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 		livenessTimeout = DefaultTimeout
 	}
 
-	container.LivenessProbe.ProbeHandler.HTTPGet = nil
-	container.LivenessProbe.ProbeHandler.TCPSocket = nil
-	container.LivenessProbe.ProbeHandler.Exec = provider.BuildMgmtApiGetAction(LivenessEndpoint, livenessTimeout)
+	container.LivenessProbe.HTTPGet = nil
+	container.LivenessProbe.TCPSocket = nil
+	container.LivenessProbe.Exec = provider.BuildMgmtApiGetAction(LivenessEndpoint, livenessTimeout)
 
 	// Update Readiness probe to account for mutual auth (can't just use HTTP probe now)
 	// TODO: Get endpoint from configured HTTPGet probe
@@ -348,9 +348,9 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 		readinessTimeout = DefaultTimeout
 	}
 
-	container.ReadinessProbe.ProbeHandler.HTTPGet = nil
-	container.ReadinessProbe.ProbeHandler.TCPSocket = nil
-	container.ReadinessProbe.ProbeHandler.Exec = provider.BuildMgmtApiGetAction(ReadinessEndpoint, readinessTimeout)
+	container.ReadinessProbe.HTTPGet = nil
+	container.ReadinessProbe.TCPSocket = nil
+	container.ReadinessProbe.Exec = provider.BuildMgmtApiGetAction(ReadinessEndpoint, readinessTimeout)
 
 	return nil
 }
@@ -359,7 +359,7 @@ func validatePrivateKey(data []byte) []error {
 	const privateKeyExpect = "Private key should be unencrypted PKCS#8 format using PEM encoding with preamble 'PRIVATE KEY'"
 	var validationErrors []error
 	var block *pem.Block
-	var rest []byte = data
+	var rest = data
 	foundBlocks := false
 
 	for {
@@ -578,8 +578,8 @@ func validatePeerACertificateSignedByPeerBCa(peerACertificate, peerACa, peerBCa 
 
 func validateSecretStructure(secret *corev1.Secret) error {
 	secretNamespacedName := types.NamespacedName{
-		Name:      secret.ObjectMeta.Name,
-		Namespace: secret.ObjectMeta.Namespace,
+		Name:      secret.Name,
+		Namespace: secret.Namespace,
 	}
 
 	// Check secret type
@@ -709,7 +709,7 @@ func (provider *ManualManagementApiSecurityProvider) ValidateConfig(ctx context.
 
 	for _, check := range certificateSigningChecks {
 		var err error
-		secretName := check.peerAsecret.ObjectMeta.Name
+		secretName := check.peerAsecret.Name
 		err = validatePeerACertificateSignedByPeerBCa(check.peerAsecret.Data["tls.crt"], check.peerAsecret.Data["ca.crt"], check.peerBsecret.Data["ca.crt"])
 		if err != nil {
 			validationErrors = append(

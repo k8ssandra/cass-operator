@@ -21,7 +21,7 @@ import (
 func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	svcName := dc.GetDatacenterServiceName()
 	service := makeGenericHeadlessService(dc)
-	service.ObjectMeta.Name = svcName
+	service.Name = svcName
 
 	nativePort := api.DefaultNativePort
 	if dc.IsNodePortEnabled() {
@@ -115,15 +115,15 @@ func buildLabelSelectorForSeedService(dc *api.CassandraDatacenter) map[string]st
 // nodes in the cluster
 func newSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	service := makeGenericHeadlessService(dc)
-	service.ObjectMeta.Name = dc.GetSeedServiceName()
+	service.Name = dc.GetSeedServiceName()
 
 	labels := dc.GetClusterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
-	service.ObjectMeta.Labels = labels
+	service.Labels = labels
 
 	anns := dc.GetAnnotations()
 	oplabels.AddOperatorAnnotations(anns, dc)
-	service.ObjectMeta.Annotations = anns
+	service.Annotations = anns
 
 	service.Spec.Selector = buildLabelSelectorForSeedService(dc)
 	service.Spec.PublishNotReadyAddresses = true
@@ -143,10 +143,10 @@ func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter)
 	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
 	var service corev1.Service
-	service.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
-	service.ObjectMeta.Namespace = dc.Namespace
-	service.ObjectMeta.Labels = labels
-	service.ObjectMeta.Annotations = anns
+	service.Name = dc.GetAdditionalSeedsServiceName()
+	service.Namespace = dc.Namespace
+	service.Labels = labels
+	service.Annotations = anns
 	// We omit the label selector because we will create the endpoints manually
 	service.Spec.Type = "ClusterIP"
 	service.Spec.ClusterIP = "None"

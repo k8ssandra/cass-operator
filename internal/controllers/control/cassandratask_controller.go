@@ -56,7 +56,7 @@ const (
 // These are vars to allow modifications for testing
 var (
 	JobRunningRequeue  = 10 * time.Second
-	TaskRunningRequeue = time.Duration(5 * time.Second)
+	TaskRunningRequeue = 5 * time.Second
 )
 
 // CassandraTaskReconciler reconciles a CassandraJob object

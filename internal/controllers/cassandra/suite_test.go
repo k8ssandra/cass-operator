@@ -145,8 +145,8 @@ var _ = BeforeSuite(func() {
 		return time.Duration(msec * int(time.Millisecond))
 	}
 
-	control.JobRunningRequeue = time.Duration(1 * time.Millisecond)
-	control.TaskRunningRequeue = time.Duration(1 * time.Millisecond)
+	control.JobRunningRequeue = 1 * time.Millisecond
+	control.TaskRunningRequeue = 1 * time.Millisecond
 
 	createStorageClass(ctx, "default")
 

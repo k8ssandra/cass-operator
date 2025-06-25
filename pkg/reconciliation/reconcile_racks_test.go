@@ -2420,7 +2420,7 @@ func TestStartingSequenceBuilder(t *testing.T) {
 									StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
 								},
 							},
-							Ready: bool(pod.started),
+							Ready: pod.started,
 						},
 					}
 					p.Status.PodIP = "127.0.0.1"

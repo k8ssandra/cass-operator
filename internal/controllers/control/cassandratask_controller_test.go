@@ -223,7 +223,7 @@ func waitForTaskCompletion(taskKey types.NamespacedName) *api.CassandraTask {
 		Expect(err).ToNot(HaveOccurred())
 
 		return emptyTask.Status.CompletionTime != nil
-	}, time.Duration(5*time.Second)).Should(BeTrue())
+	}, 5*time.Second).Should(BeTrue())
 	return emptyTask
 }
 
@@ -235,15 +235,15 @@ func waitForTaskFailed(taskKey types.NamespacedName) *api.CassandraTask {
 		Expect(err).ToNot(HaveOccurred())
 
 		return emptyTask.Status.Failed > 0
-	}, time.Duration(5*time.Second)).Should(BeTrue())
+	}, 5*time.Second).Should(BeTrue())
 	return emptyTask
 }
 
 var _ = Describe("CassandraTask controller tests", func() {
 	Describe("Execute jobs against all pods", func() {
 		BeforeEach(func() {
-			JobRunningRequeue = time.Duration(1 * time.Millisecond)
-			TaskRunningRequeue = time.Duration(1 * time.Millisecond)
+			JobRunningRequeue = 1 * time.Millisecond
+			TaskRunningRequeue = 1 * time.Millisecond
 		})
 		Context("Async jobs", func() {
 			var testNamespaceName string
@@ -596,7 +596,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 					pod := &corev1.Pod{}
 					err := k8sClient.Get(context.TODO(), podKey, pod)
 					return err != nil && errors.IsNotFound(err)
-				}, time.Duration(3*time.Second)).Should(BeTrue())
+				}, 3*time.Second).Should(BeTrue())
 
 				// Recreate it so the process "finishes"
 				createPod(testNamespaceName, clusterName, testDatacenterName, "r1", 2)

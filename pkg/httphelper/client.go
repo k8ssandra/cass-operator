@@ -1341,7 +1341,7 @@ func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod)
 		return false, err
 	}
 	var parsedResponse map[string]interface{}
-	err = json.Unmarshal([]byte(apiResponse), &parsedResponse)
+	err = json.Unmarshal(apiResponse, &parsedResponse)
 	if err != nil {
 		client.Log.Error(err, "failed to unmarshall JSON response from /api/v0/ops/node/fullquerylogging", "response", string(apiResponse))
 		return false, err

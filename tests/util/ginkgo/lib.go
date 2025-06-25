@@ -620,7 +620,7 @@ func (ns NsWrapper) RetrieveStatusFromNodetool(podName string) []NodetoolNodeInf
 			"J": "joining",
 			"M": "moving",
 			"S": "stopped",
-		}[string(s)]
+		}[s]
 
 		if !ok {
 			status = s

@@ -12,7 +12,7 @@ type configData struct {
 
 func (c *configData) UnmarshalJSON(data []byte) error {
 	intermediate := make(map[string]json.RawMessage)
-	if err := json.Unmarshal([]byte(data), &intermediate); err != nil {
+	if err := json.Unmarshal(data, &intermediate); err != nil {
 		return err
 	}
 	// If jvm-options key exists, parse, add to c.CassEnvSh field, delete from intermediate map.

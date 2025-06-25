@@ -65,7 +65,7 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 		if !ok {
 			return nil, errors.New(fmt.Sprint("could not get CDC field", fieldName))
 		}
-		nameTag := strings.Split(string(reflectedField.Tag.Get("json")), ",")[0]
+		nameTag := strings.Split(reflectedField.Tag.Get("json"), ",")[0]
 		reflectedValue := interface{}(nil)
 		// We need to get value types back from pointer types here and handle nil pointers.
 		switch reflectedField.Type.Kind() {

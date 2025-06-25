@@ -27,5 +27,5 @@ func TestPodDisruptionBudget(t *testing.T) {
 	assert.Equal("dc1-pdb", pdb.Name)
 	assert.Equal("test", pdb.Namespace)
 	assert.Equal("dc1", pdb.Spec.Selector.MatchLabels["cassandra.datastax.com/datacenter"])
-	assert.Equal(pdb.Spec.MinAvailable.IntVal, int32(dc.Spec.Size-1))
+	assert.Equal(pdb.Spec.MinAvailable.IntVal, dc.Spec.Size-1)
 }

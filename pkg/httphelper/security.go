@@ -104,8 +104,7 @@ type ManagementApiSecurityProvider interface {
 	ValidateConfig(ctx context.Context, client client.Client) []error
 }
 
-type InsecureManagementApiSecurityProvider struct {
-}
+type InsecureManagementApiSecurityProvider struct{}
 
 func buildInsecureManagementApiSecurityProvider(dc *api.CassandraDatacenter) (ManagementApiSecurityProvider, error) {
 	// If both are nil, then default to insecure
@@ -358,7 +357,7 @@ func validatePrivateKey(data []byte) []error {
 	const privateKeyExpect = "Private key should be unencrypted PKCS#8 format using PEM encoding with preamble 'PRIVATE KEY'"
 	var validationErrors []error
 	var block *pem.Block
-	var rest = data
+	rest := data
 	foundBlocks := false
 
 	for {
@@ -527,7 +526,7 @@ func validatePeerACertificateSignedByPeerBCa(peerACertificate, peerACa, peerBCa 
 
 	// Make sure the certificate chain is valid (i.e. that it is a sequence of
 	// certificates for which each certificate in chain has signed the one
-	// preceeding it)
+	// preceding it)
 	err = validateCertificateChain(peerACertificateChain)
 	if err != nil {
 		return err

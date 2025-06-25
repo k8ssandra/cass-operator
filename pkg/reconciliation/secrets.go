@@ -100,7 +100,6 @@ func (rc *ReconciliationContext) retrieveSecret(secretNamespacedName types.Names
 		rc.Ctx,
 		secretNamespacedName,
 		secret)
-
 	if err != nil {
 		return nil, err
 	}
@@ -253,8 +252,8 @@ func validateCassandraUserSecretContent(dc *api.CassandraDatacenter, secret *cor
 
 	if secret != nil {
 		namespacedName := types.NamespacedName{
-			Name:      secret.ObjectMeta.Name,
-			Namespace: secret.ObjectMeta.Namespace,
+			Name:      secret.Name,
+			Namespace: secret.Namespace,
 		}
 		errorPrefix := fmt.Sprintf("Validation failed for user secret: %s", namespacedName.String())
 
@@ -300,14 +299,13 @@ func (rc *ReconciliationContext) validateCassandraUserSecrets() []error {
 
 	for _, user := range users {
 		secretName := user.SecretName
-		namespace := dc.ObjectMeta.Namespace
+		namespace := dc.Namespace
 		secretKey := types.NamespacedName{
 			Name:      secretName,
 			Namespace: namespace,
 		}
 
 		secret, err := rc.retrieveSecret(secretKey)
-
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Validation of user secret failed due to an error: %w", err))
 			continue

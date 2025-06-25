@@ -81,7 +81,8 @@ var _ = Describe(testName, func() {
 			podName := ns.OutputAndLog(step, k)
 
 			step = "finding mgmt api PID on the pod"
-			execArgs := []string{"-c", "cassandra",
+			execArgs := []string{
+				"-c", "cassandra",
 				"--", "bash", "-c",
 				"ps aux | grep [m]anagement-api",
 			}
@@ -90,7 +91,8 @@ var _ = Describe(testName, func() {
 			pid := strings.Fields(ps)[1]
 
 			step = "killing mgmt api process on the pod"
-			execArgs = []string{"-c", "cassandra",
+			execArgs = []string{
+				"-c", "cassandra",
 				"--", "bash", "-c",
 				fmt.Sprintf("kill %s", pid),
 			}

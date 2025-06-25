@@ -58,7 +58,7 @@ func TestCassandraDatacenter_allPodsServiceLabels(t *testing.T) {
 
 	service := newAllPodsServiceForCassandraDatacenter(dc)
 
-	gotLabels := service.ObjectMeta.Labels
+	gotLabels := service.Labels
 	if !reflect.DeepEqual(wantLabels, gotLabels) {
 		t.Errorf("allPodsService labels = %v, want %v", gotLabels, wantLabels)
 	}
@@ -544,7 +544,7 @@ func TestServicePorts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var getServicePorts = func(svc *corev1.Service) []int32 {
+			getServicePorts := func(svc *corev1.Service) []int32 {
 				servicePorts := make([]int32, len(svc.Spec.Ports))
 				for i := 0; i < len(svc.Spec.Ports); i++ {
 					servicePorts[i] = svc.Spec.Ports[i].Port

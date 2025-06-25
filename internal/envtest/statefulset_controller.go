@@ -194,7 +194,8 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			},
 			Phase:  corev1.PodRunning,
 			PodIP:  podIP,
-			PodIPs: []corev1.PodIP{{IP: podIP}}}
+			PodIPs: []corev1.PodIP{{IP: podIP}},
+		}
 		if err := r.Status().Patch(ctx, pod, patchPod); err != nil {
 			logger.Error(err, "Failed to patch the Pod")
 			return ctrl.Result{}, err

@@ -41,7 +41,7 @@ const (
 func calculateNodeAffinity(labels map[string]string, existingNodeAffinity *corev1.NodeAffinity, rackNodeAffinity *corev1.NodeAffinity) *corev1.NodeAffinity {
 	var nodeSelectors []corev1.NodeSelectorRequirement
 
-	//we make a new map in order to sort because a map is random by design
+	// we make a new map in order to sort because a map is random by design
 	keys := make([]string, 0, len(labels))
 	for key := range labels {
 		keys = append(keys, key)

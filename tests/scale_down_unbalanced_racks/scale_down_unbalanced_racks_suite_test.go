@@ -129,7 +129,6 @@ var _ = Describe(testName, func() {
 				WithLabel(dcLabel).
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "[]", 300)
-
 		})
 	})
 })

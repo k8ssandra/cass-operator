@@ -41,7 +41,7 @@ func duplicate(value string, count int) string {
 // Utility function to override the server config in a spec file.
 // This will copy the provided yaml spec to a temp file, replacing or
 // adding the supplied server overrides, to allow for running tests
-// against mutliple Cassandra/DSE versions.
+// against multiple Cassandra/DSE versions.
 func CreateTestFile(dcYaml string) (string, error) {
 	var data map[string]any
 
@@ -476,7 +476,8 @@ func (ns *NsWrapper) EnableGossipWaitReady(podName string) {
 }
 
 func (ns *NsWrapper) DisableGossip(podName string) {
-	execArgs := []string{"-c", "cassandra",
+	execArgs := []string{
+		"-c", "cassandra",
 		"--", "bash", "-c",
 		"nodetool disablegossip",
 	}
@@ -485,7 +486,8 @@ func (ns *NsWrapper) DisableGossip(podName string) {
 }
 
 func (ns *NsWrapper) EnableGossip(podName string) {
-	execArgs := []string{"-c", "cassandra",
+	execArgs := []string{
+		"-c", "cassandra",
 		"--", "bash", "-c",
 		"nodetool enablegossip",
 	}
@@ -494,7 +496,8 @@ func (ns *NsWrapper) EnableGossip(podName string) {
 }
 
 func (ns *NsWrapper) KillCassandra(podName string) {
-	execArgs := []string{"-c", "cassandra",
+	execArgs := []string{
+		"-c", "cassandra",
 		"--", "sh", "-c",
 		"pkill -e -f -9 datastax-mgmtapi-agent.jar",
 	}

@@ -217,7 +217,6 @@ func (impl *DynamicWatchesAnnotationImpl) listAllWatched(namespace string) ([]un
 		impl.Ctx,
 		watchedList,
 		listOptions)
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil
@@ -240,7 +239,6 @@ func (impl *DynamicWatchesAnnotationImpl) getWatched(watched types.NamespacedNam
 		impl.Ctx,
 		watched,
 		watchedItem)
-
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +288,6 @@ func (impl *DynamicWatchesAnnotationImpl) UpdateWatch(watcher types.NamespacedNa
 	// Now we need to add `watcher` to the relevant resource
 	for _, name := range watched {
 		watchedItem, err := impl.getWatched(name)
-
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// we are attempting to watch a resource that does not exist...

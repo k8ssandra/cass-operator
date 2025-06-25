@@ -106,7 +106,6 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	logger.Info("======== handler::Reconcile has been called")
 
 	rc, err := reconciliation.CreateReconciliationContext(ctx, &request, r.Client, r.Scheme, r.Recorder, r.SecretWatches)
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.

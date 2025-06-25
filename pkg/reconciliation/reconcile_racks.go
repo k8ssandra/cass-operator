@@ -431,7 +431,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 		}
 
 		desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, int(*statefulSet.Spec.Replicas))
-
 		if err != nil {
 			logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
 			return result.Error(err)
@@ -773,7 +772,6 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	// step 1 - see if any nodes are already coming up
 
 	nodeIsStarting, _, err := rc.findStartingNodes()
-
 	if err != nil {
 		return result.Error(err)
 	}
@@ -784,7 +782,6 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	// step 2 - get one node up per rack
 
 	atLeastOneFirstNodeNotReady, err := rc.startOneNodePerRack(endpointData, seedCount)
-
 	if err != nil {
 		return result.Error(err)
 	}
@@ -975,7 +972,7 @@ func (rc *ReconciliationContext) CheckRackPodLabels() result.ReconcileResult {
 
 func (rc *ReconciliationContext) upsertUser(user api.CassandraUser) error {
 	dc := rc.Datacenter
-	namespace := dc.ObjectMeta.Namespace
+	namespace := dc.Namespace
 
 	namespacedName := types.NamespacedName{
 		Name:      user.SecretName,
@@ -1161,7 +1158,7 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 }
 
 func getTimePodCreated(pod *corev1.Pod) metav1.Time {
-	return pod.ObjectMeta.CreationTimestamp
+	return pod.CreationTimestamp
 }
 
 func getTimeStartedReplacingNodes(dc *api.CassandraDatacenter) (metav1.Time, bool) {
@@ -1406,7 +1403,7 @@ func (rc *ReconciliationContext) getCassMetadataEndpoints() httphelper.CassMetad
 // properly recreate a pvc, pv, and pod.
 func (rc *ReconciliationContext) isNodeStuckWithoutPVC(pod *corev1.Pod) bool {
 	if pod.Status.Phase == corev1.PodPending {
-		_, err := rc.GetPodPVC(pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
+		_, err := rc.GetPodPVC(pod.Namespace, pod.Name)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return true
@@ -1528,7 +1525,8 @@ func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (int, 
 // GetStatefulSetForRack returns the statefulset for the rack
 // and whether it currently exists and whether an error occurred
 func (rc *ReconciliationContext) GetStatefulSetForRack(
-	nextRack *RackInformation) (*appsv1.StatefulSet, bool, error) {
+	nextRack *RackInformation,
+) (*appsv1.StatefulSet, bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::getStatefulSetForRack")
 
 	// Check if the desiredStatefulSet already exists
@@ -1608,7 +1606,8 @@ func (rc *ReconciliationContext) CheckDcPodDisruptionBudget() result.ReconcileRe
 		ctx,
 		types.NamespacedName{
 			Name:      desiredBudget.Name,
-			Namespace: desiredBudget.Namespace},
+			Namespace: desiredBudget.Namespace,
+		},
 		currentBudget)
 
 	if err != nil && !errors.IsNotFound(err) {
@@ -1688,7 +1687,8 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 			rc.Ctx,
 			types.NamespacedName{
 				Name:      podName,
-				Namespace: statefulSet.Namespace},
+				Namespace: statefulSet.Namespace,
+			},
 			pod)
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -1747,7 +1747,8 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 			rc.Ctx,
 			types.NamespacedName{
 				Name:      pvcName,
-				Namespace: statefulSet.Namespace},
+				Namespace: statefulSet.Namespace,
+			},
 			pvc)
 		if err != nil {
 			rc.ReqLogger.Error(

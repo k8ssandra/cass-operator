@@ -163,12 +163,12 @@ func newEndpointsForAdditionalSeeds(dc *api.CassandraDatacenter) (*corev1.Endpoi
 	labels := dc.GetDatacenterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
 	endpoints := corev1.Endpoints{}
-	endpoints.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
-	endpoints.ObjectMeta.Namespace = dc.Namespace
-	endpoints.ObjectMeta.Labels = labels
+	endpoints.Name = dc.GetAdditionalSeedsServiceName()
+	endpoints.Namespace = dc.Namespace
+	endpoints.Labels = labels
 	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
-	endpoints.ObjectMeta.Annotations = anns
+	endpoints.Annotations = anns
 
 	addresses := make([]corev1.EndpointAddress, 0, len(dc.Spec.AdditionalSeeds))
 	for _, additionalSeed := range dc.Spec.AdditionalSeeds {
@@ -221,7 +221,7 @@ func resolveAddress(hostname string) ([]string, error) {
 // that preserves the client source IPs
 func newNodePortServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	service := makeGenericHeadlessService(dc)
-	service.ObjectMeta.Name = dc.GetNodePortServiceName()
+	service.Name = dc.GetNodePortServiceName()
 
 	service.Spec.Type = "NodePort"
 	// Note: ClusterIp = "None" is not valid for NodePort
@@ -255,8 +255,8 @@ func newNodePortServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *core
 // which covers all server pods in the datacenter, whether they are ready or not
 func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	service := makeGenericHeadlessService(dc)
-	service.ObjectMeta.Name = dc.GetAllPodsServiceName()
-	service.ObjectMeta.Labels[api.PromMetricsLabel] = "true"
+	service.Name = dc.GetAllPodsServiceName()
+	service.Labels[api.PromMetricsLabel] = "true"
 	service.Spec.PublishNotReadyAddresses = true
 
 	nativePort := api.DefaultNativePort
@@ -295,15 +295,15 @@ func makeGenericHeadlessService(dc *api.CassandraDatacenter) *corev1.Service {
 	oplabels.AddOperatorLabels(labels, dc)
 	selector := dc.GetDatacenterLabels()
 	var service corev1.Service
-	service.ObjectMeta.Namespace = dc.Namespace
-	service.ObjectMeta.Labels = labels
+	service.Namespace = dc.Namespace
+	service.Labels = labels
 	service.Spec.Selector = selector
 	service.Spec.Type = "ClusterIP"
 	service.Spec.ClusterIP = "None"
 
 	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
-	service.ObjectMeta.Annotations = anns
+	service.Annotations = anns
 
 	return &service
 }

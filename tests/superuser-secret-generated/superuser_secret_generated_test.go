@@ -4,10 +4,9 @@
 package superuser_secret_generated
 
 import (
+	"encoding/base64"
 	"fmt"
 	"testing"
-
-	"encoding/base64"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

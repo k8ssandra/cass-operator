@@ -53,7 +53,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 // updateAdditionalJVMOpts adds CDC related entries to additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
 func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfiguration, cassDC cassdcapi.CassandraDatacenter, mcacEnabled bool) ([]string, error) {
 	out := removeEntryFromSlice(optsSlice, "pulsarServiceUrl")
-	//Next, create an additional options entry that instantiates the settings we want.
+	// Next, create an additional options entry that instantiates the settings we want.
 	reflectedCDCConfig := reflect.ValueOf(*CDCConfig)
 	t := reflectedCDCConfig.Type()
 	optsSlice = []string{}

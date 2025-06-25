@@ -32,8 +32,10 @@ var fullQueryIsSupported string = `{"cassandra_version": "4.0.1",
 }
 `
 
-var httpResponseFullQueryEnabled string = `{"entity": true}`
-var httpResponseFullQueryDisabled string = `{"entity": false}`
+var (
+	httpResponseFullQueryEnabled  string = `{"entity": true}`
+	httpResponseFullQueryDisabled string = `{"entity": false}`
+)
 
 func setupPodList(t *testing.T, rc *ReconciliationContext) {
 	podIP := "192.168.101.11"

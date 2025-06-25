@@ -373,7 +373,6 @@ JobDefinition:
 		}
 
 		res, failed, completed, errMsg, err = r.reconcileEveryPodTask(ctx, dc, taskConfig)
-
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -564,11 +563,10 @@ func JobStatusToPodAnnotations(taskId string, annotations map[string]string, job
 	return nil
 }
 
-var (
-	// TODO This should be per Datacenter for sync tasks also
-	jobRunner chan int = make(chan int, 1)
-	// jobRunningRequeue          = time.Duration(10 * time.Second)
-)
+// TODO This should be per Datacenter for sync tasks also
+var jobRunner chan int = make(chan int, 1)
+
+// jobRunningRequeue          = time.Duration(10 * time.Second)
 
 func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]corev1.Pod, error) {
 	var pods corev1.PodList

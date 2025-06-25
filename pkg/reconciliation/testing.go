@@ -43,7 +43,8 @@ func MockSetControllerReference() func() {
 		owner,
 		object metav1.Object,
 		scheme *runtime.Scheme,
-		opts ...controllerutil.OwnerReferenceOption) error {
+		opts ...controllerutil.OwnerReferenceOption,
+	) error {
 		return nil
 	}
 
@@ -54,7 +55,8 @@ func MockSetControllerReference() func() {
 
 // CreateMockReconciliationContext ...
 func CreateMockReconciliationContext(
-	reqLogger logr.Logger) *ReconciliationContext {
+	reqLogger logr.Logger,
+) *ReconciliationContext {
 	// These defaults may need to be settable via arguments
 
 	var (

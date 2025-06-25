@@ -66,7 +66,6 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
-
 		})
 		Specify("the operator can perform a rolling restart with rollingRestartRequested spec change", func() {
 			step := "trigger restart"

@@ -42,8 +42,7 @@ func SetupCassandraDatacenterWebhookWithManager(mgr ctrl.Manager) error {
 
 // CassandraDatacenterCustomDefaulter struct is responsible for setting default values on the custom resource of the
 // Kind CassandraDatacenter when those are created or updated.
-type CassandraDatacenterCustomDefaulter struct {
-}
+type CassandraDatacenterCustomDefaulter struct{}
 
 var _ webhook.CustomDefaulter = &CassandraDatacenterCustomDefaulter{}
 
@@ -54,8 +53,7 @@ func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, obj ru
 
 // CassandraDatacenterCustomValidator struct is responsible for validating the CassandraDatacenter resource
 // when it is created, updated, or deleted.
-type CassandraDatacenterCustomValidator struct {
-}
+type CassandraDatacenterCustomValidator struct{}
 
 var _ webhook.CustomValidator = &CassandraDatacenterCustomValidator{}
 
@@ -293,9 +291,7 @@ func ValidateAdditionalVolumes(dc *api.CassandraDatacenter) error {
 	return nil
 }
 
-var (
-	ErrFQLNotSupported = fmt.Errorf("full query logging is only supported on OSS Cassandra 4.0+")
-)
+var ErrFQLNotSupported = fmt.Errorf("full query logging is only supported on OSS Cassandra 4.0+")
 
 func ValidateFQLConfig(dc *api.CassandraDatacenter) error {
 	if dc.Spec.Config != nil {

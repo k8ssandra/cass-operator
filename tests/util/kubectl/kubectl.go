@@ -244,10 +244,10 @@ func Patch(resource string, data string) KCmd {
 }
 
 func erasePreviousLine() {
-	//cursor up one line
+	// cursor up one line
 	fmt.Print("\033[A")
 
-	//erase line
+	// erase line
 	fmt.Print("\033[K")
 }
 
@@ -320,7 +320,7 @@ func WaitForOutputContains(k KCmd, expected string, seconds int) error {
 }
 
 func DumpAllLogs(path string) KCmd {
-	//Make dir if doesn't exist
+	// Make dir if doesn't exist
 	_ = os.MkdirAll(path, os.ModePerm)
 	args := []string{"dump", "-A"}
 	flags := map[string]string{"output-directory": path}
@@ -328,7 +328,7 @@ func DumpAllLogs(path string) KCmd {
 }
 
 func DumpLogs(path string, namespace string) KCmd {
-	//Make dir if doesn't exist
+	// Make dir if doesn't exist
 	_ = os.MkdirAll(path, os.ModePerm)
 	args := []string{"dump", "-n", namespace}
 	flags := map[string]string{"output-directory": path}

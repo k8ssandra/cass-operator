@@ -25,7 +25,8 @@ const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
 
 func NewNamespacedNameForStatefulSet(
 	dc *api.CassandraDatacenter,
-	rackName string) types.NamespacedName {
+	rackName string,
+) types.NamespacedName {
 	name := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-" + dc.LabelResourceName() + "-" + api.CleanupSubdomain(rackName) + "-sts"
 	ns := dc.Namespace
 
@@ -37,7 +38,7 @@ func NewNamespacedNameForStatefulSet(
 
 func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[string]string, error) {
 	var nodeAffinityLabels map[string]string
-	var log = logf.Log.WithName("construct_statefulset")
+	log := logf.Log.WithName("construct_statefulset")
 	racks := dc.GetRacks()
 	for _, rack := range racks {
 		if rack.Name == rackName {
@@ -64,7 +65,8 @@ func newStatefulSetForCassandraDatacenter(
 	sts *appsv1.StatefulSet,
 	rackName string,
 	dc *api.CassandraDatacenter,
-	replicaCount int) (*appsv1.StatefulSet, error) {
+	replicaCount int,
+) (*appsv1.StatefulSet, error) {
 	replicaCountInt32 := int32(replicaCount)
 
 	// see https://github.com/kubernetes/kubernetes/pull/74941

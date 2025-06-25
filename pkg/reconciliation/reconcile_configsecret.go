@@ -33,7 +33,6 @@ func (rc *ReconciliationContext) CheckConfigSecret() result.ReconcileResult {
 
 	key := types.NamespacedName{Namespace: rc.Datacenter.Namespace, Name: rc.Datacenter.Spec.ConfigSecret}
 	secret, err := rc.retrieveSecret(key)
-
 	if err != nil {
 		rc.ReqLogger.Error(err, "failed to get config secret", "ConfigSecret", key.Name)
 		return result.Error(err)

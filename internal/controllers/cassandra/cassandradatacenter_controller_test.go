@@ -25,9 +25,7 @@ const (
 	pollingTime = 50 * time.Millisecond
 )
 
-var (
-	testNamespaceName string
-)
+var testNamespaceName string
 
 func clusterName() string {
 	// TODO Modify when multiple clusters are needed
@@ -253,6 +251,7 @@ func verifyDatacenterDeleted(ctx context.Context, dcName string) AsyncAssertion 
 		}
 	}).WithContext(ctx).WithTimeout(10 * time.Second).WithPolling(100 * time.Millisecond)
 }
+
 func verifyOwnerReference(g Gomega, ownerRef metav1.OwnerReference, dcName string) {
 	g.Expect(ownerRef.Kind).To(Equal("CassandraDatacenter"))
 	g.Expect(ownerRef.Name).To(Equal(dcName))

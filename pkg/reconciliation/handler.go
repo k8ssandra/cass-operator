@@ -22,8 +22,10 @@ import (
 var setControllerReference = controllerutil.SetControllerReference
 
 // key: Node.Name, value: CassandraDatacenter.Name
-var nodeToDc = make(map[string][]types.NamespacedName)
-var nodeToDcLock = sync.RWMutex{}
+var (
+	nodeToDc     = make(map[string][]types.NamespacedName)
+	nodeToDcLock = sync.RWMutex{}
+)
 
 // Get the dcNames and dcNamespaces for a node
 func DatacentersForNode(nodeName string) []types.NamespacedName {
@@ -92,7 +94,7 @@ func (rc *ReconciliationContext) addFinalizer() error {
 }
 
 func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
-	var errs = []error{}
+	errs := []error{}
 
 	// Basic validation up here
 

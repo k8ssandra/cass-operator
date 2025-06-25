@@ -82,7 +82,7 @@ func Test_GetJKS(t *testing.T) {
 		_ = os.Remove("test-jks")
 	}()
 
-	err = os.WriteFile("test-jks", jks, 0644)
+	err = os.WriteFile("test-jks", jks, 0o644)
 	if err != nil {
 		t.Errorf("WriteFile error: %e", err)
 	}

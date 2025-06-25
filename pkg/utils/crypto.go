@@ -132,7 +132,8 @@ func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err
 					Type:    "X509",
 					Content: ca_cert_bytes,
 				},
-			}}
+			},
+		}
 		err = keystore.Encode(buffer, store, []byte(dcname))
 		return buffer.Bytes(), err
 	}
@@ -149,7 +150,7 @@ func rsa2pkcs8(key *rsa.PrivateKey) ([]byte, error) {
 	var pkey pkcs8Key
 	pkey.Version = 0
 	pkey.PrivateKeyAlgorithm = make([]asn1.ObjectIdentifier, 1)
-	pkey.PrivateKeyAlgorithm[0] = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1} //RSA
+	pkey.PrivateKeyAlgorithm[0] = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1} // RSA
 	pkey.PrivateKey = x509.MarshalPKCS1PrivateKey(key)
 
 	return asn1.Marshal(pkey)

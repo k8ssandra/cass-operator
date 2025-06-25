@@ -80,7 +80,8 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
 				oplabels.VersionLabel:   "4.0.1",
 			},
-		}, {
+		},
+		{
 			name: "Cluster name with spaces",
 			args: args{
 				resourceLabels: make(map[string]string),
@@ -164,7 +165,8 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
 				oplabels.VersionLabel:   "4.0.1",
 			},
-		}, {
+		},
+		{
 			name: "DC Label, No Cluster Label",
 			args: args{
 				resourceLabels: map[string]string{
@@ -487,7 +489,7 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	require.Equal("bar", sts.Spec.Template.Labels["foo"])
 
 	// Now update the template and verify that the StatefulSet is updated
-	rc.Datacenter.Spec.PodTemplateSpec.ObjectMeta.Labels["foo2"] = "baz"
+	rc.Datacenter.Spec.PodTemplateSpec.Labels["foo2"] = "baz"
 	rc.Datacenter.Generation++
 	res = rc.CheckRackPodTemplate()
 	require.Equal(result.Done(), res)
@@ -1075,7 +1077,7 @@ func TestReconcileRacks_UpdateRackNodeCount(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	var nextRack = &RackInformation{}
+	nextRack := &RackInformation{}
 
 	nextRack.RackName = "default"
 	nextRack.NodeCount = 2
@@ -1336,12 +1338,10 @@ func Test_isMgmtApiRunning(t *testing.T) {
 		pod *corev1.Pod
 	}
 	readyServerContainer := makeMockReadyStartedPod()
-	readyServerContainer.Status.ContainerStatuses[0].State.Running =
-		&corev1.ContainerStateRunning{StartedAt: metav1.Date(2019, time.July, 4, 12, 12, 12, 0, time.UTC)}
+	readyServerContainer.Status.ContainerStatuses[0].State.Running = &corev1.ContainerStateRunning{StartedAt: metav1.Date(2019, time.July, 4, 12, 12, 12, 0, time.UTC)}
 
 	veryFreshServerContainer := makeMockReadyStartedPod()
-	veryFreshServerContainer.Status.ContainerStatuses[0].State.Running =
-		&corev1.ContainerStateRunning{StartedAt: metav1.Now()}
+	veryFreshServerContainer.Status.ContainerStatuses[0].State.Running = &corev1.ContainerStateRunning{StartedAt: metav1.Now()}
 
 	podThatHasNoServer := makeMockReadyStartedPod()
 	podThatHasNoServer.Status.ContainerStatuses[0].Name = "nginx"
@@ -3419,7 +3419,7 @@ func TestDatacenterStatus(t *testing.T) {
 	k8sMockClientStatusUpdate(mockClient.Status().(*mocks.SubResourceClient), nil).Times(2)
 	assert.NoError(rc.setConditionStatus(api.DatacenterRequiresUpdate, corev1.ConditionTrue)) // This uses one StatusUpdate call
 	rc.Datacenter.Status.ObservedGeneration = 0
-	rc.Datacenter.ObjectMeta.Generation = 1
+	rc.Datacenter.Generation = 1
 	assert.NoError(setDatacenterStatus(rc))
 	assert.Equal(int64(1), rc.Datacenter.Status.ObservedGeneration)
 	assert.Equal(corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterRequiresUpdate))

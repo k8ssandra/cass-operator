@@ -31,7 +31,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - endpoints
   - events
   - persistentvolumeclaims
   - pods
@@ -128,6 +127,18 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - policy
   resources:

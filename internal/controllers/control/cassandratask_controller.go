@@ -579,10 +579,11 @@ func (r *CassandraTaskReconciler) processPod(
 
 	if jobStatus.Id != "" {
 		// Check the completed statuses
-		if jobStatus.Status == podJobCompleted {
+		switch jobStatus.Status {
+		case podJobCompleted:
 			completed++
 			return ctrl.Result{}, failed, completed, errMsg, nil
-		} else if jobStatus.Status == podJobError {
+		case podJobError:
 			failed++
 			return ctrl.Result{}, failed, completed, errMsg, nil
 		}

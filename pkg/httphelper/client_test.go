@@ -137,8 +137,7 @@ func Test_parseMetadataEndpointsResponseBody_Cassandra4(t *testing.T) {
       "SCHEMA": "1f9c10f4-9964-3a41-bef6-66720dc90429",
       "SSTABLE_VERSIONS": "big-nb",
       "STATUS": "NORMAL,-2378755110699573255",
-      "STATUS_WITH_PORT": "NORMAL,-2378755110699573255",
-      "TOKENS": "\u0000\u0000\u0000\bÞüöÔ{\u001B_ù\u0000\u0000\u0000\bÑiä¹/8a^\u0000\u0000\u0000\bºñ÷\u0005©2\u0000\u0000\u0000\b¤á\"åÈEYo\u0000\u0000\u0000\bt^>k)\u0000$\u0000\u0000\u0000\b2c\u0019z\u000B¾\u0000\u0000\u0000\b\u0016\u0006î^°o\u0005\u0000\u0000\u0000\b!¾Â¡±\bý¢\u0000\u0000\u0000\b5»±¨Ãh\u0000\u0000\u0000\bD[\u0016ß8\u0010\u0000\u0000\u0000\b\u0006áÝ«x@â\u0000\u0000\u0000\bRº}\u0006\u0012\u001C\u0000\u0000\u0000\b^\u0013qÖó0¥g\u0000\u0000\u0000\bm\u0001L\u001D0­z\u0000\u0000\u0000\bw7ËX©Ã\u0000\u0000\u0000\u0000"
+      "STATUS_WITH_PORT": "NORMAL,-2378755110699573255"
     }
   ],
   "variant": {

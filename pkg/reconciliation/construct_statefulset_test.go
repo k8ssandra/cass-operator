@@ -151,8 +151,7 @@ func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing
 			},
 		},
 	}
-	var nodeAffinityLabels map[string]string
-	nodeAffinityLabels = rackNodeAffinitylabels(dc, "rack1")
+	nodeAffinityLabels := rackNodeAffinitylabels(dc, "rack1")
 
 	expected := map[string]string{
 		"label1": "dc",

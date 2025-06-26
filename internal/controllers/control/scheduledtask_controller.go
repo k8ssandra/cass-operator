@@ -93,10 +93,7 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	defaults(scheduledtask)
 
-	previousExecution, err := getPreviousExecutionTime(scheduledtask)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	previousExecution := getPreviousExecutionTime(scheduledtask)
 
 	now := r.Clock.Now().UTC()
 	createTask := false
@@ -171,7 +168,7 @@ func defaults(scheduledtask *controlapi.ScheduledTask) {
 	}
 }
 
-func getPreviousExecutionTime(scheduledtask *controlapi.ScheduledTask) (time.Time, error) {
+func getPreviousExecutionTime(scheduledtask *controlapi.ScheduledTask) time.Time {
 	previousExecution := scheduledtask.Status.LastExecution
 
 	if previousExecution.IsZero() {
@@ -179,7 +176,7 @@ func getPreviousExecutionTime(scheduledtask *controlapi.ScheduledTask) (time.Tim
 		previousExecution = scheduledtask.CreationTimestamp
 	}
 
-	return previousExecution.UTC(), nil
+	return previousExecution.UTC()
 }
 
 func (r *ScheduledTaskReconciler) activeTasks(scheduledtask *controlapi.ScheduledTask, dc *api.CassandraDatacenter, command controlapi.CassandraCommand) (int, error) {

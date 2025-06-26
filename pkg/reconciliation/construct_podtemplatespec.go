@@ -967,10 +967,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 	oplabels.AddOperatorAnnotations(baseTemplate.Annotations, dc)
 
 	// Affinity
-	nodeAffinityLabels, nodeAffinityLabelsConfigurationError := rackNodeAffinitylabels(dc, rack.Name)
-	if nodeAffinityLabelsConfigurationError != nil {
-		return nil, nodeAffinityLabelsConfigurationError
-	}
+	nodeAffinityLabels := rackNodeAffinitylabels(dc, rack.Name)
 
 	rackAffinities := rack.Affinity
 

@@ -109,8 +109,7 @@ func (rc *ReconciliationContext) CalculateRackInformation() error {
 func (rc *ReconciliationContext) CheckSuperuserSecretCreation() result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckSuperuserSecretCreation")
 
-	_, err := rc.retrieveSuperuserSecretOrCreateDefault()
-	if err != nil {
+	if err := rc.retrieveSuperuserSecretOrCreateDefault(); err != nil {
 		rc.ReqLogger.Error(err, "error retrieving SuperuserSecret for CassandraDatacenter.")
 		return result.Error(err)
 	}
@@ -1043,8 +1042,7 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 	}
 
 	// make sure the default superuser secret exists
-	_, err = rc.retrieveSuperuserSecretOrCreateDefault()
-	if err != nil {
+	if err = rc.retrieveSuperuserSecretOrCreateDefault(); err != nil {
 		rc.ReqLogger.Error(err, "Failed to verify superuser secret status")
 	}
 

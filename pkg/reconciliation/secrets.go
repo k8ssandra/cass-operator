@@ -113,16 +113,16 @@ func (rc *ReconciliationContext) retrieveSuperuserSecret() (*corev1.Secret, erro
 	return rc.retrieveSecret(secretNamespacedName)
 }
 
-func (rc *ReconciliationContext) retrieveSuperuserSecretOrCreateDefault() (*corev1.Secret, error) {
+func (rc *ReconciliationContext) retrieveSuperuserSecretOrCreateDefault() error {
 	dc := rc.Datacenter
 
-	secret, retrieveErr := rc.retrieveSuperuserSecret()
+	_, retrieveErr := rc.retrieveSuperuserSecret()
 	if retrieveErr != nil {
 		if errors.IsNotFound(retrieveErr) {
 			secret, err := buildDefaultSuperuserSecret(dc)
 
 			if err == nil && secret == nil {
-				return nil, retrieveErr
+				return retrieveErr
 			}
 
 			if err == nil {
@@ -130,14 +130,14 @@ func (rc *ReconciliationContext) retrieveSuperuserSecretOrCreateDefault() (*core
 			}
 
 			if err != nil {
-				return nil, fmt.Errorf("failed to create default superuser secret: %w", err)
+				return fmt.Errorf("failed to create default superuser secret: %w", err)
 			}
 		} else {
-			return nil, retrieveErr
+			return retrieveErr
 		}
 	}
 
-	return secret, nil
+	return nil
 }
 
 func (rc *ReconciliationContext) createInternodeCACredential() (*corev1.Secret, error) {
@@ -247,7 +247,7 @@ func (rc *ReconciliationContext) retrieveInternodeCredentialSecretOrCreateDefaul
 }
 
 // Helper function that is easier to test
-func validateCassandraUserSecretContent(dc *api.CassandraDatacenter, secret *corev1.Secret) []error {
+func validateCassandraUserSecretContent(secret *corev1.Secret) []error {
 	var errs []error
 
 	if secret != nil {
@@ -289,7 +289,7 @@ func (rc *ReconciliationContext) validateSuperuserSecret() []error {
 			return []error{fmt.Errorf("validation of superuser secret failed due to an error: %w", err)}
 		}
 	}
-	return validateCassandraUserSecretContent(rc.Datacenter, secret)
+	return validateCassandraUserSecretContent(secret)
 }
 
 func (rc *ReconciliationContext) validateCassandraUserSecrets() []error {
@@ -311,7 +311,7 @@ func (rc *ReconciliationContext) validateCassandraUserSecrets() []error {
 			continue
 		}
 
-		errs = append(errs, validateCassandraUserSecretContent(dc, secret)...)
+		errs = append(errs, validateCassandraUserSecretContent(secret)...)
 	}
 
 	return errs

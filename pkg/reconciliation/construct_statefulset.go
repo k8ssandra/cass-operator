@@ -36,7 +36,7 @@ func NewNamespacedNameForStatefulSet(
 	}
 }
 
-func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[string]string, error) {
+func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) map[string]string {
 	var nodeAffinityLabels map[string]string
 	log := logf.Log.WithName("construct_statefulset")
 	racks := dc.GetRacks()
@@ -57,7 +57,7 @@ func rackNodeAffinitylabels(dc *api.CassandraDatacenter, rackName string) (map[s
 			break
 		}
 	}
-	return nodeAffinityLabels, nil
+	return nodeAffinityLabels
 }
 
 // Create a statefulset object for the Datacenter.

@@ -307,7 +307,7 @@ func (rc *ReconciliationContext) validateCassandraUserSecrets() []error {
 
 		secret, err := rc.retrieveSecret(secretKey)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("Validation of user secret failed due to an error: %w", err))
+			errs = append(errs, fmt.Errorf("validation of user secret failed due to an error: %w", err))
 			continue
 		}
 

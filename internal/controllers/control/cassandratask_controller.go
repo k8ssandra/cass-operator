@@ -253,7 +253,6 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	var res ctrl.Result
-	// completedCount := int32(0)
 
 	// We only support a single job at this stage
 	if len(cassTask.Spec.Jobs) > 1 {
@@ -262,126 +261,13 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	taskId := string(cassTask.UID)
 
-	var err error
-	var errMsg string
-	var failed, completed int
-JobDefinition:
-	for _, job := range cassTask.Spec.Jobs {
-		taskConfig := &TaskConfiguration{
-			RestartPolicy: cassTask.Spec.RestartPolicy,
-			Id:            taskId,
-			Datacenter:    dc,
-			TaskStartTime: cassTask.Status.StartTime,
-			Context:       ctx,
-			Arguments:     job.Arguments,
-		}
+	// var err error
+	// var errMsg string
+	// var failed, completed int
 
-		// Process all the reconcileEveryPodTasks
-		switch job.Command {
-		case api.CommandRebuild:
-			rebuild(taskConfig)
-		case api.CommandCleanup:
-			cleanup(taskConfig)
-		case api.CommandRestart:
-			// This job is targeting StatefulSets and not Pods
-			sts, err := r.getDatacenterStatefulSets(ctx, dc)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-
-			res, err = r.restartSts(taskConfig, sts)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			completed = taskConfig.Completed
-			break JobDefinition
-		case api.CommandReplaceNode:
-			r.replace(taskConfig)
-		case api.CommandUpgradeSSTables:
-			upgradesstables(taskConfig)
-		case api.CommandScrub:
-			scrub(taskConfig)
-		case api.CommandCompaction:
-			compact(taskConfig)
-		case api.CommandMove:
-			r.move(taskConfig)
-		case api.CommandFlush:
-			flush(taskConfig)
-		case api.CommandGarbageCollect:
-			gc(taskConfig)
-		case api.CommandRefresh:
-			// This targets the Datacenter only
-			res, err = r.refreshDatacenter(ctx, dc, &cassTask)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			completed = taskConfig.Completed
-			break JobDefinition
-		case api.CommandTSReload:
-			inodeTsReload(taskConfig)
-		default:
-			err = fmt.Errorf("unknown job command: %s", job.Command)
-			return ctrl.Result{}, err
-		}
-
-		if !r.HasCondition(&cassTask, api.JobRunning, metav1.ConditionTrue) {
-			valid, errValidate := taskConfig.Validate()
-			if errValidate != nil && valid {
-				// Retry, this is a transient error
-				return ctrl.Result{}, errValidate
-			}
-
-			if !valid {
-				failed++
-				err = reconcile.TerminalError(errValidate)
-				res = ctrl.Result{}
-				break
-			}
-
-			if err := taskConfig.PreProcess(); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-
-		if modified := SetCondition(&cassTask, api.JobRunning, metav1.ConditionTrue, ""); modified {
-			if err = r.Status().Update(ctx, &cassTask); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-
-		if job.Command == api.CommandReplaceNode {
-			// Special handling for replace process since it targets a single pod
-			if err := r.replacePreProcess(taskConfig); err != nil {
-				return ctrl.Result{}, err
-			}
-			nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc, nil)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-
-			pod := &corev1.Pod{}
-			if err := r.Get(taskConfig.Context, types.NamespacedName{Name: taskConfig.Arguments.PodName, Namespace: dc.Namespace}, pod); err != nil {
-				return ctrl.Result{}, err
-			}
-			if err := r.replacePod(nodeMgmtClient, pod, taskConfig); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			completed++
-			res = ctrl.Result{}
-			break
-		}
-
-		res, failed, completed, errMsg, err = r.reconcileEveryPodTask(ctx, dc, taskConfig)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		if res.RequeueAfter > 0 {
-			// This job isn't complete yet or there's an error, do not continue
-			logger.V(1).Info("This job isn't complete yet or there's an error, requeueing", "requeueAfter", res.RequeueAfter)
-			break
-		}
+	res, failed, completed, errMsg, err := r.processJobs(ctx, dc, &cassTask, taskId)
+	if err != nil && !errors.Is(err, reconcile.TerminalError(nil)) {
+		return ctrl.Result{}, err
 	}
 
 	if res.RequeueAfter == 0 && !res.Requeue {
@@ -640,103 +526,112 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 	errMsg := ""
 
 	for idx, pod := range dcPods {
-		// TODO Do we need post-pod processing functionality also? In case we need to wait for some other event to happen (processed by cass-operator).
-		//		or could we requeue with the filter instead of only bypassing? Or could we requeue in the Async / SyncFunc?
-		//		Waiting for a long time in the sync func doesn't sound very nice strategy and our async process is tied to JobDetails at this point.
-		//		Alternatively, we could modify "Success" to be a function that's then waited for.
-		if !taskConfig.Filter(&pod) {
-			continue
-		}
 		features, err := nodeMgmtClient.FeatureSet(&pod)
 		if err != nil {
 			return ctrl.Result{}, failed, completed, errMsg, err
 		}
 
-		if pod.Annotations == nil {
-			pod.Annotations = make(map[string]string)
-		}
-
-		jobStatus, err := GetJobStatusFromPodAnnotations(taskConfig.Id, pod.Annotations)
+		res, f, c, em, err := r.processPod(ctx, pod, idx, taskConfig, nodeMgmtClient, features, failed, completed, errMsg)
 		if err != nil {
 			return ctrl.Result{}, failed, completed, errMsg, err
 		}
 
-		if jobStatus.Id != "" {
-			// Check the completed statuses
-			if jobStatus.Status == podJobCompleted {
-				completed++
-				continue
-			} else if jobStatus.Status == podJobError {
-				failed++
-				continue
+		failed = f
+		completed = c
+		errMsg = em
+
+		if res.RequeueAfter > 0 {
+			// This job isn't complete yet or there's an error, do not continue
+			logger.V(1).Info("This job isn't complete yet or there's an error, requeueing", "requeueAfter", res.RequeueAfter)
+			return res, failed, completed, errMsg, nil
+		}
+	}
+
+	return ctrl.Result{}, failed, completed, errMsg, nil
+}
+
+// processPod handles the processing of a single pod within the reconcileEveryPodTask function
+func (r *CassandraTaskReconciler) processPod(
+	ctx context.Context,
+	pod corev1.Pod,
+	idx int,
+	taskConfig *TaskConfiguration,
+	nodeMgmtClient httphelper.NodeMgmtClient,
+	features *httphelper.FeatureSet,
+	failed int,
+	completed int,
+	errMsg string,
+) (ctrl.Result, int, int, string, error) {
+	logger := log.FromContext(ctx)
+
+	if !taskConfig.Filter(&pod) {
+		return ctrl.Result{}, failed, completed, errMsg, nil
+	}
+
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+
+	jobStatus, err := GetJobStatusFromPodAnnotations(taskConfig.Id, pod.Annotations)
+	if err != nil {
+		return ctrl.Result{}, failed, completed, errMsg, err
+	}
+
+	if jobStatus.Id != "" {
+		// Check the completed statuses
+		if jobStatus.Status == podJobCompleted {
+			completed++
+			return ctrl.Result{}, failed, completed, errMsg, nil
+		} else if jobStatus.Status == podJobError {
+			failed++
+			return ctrl.Result{}, failed, completed, errMsg, nil
+		}
+
+		// Only if we have "Running" status should we check the jobDetails
+		if features.Supports(taskConfig.AsyncFeature) {
+			// Pod is currently processing something, or has finished processing.. update the status
+			details, err := nodeMgmtClient.JobDetails(&pod, jobStatus.Id)
+			if err != nil {
+				logger.Error(err, "Could not get JobDetails for pod", "Pod", pod)
+				return ctrl.Result{}, failed, completed, errMsg, err
 			}
 
-			// Only if we have "Running" status should we check the jobDetails
-			if features.Supports(taskConfig.AsyncFeature) {
-				// Pod is currently processing something, or has finished processing.. update the status
-				details, err := nodeMgmtClient.JobDetails(&pod, jobStatus.Id)
+			if details.Id == "" {
+				// This job was not found, pod most likely restarted. Let's retry..
+				delete(pod.Annotations, getJobAnnotationKey(taskConfig.Id))
+				err = r.Update(ctx, &pod)
 				if err != nil {
-					logger.Error(err, "Could not get JobDetails for pod", "Pod", pod)
+					return ctrl.Result{}, failed, completed, errMsg, err
+				}
+				return ctrl.Result{RequeueAfter: 1 * time.Second}, failed, completed, errMsg, nil
+			} else if details.Status == podJobError {
+				// Log the error, move on
+				errMsg = details.Error
+				err = fmt.Errorf("task failed: %s", errMsg)
+				logger.Error(err, "Job failed to successfully complete the task", "Pod", pod)
+				if taskConfig.RestartPolicy != corev1.RestartPolicyOnFailure || jobStatus.Retries >= 1 {
+					jobStatus.Status = podJobError
+				} else {
+					logger.V(1).Info("Restarting the pod due to the RestartPolicy", "Pod", pod)
+					jobStatus.Retries++
+					jobStatus.Status = podJobWaiting
+					jobStatus.Id = "" // Remove id, so next requeue restarts it
+				}
+
+				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
 					return ctrl.Result{}, failed, completed, errMsg, err
 				}
 
-				if details.Id == "" {
-					// This job was not found, pod most likely restarted. Let's retry..
-					delete(pod.Annotations, getJobAnnotationKey(taskConfig.Id))
-					err = r.Update(ctx, &pod)
-					if err != nil {
-						return ctrl.Result{}, failed, completed, errMsg, err
-					}
-					return ctrl.Result{RequeueAfter: 1 * time.Second}, failed, completed, errMsg, nil
-				} else if details.Status == podJobError {
-					// Log the error, move on
-					errMsg = details.Error
-					err = fmt.Errorf("task failed: %s", errMsg)
-					logger.Error(err, "Job failed to successfully complete the task", "Pod", pod)
-					if taskConfig.RestartPolicy != corev1.RestartPolicyOnFailure || jobStatus.Retries >= 1 {
-						jobStatus.Status = podJobError
-					} else {
-						logger.V(1).Info("Restarting the pod due to the RestartPolicy", "Pod", pod)
-						jobStatus.Retries++
-						jobStatus.Status = podJobWaiting
-						jobStatus.Id = "" // Remove id, so next requeue restarts it
-					}
-
-					if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-						return ctrl.Result{}, failed, completed, errMsg, err
-					}
-
-					if err = r.Update(ctx, &pod); err != nil {
-						return ctrl.Result{}, failed, completed, errMsg, err
-					}
-
-					if jobStatus.Status == podJobError {
-						failed++
-						continue
-					}
-				} else if details.Status == podJobCompleted {
-					// Pod has finished, remove the job_id and let us move to the next pod
-					jobStatus.Status = podJobCompleted
-					if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-						return ctrl.Result{}, failed, completed, errMsg, err
-					}
-
-					if err = r.Update(ctx, &pod); err != nil {
-						return ctrl.Result{}, failed, completed, errMsg, err
-					}
-					completed++
-					continue
-				} else if details.Status == podJobWaiting {
-					// Job is still running or waiting
-					return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
-				}
-			} else {
-				if len(jobRunner) > 0 {
-					// Something is still holding the worker
-					return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
+				if err = r.Update(ctx, &pod); err != nil {
+					return ctrl.Result{}, failed, completed, errMsg, err
 				}
 
-				// Nothing is holding the job, this pod has finished
+				if jobStatus.Status == podJobError {
+					failed++
+					return ctrl.Result{}, failed, completed, errMsg, nil
+				}
+			} else if details.Status == podJobCompleted {
+				// Pod has finished, remove the job_id and let us move to the next pod
 				jobStatus.Status = podJobCompleted
 				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
 					return ctrl.Result{}, failed, completed, errMsg, err
@@ -746,27 +641,10 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 					return ctrl.Result{}, failed, completed, errMsg, err
 				}
 				completed++
-				continue
-			}
-		}
-
-		if features.Supports(taskConfig.AsyncFeature) {
-			// Pod isn't running anything at the moment, this pod should run next
-			jobId, err := taskConfig.AsyncFunc(nodeMgmtClient, &pod, taskConfig)
-			if err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
-			}
-			jobStatus.Handler = jobHandlerMgmtApi
-			jobStatus.Id = jobId
-
-			if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
-			}
-
-			err = r.Update(ctx, &pod)
-			if err != nil {
-				logger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
-				return ctrl.Result{}, failed, completed, errMsg, err
+				return ctrl.Result{}, failed, completed, errMsg, nil
+			} else if details.Status == podJobWaiting {
+				// Job is still running or waiting
+				return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
 			}
 		} else {
 			if len(jobRunner) > 0 {
@@ -774,88 +652,252 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 				return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
 			}
 
-			if taskConfig.SyncFunc == nil {
-				// This feature is not supported in sync mode, mark everything as done
-				err := fmt.Errorf("this job isn't supported by the target pod")
-				logger.Error(err, "unable to execute requested job against pod", "Pod", pod)
-				failed++
-				return ctrl.Result{}, failed, completed, errMsg, err
-			}
-
-			if taskConfig.SyncFeature != "" {
-				if !features.Supports(taskConfig.SyncFeature) {
-					logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
-					jobStatus.Status = podJobError
-					failed++
-					errMsg = fmt.Sprintf("Pod %s doesn't support %s feature", pod.Name, taskConfig.SyncFeature)
-					return ctrl.Result{}, failed, completed, errMsg, err
-				}
-			}
-
-			jobId := strconv.Itoa(idx)
-
-			// This pod should run next, mark it
-			jobStatus.Handler = oplabels.ManagedByLabelValue
-			jobStatus.Id = jobId
-
+			// Nothing is holding the job, this pod has finished
+			jobStatus.Status = podJobCompleted
 			if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
 				return ctrl.Result{}, failed, completed, errMsg, err
 			}
 
-			err = r.Update(ctx, &pod)
+			if err = r.Update(ctx, &pod); err != nil {
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+			completed++
+			return ctrl.Result{}, failed, completed, errMsg, nil
+		}
+	}
+
+	if features.Supports(taskConfig.AsyncFeature) {
+		// Pod isn't running anything at the moment, this pod should run next
+		jobId, err := taskConfig.AsyncFunc(nodeMgmtClient, &pod, taskConfig)
+		if err != nil {
+			return ctrl.Result{}, failed, completed, errMsg, err
+		}
+		jobStatus.Handler = jobHandlerMgmtApi
+		jobStatus.Id = jobId
+
+		if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
+			return ctrl.Result{}, failed, completed, errMsg, err
+		}
+
+		err = r.Update(ctx, &pod)
+		if err != nil {
+			logger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
+			return ctrl.Result{}, failed, completed, errMsg, err
+		}
+	} else {
+		if len(jobRunner) > 0 {
+			// Something is still holding the worker
+			return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
+		}
+
+		if taskConfig.SyncFunc == nil {
+			// This feature is not supported in sync mode, mark everything as done
+			err := fmt.Errorf("this job isn't supported by the target pod")
+			logger.Error(err, "unable to execute requested job against pod", "Pod", pod)
+			failed++
+			return ctrl.Result{}, failed, completed, errMsg, err
+		}
+
+		if taskConfig.SyncFeature != "" {
+			if !features.Supports(taskConfig.SyncFeature) {
+				logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
+				jobStatus.Status = podJobError
+				failed++
+				errMsg = fmt.Sprintf("Pod %s doesn't support %s feature", pod.Name, taskConfig.SyncFeature)
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+		}
+
+		jobId := strconv.Itoa(idx)
+
+		// This pod should run next, mark it
+		jobStatus.Handler = oplabels.ManagedByLabelValue
+		jobStatus.Id = jobId
+
+		if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
+			return ctrl.Result{}, failed, completed, errMsg, err
+		}
+
+		err = r.Update(ctx, &pod)
+		if err != nil {
+			logger.Error(err, "Failed to patch pod's status to indicate its running a local job", "Pod", pod)
+			return ctrl.Result{}, failed, completed, errMsg, err
+		}
+
+		pod := pod
+
+		go func() {
+			// Write value to the jobRunner to indicate we're running
+			podKey := types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}
+			logger.V(1).Info("starting execution of sync blocking job", "Pod", pod)
+			jobRunner <- idx
+			defer func() {
+				// Remove the value from the jobRunner
+				<-jobRunner
+			}()
+
+			if err = taskConfig.SyncFunc(nodeMgmtClient, &pod, taskConfig); err != nil {
+				// We only log, nothing else to do - we won't even retry this pod
+				logger.Error(err, "executing the sync task failed", "Pod", pod)
+				jobStatus.Status = podJobError
+			} else {
+				jobStatus.Status = podJobCompleted
+			}
+
+			if err := r.Get(context.Background(), podKey, &pod); err != nil {
+				logger.Error(err, "Failed to get pod for annotation update", "Pod", pod)
+			}
+
+			podPatch := client.MergeFrom(pod.DeepCopy())
+
+			if pod.Annotations == nil {
+				pod.Annotations = make(map[string]string)
+			}
+			if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
+				logger.Error(err, "Failed to update local job's status", "Pod", pod)
+			}
+
+			if err = r.Patch(ctx, &pod, podPatch); err != nil {
+				logger.Error(err, "Failed to update local job's status", "Pod", pod)
+			}
+		}()
+	}
+
+	// We have a job going on, return back later to check the status
+	return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
+}
+
+func (r *CassandraTaskReconciler) processJobs(ctx context.Context, dc *cassapi.CassandraDatacenter, cassTask *api.CassandraTask, taskId string) (ctrl.Result, int, int, string, error) {
+	var res ctrl.Result
+	var err error
+	var errMsg string
+	var failed, completed int
+	logger := log.FromContext(ctx)
+
+JobDefinition:
+	for _, job := range cassTask.Spec.Jobs {
+		taskConfig := &TaskConfiguration{
+			RestartPolicy: cassTask.Spec.RestartPolicy,
+			Id:            taskId,
+			Datacenter:    dc,
+			TaskStartTime: cassTask.Status.StartTime,
+			Context:       ctx,
+			Arguments:     job.Arguments,
+		}
+
+		// Process all the reconcileEveryPodTasks
+		switch job.Command {
+		case api.CommandRebuild:
+			rebuild(taskConfig)
+		case api.CommandCleanup:
+			cleanup(taskConfig)
+		case api.CommandRestart:
+			// This job is targeting StatefulSets and not Pods
+			sts, err := r.getDatacenterStatefulSets(ctx, dc)
 			if err != nil {
-				logger.Error(err, "Failed to patch pod's status to indicate its running a local job", "Pod", pod)
 				return ctrl.Result{}, failed, completed, errMsg, err
 			}
 
-			pod := pod
-
-			go func() {
-				// go func(targetPod *corev1.Pod) {
-				// Write value to the jobRunner to indicate we're running
-				podKey := types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}
-				logger.V(1).Info("starting execution of sync blocking job", "Pod", pod)
-				jobRunner <- idx
-				defer func() {
-					// Remove the value from the jobRunner
-					<-jobRunner
-				}()
-
-				if err = taskConfig.SyncFunc(nodeMgmtClient, &pod, taskConfig); err != nil {
-					// We only log, nothing else to do - we won't even retry this pod
-					logger.Error(err, "executing the sync task failed", "Pod", pod)
-					jobStatus.Status = podJobError
-				} else {
-					jobStatus.Status = podJobCompleted
-				}
-
-				if err := r.Get(context.Background(), podKey, &pod); err != nil {
-					logger.Error(err, "Failed to get pod for annotation update", "Pod", pod)
-				}
-
-				podPatch := client.MergeFrom(pod.DeepCopy())
-
-				if pod.Annotations == nil {
-					pod.Annotations = make(map[string]string)
-				}
-				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-					logger.Error(err, "Failed to update local job's status", "Pod", pod)
-				}
-
-				if err = r.Patch(ctx, &pod, podPatch); err != nil {
-					logger.Error(err, "Failed to update local job's status", "Pod", pod)
-				}
-			}()
+			var restartRes ctrl.Result
+			restartRes, err = r.restartSts(taskConfig, sts)
+			if err != nil {
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+			res = restartRes
+			completed = taskConfig.Completed
+			break JobDefinition
+		case api.CommandReplaceNode:
+			r.replace(taskConfig)
+		case api.CommandUpgradeSSTables:
+			upgradesstables(taskConfig)
+		case api.CommandScrub:
+			scrub(taskConfig)
+		case api.CommandCompaction:
+			compact(taskConfig)
+		case api.CommandMove:
+			r.move(taskConfig)
+		case api.CommandFlush:
+			flush(taskConfig)
+		case api.CommandGarbageCollect:
+			gc(taskConfig)
+		case api.CommandRefresh:
+			// This targets the Datacenter only
+			var refreshRes ctrl.Result
+			refreshRes, err = r.refreshDatacenter(ctx, dc, cassTask)
+			if err != nil {
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+			res = refreshRes
+			completed = taskConfig.Completed
+			break JobDefinition
+		case api.CommandTSReload:
+			inodeTsReload(taskConfig)
+		default:
+			err = fmt.Errorf("unknown job command: %s", job.Command)
+			return ctrl.Result{}, failed, completed, errMsg, err
 		}
 
-		// We have a job going on, return back later to check the status
-		return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
+		if !r.HasCondition(cassTask, api.JobRunning, metav1.ConditionTrue) {
+			valid, errValidate := taskConfig.Validate()
+			if errValidate != nil && valid {
+				// Retry, this is a transient error
+				return ctrl.Result{}, failed, completed, errMsg, errValidate
+			}
+
+			if !valid {
+				failed++
+				err = reconcile.TerminalError(errValidate)
+				res = ctrl.Result{}
+				break
+			}
+
+			if err := taskConfig.PreProcess(); err != nil {
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+		}
+
+		if modified := SetCondition(cassTask, api.JobRunning, metav1.ConditionTrue, ""); modified {
+			if err = r.Status().Update(ctx, cassTask); err != nil {
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+		}
+
+		if job.Command == api.CommandReplaceNode {
+			// Special handling for replace process since it targets a single pod
+			if err := r.replacePreProcess(taskConfig); err != nil {
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+			nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc, nil)
+			if err != nil {
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+
+			pod := &corev1.Pod{}
+			if err := r.Get(taskConfig.Context, types.NamespacedName{Name: taskConfig.Arguments.PodName, Namespace: dc.Namespace}, pod); err != nil {
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+			if err := r.replacePod(nodeMgmtClient, pod, taskConfig); err != nil {
+				return ctrl.Result{}, failed, completed, errMsg, err
+			}
+
+			completed++
+			res = ctrl.Result{}
+			break
+		}
+
+		var podTaskRes ctrl.Result
+		podTaskRes, failed, completed, errMsg, err = r.reconcileEveryPodTask(ctx, dc, taskConfig)
+		if err != nil {
+			return podTaskRes, failed, completed, errMsg, err
+		}
+		res = podTaskRes
+
+		if res.RequeueAfter > 0 {
+			// This job isn't complete yet or there's an error, do not continue
+			logger.V(1).Info("This job isn't complete yet or there's an error, requeueing", "requeueAfter", res.RequeueAfter)
+			break
+		}
 	}
 
-	if len(jobRunner) > 0 {
-		// Something is still holding the worker while none of the existing pods are, probably the replace job.
-		return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
-	}
-
-	return ctrl.Result{}, failed, completed, errMsg, nil
+	return res, failed, completed, errMsg, err
 }

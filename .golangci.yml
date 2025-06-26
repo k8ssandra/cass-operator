@@ -34,6 +34,8 @@ linters:
       disable:
         - fieldalignment
       enable-all: true
+    gocyclo:
+      min-complexity: 40
     nolintlint:
       allow-unused: false
     revive:
@@ -87,6 +89,8 @@ linters:
       - linters:
           - unparam
         path: pkg/reconciliation/testing.go
+      - path: tests/util/ginkgo/lib.go
+        text: "ST1001: should not use dot imports"
     paths:
       - third_party$
       - builtin$

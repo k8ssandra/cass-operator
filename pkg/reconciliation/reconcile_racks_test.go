@@ -775,7 +775,7 @@ func TestReconcileRacks_GetStatefulsetError(t *testing.T) {
 
 	t.Skip("FIXME - Skipping assertion")
 
-	assert.Equal(t, reconcile.Result{Requeue: true}, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 }
 
 func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
@@ -816,7 +816,7 @@ func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.True(t, result.Requeue, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 }
 
 func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
@@ -852,7 +852,7 @@ func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.Equal(t, reconcile.Result{Requeue: true}, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 }
 
 func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
@@ -893,7 +893,7 @@ func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.True(t, result.Requeue, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 }
 
 func TestReconcileRacks_NeedToPark(t *testing.T) {
@@ -930,7 +930,7 @@ func TestReconcileRacks_NeedToPark(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Apply() should not have returned an error")
-	assert.False(t, result.Requeue, "Should not requeue request")
+	assert.False(t, result.RequeueAfter > 0, "Should not requeue request")
 
 	currentStatefulSet := &appsv1.StatefulSet{}
 	nsName := types.NamespacedName{Name: preExistingStatefulSet.Name, Namespace: preExistingStatefulSet.Namespace}
@@ -1057,7 +1057,7 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.Equal(t, reconcile.Result{Requeue: true}, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 
 	currentStatefulSet := &appsv1.StatefulSet{}
 	nsName := types.NamespacedName{Name: secondDesiredStatefulSet.Name, Namespace: secondDesiredStatefulSet.Namespace}
@@ -1162,7 +1162,7 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.Equal(t, reconcile.Result{Requeue: false}, result, "Should not requeue request")
+	assert.Equal(t, reconcile.Result{}, result, "Should not requeue request")
 
 	currentStatefulSet := &appsv1.StatefulSet{}
 	nsName := types.NamespacedName{Name: desiredStatefulSet.Name, Namespace: desiredStatefulSet.Namespace}
@@ -1185,7 +1185,7 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 
 	result, err = rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.Equal(t, reconcile.Result{Requeue: true}, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 
 	currentStatefulSet = &appsv1.StatefulSet{}
 	nsName = types.NamespacedName{Name: desiredStatefulSet.Name, Namespace: desiredStatefulSet.Namespace}

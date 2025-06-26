@@ -46,7 +46,7 @@ func (c callBackSoon) Completed() bool {
 
 func (c callBackSoon) Output() (ctrl.Result, error) {
 	t := DurationFunc(c.secs)
-	return ctrl.Result{Requeue: true, RequeueAfter: t}, nil
+	return ctrl.Result{RequeueAfter: t}, nil
 }
 
 type errorOut struct {

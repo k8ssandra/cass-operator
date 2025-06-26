@@ -61,7 +61,7 @@ func TestRequeueSoon(t *testing.T) {
 
 		assert.NoError(t, err, "RequeueSoon() should not have an error")
 
-		assert.Equal(t, reconcile.Result{Requeue: true, RequeueAfter: time.Second * 10}, res,
+		assert.Equal(t, reconcile.Result{RequeueAfter: time.Second * 10}, res,
 			"RequeueSoon() should return a reconcile.Result{} with Requeue=true and 10 seconds")
 	})
 }

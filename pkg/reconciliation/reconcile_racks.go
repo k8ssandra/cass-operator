@@ -37,9 +37,8 @@ import (
 )
 
 var (
-	ResultShouldNotRequeue  reconcile.Result = reconcile.Result{Requeue: false}
-	ResultShouldRequeueNow  reconcile.Result = reconcile.Result{Requeue: true}
-	ResultShouldRequeueSoon reconcile.Result = reconcile.Result{Requeue: true, RequeueAfter: 2 * time.Second}
+	ResultShouldNotRequeue  reconcile.Result = reconcile.Result{}
+	ResultShouldRequeueSoon reconcile.Result = reconcile.Result{RequeueAfter: 2 * time.Second}
 
 	QuietDurationFunc func(int) time.Duration = func(secs int) time.Duration { return time.Duration(secs) * time.Second }
 )
@@ -2143,8 +2142,8 @@ func (rc *ReconciliationContext) hasAdditionalSeeds() bool {
 	}
 	additionalSeedEndpoints := 0
 	if additionalSeedEndpoint, err := rc.GetAdditionalSeedEndpoint(); err == nil {
-		if len(additionalSeedEndpoint.Subsets) > 0 {
-			additionalSeedEndpoints = len(additionalSeedEndpoint.Subsets[0].Addresses)
+		for _, ep := range additionalSeedEndpoint.Endpoints {
+			additionalSeedEndpoints += len(ep.Addresses)
 		}
 	}
 	return additionalSeedEndpoints > 0

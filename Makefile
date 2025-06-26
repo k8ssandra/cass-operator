@@ -128,7 +128,7 @@ vet: ## Run go vet against code.
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint against code.
-	$(GOLANGCI_LINT) run ./...
+	$(GOLANGCI_LINT) run --max-issues-per-linter 0 --max-same-issues 0 ./...
 
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes

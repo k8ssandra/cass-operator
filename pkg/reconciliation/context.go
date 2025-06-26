@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -40,7 +41,7 @@ type ReconciliationContext struct {
 	Ctx context.Context
 
 	Services               []*corev1.Service
-	Endpoints              *corev1.Endpoints
+	Endpoints              *discoveryv1.EndpointSlice
 	desiredRackInformation []*RackInformation
 	statefulSets           []*appsv1.StatefulSet
 	dcPods                 []*corev1.Pod

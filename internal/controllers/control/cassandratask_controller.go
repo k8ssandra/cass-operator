@@ -166,7 +166,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	if cassTask.Status.CompletionTime == nil && status == completedTaskLabelValue {
 		// This is out of sync
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{RequeueAfter: 200 * time.Millisecond}, nil
 	}
 
 	// Check if job is finished, and if and only if, check the TTL from last finished time.
@@ -261,16 +261,12 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	taskId := string(cassTask.UID)
 
-	// var err error
-	// var errMsg string
-	// var failed, completed int
-
 	res, failed, completed, errMsg, err := r.processJobs(ctx, dc, &cassTask, taskId)
 	if err != nil && !errors.Is(err, reconcile.TerminalError(nil)) {
 		return ctrl.Result{}, err
 	}
 
-	if res.RequeueAfter == 0 && !res.Requeue {
+	if res.RequeueAfter == 0 {
 		// Job has been completed
 		cassTask.GetLabels()[taskStatusLabel] = completedTaskLabelValue
 		if errUpdate := r.Update(ctx, &cassTask); errUpdate != nil {

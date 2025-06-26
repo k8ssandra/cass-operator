@@ -13,6 +13,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -159,46 +160,39 @@ func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter)
 	return &service
 }
 
-func newEndpointsForAdditionalSeeds(dc *api.CassandraDatacenter) (*corev1.Endpoints, error) {
+func newEndpointsForAdditionalSeeds(dc *api.CassandraDatacenter) (*discoveryv1.EndpointSlice, error) {
 	labels := dc.GetDatacenterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
-	endpoints := corev1.Endpoints{}
-	endpoints.Name = dc.GetAdditionalSeedsServiceName()
-	endpoints.Namespace = dc.Namespace
-	endpoints.Labels = labels
+	endpointSlices := discoveryv1.EndpointSlice{}
+	endpointSlices.Name = dc.GetAdditionalSeedsServiceName()
+	endpointSlices.Namespace = dc.Namespace
+	endpointSlices.Labels = labels
 	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
-	endpoints.Annotations = anns
+	endpointSlices.Annotations = anns
 
-	addresses := make([]corev1.EndpointAddress, 0, len(dc.Spec.AdditionalSeeds))
+	addresses := make([]string, 0, len(dc.Spec.AdditionalSeeds))
 	for _, additionalSeed := range dc.Spec.AdditionalSeeds {
 		if ip := net.ParseIP(additionalSeed); ip != nil {
-			addresses = append(addresses, corev1.EndpointAddress{
-				IP: additionalSeed,
-			})
+			addresses = append(addresses, additionalSeed)
 		} else {
 			additionalSeedIPs, err := resolveAddress(additionalSeed)
 			if err != nil {
 				return nil, err
 			}
-			for _, address := range additionalSeedIPs {
-				addresses = append(addresses, corev1.EndpointAddress{
-					IP: address,
-				})
-			}
+			addresses = append(addresses, additionalSeedIPs...)
 		}
 	}
 
-	// See: https://godoc.org/k8s.io/api/core/v1#Endpoints
-	endpoints.Subsets = []corev1.EndpointSubset{
+	endpointSlices.Endpoints = []discoveryv1.Endpoint{
 		{
 			Addresses: addresses,
 		},
 	}
 
-	utils.AddHashAnnotation(&endpoints)
+	utils.AddHashAnnotation(&endpointSlices)
 
-	return &endpoints, nil
+	return &endpointSlices, nil
 }
 
 func resolveAddress(hostname string) ([]string, error) {

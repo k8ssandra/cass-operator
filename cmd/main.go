@@ -28,6 +28,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	"go.uber.org/zap/zapcore"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -187,7 +189,10 @@ func main() {
 
 	operConfig := &configv1beta1.OperatorConfig{}
 	options := ctrl.Options{
-		Scheme:                 scheme,
+		Scheme: scheme,
+		Controller: config.Controller{
+			UsePriorityQueue: ptr.To[bool](true),
+		},
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
@@ -207,8 +212,7 @@ func main() {
 		operConfig.ImageConfigFile = "/configs/image_config.yaml"
 	}
 
-	err = images.ParseImageConfig(operConfig.ImageConfigFile)
-	if err != nil {
+	if err := images.ParseImageConfig(operConfig.ImageConfigFile); err != nil {
 		setupLog.Error(err, "unable to load the image config file")
 		os.Exit(1)
 	}

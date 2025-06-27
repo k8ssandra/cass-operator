@@ -26,15 +26,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           # GHA requires longer timeout
           args: --timeout=10m
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           only-new-issues: ${{ github.event_name == 'pull_request' }}
-          skip-pkg-cache: true
-          skip-build-cache: true
+          skip-cache: true
       - name: Verify manifests and dirty state
         run: |
           make manifests generate

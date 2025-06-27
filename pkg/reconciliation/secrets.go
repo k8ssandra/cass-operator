@@ -36,7 +36,7 @@ func generateUtf8Password() (string, error) {
 	buf := make([]byte, 40)
 	_, err := rand.Read(buf)
 	if err != nil {
-		return "", fmt.Errorf("Failed to generate password: %w", err)
+		return "", fmt.Errorf("failed to generate password: %w", err)
 	}
 
 	// Now that we have some random bytes, we need to turn it into valid
@@ -72,7 +72,7 @@ func buildDefaultSuperuserSecret(dc *api.CassandraDatacenter) (*corev1.Secret, e
 		username := api.CleanupForKubernetes(dc.Spec.ClusterName) + "-superuser"
 		password, err := generateUtf8Password()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to generate superuser password: %w", err)
+			return nil, fmt.Errorf("failed to generate superuser password: %w", err)
 		}
 
 		secret.Data = map[string][]byte{
@@ -100,7 +100,6 @@ func (rc *ReconciliationContext) retrieveSecret(secretNamespacedName types.Names
 		rc.Ctx,
 		secretNamespacedName,
 		secret)
-
 	if err != nil {
 		return nil, err
 	}
@@ -114,16 +113,16 @@ func (rc *ReconciliationContext) retrieveSuperuserSecret() (*corev1.Secret, erro
 	return rc.retrieveSecret(secretNamespacedName)
 }
 
-func (rc *ReconciliationContext) retrieveSuperuserSecretOrCreateDefault() (*corev1.Secret, error) {
+func (rc *ReconciliationContext) retrieveSuperuserSecretOrCreateDefault() error {
 	dc := rc.Datacenter
 
-	secret, retrieveErr := rc.retrieveSuperuserSecret()
+	_, retrieveErr := rc.retrieveSuperuserSecret()
 	if retrieveErr != nil {
 		if errors.IsNotFound(retrieveErr) {
 			secret, err := buildDefaultSuperuserSecret(dc)
 
 			if err == nil && secret == nil {
-				return nil, retrieveErr
+				return retrieveErr
 			}
 
 			if err == nil {
@@ -131,14 +130,14 @@ func (rc *ReconciliationContext) retrieveSuperuserSecretOrCreateDefault() (*core
 			}
 
 			if err != nil {
-				return nil, fmt.Errorf("Failed to create default superuser secret: %w", err)
+				return fmt.Errorf("failed to create default superuser secret: %w", err)
 			}
 		} else {
-			return nil, retrieveErr
+			return retrieveErr
 		}
 	}
 
-	return secret, nil
+	return nil
 }
 
 func (rc *ReconciliationContext) createInternodeCACredential() (*corev1.Secret, error) {
@@ -217,7 +216,7 @@ func (rc *ReconciliationContext) retrieveInternodeCredentialSecretOrCreateDefaul
 			}
 
 			if err != nil {
-				return nil, fmt.Errorf("Failed to create internode CA credential: %w", err)
+				return nil, fmt.Errorf("failed to create internode CA credential: %w", err)
 			}
 		} else {
 			return nil, retrieveErr
@@ -237,7 +236,7 @@ func (rc *ReconciliationContext) retrieveInternodeCredentialSecretOrCreateDefaul
 			}
 
 			if err != nil {
-				return nil, fmt.Errorf("Failed to create default superuser secret: %w", err)
+				return nil, fmt.Errorf("failed to create default superuser secret: %w", err)
 			}
 		} else {
 			return nil, retrieveBootStrappingSecretErr
@@ -248,13 +247,13 @@ func (rc *ReconciliationContext) retrieveInternodeCredentialSecretOrCreateDefaul
 }
 
 // Helper function that is easier to test
-func validateCassandraUserSecretContent(dc *api.CassandraDatacenter, secret *corev1.Secret) []error {
+func validateCassandraUserSecretContent(secret *corev1.Secret) []error {
 	var errs []error
 
 	if secret != nil {
 		namespacedName := types.NamespacedName{
-			Name:      secret.ObjectMeta.Name,
-			Namespace: secret.ObjectMeta.Namespace,
+			Name:      secret.Name,
+			Namespace: secret.Namespace,
 		}
 		errorPrefix := fmt.Sprintf("Validation failed for user secret: %s", namespacedName.String())
 
@@ -267,7 +266,7 @@ func validateCassandraUserSecretContent(dc *api.CassandraDatacenter, secret *cor
 			}
 		}
 	} else {
-		errs = append(errs, fmt.Errorf("Validation failed due to a missing secret"))
+		errs = append(errs, fmt.Errorf("validation failed due to a missing secret"))
 	}
 
 	return errs
@@ -282,15 +281,15 @@ func (rc *ReconciliationContext) validateSuperuserSecret() []error {
 				return []error{}
 			} else {
 				return []error{
-					fmt.Errorf("Could not load superuser secret for CassandraCluster: %s",
+					fmt.Errorf("could not load superuser secret for CassandraCluster: %s",
 						dc.GetSuperuserSecretNamespacedName().String()),
 				}
 			}
 		} else {
-			return []error{fmt.Errorf("Validation of superuser secret failed due to an error: %w", err)}
+			return []error{fmt.Errorf("validation of superuser secret failed due to an error: %w", err)}
 		}
 	}
-	return validateCassandraUserSecretContent(rc.Datacenter, secret)
+	return validateCassandraUserSecretContent(secret)
 }
 
 func (rc *ReconciliationContext) validateCassandraUserSecrets() []error {
@@ -300,20 +299,19 @@ func (rc *ReconciliationContext) validateCassandraUserSecrets() []error {
 
 	for _, user := range users {
 		secretName := user.SecretName
-		namespace := dc.ObjectMeta.Namespace
+		namespace := dc.Namespace
 		secretKey := types.NamespacedName{
 			Name:      secretName,
 			Namespace: namespace,
 		}
 
 		secret, err := rc.retrieveSecret(secretKey)
-
 		if err != nil {
-			errs = append(errs, fmt.Errorf("Validation of user secret failed due to an error: %w", err))
+			errs = append(errs, fmt.Errorf("validation of user secret failed due to an error: %w", err))
 			continue
 		}
 
-		errs = append(errs, validateCassandraUserSecretContent(dc, secret)...)
+		errs = append(errs, validateCassandraUserSecretContent(secret)...)
 	}
 
 	return errs

@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -34,7 +33,7 @@ type DynamicWatches interface {
 }
 
 type DynamicWatchesAnnotationImpl struct {
-	Client          runtimeClient.Client
+	Client          client.Client
 	Ctx             context.Context
 	WatchedType     metav1.TypeMeta
 	WatchedListType metav1.TypeMeta
@@ -195,7 +194,7 @@ func (impl *DynamicWatchesAnnotationImpl) addWatcher(watched metav1.Object, watc
 func hasWatchedLabel(meta metav1.Object) bool {
 	labels := getLabelsOrEmptyMap(meta)
 	value, ok := labels[WatchedLabel]
-	return ok && "true" == value
+	return ok && value == "true"
 }
 
 //
@@ -218,7 +217,6 @@ func (impl *DynamicWatchesAnnotationImpl) listAllWatched(namespace string) ([]un
 		impl.Ctx,
 		watchedList,
 		listOptions)
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil
@@ -241,7 +239,6 @@ func (impl *DynamicWatchesAnnotationImpl) getWatched(watched types.NamespacedNam
 		impl.Ctx,
 		watched,
 		watchedItem)
-
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +274,7 @@ func (impl *DynamicWatchesAnnotationImpl) UpdateWatch(watcher types.NamespacedNa
 			watchedItem := &items[i]
 			patch := client.MergeFrom(watchedItem.DeepCopy())
 			namespacedNameAsString := namespacedNameString(watchedItem)
-			if -1 == utils.IndexOfString(watchedAsStrings, namespacedNameAsString) {
+			if utils.IndexOfString(watchedAsStrings, namespacedNameAsString) == -1 {
 				// This is not a resource that `watcher` is watching. Make sure
 				// `watcher` is not recorded as watching this resource in its
 				// annotation.
@@ -285,14 +282,12 @@ func (impl *DynamicWatchesAnnotationImpl) UpdateWatch(watcher types.NamespacedNa
 					itemsToUpdate = append(itemsToUpdate, toUpdate{watchedItem: watchedItem, patch: patch})
 				}
 			}
-
 		}
 	}
 
 	// Now we need to add `watcher` to the relevant resource
 	for _, name := range watched {
 		watchedItem, err := impl.getWatched(name)
-
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// we are attempting to watch a resource that does not exist...

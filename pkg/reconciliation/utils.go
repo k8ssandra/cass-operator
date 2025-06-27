@@ -35,7 +35,8 @@ func isResourceRequirementsNotSpecified(res *corev1.ResourceRequirements) bool {
 
 // Returns the default resources in case the given resources are not configured.
 func getResourcesOrDefault(res *corev1.ResourceRequirements,
-	defaultRes *corev1.ResourceRequirements) *corev1.ResourceRequirements {
+	defaultRes *corev1.ResourceRequirements,
+) *corev1.ResourceRequirements {
 	if !isResourceRequirementsNotSpecified(res) {
 		return defaultRes
 	}

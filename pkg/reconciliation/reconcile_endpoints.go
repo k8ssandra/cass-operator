@@ -6,7 +6,7 @@ package reconciliation
 import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/internal/result"
-	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -81,12 +81,9 @@ func (rc *ReconciliationContext) CheckAdditionalSeedEndpoints() result.Reconcile
 		return result.Error(err)
 	} else {
 		// desiredEndpoints always has just a single Subset at most - we can apply safely there all the addresses we still want to keep
-		for _, subset := range currentEndpoints.Subsets {
-			for _, addr := range subset.Addresses {
-				if addr.TargetRef != nil {
-					// Managed by something else, so we want to keep this
-					desiredEndpoints.Subsets[0].Addresses = append(desiredEndpoints.Subsets[0].Addresses, addr)
-				}
+		for _, endpoints := range currentEndpoints.Endpoints {
+			if endpoints.TargetRef != nil {
+				desiredEndpoints.Endpoints[0].Addresses = append(desiredEndpoints.Endpoints[0].Addresses, endpoints.Addresses...)
 			}
 		}
 
@@ -121,10 +118,10 @@ func (rc *ReconciliationContext) CheckAdditionalSeedEndpoints() result.Reconcile
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) GetAdditionalSeedEndpoint() (*corev1.Endpoints, error) {
+func (rc *ReconciliationContext) GetAdditionalSeedEndpoint() (*discoveryv1.EndpointSlice, error) {
 	dc := rc.Datacenter
 	nsName := types.NamespacedName{Name: dc.GetAdditionalSeedsServiceName(), Namespace: dc.Namespace}
-	currentEndpoints := &corev1.Endpoints{}
+	currentEndpoints := &discoveryv1.EndpointSlice{}
 	err := rc.Client.Get(rc.Ctx, nsName, currentEndpoints)
 	return currentEndpoints, err
 }

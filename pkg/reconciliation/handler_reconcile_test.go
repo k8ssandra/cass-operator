@@ -120,7 +120,7 @@ func TestReconcile(t *testing.T) {
 		t.Fatalf("Reconciliation Failure: (%v)", err)
 	}
 
-	if result != (reconcile.Result{Requeue: true, RequeueAfter: 10 * time.Second}) {
+	if result != (reconcile.Result{RequeueAfter: 10 * time.Second}) {
 		t.Errorf("Reconcile did not return a correct result. (%v)", result)
 	}
 }

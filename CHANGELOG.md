@@ -11,6 +11,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#803](https://github.com/k8ssandra/cass-operator/issues/803) Modify additional seeds to use discoveryv1.EndpointSlice instead of deprecated corev1.Endpoints and corev1.EndpointSubsets
+* [ENHANCEMENT] [#778](https://github.com/k8ssandra/cass-operator/issues/778) Migrate to golangici-lint 2.x series and use stricter rules.
+
 ## v1.25.0
 
 * [ENHANCEMENT] [#664](https://github.com/k8ssandra/cass-operator/issues/664) Allow skipping deletion of PVCs when the CassandraDatacenter is deleted. Set annotation cassandra.datastax.com/delete-pvc: "false" to prevent deletion, default is still to delete.

@@ -1,11 +1,12 @@
 package oplabels
 
 import (
-	. "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/stretchr/testify/require"
 	"regexp"
 	"strings"
 	"testing"
+
+	. "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/stretchr/testify/require"
 )
 
 /*
@@ -14,8 +15,7 @@ A valid label must be an empty string or consist of alphanumeric characters,
 '-', '_' or '.', and must start and end with an alphanumeric.
 */
 func TestLabelValueClean(t *testing.T) {
-
-	var cleaned = CleanLabelValue("TestCluster")
+	cleaned := CleanLabelValue("TestCluster")
 	require.EqualValues(t, "TestCluster", cleaned,
 		"expect label name to not be cleaned as no need")
 
@@ -53,13 +53,12 @@ func TestLabelValueClean(t *testing.T) {
 }
 
 func TestWhitelistRegex(t *testing.T) {
-
-	var whitelistRegex = regexp.MustCompile(`(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?`)
-	var unclean = "+!*(-_)cor @#$%^&rect _ LABEL.name-1=<>_?,."
-	var regexpResult = whitelistRegex.FindAllString(strings.Replace(unclean, " ", "", -1), -1)
+	whitelistRegex := regexp.MustCompile(`(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?`)
+	unclean := "+!*(-_)cor @#$%^&rect _ LABEL.name-1=<>_?,."
+	regexpResult := whitelistRegex.FindAllString(strings.ReplaceAll(unclean, " ", ""), -1)
 	require.EqualValues(t, "correct_LABEL.name-1", strings.Join(regexpResult, ""))
 
 	unclean = "+!*(-_)cor @#$   %^&re _c-t-.LABEL.name-1=<>_?,."
-	regexpResult = whitelistRegex.FindAllString(strings.Replace(unclean, " ", "", -1), -1)
+	regexpResult = whitelistRegex.FindAllString(strings.ReplaceAll(unclean, " ", ""), -1)
 	require.EqualValues(t, "corre_c-t-.LABEL.name-1", strings.Join(regexpResult, ""))
 }

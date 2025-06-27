@@ -75,7 +75,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
 
 			// Ensure that when 'ScaleUp' becomes 'false' that our pods are in fact up and running
-			Expect(len(ns.GetDatacenterReadyPodNames(dcName))).To(Equal(2))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(2))
 
 			ns.WaitForDatacenterReady(dcName)
 
@@ -114,7 +114,7 @@ var _ = Describe(testName, func() {
 			step = "check recorded host IDs"
 			ns.Log(step)
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
-			Expect(len(nodeStatusesHostIds), 5)
+			Expect(nodeStatusesHostIds).To(HaveLen(5))
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)

@@ -156,7 +156,7 @@ type CassandraDatacenterSpec struct {
 	// Config for the Management API certificates
 	ManagementApiAuth ManagementApiAuthConfig `json:"managementApiAuth,omitempty"`
 
-	//NodeAffinityLabels to pin the Datacenter, using node affinity
+	// NodeAffinityLabels to pin the Datacenter, using node affinity
 	NodeAffinityLabels map[string]string `json:"nodeAffinityLabels,omitempty"`
 
 	// Kubernetes resource requests and limits, per pod
@@ -520,8 +520,7 @@ type ManagementApiAuthManualConfig struct {
 	SkipSecretValidation bool `json:"skipSecretValidation,omitempty"`
 }
 
-type ManagementApiAuthInsecureConfig struct {
-}
+type ManagementApiAuthInsecureConfig struct{}
 
 type ManagementApiAuthConfig struct {
 	Insecure *ManagementApiAuthInsecureConfig `json:"insecure,omitempty"`
@@ -646,16 +645,18 @@ const (
 	dns1123LabelFmt     string = "(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?"
 )
 
-var dns1035LabelRegexp = regexp.MustCompile(dns1035LabelFmt)
-var dns1123SubdomainRegexp = regexp.MustCompile(dns1123SubdomainFmt)
-var dns1123LabelRegexp = regexp.MustCompile(dns1123LabelFmt)
+var (
+	dns1035LabelRegexp     = regexp.MustCompile(dns1035LabelFmt)
+	dns1123SubdomainRegexp = regexp.MustCompile(dns1123SubdomainFmt)
+	dns1123LabelRegexp     = regexp.MustCompile(dns1123LabelFmt)
+)
 
 // CleanLabelValue a valid label must be an empty string or consist of alphanumeric characters,
 // '-', '_' or '.', and must start and end with an alphanumeric.
 // Note: we apply a prefix of "cassandra-" to the cluster name value used as label name.
 // As such, empty string isn't a valid case.
 func CleanLabelValue(value string) string {
-	regexpResult := dns1123LabelRegexp.FindAllString(strings.Replace(value, " ", "", -1), -1)
+	regexpResult := dns1123LabelRegexp.FindAllString(strings.ReplaceAll(value, " ", ""), -1)
 	return strings.Join(regexpResult, "")
 }
 
@@ -714,7 +715,7 @@ func (dc *CassandraDatacenter) ShouldGenerateSuperuserSecret() bool {
 
 func (dc *CassandraDatacenter) GetSuperuserSecretNamespacedName() types.NamespacedName {
 	name := CleanupForKubernetes(dc.Spec.ClusterName) + "-superuser"
-	namespace := dc.ObjectMeta.Namespace
+	namespace := dc.Namespace
 	if len(dc.Spec.SuperuserSecretName) > 0 {
 		name = dc.Spec.SuperuserSecretName
 	}
@@ -769,7 +770,6 @@ func namedPort(name string, port int) corev1.ContainerPort {
 
 // GetContainerPorts will return the container ports for the pods in a statefulset based on the provided config
 func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, error) {
-
 	nativePort := DefaultNativePort
 	internodePort := DefaultInternodePort
 

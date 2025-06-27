@@ -233,7 +233,7 @@ func TestProcessDeletion_NoFinalizer(t *testing.T) {
 
 	result, err := rc.CalculateReconciliationActions()
 	assert.NoError(err)
-	assert.Equal(reconcile.Result{Requeue: false}, result, "Should not requeue request")
+	assert.Equal(reconcile.Result{}, result, "Should not requeue request")
 
 	mockClient.AssertExpectations(t)
 }

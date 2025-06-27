@@ -72,7 +72,7 @@ var _ = Describe(testName, func() {
 			step = "check recorded host IDs"
 			ns.Log(step)
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
-			Expect(len(nodeStatusesHostIds), 2)
+			Expect(nodeStatusesHostIds).To(HaveLen(2))
 
 			ns.WaitForDatacenterReady(dcName)
 			ns.WaitForDatacenterCondition(dcName, "Ready", string(corev1.ConditionTrue))
@@ -88,7 +88,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterConditionWithTimeout(dcName, "ScalingUp", string(corev1.ConditionFalse), 1200)
 			// Ensure that when 'ScaleUp' becomes 'false' that our pods are in fact up and running
-			Expect(len(ns.GetDatacenterReadyPodNames(api.CleanLabelValue(dcName)))).To(Equal(4))
+			Expect(ns.GetDatacenterReadyPodNames(api.CleanLabelValue(dcName))).To(HaveLen(4))
 
 			ns.ExpectDoneReconciling(dcName)
 			ns.WaitForDatacenterReady(dcName)

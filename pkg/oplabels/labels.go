@@ -48,7 +48,6 @@ func AddOperatorLabels(m map[string]string, dc *api.CassandraDatacenter) {
 			m[key] = api.CleanLabelValue(value)
 		}
 	}
-
 }
 
 func AddOperatorAnnotations(m map[string]string, dc *api.CassandraDatacenter) {

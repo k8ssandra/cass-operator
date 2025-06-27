@@ -80,7 +80,6 @@ func TestDeletePVCs_FailedToList(t *testing.T) {
 	if err == nil {
 		t.Fatalf("deletePVCs should have failed")
 	}
-
 }
 
 func TestDeletePVCs_PVCsNotFound(t *testing.T) {

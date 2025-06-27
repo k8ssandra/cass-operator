@@ -37,9 +37,8 @@ import (
 )
 
 var (
-	ResultShouldNotRequeue  reconcile.Result = reconcile.Result{Requeue: false}
-	ResultShouldRequeueNow  reconcile.Result = reconcile.Result{Requeue: true}
-	ResultShouldRequeueSoon reconcile.Result = reconcile.Result{Requeue: true, RequeueAfter: 2 * time.Second}
+	ResultShouldNotRequeue  reconcile.Result = reconcile.Result{}
+	ResultShouldRequeueSoon reconcile.Result = reconcile.Result{RequeueAfter: 2 * time.Second}
 
 	QuietDurationFunc func(int) time.Duration = func(secs int) time.Duration { return time.Duration(secs) * time.Second }
 )
@@ -109,8 +108,7 @@ func (rc *ReconciliationContext) CalculateRackInformation() error {
 func (rc *ReconciliationContext) CheckSuperuserSecretCreation() result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckSuperuserSecretCreation")
 
-	_, err := rc.retrieveSuperuserSecretOrCreateDefault()
-	if err != nil {
+	if err := rc.retrieveSuperuserSecretOrCreateDefault(); err != nil {
 		rc.ReqLogger.Error(err, "error retrieving SuperuserSecret for CassandraDatacenter.")
 		return result.Error(err)
 	}
@@ -170,7 +168,6 @@ func (rc *ReconciliationContext) CheckRackCreation() result.ReconcileResult {
 }
 
 func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
-
 	for idx := range rc.desiredRackInformation {
 		rackInfo := rc.desiredRackInformation[idx]
 		rackPods := rc.rackPods(rackInfo.RackName)
@@ -419,7 +416,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 			status.Replicas != status.ReadyReplicas ||
 			status.Replicas != updatedReplicas ||
 			status.Replicas != status.AvailableReplicas) {
-
 			logger.Info(
 				"waiting for upgrade to finish on statefulset",
 				"statefulset", statefulSet.Name,
@@ -433,7 +429,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 		}
 
 		desiredSts, err := newStatefulSetForCassandraDatacenter(statefulSet, rackName, dc, int(*statefulSet.Spec.Replicas))
-
 		if err != nil {
 			logger.Error(err, "error calling newStatefulSetForCassandraDatacenter")
 			return result.Error(err)
@@ -710,7 +705,7 @@ func (rc *ReconciliationContext) checkSeedLabels() (int, error) {
 }
 
 func shouldUseFastPath(dc *api.CassandraDatacenter, seedCount int) bool {
-	return seedCount > 0 && !(metav1.HasAnnotation(dc.ObjectMeta, api.AllowParallelStartsAnnotations) && dc.Annotations[api.AllowParallelStartsAnnotations] == "false")
+	return seedCount > 0 && (!metav1.HasAnnotation(dc.ObjectMeta, api.AllowParallelStartsAnnotations) || dc.Annotations[api.AllowParallelStartsAnnotations] != "false")
 }
 
 // CheckPodsReady loops over all the server pods and starts them
@@ -775,7 +770,6 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	// step 1 - see if any nodes are already coming up
 
 	nodeIsStarting, _, err := rc.findStartingNodes()
-
 	if err != nil {
 		return result.Error(err)
 	}
@@ -786,7 +780,6 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	// step 2 - get one node up per rack
 
 	atLeastOneFirstNodeNotReady, err := rc.startOneNodePerRack(endpointData, seedCount)
-
 	if err != nil {
 		return result.Error(err)
 	}
@@ -801,7 +794,7 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 		return result.Error(err)
 	}
 
-	if !clusterHealthy && !(rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionTrue) {
+	if !clusterHealthy && rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionFalse {
 		rc.ReqLogger.Info(
 			"cluster isn't healthy",
 		)
@@ -977,7 +970,7 @@ func (rc *ReconciliationContext) CheckRackPodLabels() result.ReconcileResult {
 
 func (rc *ReconciliationContext) upsertUser(user api.CassandraUser) error {
 	dc := rc.Datacenter
-	namespace := dc.ObjectMeta.Namespace
+	namespace := dc.Namespace
 
 	namespacedName := types.NamespacedName{
 		Name:      user.SecretName,
@@ -1048,8 +1041,7 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 	}
 
 	// make sure the default superuser secret exists
-	_, err = rc.retrieveSuperuserSecretOrCreateDefault()
-	if err != nil {
+	if err = rc.retrieveSuperuserSecretOrCreateDefault(); err != nil {
 		rc.ReqLogger.Error(err, "Failed to verify superuser secret status")
 	}
 
@@ -1163,7 +1155,7 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 }
 
 func getTimePodCreated(pod *corev1.Pod) metav1.Time {
-	return pod.ObjectMeta.CreationTimestamp
+	return pod.CreationTimestamp
 }
 
 func getTimeStartedReplacingNodes(dc *api.CassandraDatacenter) (metav1.Time, bool) {
@@ -1185,7 +1177,6 @@ func (rc *ReconciliationContext) updateCurrentReplacePodsProgress() error {
 		for _, pod := range startedPods {
 			// Since pod is labeled as started, it should be done being replaced
 			if utils.IndexOfString(dc.Status.NodeReplacements, pod.Name) > -1 {
-
 				// Ensure the pod is not only started but created _after_ we
 				// started replacing nodes. This is because the Pod may have
 				// been ready, marked for replacement, and then deleted, so we
@@ -1409,7 +1400,7 @@ func (rc *ReconciliationContext) getCassMetadataEndpoints() httphelper.CassMetad
 // properly recreate a pvc, pv, and pod.
 func (rc *ReconciliationContext) isNodeStuckWithoutPVC(pod *corev1.Pod) bool {
 	if pod.Status.Phase == corev1.PodPending {
-		_, err := rc.GetPodPVC(pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
+		_, err := rc.GetPodPVC(pod.Namespace, pod.Name)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return true
@@ -1531,8 +1522,8 @@ func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (int, 
 // GetStatefulSetForRack returns the statefulset for the rack
 // and whether it currently exists and whether an error occurred
 func (rc *ReconciliationContext) GetStatefulSetForRack(
-	nextRack *RackInformation) (*appsv1.StatefulSet, bool, error) {
-
+	nextRack *RackInformation,
+) (*appsv1.StatefulSet, bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::getStatefulSetForRack")
 
 	// Check if the desiredStatefulSet already exists
@@ -1573,7 +1564,6 @@ func (rc *ReconciliationContext) GetStatefulSetForRack(
 
 // ReconcileNextRack ensures that the resources for a rack have been properly created
 func (rc *ReconciliationContext) ReconcileNextRack(statefulSet *appsv1.StatefulSet) error {
-
 	rc.ReqLogger.Info("reconcile_racks::reconcileNextRack")
 
 	if err := setOperatorProgressStatus(rc, api.ProgressUpdating); err != nil {
@@ -1613,7 +1603,8 @@ func (rc *ReconciliationContext) CheckDcPodDisruptionBudget() result.ReconcileRe
 		ctx,
 		types.NamespacedName{
 			Name:      desiredBudget.Name,
-			Namespace: desiredBudget.Namespace},
+			Namespace: desiredBudget.Namespace,
+		},
 		currentBudget)
 
 	if err != nil && !errors.IsNotFound(err) {
@@ -1693,7 +1684,8 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 			rc.Ctx,
 			types.NamespacedName{
 				Name:      podName,
-				Namespace: statefulSet.Namespace},
+				Namespace: statefulSet.Namespace,
+			},
 			pod)
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -1752,7 +1744,8 @@ func (rc *ReconciliationContext) ReconcilePods(statefulSet *appsv1.StatefulSet) 
 			rc.Ctx,
 			types.NamespacedName{
 				Name:      pvcName,
-				Namespace: statefulSet.Namespace},
+				Namespace: statefulSet.Namespace,
+			},
 			pvc)
 		if err != nil {
 			rc.ReqLogger.Error(
@@ -2149,8 +2142,8 @@ func (rc *ReconciliationContext) hasAdditionalSeeds() bool {
 	}
 	additionalSeedEndpoints := 0
 	if additionalSeedEndpoint, err := rc.GetAdditionalSeedEndpoint(); err == nil {
-		if len(additionalSeedEndpoint.Subsets) > 0 {
-			additionalSeedEndpoints = len(additionalSeedEndpoint.Subsets[0].Addresses)
+		for _, ep := range additionalSeedEndpoint.Endpoints {
+			additionalSeedEndpoints += len(ep.Addresses)
 		}
 	}
 	return additionalSeedEndpoints > 0
@@ -2166,7 +2159,6 @@ func (rc *ReconciliationContext) startNode(pod *corev1.Pod, labelSeedBeforeStart
 
 	if !isServerReady(pod) {
 		if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
-
 			// this is the one exception to all seed labelling happening in labelSeedPods()
 			if labelSeedBeforeStart {
 				patch := client.MergeFrom(pod.DeepCopy())
@@ -2402,7 +2394,6 @@ func (rc *ReconciliationContext) CheckCassandraNodeStatuses() result.ReconcileRe
 
 func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	if !metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.NoAutomatedCleanupAnnotation) {
-
 		if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation) {
 			// Verify if the cleanup task has completed before moving on the with ScalingUp finished
 			task, err := rc.findActiveTask(taskapi.CommandCleanup)

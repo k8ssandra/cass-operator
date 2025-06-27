@@ -46,10 +46,12 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var k8sClient client.Client
-var testEnv *envtest.Environment
-var ctx context.Context
-var cancel context.CancelFunc
+var (
+	k8sClient client.Client
+	testEnv   *envtest.Environment
+	ctx       context.Context
+	cancel    context.CancelFunc
+)
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -143,8 +145,8 @@ var _ = BeforeSuite(func() {
 		return time.Duration(msec * int(time.Millisecond))
 	}
 
-	control.JobRunningRequeue = time.Duration(1 * time.Millisecond)
-	control.TaskRunningRequeue = time.Duration(1 * time.Millisecond)
+	control.JobRunningRequeue = 1 * time.Millisecond
+	control.TaskRunningRequeue = 1 * time.Millisecond
 
 	createStorageClass(ctx, "default")
 
@@ -153,7 +155,6 @@ var _ = BeforeSuite(func() {
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
-
 })
 
 var _ = AfterSuite(func() {

@@ -10,11 +10,11 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -27,7 +27,7 @@ import (
 // ReconciliationContext contains all of the input necessary to calculate a list of ReconciliationActions
 type ReconciliationContext struct {
 	Request        *reconcile.Request
-	Client         runtimeClient.Client
+	Client         client.Client
 	Scheme         *runtime.Scheme
 	Datacenter     *api.CassandraDatacenter
 	NodeMgmtClient httphelper.NodeMgmtClient
@@ -41,7 +41,7 @@ type ReconciliationContext struct {
 	Ctx context.Context
 
 	Services               []*corev1.Service
-	Endpoints              *corev1.Endpoints
+	Endpoints              *discoveryv1.EndpointSlice
 	desiredRackInformation []*RackInformation
 	statefulSets           []*appsv1.StatefulSet
 	dcPods                 []*corev1.Pod
@@ -52,11 +52,11 @@ type ReconciliationContext struct {
 func CreateReconciliationContext(
 	ctx context.Context,
 	req *reconcile.Request,
-	cli runtimeClient.Client,
+	cli client.Client,
 	scheme *runtime.Scheme,
 	rec record.EventRecorder,
-	secretWatches dynamicwatch.DynamicWatches) (*ReconciliationContext, error) {
-
+	secretWatches dynamicwatch.DynamicWatches,
+) (*ReconciliationContext, error) {
 	reqLogger := log.FromContext(ctx)
 	rc := &ReconciliationContext{}
 	rc.Request = req
@@ -119,7 +119,7 @@ func (rc *ReconciliationContext) GetLogger() logr.Logger {
 	return rc.ReqLogger
 }
 
-func (rc *ReconciliationContext) GetClient() runtimeClient.Client {
+func (rc *ReconciliationContext) GetClient() client.Client {
 	return rc.Client
 }
 

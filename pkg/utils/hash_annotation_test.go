@@ -1,12 +1,12 @@
 package utils
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	"testing"
+
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 func Test_deepHashString(t *testing.T) {
-
 	t.Run("test hash behavior", func(t *testing.T) {
 		var ss1 appsv1.StatefulSet
 		var ss2 appsv1.StatefulSet

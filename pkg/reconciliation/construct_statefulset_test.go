@@ -133,7 +133,6 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 			volumeClaim.Annotations,
 			"Add")
 	}
-
 }
 
 func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing.T) {
@@ -152,13 +151,7 @@ func Test_newStatefulSetForCassandraDatacenter_rackNodeAffinitylabels(t *testing
 			},
 		},
 	}
-	var nodeAffinityLabels map[string]string
-	var nodeAffinityLabelsConfigurationError error
-
-	nodeAffinityLabels, nodeAffinityLabelsConfigurationError = rackNodeAffinitylabels(dc, "rack1")
-
-	assert.NoError(t, nodeAffinityLabelsConfigurationError,
-		"should not have gotten error when getting NodeAffinitylabels of rack rack1")
+	nodeAffinityLabels := rackNodeAffinitylabels(dc, "rack1")
 
 	expected := map[string]string{
 		"label1": "dc",

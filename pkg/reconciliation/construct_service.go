@@ -13,6 +13,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -21,7 +22,7 @@ import (
 func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	svcName := dc.GetDatacenterServiceName()
 	service := makeGenericHeadlessService(dc)
-	service.ObjectMeta.Name = svcName
+	service.Name = svcName
 
 	nativePort := api.DefaultNativePort
 	if dc.IsNodePortEnabled() {
@@ -115,15 +116,15 @@ func buildLabelSelectorForSeedService(dc *api.CassandraDatacenter) map[string]st
 // nodes in the cluster
 func newSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	service := makeGenericHeadlessService(dc)
-	service.ObjectMeta.Name = dc.GetSeedServiceName()
+	service.Name = dc.GetSeedServiceName()
 
 	labels := dc.GetClusterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
-	service.ObjectMeta.Labels = labels
+	service.Labels = labels
 
 	anns := dc.GetAnnotations()
 	oplabels.AddOperatorAnnotations(anns, dc)
-	service.ObjectMeta.Annotations = anns
+	service.Annotations = anns
 
 	service.Spec.Selector = buildLabelSelectorForSeedService(dc)
 	service.Spec.PublishNotReadyAddresses = true
@@ -143,10 +144,10 @@ func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter)
 	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
 	var service corev1.Service
-	service.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
-	service.ObjectMeta.Namespace = dc.Namespace
-	service.ObjectMeta.Labels = labels
-	service.ObjectMeta.Annotations = anns
+	service.Name = dc.GetAdditionalSeedsServiceName()
+	service.Namespace = dc.Namespace
+	service.Labels = labels
+	service.Annotations = anns
 	// We omit the label selector because we will create the endpoints manually
 	service.Spec.Type = "ClusterIP"
 	service.Spec.ClusterIP = "None"
@@ -159,46 +160,39 @@ func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter)
 	return &service
 }
 
-func newEndpointsForAdditionalSeeds(dc *api.CassandraDatacenter) (*corev1.Endpoints, error) {
+func newEndpointsForAdditionalSeeds(dc *api.CassandraDatacenter) (*discoveryv1.EndpointSlice, error) {
 	labels := dc.GetDatacenterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
-	endpoints := corev1.Endpoints{}
-	endpoints.ObjectMeta.Name = dc.GetAdditionalSeedsServiceName()
-	endpoints.ObjectMeta.Namespace = dc.Namespace
-	endpoints.ObjectMeta.Labels = labels
+	endpointSlices := discoveryv1.EndpointSlice{}
+	endpointSlices.Name = dc.GetAdditionalSeedsServiceName()
+	endpointSlices.Namespace = dc.Namespace
+	endpointSlices.Labels = labels
 	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
-	endpoints.ObjectMeta.Annotations = anns
+	endpointSlices.Annotations = anns
 
-	addresses := make([]corev1.EndpointAddress, 0, len(dc.Spec.AdditionalSeeds))
+	addresses := make([]string, 0, len(dc.Spec.AdditionalSeeds))
 	for _, additionalSeed := range dc.Spec.AdditionalSeeds {
 		if ip := net.ParseIP(additionalSeed); ip != nil {
-			addresses = append(addresses, corev1.EndpointAddress{
-				IP: additionalSeed,
-			})
+			addresses = append(addresses, additionalSeed)
 		} else {
 			additionalSeedIPs, err := resolveAddress(additionalSeed)
 			if err != nil {
 				return nil, err
 			}
-			for _, address := range additionalSeedIPs {
-				addresses = append(addresses, corev1.EndpointAddress{
-					IP: address,
-				})
-			}
+			addresses = append(addresses, additionalSeedIPs...)
 		}
 	}
 
-	// See: https://godoc.org/k8s.io/api/core/v1#Endpoints
-	endpoints.Subsets = []corev1.EndpointSubset{
+	endpointSlices.Endpoints = []discoveryv1.Endpoint{
 		{
 			Addresses: addresses,
 		},
 	}
 
-	utils.AddHashAnnotation(&endpoints)
+	utils.AddHashAnnotation(&endpointSlices)
 
-	return &endpoints, nil
+	return &endpointSlices, nil
 }
 
 func resolveAddress(hostname string) ([]string, error) {
@@ -221,7 +215,7 @@ func resolveAddress(hostname string) ([]string, error) {
 // that preserves the client source IPs
 func newNodePortServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	service := makeGenericHeadlessService(dc)
-	service.ObjectMeta.Name = dc.GetNodePortServiceName()
+	service.Name = dc.GetNodePortServiceName()
 
 	service.Spec.Type = "NodePort"
 	// Note: ClusterIp = "None" is not valid for NodePort
@@ -255,8 +249,8 @@ func newNodePortServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *core
 // which covers all server pods in the datacenter, whether they are ready or not
 func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	service := makeGenericHeadlessService(dc)
-	service.ObjectMeta.Name = dc.GetAllPodsServiceName()
-	service.ObjectMeta.Labels[api.PromMetricsLabel] = "true"
+	service.Name = dc.GetAllPodsServiceName()
+	service.Labels[api.PromMetricsLabel] = "true"
 	service.Spec.PublishNotReadyAddresses = true
 
 	nativePort := api.DefaultNativePort
@@ -295,15 +289,15 @@ func makeGenericHeadlessService(dc *api.CassandraDatacenter) *corev1.Service {
 	oplabels.AddOperatorLabels(labels, dc)
 	selector := dc.GetDatacenterLabels()
 	var service corev1.Service
-	service.ObjectMeta.Namespace = dc.Namespace
-	service.ObjectMeta.Labels = labels
+	service.Namespace = dc.Namespace
+	service.Labels = labels
 	service.Spec.Selector = selector
 	service.Spec.Type = "ClusterIP"
 	service.Spec.ClusterIP = "None"
 
 	anns := make(map[string]string)
 	oplabels.AddOperatorAnnotations(anns, dc)
-	service.ObjectMeta.Annotations = anns
+	service.Annotations = anns
 
 	return &service
 }

@@ -132,8 +132,8 @@ func TestScheduler(t *testing.T) {
 	err = fakeClient.Get(context.TODO(), nsName, scheduledTaskLive)
 	require.NoError(err)
 
-	require.Equal(fClock.currentTime, scheduledTaskLive.Status.LastExecution.Time.UTC())
-	require.Equal(time.Time{}.Add(2*time.Minute), scheduledTaskLive.Status.NextSchedule.Time.UTC())
+	require.Equal(fClock.currentTime, scheduledTaskLive.Status.LastExecution.UTC())
+	require.Equal(time.Time{}.Add(2*time.Minute), scheduledTaskLive.Status.NextSchedule.UTC())
 
 	// Test that next invocation also works
 	fClock.currentTime = fClock.currentTime.Add(1 * time.Minute)

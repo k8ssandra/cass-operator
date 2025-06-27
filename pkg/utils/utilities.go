@@ -71,7 +71,6 @@ func MergeMap(destination map[string]string, sources ...map[string]string) map[s
 
 // SearchMap will recursively search a map looking for a key with a value of another map
 func SearchMap(mapToSearch map[string]interface{}, key string) map[string]interface{} {
-
 	if v, ok := mapToSearch[key]; ok {
 		return v.(map[string]interface{})
 	}

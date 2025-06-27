@@ -116,7 +116,6 @@ func FakeServer(cli client.Client, logger logr.Logger, podKey types.NamespacedNa
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-
 	})
 
 	managementMockServer := httptest.NewServer(handlerFunc)

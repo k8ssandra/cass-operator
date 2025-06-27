@@ -234,6 +234,7 @@ tags
 *.code-workspace
 .devcontainer/
 .vscode/
+.github/copilot-instructions.md
 
 ### VisualStudioCode Patch ###
 # Ignore all local history of files

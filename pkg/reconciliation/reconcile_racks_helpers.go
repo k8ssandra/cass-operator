@@ -8,7 +8,6 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 )
 
 func mapContains(base map[string]string, submap map[string]string) bool {
@@ -57,7 +56,7 @@ func FindIpForHostId(endpointData httphelper.CassMetadataEndpoints, hostId strin
 	// If there are no nodes to ask, then of course we will not find an IP. We
 	// treat this as an error since we have not way to determine the mapping.
 	if len(endpointData.Entity) < 1 {
-		return "", fmt.Errorf("No pods available to ask for the IP address of %s", hostId)
+		return "", fmt.Errorf("no pods available to ask for the IP address of %s", hostId)
 	}
 
 	// Search for a cassandra node that knows about the given hostId
@@ -81,7 +80,7 @@ func PodPtrsFromPodList(podList *corev1.PodList) []*corev1.Pod {
 	return pods
 }
 
-func MapPodsToEndpointDataByName(pods []*v1.Pod, epData httphelper.CassMetadataEndpoints) map[string]httphelper.EndpointState {
+func MapPodsToEndpointDataByName(pods []*corev1.Pod, epData httphelper.CassMetadataEndpoints) map[string]httphelper.EndpointState {
 	result := make(map[string]httphelper.EndpointState)
 	for idx := range pods {
 		pod := pods[idx]

@@ -29,7 +29,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	if c.CassEnvSh != nil && c.CassEnvSh.AddtnlJVMOptions != nil {
 		additionalJVMOpts = *c.CassEnvSh.AddtnlJVMOptions
 	}
-	updateCassandraYaml(&c, cassDC.Spec.CDC) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
+	updateCassandraYaml(&c) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
 	// Figure out what to do and reconcile config.CassEnvSh.AddtnlJVMOptions back to desired state per CDCConfig.
 	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, cassDC.Spec.CDC, cassDC, mcacEnabled(cassDC))
 	if err != nil {
@@ -53,7 +53,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 // updateAdditionalJVMOpts adds CDC related entries to additional-jvm-opts. Docs here https://docs.datastax.com/en/cdc-for-cassandra/cdc-apache-cassandra/$%7Bversion%7D/index.html
 func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfiguration, cassDC cassdcapi.CassandraDatacenter, mcacEnabled bool) ([]string, error) {
 	out := removeEntryFromSlice(optsSlice, "pulsarServiceUrl")
-	//Next, create an additional options entry that instantiates the settings we want.
+	// Next, create an additional options entry that instantiates the settings we want.
 	reflectedCDCConfig := reflect.ValueOf(*CDCConfig)
 	t := reflectedCDCConfig.Type()
 	optsSlice = []string{}
@@ -65,7 +65,7 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 		if !ok {
 			return nil, errors.New(fmt.Sprint("could not get CDC field", fieldName))
 		}
-		nameTag := strings.Split(string(reflectedField.Tag.Get("json")), ",")[0]
+		nameTag := strings.Split(reflectedField.Tag.Get("json"), ",")[0]
 		reflectedValue := interface{}(nil)
 		// We need to get value types back from pointer types here and handle nil pointers.
 		switch reflectedField.Type.Kind() {
@@ -129,7 +129,7 @@ func mcacEnabled(cassDC cassdcapi.CassandraDatacenter) bool {
 	return true
 }
 
-func updateCassandraYaml(cassConfig *configData, cdcConfig *cassdcapi.CDCConfiguration) {
+func updateCassandraYaml(cassConfig *configData) {
 	if cassConfig.CassandraYaml == nil {
 		cassConfig.CassandraYaml = make(map[string]interface{})
 	}

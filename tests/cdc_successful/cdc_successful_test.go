@@ -51,7 +51,6 @@ func TestLifecycle(t *testing.T) {
 var _ = Describe(testName, func() {
 	Context("when in a new cluster with CDC enabled", func() {
 		Specify("CDC feeds will become available for read", func() {
-
 			By("creating a namespace for the cass-operator")
 			err := kubectl.CreateNamespace(namespace).ExecV()
 			Expect(err).ToNot(HaveOccurred())

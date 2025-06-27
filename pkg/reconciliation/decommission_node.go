@@ -323,9 +323,7 @@ func (rc *ReconciliationContext) DeletePodPvcs(pod *corev1.Pod) error {
 
 		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.DeletedPvc,
 			"Claim Name: %s", pvcName)
-
 	}
-
 	return nil
 }
 
@@ -427,7 +425,6 @@ func (rc *ReconciliationContext) GetUsedStorageForPods(epData httphelper.CassMet
 				"pod", podName,
 				"Bytes reported by mgmt api", data.Load)
 			return nil, err
-
 		}
 		podStorageMap[podName] = load
 	}

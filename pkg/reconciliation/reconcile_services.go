@@ -128,5 +128,9 @@ func (rc *ReconciliationContext) CheckHeadlessServices() result.ReconcileResult 
 		return rc.CreateHeadlessServices()
 	}
 
+	if len(dc.Spec.AdditionalSeeds) > 0 {
+		return rc.CheckAdditionalSeedEndpointSlices()
+	}
+
 	return result.Continue()
 }

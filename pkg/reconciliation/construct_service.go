@@ -5,6 +5,7 @@ package reconciliation
 
 // This file defines constructors for k8s service-related objects
 import (
+	"fmt"
 	"net"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -160,55 +162,74 @@ func newAdditionalSeedServiceForCassandraDatacenter(dc *api.CassandraDatacenter)
 	return &service
 }
 
-func newEndpointsForAdditionalSeeds(dc *api.CassandraDatacenter) (*discoveryv1.EndpointSlice, error) {
-	labels := dc.GetDatacenterLabels()
-	oplabels.AddOperatorLabels(labels, dc)
-	endpointSlices := discoveryv1.EndpointSlice{}
-	endpointSlices.Name = dc.GetAdditionalSeedsServiceName()
-	endpointSlices.Namespace = dc.Namespace
-	endpointSlices.Labels = labels
-	anns := make(map[string]string)
-	oplabels.AddOperatorAnnotations(anns, dc)
-	endpointSlices.Annotations = anns
+func newEndpointSlicesForAdditionalSeeds(dc *api.CassandraDatacenter) []*discoveryv1.EndpointSlice {
+	ipv4Addresses := make([]string, 0)
+	ipv6Addresses := make([]string, 0)
+	fqdnAddresses := make([]string, 0)
 
-	addresses := make([]string, 0, len(dc.Spec.AdditionalSeeds))
 	for _, additionalSeed := range dc.Spec.AdditionalSeeds {
-		if ip := net.ParseIP(additionalSeed); ip != nil {
-			addresses = append(addresses, additionalSeed)
-		} else {
-			additionalSeedIPs, err := resolveAddress(additionalSeed)
-			if err != nil {
-				return nil, err
+		ip := net.ParseIP(additionalSeed)
+		if ip != nil {
+			if ip.To4() != nil {
+				ipv4Addresses = append(ipv4Addresses, additionalSeed)
+			} else {
+				ipv6Addresses = append(ipv6Addresses, additionalSeed)
 			}
-			addresses = append(addresses, additionalSeedIPs...)
+		} else {
+			fqdnAddresses = append(fqdnAddresses, additionalSeed)
 		}
 	}
 
-	endpointSlices.Endpoints = []discoveryv1.Endpoint{
-		{
-			Addresses: addresses,
+	endpointSlices := make([]*discoveryv1.EndpointSlice, 0)
+
+	ipv4Slice := createEndpointSlice(dc, discoveryv1.AddressTypeIPv4, ipv4Addresses)
+	endpointSlices = append(endpointSlices, ipv4Slice)
+
+	ipv6Slice := createEndpointSlice(dc, discoveryv1.AddressTypeIPv6, ipv6Addresses)
+	endpointSlices = append(endpointSlices, ipv6Slice)
+
+	fqdnSlice := createEndpointSlice(dc, discoveryv1.AddressTypeFQDN, fqdnAddresses)
+	endpointSlices = append(endpointSlices, fqdnSlice)
+
+	return endpointSlices
+}
+
+// Helper function to create an EndpointSlice of a specific address type
+func createEndpointSlice(dc *api.CassandraDatacenter, addressType discoveryv1.AddressType, addresses []string) *discoveryv1.EndpointSlice {
+	labels := dc.GetDatacenterLabels()
+	oplabels.AddOperatorLabels(labels, dc)
+
+	// Add service name as per Kubernetes EndpointSlice naming convention
+	serviceName := dc.GetAdditionalSeedsServiceName()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels[discoveryv1.LabelServiceName] = serviceName
+
+	// Create a unique name based on service name and address type
+	name := fmt.Sprintf("%s-%s", serviceName, strings.ToLower(string(addressType)))
+
+	endpointSlice := discoveryv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: dc.Namespace,
+			Labels:    labels,
+		},
+		AddressType: addressType,
+		Endpoints: []discoveryv1.Endpoint{
+			{
+				Addresses: addresses,
+			},
 		},
 	}
 
-	utils.AddHashAnnotation(&endpointSlices)
+	anns := make(map[string]string)
+	oplabels.AddOperatorAnnotations(anns, dc)
+	endpointSlice.Annotations = anns
 
-	return &endpointSlices, nil
-}
+	utils.AddHashAnnotation(&endpointSlice)
 
-func resolveAddress(hostname string) ([]string, error) {
-	ips, err := net.LookupIP(hostname)
-	if err != nil {
-		return []string{}, err
-	}
-	ipStrings := make([]string, 0, len(ips))
-	for _, ip := range ips {
-		// Exclude IPv6 addresses
-		if ip.To4() != nil {
-			ipStrings = append(ipStrings, ip.String())
-		}
-	}
-
-	return ipStrings, nil
+	return &endpointSlice
 }
 
 // newNodePortServiceForCassandraDatacenter creates a headless service owned by the CassandraDatacenter,

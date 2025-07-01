@@ -59,9 +59,9 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 		return result.Output()
 	}
 
-	if result := rc.CheckAdditionalSeedEndpoints(); result.Completed() {
-		return result.Output()
-	}
+	// if result := rc.CheckAdditionalSeedEndpoints(); result.Completed() {
+	// 	return result.Output()
+	// }
 
 	if err := rc.CalculateRackInformation(); err != nil {
 		return result.Error(err).Output()

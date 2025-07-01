@@ -27,7 +27,7 @@ var (
 	dcResource                     = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel                        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	additionalSeedServiceResource  = "services/cluster1-dc1-additional-seed-service"
-	additionalSeedEndpointResource = "endpoints/cluster1-dc1-additional-seed-service"
+	additionalSeedEndpointResource = "endpointslices/cluster1-dc1-additional-seed-service"
 	ns                             = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -192,7 +192,7 @@ func checkSeedConstraints() {
 
 func getAdditionalSeedEndpointResourceAddresses() ([]interface{}, error) {
 	// Should be addresses and then go through them in the later check
-	jsonpath := "jsonpath={.subsets[0].addresses}"
+	jsonpath := "jsonpath={.endpoints[].addresses}"
 	k := kubectl.Get(additionalSeedEndpointResource).FormatOutput(jsonpath)
 	output, err := ns.Output(k)
 	if err != nil {
@@ -245,7 +245,7 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForOperatorReady()
 
-			step = "creating a datacenter resource with 2 racks/4 nodes"
+			step = "creating a datacenter resource with 3 racks/3 nodes"
 			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
 			Expect(err).ToNot(HaveOccurred())
 

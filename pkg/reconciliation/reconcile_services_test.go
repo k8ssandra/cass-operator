@@ -4,6 +4,7 @@
 package reconciliation
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -12,9 +13,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
+	discoveryv1 "k8s.io/api/discovery/v1"
 )
 
 func TestReconcileHeadlessService(t *testing.T) {
@@ -188,4 +192,71 @@ func TestCreateHeadlessService_ClientReturnsError(t *testing.T) {
 	assert.True(t, recResult.Completed(), "Reconcile loop should be completed")
 
 	mockClient.AssertExpectations(t)
+}
+
+func TestEndpointSliceControllerIntegration(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(rc.Datacenter).Build()
+
+	rc.Client = fakeClient
+	rc.Datacenter.Spec.AdditionalSeeds = []string{
+		"192.168.1.1",      // IPv4
+		"2001:db8::1",      // IPv6
+		"seed.example.com", // FQDN
+	}
+
+	dc := rc.Datacenter
+
+	// err := fakeClient.Create(context.Background(), dc)
+	// assert.NoError(t, err)
+
+	additionalSvc := newAdditionalSeedServiceForCassandraDatacenter(dc)
+	err := fakeClient.Create(context.Background(), additionalSvc)
+	assert.NoError(t, err)
+
+	endpointSlices := newEndpointSlicesForAdditionalSeeds(dc)
+	assert.Equal(t, 3, len(endpointSlices))
+
+	for _, slice := range endpointSlices {
+		err = fakeClient.Create(context.Background(), slice)
+		assert.NoError(t, err)
+	}
+
+	res := rc.CheckAdditionalSeedEndpointSlices()
+	assert.False(t, res.Completed())
+
+	sliceList := &discoveryv1.EndpointSliceList{}
+	err = fakeClient.List(context.Background(), sliceList,
+		client.InNamespace("default"),
+		client.MatchingLabels{discoveryv1.LabelServiceName: dc.GetAdditionalSeedsServiceName()})
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(sliceList.Items))
+
+	addressTypeCounts := map[discoveryv1.AddressType]int{
+		discoveryv1.AddressTypeIPv4: 0,
+		discoveryv1.AddressTypeIPv6: 0,
+		discoveryv1.AddressTypeFQDN: 0,
+	}
+
+	for _, slice := range sliceList.Items {
+		assert.Equal(t, dc.GetAdditionalSeedsServiceName(),
+			slice.Labels[discoveryv1.LabelServiceName])
+
+		addressTypeCounts[slice.AddressType]++
+
+		switch slice.AddressType {
+		case discoveryv1.AddressTypeIPv4:
+			assert.Equal(t, "192.168.1.1", slice.Endpoints[0].Addresses[0])
+		case discoveryv1.AddressTypeIPv6:
+			assert.Equal(t, "2001:db8::1", slice.Endpoints[0].Addresses[0])
+		case discoveryv1.AddressTypeFQDN:
+			assert.Equal(t, "seed.example.com", slice.Endpoints[0].Addresses[0])
+		}
+	}
+
+	assert.Equal(t, 1, addressTypeCounts[discoveryv1.AddressTypeIPv4])
+	assert.Equal(t, 1, addressTypeCounts[discoveryv1.AddressTypeIPv6])
+	assert.Equal(t, 1, addressTypeCounts[discoveryv1.AddressTypeFQDN])
 }

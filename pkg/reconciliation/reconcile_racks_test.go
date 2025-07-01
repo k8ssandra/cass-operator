@@ -2913,9 +2913,13 @@ func TestStartOneNodePerRack(t *testing.T) {
 				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
 				k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil)
 
+				// We need to mock the hasAdditionalSeeds call
+				// Mock the Get calls for EndpointSlices
+				// Three calls for the three potential slices (IPv4, IPv6, FQDN)
+
 				if tt.seedCount < 1 {
 					// There's additional checks here, for fetching the possible additional-seeds (the GET) and pre-adding a seed label
-					k8sMockClientGet(mockClient, nil)
+					k8sMockClientGet(mockClient, nil).Times(3)
 					k8sMockClientPatch(mockClient, nil)
 				}
 			}
@@ -3003,7 +3007,7 @@ func TestStartOneNodePerRackFailed(t *testing.T) {
 			rc.Client = mockClient
 
 			mockHttpClient := mocks.NewHttpClient(t)
-			k8sMockClientGet(mockClient, nil)
+			k8sMockClientGet(mockClient, nil).Times(3)
 
 			client := httphelper.NodeMgmtClient{
 				Client:   mockHttpClient,

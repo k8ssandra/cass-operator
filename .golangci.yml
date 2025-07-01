@@ -99,7 +99,7 @@ linters:
 formatters:
   enable:
     - gofmt
-    - gofumpt
+    # - gofumpt
     - goimports
   exclusions:
     generated: lax

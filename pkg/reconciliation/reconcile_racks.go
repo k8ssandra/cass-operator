@@ -545,10 +545,6 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 			return res
 		}
 	}
-	// if len(forceRacks) == 0 {
-	// 	return result.Continue()
-	// }
-	// Do the rackFiltering here
 
 	return result.Continue()
 }
@@ -2027,8 +2023,16 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.CassMetadataEndpoints, readySeeds int) (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::startOneNodePerRack")
 
-	labelSeedBeforeStart := readySeeds == 0 && !rc.hasAdditionalSeeds()
+	labelSeedBeforeStart := readySeeds == 0
+	if labelSeedBeforeStart {
+		hasAdditionalSeeds, err := rc.hasAdditionalSeeds()
+		if err != nil {
+			return false, fmt.Errorf("failed to check for additional seeds: %w", err)
+		}
+		labelSeedBeforeStart = !hasAdditionalSeeds
+	}
 
+	// labelSeedBeforeStart := readySeeds == 0 && !hasAdditionalSeeds
 	runningPods := 0
 
 RackLoop:
@@ -2136,17 +2140,18 @@ func (rc *ReconciliationContext) createStartSequence() []*corev1.Pod {
 }
 
 // hasAdditionalSeeds returns true if the datacenter has at least one additional seed.
-func (rc *ReconciliationContext) hasAdditionalSeeds() bool {
+func (rc *ReconciliationContext) hasAdditionalSeeds() (bool, error) {
 	if len(rc.Datacenter.Spec.AdditionalSeeds) > 0 {
-		return true
+		return true, nil
 	}
-	additionalSeedEndpoints := 0
-	if additionalSeedEndpoint, err := rc.GetAdditionalSeedEndpoint(); err == nil {
-		for _, ep := range additionalSeedEndpoint.Endpoints {
-			additionalSeedEndpoints += len(ep.Addresses)
-		}
+
+	count, err := rc.GetAdditionalSeedAddressCount()
+	if err != nil {
+		rc.ReqLogger.Error(err, "Failed to get additional seed address count")
+		return false, err
 	}
-	return additionalSeedEndpoints > 0
+
+	return count > 0, nil
 }
 
 // startNode starts the Cassandra node in the given pod, if it wasn't started yet. It returns true

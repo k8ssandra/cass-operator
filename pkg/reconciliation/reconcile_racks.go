@@ -2068,7 +2068,8 @@ RackLoop:
 			// we don't want to interrupt other racks from starting even if this rack is down (such as zone failure)
 		}
 	}
-	if runningPods < 1 {
+
+	if runningPods < 1 && rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) != corev1.ConditionTrue {
 		return true, fmt.Errorf("no pods were ready to be started in any rack")
 	}
 	return false, nil

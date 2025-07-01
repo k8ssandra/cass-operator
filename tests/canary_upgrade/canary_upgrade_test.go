@@ -63,13 +63,13 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForSuperUserUpserted(dcName, 600)
+			ns.WaitForDatacenterReady(dcName)
 
 			step = "check recorded host IDs"
 			ns.Log(step)
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
-			Expect(len(nodeStatusesHostIds), 3)
+			Expect(nodeStatusesHostIds).To(HaveLen(3))
 
-			ns.WaitForDatacenterReady(dcName)
 			ns.WaitForDatacenterCondition(dcName, "Initialized", string(corev1.ConditionTrue))
 
 			step = "prepare for canary upgrade"

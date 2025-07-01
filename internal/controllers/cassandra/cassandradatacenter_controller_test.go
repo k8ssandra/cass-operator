@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr" //nolint:staticcheck
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -25,9 +25,7 @@ const (
 	pollingTime = 50 * time.Millisecond
 )
 
-var (
-	testNamespaceName string
-)
+var testNamespaceName string
 
 func clusterName() string {
 	// TODO Modify when multiple clusters are needed
@@ -197,14 +195,14 @@ func verifyStsCount(ctx context.Context, dcName string, rackCount, podsPerSts in
 	return Eventually(func(g Gomega) {
 		stsAll := &appsv1.StatefulSetList{}
 		g.Expect(k8sClient.List(ctx, stsAll, client.MatchingLabels{cassdcapi.DatacenterLabel: dcName}, client.InNamespace(testNamespaceName))).To(Succeed())
-		g.Expect(len(stsAll.Items)).To(Equal(rackCount))
+		g.Expect(stsAll.Items).To(HaveLen(rackCount))
 
 		for _, sts := range stsAll.Items {
 			rackName := sts.Labels[cassdcapi.RackLabel]
 
 			podList := &corev1.PodList{}
 			g.Expect(k8sClient.List(ctx, podList, client.MatchingLabels{cassdcapi.DatacenterLabel: dcName, cassdcapi.RackLabel: rackName}, client.InNamespace(testNamespaceName))).To(Succeed())
-			g.Expect(len(podList.Items)).To(Equal(podsPerSts))
+			g.Expect(podList.Items).To(HaveLen(podsPerSts))
 		}
 	})
 }
@@ -213,7 +211,7 @@ func verifyPodCount(ctx context.Context, dcName string, podCount int) AsyncAsser
 	return Eventually(func(g Gomega) {
 		podList := &corev1.PodList{}
 		g.Expect(k8sClient.List(ctx, podList, client.MatchingLabels{cassdcapi.DatacenterLabel: dcName}, client.InNamespace(testNamespaceName))).To(Succeed())
-		g.Expect(len(podList.Items)).To(Equal(podCount))
+		g.Expect(podList.Items).To(HaveLen(podCount))
 	})
 }
 
@@ -231,7 +229,7 @@ func verifyDatacenterDeleted(ctx context.Context, dcName string) AsyncAssertion 
 		svcList := &corev1.ServiceList{}
 		g.Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{cassdcapi.DatacenterLabel: dcName}, client.InNamespace(testNamespaceName))).To(Succeed())
 		for _, svc := range svcList.Items {
-			g.Expect(len(svc.OwnerReferences)).To(Equal(1))
+			g.Expect(svc.OwnerReferences).To(HaveLen(1))
 			verifyOwnerReference(g, svc.OwnerReferences[0], dcName)
 			g.Expect(k8sClient.Delete(ctx, &svc)).To(Succeed())
 		}
@@ -240,7 +238,7 @@ func verifyDatacenterDeleted(ctx context.Context, dcName string) AsyncAssertion 
 		stsAll := &appsv1.StatefulSetList{}
 		g.Expect(k8sClient.List(ctx, stsAll, client.MatchingLabels{cassdcapi.DatacenterLabel: dcName}, client.InNamespace(testNamespaceName))).To(Succeed())
 		for _, sts := range stsAll.Items {
-			g.Expect(len(sts.OwnerReferences)).To(Equal(1))
+			g.Expect(sts.OwnerReferences).To(HaveLen(1))
 			verifyOwnerReference(g, sts.OwnerReferences[0], dcName)
 			g.Expect(k8sClient.Delete(ctx, &sts)).To(Succeed())
 		}
@@ -251,7 +249,6 @@ func verifyDatacenterDeleted(ctx context.Context, dcName string) AsyncAssertion 
 		for _, pvc := range pvcList.Items {
 			g.Expect(pvc.GetDeletionTimestamp()).ToNot(BeNil())
 		}
-
 	}).WithContext(ctx).WithTimeout(10 * time.Second).WithPolling(100 * time.Millisecond)
 }
 

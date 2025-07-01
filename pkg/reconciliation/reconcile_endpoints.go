@@ -4,127 +4,108 @@
 package reconciliation
 
 import (
-	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/internal/result"
-	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
-func (rc *ReconciliationContext) CreateEndpointsForAdditionalSeedService() result.ReconcileResult {
-	// unpacking
+func (rc *ReconciliationContext) CheckAdditionalSeedEndpointSlices() result.ReconcileResult {
 	logger := rc.ReqLogger
 	client := rc.Client
-	endpoints := rc.Endpoints
 
-	logger.Info(
-		"Creating endpoints for additional seed service",
-		"endpointsNamespace", endpoints.Namespace,
-		"endpointsName", endpoints.Name)
+	logger.Info("reconcile_services::checkAdditionalSeedEndpointSlices")
 
-	if err := setOperatorProgressStatus(rc, api.ProgressUpdating); err != nil {
-		return result.Error(err)
-	}
+	slices := newEndpointSlicesForAdditionalSeeds(rc.Datacenter)
 
-	if err := client.Create(rc.Ctx, endpoints); err != nil {
-		logger.Error(err, "Could not create endpoints for additional seed service")
+	for _, slice := range slices {
+		hasAddresses := len(slice.Endpoints) > 0 && len(slice.Endpoints[0].Addresses) > 0
 
-		return result.Error(err)
-	}
+		nsName := types.NamespacedName{Name: slice.Name, Namespace: slice.Namespace}
+		currentSlice := &discoveryv1.EndpointSlice{}
 
-	rc.Recorder.Eventf(rc.Datacenter, "Normal", "CreatedResource", "Created endpoints %s", endpoints.Name)
+		err := client.Get(rc.Ctx, nsName, currentSlice)
+		if err != nil && errors.IsNotFound(err) {
+			if hasAddresses {
+				logger.Info("Additional seed endpoint slice not found, creating it", "slice", nsName)
+				if err := client.Create(rc.Ctx, slice); err != nil {
+					logger.Error(err, "Could not create additional seed endpoint slice",
+						"slice", nsName,
+					)
+					return result.Error(err)
+				}
+			}
+		} else if err != nil {
+			logger.Error(err, "Could not get additional seed endpoint slice",
+				"slice", nsName,
+			)
+			return result.Error(err)
+		} else {
+			if !hasAddresses {
+				logger.Info("Deleting endpoint slice as it should now be empty", "slice", nsName)
+				if err := client.Delete(rc.Ctx, currentSlice); err != nil {
+					logger.Error(err, "Could not delete additional seed endpoint slice",
+						"slice", nsName,
+					)
+					return result.Error(err)
+				}
+			} else if !utils.ResourcesHaveSameHash(currentSlice, slice) {
+				resourceVersion := currentSlice.GetResourceVersion()
+				slice.DeepCopyInto(currentSlice)
+				currentSlice.SetResourceVersion(resourceVersion)
 
-	return result.Continue()
-}
-
-func (rc *ReconciliationContext) CheckAdditionalSeedEndpoints() result.ReconcileResult {
-	// unpacking
-	logger := rc.ReqLogger
-	dc := rc.Datacenter
-	client := rc.Client
-
-	logger.Info("reconcile_endpoints::CheckAdditionalSeedEndpoints")
-
-	if len(dc.Spec.AdditionalSeeds) == 0 {
-		return result.Continue()
-	}
-
-	desiredEndpoints, err := newEndpointsForAdditionalSeeds(dc)
-	if err != nil {
-		logger.Error(err, "Could not set additional seeds for endpoints for additional seed service")
-		return result.Error(err)
-	}
-
-	createNeeded := false
-
-	// Set CassandraDatacenter dc as the owner and controller
-	err = setControllerReference(dc, desiredEndpoints, rc.Scheme)
-	if err != nil {
-		logger.Error(err, "Could not set controller reference for endpoints for additional seed service")
-		return result.Error(err)
-	}
-
-	// See if the Endpoints already exists
-	currentEndpoints, err := rc.GetAdditionalSeedEndpoint()
-
-	if err != nil && errors.IsNotFound(err) {
-		// if it's not found, we need to create it
-		createNeeded = true
-	} else if err != nil {
-		// if we hit a k8s error, log it and error out
-		nsName := types.NamespacedName{Name: desiredEndpoints.Name, Namespace: desiredEndpoints.Namespace}
-		logger.Error(err, "Could not get endpoints for additional seed service",
-			"name", nsName,
-		)
-		return result.Error(err)
-	} else {
-		// desiredEndpoints always has just a single Subset at most - we can apply safely there all the addresses we still want to keep
-		for _, subset := range currentEndpoints.Subsets {
-			for _, addr := range subset.Addresses {
-				if addr.TargetRef != nil {
-					// Managed by something else, so we want to keep this
-					desiredEndpoints.Subsets[0].Addresses = append(desiredEndpoints.Subsets[0].Addresses, addr)
+				if err := client.Update(rc.Ctx, currentSlice); err != nil {
+					logger.Error(err, "Unable to update additional seed endpoint slice",
+						"slice", currentSlice)
+					return result.Error(err)
 				}
 			}
 		}
-
-		// if we found the endpoints already, check if it needs updating
-		if !utils.ResourcesHaveSameHash(currentEndpoints, desiredEndpoints) {
-			resourceVersion := currentEndpoints.GetResourceVersion()
-			// preserve any labels and annotations that were added to the Endpoints post-creation
-			desiredEndpoints.Labels = utils.MergeMap(map[string]string{}, currentEndpoints.Labels, desiredEndpoints.Labels)
-			desiredEndpoints.Annotations = utils.MergeMap(map[string]string{}, currentEndpoints.Annotations, desiredEndpoints.Annotations)
-
-			logger.Info("Updating endpoints for additional seed service",
-				"endpoints", currentEndpoints,
-				"desired", desiredEndpoints)
-
-			desiredEndpoints.DeepCopyInto(currentEndpoints)
-
-			currentEndpoints.SetResourceVersion(resourceVersion)
-
-			if err := client.Update(rc.Ctx, currentEndpoints); err != nil {
-				logger.Error(err, "Unable to update endpoints for additional seed service",
-					"endpoints", currentEndpoints)
-				return result.Error(err)
-			}
-		}
-	}
-
-	if createNeeded {
-		rc.Endpoints = desiredEndpoints
-		return rc.CreateEndpointsForAdditionalSeedService()
 	}
 
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) GetAdditionalSeedEndpoint() (*corev1.Endpoints, error) {
+// GetAdditionalSeedAddressCount fetches all EndpointSlices for the additional seeds service
+// and returns the total count of addresses across all slices
+func (rc *ReconciliationContext) GetAdditionalSeedAddressCount() (int, error) {
+	logger := rc.ReqLogger
+	kubeClient := rc.Client
 	dc := rc.Datacenter
-	nsName := types.NamespacedName{Name: dc.GetAdditionalSeedsServiceName(), Namespace: dc.Namespace}
-	currentEndpoints := &corev1.Endpoints{}
-	err := rc.Client.Get(rc.Ctx, nsName, currentEndpoints)
-	return currentEndpoints, err
+	logger.Info("reconcile_services::getAdditionalSeedAddressCount")
+
+	slices := newEndpointSlicesForAdditionalSeeds(dc)
+	totalAddresses := 0
+
+	for _, slice := range slices {
+		nsName := types.NamespacedName{Name: slice.Name, Namespace: slice.Namespace}
+		currentSlice := &discoveryv1.EndpointSlice{}
+
+		if err := kubeClient.Get(rc.Ctx, nsName, currentSlice); err != nil {
+			if errors.IsNotFound(err) {
+				logger.V(1).Info("EndpointSlice not found", "name", nsName.Name)
+				continue
+			}
+			logger.Error(err, "Failed to get endpoint slice", "name", nsName.Name)
+			return 0, err
+		}
+
+		// Count addresses in this slice
+		sliceAddresses := 0
+		for _, endpoint := range currentSlice.Endpoints {
+			sliceAddresses += len(endpoint.Addresses)
+		}
+
+		totalAddresses += sliceAddresses
+
+		logger.V(1).Info("Found endpoint slice with addresses",
+			"name", currentSlice.Name,
+			"addressType", currentSlice.AddressType,
+			"addresses", sliceAddresses,
+			"totalAddresses", totalAddresses)
+	}
+
+	return totalAddresses, nil
 }

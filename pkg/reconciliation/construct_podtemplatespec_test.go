@@ -651,7 +651,8 @@ func TestCassandraDatacenter_buildPodTemplateSpec_containers_merge(t *testing.T)
 			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{testContainer}},
+					Containers: []corev1.Container{testContainer},
+				},
 			},
 		},
 	}
@@ -685,7 +686,8 @@ func TestCassandraDatacenter_buildPodTemplateSpec_initcontainers_merge(t *testin
 			},
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{testContainer}},
+					InitContainers: []corev1.Container{testContainer},
+				},
 			},
 			ConfigBuilderResources: testContainer.Resources,
 		},
@@ -1122,7 +1124,6 @@ func TestCassandraDatacenter_buildContainers_additional_labels(t *testing.T) {
 	if !reflect.DeepEqual(expectedAnnotations, gotAnns) {
 		t.Errorf("labels = %v, want %v", gotAnns, expectedAnnotations)
 	}
-
 }
 
 func TestCassandraDatacenter_buildPodTemplateSpec_overrideSecurityContext(t *testing.T) {

@@ -80,7 +80,8 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
 				oplabels.VersionLabel:   "4.0.1",
 			},
-		}, {
+		},
+		{
 			name: "Cluster name with spaces",
 			args: args{
 				resourceLabels: make(map[string]string),
@@ -164,7 +165,8 @@ func Test_validateLabelsForCluster(t *testing.T) {
 				oplabels.InstanceLabel:  fmt.Sprintf("%s-exampleCluster", oplabels.NameLabelValue),
 				oplabels.VersionLabel:   "4.0.1",
 			},
-		}, {
+		},
+		{
 			name: "DC Label, No Cluster Label",
 			args: args{
 				resourceLabels: map[string]string{
@@ -487,7 +489,7 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	require.Equal("bar", sts.Spec.Template.Labels["foo"])
 
 	// Now update the template and verify that the StatefulSet is updated
-	rc.Datacenter.Spec.PodTemplateSpec.ObjectMeta.Labels["foo2"] = "baz"
+	rc.Datacenter.Spec.PodTemplateSpec.Labels["foo2"] = "baz"
 	rc.Datacenter.Generation++
 	res = rc.CheckRackPodTemplate()
 	require.Equal(result.Done(), res)
@@ -625,7 +627,6 @@ func TestReconcileNextRack(t *testing.T) {
 	// 2. Creates a PodDisruptionBudget for the StatefulSet.
 	//
 	// TODO: check if Create() has been called on the fake client
-
 }
 
 func TestReconcileNextRack_CreateError(t *testing.T) {
@@ -672,7 +673,6 @@ func TestCalculateRackInformation(t *testing.T) {
 	assert.Equal(t, 2, rackInfo.NodeCount, "Should have correct node count")
 
 	// TODO add more RackInformation validation
-
 }
 
 func TestCalculateRackInformation_MultiRack(t *testing.T) {
@@ -775,7 +775,7 @@ func TestReconcileRacks_GetStatefulsetError(t *testing.T) {
 
 	t.Skip("FIXME - Skipping assertion")
 
-	assert.Equal(t, reconcile.Result{Requeue: true}, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 }
 
 func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
@@ -816,7 +816,7 @@ func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.True(t, result.Requeue, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 }
 
 func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
@@ -852,7 +852,7 @@ func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.Equal(t, reconcile.Result{Requeue: true}, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 }
 
 func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
@@ -893,7 +893,7 @@ func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.True(t, result.Requeue, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 }
 
 func TestReconcileRacks_NeedToPark(t *testing.T) {
@@ -930,7 +930,7 @@ func TestReconcileRacks_NeedToPark(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Apply() should not have returned an error")
-	assert.False(t, result.Requeue, "Should not requeue request")
+	assert.False(t, result.RequeueAfter > 0, "Should not requeue request")
 
 	currentStatefulSet := &appsv1.StatefulSet{}
 	nsName := types.NamespacedName{Name: preExistingStatefulSet.Name, Namespace: preExistingStatefulSet.Namespace}
@@ -1057,7 +1057,7 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.Equal(t, reconcile.Result{Requeue: true}, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 
 	currentStatefulSet := &appsv1.StatefulSet{}
 	nsName := types.NamespacedName{Name: secondDesiredStatefulSet.Name, Namespace: secondDesiredStatefulSet.Namespace}
@@ -1077,7 +1077,7 @@ func TestReconcileRacks_UpdateRackNodeCount(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	var nextRack = &RackInformation{}
+	nextRack := &RackInformation{}
 
 	nextRack.RackName = "default"
 	nextRack.NodeCount = 2
@@ -1162,7 +1162,7 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 
 	result, err := rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.Equal(t, reconcile.Result{Requeue: false}, result, "Should not requeue request")
+	assert.Equal(t, reconcile.Result{}, result, "Should not requeue request")
 
 	currentStatefulSet := &appsv1.StatefulSet{}
 	nsName := types.NamespacedName{Name: desiredStatefulSet.Name, Namespace: desiredStatefulSet.Namespace}
@@ -1185,7 +1185,7 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 
 	result, err = rc.ReconcileAllRacks()
 	assert.NoErrorf(t, err, "Should not have returned an error")
-	assert.Equal(t, reconcile.Result{Requeue: true}, result, "Should requeue request")
+	assert.True(t, result.RequeueAfter > 0, "Should requeue request")
 
 	currentStatefulSet = &appsv1.StatefulSet{}
 	nsName = types.NamespacedName{Name: desiredStatefulSet.Name, Namespace: desiredStatefulSet.Namespace}
@@ -1338,12 +1338,10 @@ func Test_isMgmtApiRunning(t *testing.T) {
 		pod *corev1.Pod
 	}
 	readyServerContainer := makeMockReadyStartedPod()
-	readyServerContainer.Status.ContainerStatuses[0].State.Running =
-		&corev1.ContainerStateRunning{StartedAt: metav1.Date(2019, time.July, 4, 12, 12, 12, 0, time.UTC)}
+	readyServerContainer.Status.ContainerStatuses[0].State.Running = &corev1.ContainerStateRunning{StartedAt: metav1.Date(2019, time.July, 4, 12, 12, 12, 0, time.UTC)}
 
 	veryFreshServerContainer := makeMockReadyStartedPod()
-	veryFreshServerContainer.Status.ContainerStatuses[0].State.Running =
-		&corev1.ContainerStateRunning{StartedAt: metav1.Now()}
+	veryFreshServerContainer.Status.ContainerStatuses[0].State.Running = &corev1.ContainerStateRunning{StartedAt: metav1.Now()}
 
 	podThatHasNoServer := makeMockReadyStartedPod()
 	podThatHasNoServer.Status.ContainerStatuses[0].Name = "nginx"
@@ -2024,7 +2022,6 @@ func TestFailedStart(t *testing.T) {
 }
 
 func TestStartBootstrappedNodes(t *testing.T) {
-
 	// A boolean representing the state of a pod (started or not).
 	type pod bool
 
@@ -2285,7 +2282,6 @@ func TestStartBootstrappedNodes(t *testing.T) {
 					Protocol: "http",
 				}
 				rc.NodeMgmtClient = client
-
 			}
 
 			epData := httphelper.CassMetadataEndpoints{
@@ -2321,7 +2317,6 @@ func TestStartBootstrappedNodes(t *testing.T) {
 }
 
 func TestStartingSequenceBuilder(t *testing.T) {
-
 	type podStart struct {
 		started      bool
 		failedStarts int
@@ -2425,7 +2420,7 @@ func TestStartingSequenceBuilder(t *testing.T) {
 									StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
 								},
 							},
-							Ready: bool(pod.started),
+							Ready: pod.started,
 						},
 					}
 					p.Status.PodIP = "127.0.0.1"
@@ -2451,7 +2446,6 @@ func TestStartingSequenceBuilder(t *testing.T) {
 }
 
 func TestReconciliationContext_startAllNodes(t *testing.T) {
-
 	// A boolean representing the state of a pod (started or not).
 	type pod bool
 
@@ -2584,7 +2578,6 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 					Protocol: "http",
 				}
 				rc.NodeMgmtClient = client
-
 			}
 
 			epData := httphelper.CassMetadataEndpoints{
@@ -2620,7 +2613,6 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 }
 
 func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
-
 	// A boolean representing the state of a pod (started or not).
 	type pod bool
 
@@ -2738,7 +2730,6 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 					Protocol: "http",
 				}
 				rc.NodeMgmtClient = client
-
 			}
 
 			epData := httphelper.CassMetadataEndpoints{
@@ -2922,9 +2913,13 @@ func TestStartOneNodePerRack(t *testing.T) {
 				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
 				k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil)
 
+				// We need to mock the hasAdditionalSeeds call
+				// Mock the Get calls for EndpointSlices
+				// Three calls for the three potential slices (IPv4, IPv6, FQDN)
+
 				if tt.seedCount < 1 {
 					// There's additional checks here, for fetching the possible additional-seeds (the GET) and pre-adding a seed label
-					k8sMockClientGet(mockClient, nil)
+					k8sMockClientGet(mockClient, nil).Times(3)
 					k8sMockClientPatch(mockClient, nil)
 				}
 			}
@@ -3012,7 +3007,7 @@ func TestStartOneNodePerRackFailed(t *testing.T) {
 			rc.Client = mockClient
 
 			mockHttpClient := mocks.NewHttpClient(t)
-			k8sMockClientGet(mockClient, nil)
+			k8sMockClientGet(mockClient, nil).Times(3)
 
 			client := httphelper.NodeMgmtClient{
 				Client:   mockHttpClient,
@@ -3428,7 +3423,7 @@ func TestDatacenterStatus(t *testing.T) {
 	k8sMockClientStatusUpdate(mockClient.Status().(*mocks.SubResourceClient), nil).Times(2)
 	assert.NoError(rc.setConditionStatus(api.DatacenterRequiresUpdate, corev1.ConditionTrue)) // This uses one StatusUpdate call
 	rc.Datacenter.Status.ObservedGeneration = 0
-	rc.Datacenter.ObjectMeta.Generation = 1
+	rc.Datacenter.Generation = 1
 	assert.NoError(setDatacenterStatus(rc))
 	assert.Equal(int64(1), rc.Datacenter.Status.ObservedGeneration)
 	assert.Equal(corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterRequiresUpdate))

@@ -42,8 +42,7 @@ func SetupCassandraDatacenterWebhookWithManager(mgr ctrl.Manager) error {
 
 // CassandraDatacenterCustomDefaulter struct is responsible for setting default values on the custom resource of the
 // Kind CassandraDatacenter when those are created or updated.
-type CassandraDatacenterCustomDefaulter struct {
-}
+type CassandraDatacenterCustomDefaulter struct{}
 
 var _ webhook.CustomDefaulter = &CassandraDatacenterCustomDefaulter{}
 
@@ -54,8 +53,7 @@ func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, obj ru
 
 // CassandraDatacenterCustomValidator struct is responsible for validating the CassandraDatacenter resource
 // when it is created, updated, or deleted.
-type CassandraDatacenterCustomValidator struct {
-}
+type CassandraDatacenterCustomValidator struct{}
 
 var _ webhook.CustomValidator = &CassandraDatacenterCustomValidator{}
 
@@ -159,7 +157,6 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 			dc.Spec.Resources.Limits.Cpu().IsZero() ||
 			dc.Spec.Resources.Requests.Memory().IsZero() ||
 			dc.Spec.Resources.Limits.Memory().IsZero() {
-
 			return attemptedTo("use multiple nodes per worker without cpu and memory requests and limits")
 		}
 	}
@@ -178,7 +175,6 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 // ValidateDatacenterFieldChanges checks that no values are improperly changing while updating
 // a CassandraDatacenter
 func ValidateDatacenterFieldChanges(oldDc *api.CassandraDatacenter, newDc *api.CassandraDatacenter) error {
-
 	if oldDc.Spec.ClusterName != newDc.Spec.ClusterName {
 		return attemptedTo("change clusterName")
 	}
@@ -295,9 +291,7 @@ func ValidateAdditionalVolumes(dc *api.CassandraDatacenter) error {
 	return nil
 }
 
-var (
-	ErrFQLNotSupported = fmt.Errorf("full query logging is only supported on OSS Cassandra 4.0+")
-)
+var ErrFQLNotSupported = fmt.Errorf("full query logging is only supported on OSS Cassandra 4.0+")
 
 func ValidateFQLConfig(dc *api.CassandraDatacenter) error {
 	if dc.Spec.Config != nil {

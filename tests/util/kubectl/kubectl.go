@@ -5,16 +5,15 @@ package kubectl
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"os"
-	"os/user"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"golang.org/x/term"
 
-	mageutil "github.com/k8ssandra/cass-operator/tests/util"
 	shutil "github.com/k8ssandra/cass-operator/tests/util/sh"
 )
 
@@ -24,26 +23,6 @@ const (
 	EnvDockerPassword = "M_DOCKER_PASSWORD"
 	EnvDockerServer   = "M_DOCKER_SERVER"
 )
-
-func GetKubeconfig(createDefault bool) string {
-	usr, err := user.Current()
-	if err != nil {
-		panic(err)
-	}
-	kubeconfig := os.Getenv("KUBECONFIG")
-	if kubeconfig == "" {
-		defaultDir := fmt.Sprintf("%s/.kube/", usr.HomeDir)
-		kubeconfig = fmt.Sprintf("%s/config", defaultDir)
-		if _, err := os.Stat(kubeconfig); createDefault && os.IsNotExist(err) {
-			err := os.MkdirAll(defaultDir, 0755)
-			mageutil.PanicOnError(err)
-			file, err := os.Create(kubeconfig)
-			mageutil.PanicOnError(err)
-			file.Close()
-		}
-	}
-	return kubeconfig
-}
 
 func WatchPods() {
 	args := []string{"pods", "-w"}
@@ -189,7 +168,6 @@ func CreateFromFiles(paths ...string) KCmd {
 	var args []string
 	for _, p := range paths {
 		args = append(args, "-f", p)
-
 	}
 	return KCmd{Command: "create", Args: args}
 }
@@ -266,10 +244,10 @@ func Patch(resource string, data string) KCmd {
 }
 
 func erasePreviousLine() {
-	//cursor up one line
+	// cursor up one line
 	fmt.Print("\033[A")
 
-	//erase line
+	// erase line
 	fmt.Print("\033[K")
 }
 
@@ -342,7 +320,7 @@ func WaitForOutputContains(k KCmd, expected string, seconds int) error {
 }
 
 func DumpAllLogs(path string) KCmd {
-	//Make dir if doesn't exist
+	// Make dir if doesn't exist
 	_ = os.MkdirAll(path, os.ModePerm)
 	args := []string{"dump", "-A"}
 	flags := map[string]string{"output-directory": path}
@@ -350,7 +328,7 @@ func DumpAllLogs(path string) KCmd {
 }
 
 func DumpLogs(path string, namespace string) KCmd {
-	//Make dir if doesn't exist
+	// Make dir if doesn't exist
 	_ = os.MkdirAll(path, os.ModePerm)
 	args := []string{"dump", "-n", namespace}
 	flags := map[string]string{"output-directory": path}
@@ -389,7 +367,11 @@ func storeOutput(path, objectType, ext, output string) {
 	if err != nil {
 		panic("Failed to create log file")
 	}
-	defer outputFile.Close()
+	defer func() {
+		if err := outputFile.Close(); err != nil {
+			panic(fmt.Sprintf("Failed to close output file: %v", err))
+		}
+	}()
 	_, err = outputFile.WriteString(output)
 	if err != nil {
 		panic(err)

@@ -63,7 +63,6 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReady(dcName)
 		})
 		Specify("the operator can move a cassandra node to a new token", func() {
-
 			// Create CassandraTask that should move tokens
 			step := "creating a cassandra task to move a node"
 			k := kubectl.ApplyFiles(taskYaml)

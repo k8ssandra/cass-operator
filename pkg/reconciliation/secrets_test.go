@@ -37,16 +37,16 @@ func Test_buildDefaultSuperuserSecret(t *testing.T) {
 			return
 		}
 
-		if secret.ObjectMeta.Namespace != dc.ObjectMeta.Namespace {
-			t.Errorf("expected secret in namespace '%s' but was '%s", dc.ObjectMeta.Namespace, secret.ObjectMeta.Namespace)
+		if secret.Namespace != dc.Namespace {
+			t.Errorf("expected secret in namespace '%s' but was '%s", dc.Namespace, secret.Namespace)
 		}
 
 		expectedSecretName := fmt.Sprintf("%s-superuser", api.CleanupForKubernetes(dc.Spec.ClusterName))
-		if secret.ObjectMeta.Name != expectedSecretName {
-			t.Errorf("expected default secret name '%s' but was '%s'", expectedSecretName, secret.ObjectMeta.Name)
+		if secret.Name != expectedSecretName {
+			t.Errorf("expected default secret name '%s' but was '%s'", expectedSecretName, secret.Name)
 		}
 
-		errors := validateCassandraUserSecretContent(dc, secret)
+		errors := validateCassandraUserSecretContent(secret)
 		if len(errors) > 0 {
 			t.Errorf("expected default secret to be valid, but was not: %v", errors[0])
 		}
@@ -171,7 +171,7 @@ func Test_validateCassandraUserSecretContent(t *testing.T) {
 				Data: test.data,
 			}
 		}
-		got := (len(validateCassandraUserSecretContent(dc, secret)) == 0)
+		got := (len(validateCassandraUserSecretContent(secret)) == 0)
 		if got != test.valid {
 			t.Error(test.message)
 		}

@@ -34,6 +34,7 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
+	discoveryv1 "k8s.io/api/discovery/v1"
 )
 
 // MockSetControllerReference returns a method that will automatically reverse the mock
@@ -43,7 +44,8 @@ func MockSetControllerReference() func() {
 		owner,
 		object metav1.Object,
 		scheme *runtime.Scheme,
-		opts ...controllerutil.OwnerReferenceOption) error {
+		opts ...controllerutil.OwnerReferenceOption,
+	) error {
 		return nil
 	}
 
@@ -54,8 +56,8 @@ func MockSetControllerReference() func() {
 
 // CreateMockReconciliationContext ...
 func CreateMockReconciliationContext(
-	reqLogger logr.Logger) *ReconciliationContext {
-
+	reqLogger logr.Logger,
+) *ReconciliationContext {
 	// These defaults may need to be settable via arguments
 
 	var (
@@ -108,7 +110,8 @@ func CreateMockReconciliationContext(
 	}
 
 	s := scheme.Scheme
-	s.AddKnownTypes(api.GroupVersion, cassandraDatacenter)
+	setupScheme(s)
+	// s.AddKnownTypes(api.GroupVersion, cassandraDatacenter)
 
 	fakeClient := fake.NewClientBuilder().WithStatusSubresource(cassandraDatacenter).WithRuntimeObjects(trackObjects...).Build()
 
@@ -284,4 +287,14 @@ func k8sMockClientList(mockClient *mocks.Client, returnArg interface{}) *mock.Ca
 			})).
 		Return(returnArg).
 		Once()
+}
+
+func setupScheme(scheme *runtime.Scheme) *runtime.Scheme {
+	if scheme == nil {
+		scheme = runtime.NewScheme()
+	}
+	_ = api.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+	_ = discoveryv1.AddToScheme(scheme)
+	return scheme
 }

@@ -22,8 +22,10 @@ import (
 var setControllerReference = controllerutil.SetControllerReference
 
 // key: Node.Name, value: CassandraDatacenter.Name
-var nodeToDc = make(map[string][]types.NamespacedName)
-var nodeToDcLock = sync.RWMutex{}
+var (
+	nodeToDc     = make(map[string][]types.NamespacedName)
+	nodeToDcLock = sync.RWMutex{}
+)
 
 // Get the dcNames and dcNamespaces for a node
 func DatacentersForNode(nodeName string) []types.NamespacedName {
@@ -42,7 +44,6 @@ func DatacentersForNode(nodeName string) []types.NamespacedName {
 // request will be requeued for the next reconciler to handle in the subsequent reconcile loop, otherwise the next reconciler
 // will be called.
 func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Result, error) {
-
 	rc.ReqLogger.Info("handler::calculateReconciliationActions")
 
 	// Check if the CassandraDatacenter was marked to be deleted
@@ -58,9 +59,9 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 		return result.Output()
 	}
 
-	if result := rc.CheckAdditionalSeedEndpoints(); result.Completed() {
-		return result.Output()
-	}
+	// if result := rc.CheckAdditionalSeedEndpoints(); result.Completed() {
+	// 	return result.Output()
+	// }
 
 	if err := rc.CalculateRackInformation(); err != nil {
 		return result.Error(err).Output()
@@ -93,7 +94,7 @@ func (rc *ReconciliationContext) addFinalizer() error {
 }
 
 func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
-	var errs []error = []error{}
+	errs := []error{}
 
 	// Basic validation up here
 

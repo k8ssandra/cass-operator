@@ -33,7 +33,6 @@ func (rc *ReconciliationContext) CheckConfigSecret() result.ReconcileResult {
 
 	key := types.NamespacedName{Namespace: rc.Datacenter.Namespace, Name: rc.Datacenter.Spec.ConfigSecret}
 	secret, err := rc.retrieveSecret(key)
-
 	if err != nil {
 		rc.ReqLogger.Error(err, "failed to get config secret", "ConfigSecret", key.Name)
 		return result.Error(err)
@@ -57,7 +56,7 @@ func (rc *ReconciliationContext) CheckConfigSecret() result.ReconcileResult {
 	}
 
 	storedConfig, found := dcConfigSecret.Data["config"]
-	if !(found && bytes.Equal(storedConfig, config)) {
+	if !found || !bytes.Equal(storedConfig, config) {
 		if err := rc.updateConfigHashAnnotation(dcConfigSecret); err != nil {
 			rc.ReqLogger.Error(err, "failed to update config hash annotation")
 			return result.Error(err)

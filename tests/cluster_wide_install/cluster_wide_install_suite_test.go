@@ -47,9 +47,7 @@ func TestLifecycle(t *testing.T) {
 		if err != nil {
 			t.Logf("Failed to undeploy cass-operator: %v", err)
 		}
-
 	})
-
 	RegisterFailHandler(Fail)
 	RunSpecs(t, testName)
 }

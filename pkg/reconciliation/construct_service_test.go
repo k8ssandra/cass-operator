@@ -6,12 +6,14 @@ package reconciliation
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -58,7 +60,7 @@ func TestCassandraDatacenter_allPodsServiceLabels(t *testing.T) {
 
 	service := newAllPodsServiceForCassandraDatacenter(dc)
 
-	gotLabels := service.ObjectMeta.Labels
+	gotLabels := service.Labels
 	if !reflect.DeepEqual(wantLabels, gotLabels) {
 		t.Errorf("allPodsService labels = %v, want %v", gotLabels, wantLabels)
 	}
@@ -143,7 +145,6 @@ func TestLabelsWithNewSeedServiceForCassandraDatacenter(t *testing.T) {
 			"Add": "annotation",
 		})
 	}
-
 }
 
 func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T) {
@@ -545,7 +546,7 @@ func TestServicePorts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var getServicePorts = func(svc *corev1.Service) []int32 {
+			getServicePorts := func(svc *corev1.Service) []int32 {
 				servicePorts := make([]int32, len(svc.Spec.Ports))
 				for i := 0; i < len(svc.Spec.Ports); i++ {
 					servicePorts[i] = svc.Spec.Ports[i].Port
@@ -564,4 +565,174 @@ func TestServicePorts(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestNewEndpointSlicesForAdditionalSeeds(t *testing.T) {
+	expectedTypes := []discoveryv1.AddressType{discoveryv1.AddressTypeIPv4, discoveryv1.AddressTypeIPv6, discoveryv1.AddressTypeFQDN}
+
+	testCases := []struct {
+		name            string
+		additionalSeeds []string
+		expectedCounts  map[discoveryv1.AddressType]int
+	}{
+		{
+			name:            "IPv4 addresses only",
+			additionalSeeds: []string{"192.168.1.1", "10.0.0.1", "172.16.0.1"},
+			expectedCounts: map[discoveryv1.AddressType]int{
+				discoveryv1.AddressTypeIPv4: 3,
+			},
+		},
+		{
+			name:            "IPv6 addresses only",
+			additionalSeeds: []string{"2001:db8::1", "2001:db8:1::1"},
+			expectedCounts: map[discoveryv1.AddressType]int{
+				discoveryv1.AddressTypeIPv6: 2,
+			},
+		},
+		{
+			name:            "FQDN addresses only",
+			additionalSeeds: []string{"seed1.example.com", "seed2.example.com"},
+			expectedCounts: map[discoveryv1.AddressType]int{
+				discoveryv1.AddressTypeFQDN: 2,
+			},
+		},
+		{
+			name:            "Mixed address types",
+			additionalSeeds: []string{"192.168.1.1", "2001:db8::1", "seed1.example.com"},
+			expectedCounts: map[discoveryv1.AddressType]int{
+				discoveryv1.AddressTypeIPv4: 1,
+				discoveryv1.AddressTypeIPv6: 1,
+				discoveryv1.AddressTypeFQDN: 1,
+			},
+		},
+		{
+			name:            "Empty additional seeds",
+			additionalSeeds: []string{},
+			expectedCounts:  map[discoveryv1.AddressType]int{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dc := &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "dc1",
+					Namespace: "test",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:     "test-cluster",
+					AdditionalSeeds: tc.additionalSeeds,
+				},
+			}
+
+			slices := newEndpointSlicesForAdditionalSeeds(dc)
+			assert.Equal(t, len(expectedTypes), len(slices), "Number of slices should match expected types")
+
+			// Check that we have the expected types of slices
+			foundTypes := make([]discoveryv1.AddressType, 0, len(slices))
+			for _, slice := range slices {
+				foundTypes = append(foundTypes, slice.AddressType)
+
+				// Check the count of addresses for each type
+				if count, exists := tc.expectedCounts[slice.AddressType]; exists {
+					assert.Equal(t, 1, len(slice.Endpoints), "Should have one endpoint")
+					if len(slice.Endpoints) > 0 {
+						assert.Equal(t, count, len(slice.Endpoints[0].Addresses),
+							"Address count mismatch for type %s", slice.AddressType)
+					}
+				}
+
+				// Check service name label
+				assert.Equal(t, dc.GetAdditionalSeedsServiceName(),
+					slice.Labels[discoveryv1.LabelServiceName],
+					"Service name label should match")
+
+				// Check the name follows the pattern
+				expectedName := fmt.Sprintf("%s-%s",
+					dc.GetAdditionalSeedsServiceName(),
+					strings.ToLower(string(slice.AddressType)))
+				assert.Equal(t, expectedName, slice.Name, "Slice name should follow the pattern")
+
+				// Check namespace
+				assert.Equal(t, dc.Namespace, slice.Namespace, "Namespace should match")
+			}
+
+			// Check that we have all expected types (order-independent)
+			assert.ElementsMatch(t, expectedTypes, foundTypes, "Address types should match expected")
+		})
+	}
+}
+
+func TestCreateEndpointSlice(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dc1",
+			Namespace: "test",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "test-cluster",
+		},
+	}
+
+	addresses := []string{"192.168.1.1", "192.168.1.2"}
+	slice := createEndpointSlice(dc, discoveryv1.AddressTypeIPv4, addresses)
+
+	assert.Equal(t, discoveryv1.AddressTypeIPv4, slice.AddressType)
+	assert.Equal(t, "test", slice.Namespace)
+	assert.Equal(t, fmt.Sprintf("%s-ipv4", dc.GetAdditionalSeedsServiceName()), slice.Name)
+	assert.Equal(t, 1, len(slice.Endpoints))
+	assert.Equal(t, addresses, slice.Endpoints[0].Addresses)
+	assert.Equal(t, dc.GetAdditionalSeedsServiceName(), slice.Labels[discoveryv1.LabelServiceName])
+
+	for k, v := range dc.GetDatacenterLabels() {
+		assert.Equal(t, v, slice.Labels[k])
+	}
+}
+
+func TestEndpointSlicesCorrectAddressSlice(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dc1",
+			Namespace: "test",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName: "test-cluster",
+			AdditionalSeeds: []string{
+				"192.168.1.1",       // IPv4
+				"2001:db8::1",       // IPv6
+				"seed1.example.com", // FQDN
+			},
+		},
+	}
+
+	assert := assert.New(t)
+	endpointSlices := newEndpointSlicesForAdditionalSeeds(dc)
+	assert.Equal(3, len(endpointSlices), "Should create 3 EndpointSlices for 3 different address types")
+
+	addressTypeCounts := map[discoveryv1.AddressType]int{
+		discoveryv1.AddressTypeIPv4: 0,
+		discoveryv1.AddressTypeIPv6: 0,
+		discoveryv1.AddressTypeFQDN: 0,
+	}
+
+	for _, slice := range endpointSlices {
+		switch slice.AddressType {
+		case discoveryv1.AddressTypeIPv4:
+			assert.Equal(1, len(slice.Endpoints[0].Addresses))
+			assert.Equal("192.168.1.1", slice.Endpoints[0].Addresses[0])
+			addressTypeCounts[discoveryv1.AddressTypeIPv4]++
+		case discoveryv1.AddressTypeIPv6:
+			assert.Equal(1, len(slice.Endpoints[0].Addresses))
+			assert.Equal("2001:db8::1", slice.Endpoints[0].Addresses[0])
+			addressTypeCounts[discoveryv1.AddressTypeIPv6]++
+		case discoveryv1.AddressTypeFQDN:
+			assert.Equal(1, len(slice.Endpoints[0].Addresses))
+			assert.Equal("seed1.example.com", slice.Endpoints[0].Addresses[0])
+			addressTypeCounts[discoveryv1.AddressTypeFQDN]++
+		}
+	}
+
+	assert.Equal(1, addressTypeCounts[discoveryv1.AddressTypeIPv4])
+	assert.Equal(1, addressTypeCounts[discoveryv1.AddressTypeIPv6])
+	assert.Equal(1, addressTypeCounts[discoveryv1.AddressTypeFQDN])
 }

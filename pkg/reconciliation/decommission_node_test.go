@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,7 +30,7 @@ func TestRetryDecommissionNode(t *testing.T) {
 	rc.Client = mockClient
 
 	rc.Datacenter.SetCondition(api.DatacenterCondition{
-		Status: v1.ConditionTrue,
+		Status: corev1.ConditionTrue,
 		Type:   api.DatacenterScalingDown,
 	})
 	res := &http.Response{

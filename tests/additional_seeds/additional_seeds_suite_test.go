@@ -6,7 +6,6 @@ package additional_seeds
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -27,7 +26,7 @@ var (
 	dcResource                     = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	dcLabel                        = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	additionalSeedServiceResource  = "services/cluster1-dc1-additional-seed-service"
-	additionalSeedEndpointResource = "endpoints/cluster1-dc1-additional-seed-service"
+	additionalSeedEndpointResource = "endpointslices/cluster1-dc1-additional-seed-service"
 	ns                             = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -190,10 +189,10 @@ func checkSeedConstraints() {
 	// checkCassandraSeedListsAlignWithSeedLabels(info)
 }
 
-func getAdditionalSeedEndpointResourceAddresses() ([]interface{}, error) {
+func getAdditionalSeedEndpointResourceAddresses(suffix string) ([]interface{}, error) {
 	// Should be addresses and then go through them in the later check
-	jsonpath := "jsonpath={.subsets[0].addresses}"
-	k := kubectl.Get(additionalSeedEndpointResource).FormatOutput(jsonpath)
+	jsonpath := "jsonpath={.endpoints[].addresses}"
+	k := kubectl.Get(fmt.Sprintf("%s-%s", additionalSeedEndpointResource, suffix)).FormatOutput(jsonpath)
 	output, err := ns.Output(k)
 	if err != nil {
 		return nil, err
@@ -222,15 +221,15 @@ func checkAdditionalSeedService() {
 	Expect(actualType).To(Equal("ClusterIP"), "Expected additional seed service type %s to be ClusterIP", actualType)
 
 	// Check the endpoints
-	ipList, err := getAdditionalSeedEndpointResourceAddresses()
+	ipList, err := getAdditionalSeedEndpointResourceAddresses("ipv4")
 	Expect(err).ToNot(HaveOccurred())
-	firstIP := ipList[0].(map[string]interface{})
-	Expect(firstIP["ip"]).To(Equal("192.168.1.1"), "Expected additional seed endpoints IP %s to be 192.168.1.1", firstIP)
+	firstIP := ipList[0].(string)
+	Expect(firstIP).To(Equal("192.168.1.1"), "Expected additional seed endpoints IP %s to be 192.168.1.1", firstIP)
 
-	secondIP := ipList[1].(map[string]interface{})
-	actualIp := secondIP["ip"].(string)
-	match, _ := regexp.MatchString("^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$", actualIp)
-	Expect(match).To(BeTrue())
+	ipList, err = getAdditionalSeedEndpointResourceAddresses("fqdn")
+	Expect(err).ToNot(HaveOccurred())
+	firstIP = ipList[0].(string)
+	Expect(firstIP).To(Equal("www.datastax.com"), "Expected additional seed endpoints FQDN %s to be www.datastax.com", firstIP)
 }
 
 var _ = Describe(testName, func() {
@@ -245,7 +244,7 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForOperatorReady()
 
-			step = "creating a datacenter resource with 2 racks/4 nodes"
+			step = "creating a datacenter resource with 3 racks/3 nodes"
 			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -274,7 +273,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			Eventually(func() error {
-				_, err := getAdditionalSeedEndpointResourceAddresses()
+				_, err := getAdditionalSeedEndpointResourceAddresses("ipv4")
 				return err
 			}, "15s", "100ms").Should(Succeed())
 

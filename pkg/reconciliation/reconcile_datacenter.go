@@ -112,8 +112,8 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 
 	// Clean up annotation litter on the user Secrets
 	err := rc.SecretWatches.RemoveWatcher(types.NamespacedName{
-		Name: rc.Datacenter.GetName(), Namespace: rc.Datacenter.GetNamespace()})
-
+		Name: rc.Datacenter.GetName(), Namespace: rc.Datacenter.GetNamespace(),
+	})
 	if err != nil {
 		rc.ReqLogger.Error(err, "Failed to remove dynamic secret watches for CassandraDatacenter")
 	}
@@ -162,7 +162,6 @@ func (rc *ReconciliationContext) deletePVCs() error {
 		"numPVCs", len(persistentVolumeClaimList))
 
 	for _, pvc := range persistentVolumeClaimList {
-
 		if isBeingUsed, err := rc.isBeingUsed(pvc); err != nil {
 			logger.Error(err, "Failed to check if PVC is being used")
 			return err

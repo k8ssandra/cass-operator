@@ -135,10 +135,10 @@ var _ = Describe(testName, func() {
 			ns.WaitForCompleteTask("rebuild-dc")
 
 			podNames := ns.GetDatacenterReadyPodNames(dc1Name)
-			Expect(len(podNames)).To(Equal(2))
+			Expect(podNames).To(HaveLen(2))
 			dcs := findDatacenters(podNames[0])
 
-			Expect(len(dcs)).To(Equal(2), fmt.Sprintf("Expected to find 2 datacenters in nodetool status but found %v", dcs))
+			Expect(dcs).To(HaveLen(2), fmt.Sprintf("Expected to find 2 datacenters in nodetool status but found %v", dcs))
 
 			step = "annotate dc2 to do decommission on delete"
 			k = kubectl.Annotate("cassdc", dc2Name, "cassandra.datastax.com/decommission-on-delete", "true")

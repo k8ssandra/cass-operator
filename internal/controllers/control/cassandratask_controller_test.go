@@ -10,7 +10,6 @@ import (
 
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 
-	cassapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	api "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -132,7 +131,7 @@ func createStatefulSets(namespace string) {
 
 		Expect(k8sClient.Get(context.TODO(), stsKey, sts)).Should(Succeed())
 		sts.Status.CurrentRevision = "0"
-		Expect(k8sClient.Status().Update(context.TODO(), sts))
+		Expect(k8sClient.Status().Update(context.TODO(), sts)).To(Succeed())
 	}
 }
 
@@ -224,7 +223,7 @@ func waitForTaskCompletion(taskKey types.NamespacedName) *api.CassandraTask {
 		Expect(err).ToNot(HaveOccurred())
 
 		return emptyTask.Status.CompletionTime != nil
-	}, time.Duration(5*time.Second)).Should(BeTrue())
+	}, 5*time.Second).Should(BeTrue())
 	return emptyTask
 }
 
@@ -236,14 +235,16 @@ func waitForTaskFailed(taskKey types.NamespacedName) *api.CassandraTask {
 		Expect(err).ToNot(HaveOccurred())
 
 		return emptyTask.Status.Failed > 0
-	}, time.Duration(5*time.Second)).Should(BeTrue())
+	}, 5*time.Second).Should(BeTrue())
 	return emptyTask
 }
 
 var _ = Describe("CassandraTask controller tests", func() {
 	Describe("Execute jobs against all pods", func() {
-		JobRunningRequeue = time.Duration(1 * time.Millisecond)
-		TaskRunningRequeue = time.Duration(1 * time.Millisecond)
+		BeforeEach(func() {
+			JobRunningRequeue = 1 * time.Millisecond
+			TaskRunningRequeue = 1 * time.Millisecond
+		})
 		Context("Async jobs", func() {
 			var testNamespaceName string
 			BeforeEach(func() {
@@ -276,7 +277,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 					// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 					Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount))
 
-					Expect(len(completedTask.Status.Conditions)).To(Equal(2))
+					Expect(completedTask.Status.Conditions).To(HaveLen(2))
 					for _, cond := range completedTask.Status.Conditions {
 						switch cond.Type {
 						case string(api.JobComplete):
@@ -432,7 +433,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				Expect(json.Unmarshal(callDetails.Payloads[0], &req)).Should(Succeed())
 				Expect(req.KeyspaceName).To(Equal("ks1"))
 				Expect(req.SplitOutput).To(BeTrue())
-				Expect(len(req.Tables)).To(BeNumerically("==", 1))
+				Expect(req.Tables).To(HaveLen(1))
 			})
 
 			When("Running cleanup twice in the same datacenter", func() {
@@ -595,7 +596,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 					pod := &corev1.Pod{}
 					err := k8sClient.Get(context.TODO(), podKey, pod)
 					return err != nil && errors.IsNotFound(err)
-				}, time.Duration(3*time.Second)).Should(BeTrue())
+				}, 3*time.Second).Should(BeTrue())
 
 				// Recreate it so the process "finishes"
 				createPod(testNamespaceName, clusterName, testDatacenterName, "r1", 2)
@@ -776,20 +777,20 @@ var _ = Describe("CassandraTask controller tests", func() {
 				// Verify other racks haven't been modified
 				var stsAll appsv1.StatefulSetList
 				Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
-				Expect(len(stsAll.Items)).To(Equal(rackCount))
+				Expect(stsAll.Items).To(HaveLen(rackCount))
 
 				for _, sts := range stsAll.Items {
 					if sts.Name == stsKey.Name {
 						continue
 					}
-					_, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]
+					_, found := sts.Spec.Template.Annotations[api.RestartedAtAnnotation]
 					Expect(found).ToNot(BeTrue())
 				}
 			})
 			It("Restarts datacenter", func() {
 				var stsAll appsv1.StatefulSetList
 				Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
-				Expect(len(stsAll.Items)).To(Equal(rackCount))
+				Expect(stsAll.Items).To(HaveLen(rackCount))
 
 				// Create task to restart all
 				taskKey, task := buildTask(api.CommandRestart, testNamespaceName)
@@ -855,13 +856,13 @@ var _ = Describe("CassandraTask controller tests", func() {
 					if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: testDatacenterName, Namespace: testNamespaceName}, dc); err != nil {
 						return false
 					}
-					if metav1.HasAnnotation(dc.ObjectMeta, cassapi.UpdateAllowedAnnotation) {
-						return dc.Annotations[cassapi.UpdateAllowedAnnotation] == "once"
+					if metav1.HasAnnotation(dc.ObjectMeta, cassdcapi.UpdateAllowedAnnotation) {
+						return dc.Annotations[cassdcapi.UpdateAllowedAnnotation] == "once"
 					}
 					return false
 				}, "5s", "50ms").Should(BeTrue())
 
-				delete(dc.Annotations, cassapi.UpdateAllowedAnnotation)
+				delete(dc.Annotations, cassdcapi.UpdateAllowedAnnotation)
 				Expect(k8sClient.Update(context.Background(), dc)).Should(Succeed())
 
 				_ = waitForTaskCompletion(taskKey)
@@ -869,7 +870,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 			It("Completes if autoupdate-spec is always allowed", func() {
 				dc := &cassdcapi.CassandraDatacenter{}
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: testDatacenterName, Namespace: testNamespaceName}, dc)).To(Succeed())
-				metav1.SetMetaDataAnnotation(&dc.ObjectMeta, cassapi.UpdateAllowedAnnotation, string(cassapi.AllowUpdateAlways))
+				metav1.SetMetaDataAnnotation(&dc.ObjectMeta, cassdcapi.UpdateAllowedAnnotation, string(cassdcapi.AllowUpdateAlways))
 				Expect(k8sClient.Update(context.Background(), dc)).Should(Succeed())
 
 				taskKey, task := buildTask(api.CommandRefresh, testNamespaceName)

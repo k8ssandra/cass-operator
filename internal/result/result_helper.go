@@ -21,6 +21,7 @@ type continueReconcile struct{}
 func (c continueReconcile) Completed() bool {
 	return false
 }
+
 func (c continueReconcile) Output() (ctrl.Result, error) {
 	panic("there was no Result to return")
 }
@@ -30,6 +31,7 @@ type done struct{}
 func (d done) Completed() bool {
 	return true
 }
+
 func (d done) Output() (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
@@ -41,9 +43,10 @@ type callBackSoon struct {
 func (c callBackSoon) Completed() bool {
 	return true
 }
+
 func (c callBackSoon) Output() (ctrl.Result, error) {
 	t := DurationFunc(c.secs)
-	return ctrl.Result{Requeue: true, RequeueAfter: t}, nil
+	return ctrl.Result{RequeueAfter: t}, nil
 }
 
 type errorOut struct {
@@ -53,6 +56,7 @@ type errorOut struct {
 func (e errorOut) Completed() bool {
 	return true
 }
+
 func (e errorOut) Output() (ctrl.Result, error) {
 	return ctrl.Result{}, e.err
 }

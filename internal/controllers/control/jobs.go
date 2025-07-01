@@ -72,7 +72,7 @@ func (r *CassandraTaskReconciler) restartSts(taskConfig *TaskConfiguration, sts 
 	if taskConfig.Arguments.RackName != "" {
 		singleSts := make([]appsv1.StatefulSet, 1)
 		for _, st := range sts {
-			if st.ObjectMeta.Labels[cassapi.RackLabel] == taskConfig.Arguments.RackName {
+			if st.Labels[cassapi.RackLabel] == taskConfig.Arguments.RackName {
 				singleSts[0] = st
 				sts = singleSts
 				break
@@ -81,10 +81,10 @@ func (r *CassandraTaskReconciler) restartSts(taskConfig *TaskConfiguration, sts 
 	}
 	restartedPods := 0
 	for _, st := range sts {
-		if st.Spec.Template.ObjectMeta.Annotations == nil {
-			st.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+		if st.Spec.Template.Annotations == nil {
+			st.Spec.Template.Annotations = make(map[string]string)
 		}
-		if st.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation] == restartTime {
+		if st.Spec.Template.Annotations[api.RestartedAtAnnotation] == restartTime {
 			// This one has been called to restart already - is it ready?
 
 			status := st.Status
@@ -104,8 +104,8 @@ func (r *CassandraTaskReconciler) restartSts(taskConfig *TaskConfiguration, sts 
 			// This is still restarting
 			return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
 		}
-		st.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation] = restartTime
-		if err := r.Client.Update(taskConfig.Context, &st); err != nil {
+		st.Spec.Template.Annotations[api.RestartedAtAnnotation] = restartTime
+		if err := r.Update(taskConfig.Context, &st); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -171,13 +171,13 @@ func (r *CassandraTaskReconciler) replacePod(nodeMgmtClient httphelper.NodeMgmtC
 
 		// Delete the PVCs .. without waiting (set status to terminating - finalizer will block)
 		for _, pvc := range pvcs {
-			if err := r.Client.Delete(taskConfig.Context, pvc); err != nil {
+			if err := r.Delete(taskConfig.Context, pvc); err != nil {
 				return err
 			}
 		}
 
 		// Finally, delete the pod
-		if err := r.Client.Delete(taskConfig.Context, pod); err != nil {
+		if err := r.Delete(taskConfig.Context, pod); err != nil {
 			return err
 		}
 	}
@@ -185,7 +185,7 @@ func (r *CassandraTaskReconciler) replacePod(nodeMgmtClient httphelper.NodeMgmtC
 	for i := 0; i < 10; i++ {
 		time.Sleep(1 * time.Second)
 		newPod := &corev1.Pod{}
-		if err := r.Client.Get(taskConfig.Context, podKey, newPod); err != nil {
+		if err := r.Get(taskConfig.Context, podKey, newPod); err != nil {
 			continue
 		}
 		if uid != newPod.UID {
@@ -442,7 +442,6 @@ func (r *CassandraTaskReconciler) refreshDatacenter(ctx context.Context, dc *cas
 		}
 	}
 	return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
-
 }
 
 // ts reload functionality
@@ -485,7 +484,7 @@ func (r *CassandraTaskReconciler) getPodPVCs(ctx context.Context, namespace stri
 		}
 
 		podPvc := &corev1.PersistentVolumeClaim{}
-		err := r.Client.Get(ctx, name, podPvc)
+		err := r.Get(ctx, name, podPvc)
 		if err != nil {
 			return nil, err
 		}

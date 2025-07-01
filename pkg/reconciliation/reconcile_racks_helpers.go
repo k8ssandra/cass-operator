@@ -4,6 +4,7 @@ package reconciliation
 
 import (
 	"fmt"
+	"net"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
@@ -69,6 +70,28 @@ func FindIpForHostId(endpointData httphelper.CassMetadataEndpoints, hostId strin
 	// This indicates the cassandra node with the given hostId never
 	// actually joined the ring
 	return "", nil
+}
+
+func findHostIdForIpFromEndpointsData(endpointsData []httphelper.EndpointState, ip string) (bool, string) {
+	for _, data := range endpointsData {
+		if net.ParseIP(data.GetRpcAddress()).Equal(net.ParseIP(ip)) {
+			if data.HasStatus(httphelper.StatusNormal) {
+				return true, data.HostID
+			}
+			return false, data.HostID
+		}
+	}
+	return false, ""
+}
+
+func findHostIdFromEndpointsData(endpointsData []httphelper.EndpointState) string {
+	for _, data := range endpointsData {
+		if data.IsLocal == "true" && data.HasStatus(httphelper.StatusNormal) {
+			return data.HostID
+		}
+	}
+
+	return ""
 }
 
 func PodPtrsFromPodList(podList *corev1.PodList) []*corev1.Pod {

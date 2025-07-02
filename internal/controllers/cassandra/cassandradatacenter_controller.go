@@ -121,7 +121,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 		return ctrl.Result{}, err
 	}
 
-	if err := rc.IsValid(rc.Datacenter); err != nil {
+	if err := rc.IsValid(rc.Datacenter); err != nil && rc.Datacenter.DeletionTimestamp == nil {
 		logger.Error(err, "CassandraDatacenter resource is invalid")
 		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ValidationFailed", err.Error())
 		return ctrl.Result{}, reconcile.TerminalError(err)

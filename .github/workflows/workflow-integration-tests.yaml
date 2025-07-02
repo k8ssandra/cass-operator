@@ -215,6 +215,7 @@ jobs:
         # - config_fql # OSS only, see above job
         #- decommission_dc #TODO: Fails against DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
+          - namespace_deletion
         workflowVersion:
           - ${{ inputs.version }}
         exclude:

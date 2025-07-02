@@ -184,7 +184,6 @@ var _ = Describe(testName, func() {
 				return len(tasks)
 			}, time.Minute*3, time.Second*10).Should(BeNumerically(">=", 2))
 
-			step = "verify concurrency policy prevents overlapping tasks"
 			// Get all tasks and check that only one should be running at a time
 			json = "jsonpath={.items[?(@.status.completionTime == \"\")].metadata.name}"
 			k = kubectl.Get("CassandraTask").

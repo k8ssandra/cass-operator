@@ -4,6 +4,7 @@
 package reconciliation
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -3654,4 +3655,125 @@ func TestShouldUseFastPath(t *testing.T) {
 	assert.True(shouldUseFastPath(dc, seedCount))
 	metav1.SetMetaDataAnnotation(&dc.ObjectMeta, api.AllowParallelStartsAnnotations, "false")
 	assert.False(shouldUseFastPath(dc, seedCount))
+}
+
+func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
+	podName := "cassandradatacenter-example-default-sts-0"
+	testPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: "default", // Match the namespace from setupTest()
+			Labels: map[string]string{
+				api.ClusterLabel:    "cassandradatacenter-example-cluster", // Match the clusterName from setupTest()
+				api.DatacenterLabel: "cassandradatacenter-example",         // Match the datacenter name from setupTest()
+				api.RackLabel:       "default",
+				api.CassNodeState:   stateStarted, // Need this to pass the isMgmtApiRunning check
+			},
+		},
+		Status: corev1.PodStatus{
+			PodIP: "10.244.0.1",
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:  "cassandra",
+					Ready: true,
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now().Add(time.Second * -30)), // Started 30 seconds ago
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Test cases
+	testCases := []struct {
+		name              string
+		supportAsyncFlush bool
+		expectedHostID    string
+	}{
+		{
+			name:              "Modern version with AsyncFlush feature",
+			supportAsyncFlush: true,
+			expectedHostID:    "test-host-id",
+		},
+		{
+			name:              "Legacy version without AsyncFlush feature",
+			supportAsyncFlush: false,
+			expectedHostID:    "test-host-id",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockHttpClient := mocks.NewHttpClient(t)
+
+			featuresJson := []byte(`{
+				"cassandra_version": "4.0.0",
+				"features": ["async_flush_task"]
+			}`)
+			if !tc.supportAsyncFlush {
+				featuresJson = []byte(`{
+					"cassandra_version": "4.0.0",
+					"features": []
+				}`)
+			}
+
+			// Current mgmt-api
+			modernEndpointsJson := []byte(`{
+				"entity": [
+					{
+						"ENDPOINT_IP": "255.244.0.1",
+						"HOST_ID": "test-host-id",
+						"RELEASE_VERSION": "4.0.0",
+						"STATUS": "NORMAL,4241053645453754050",
+						"RPC_ADDRESS": "255.244.0.1",
+						"IS_LOCAL": "true"
+					}
+				]
+			}`)
+
+			// <v0.1.69 mgmt-api
+			legacyEndpointsJson := []byte(`{
+				"entity": [
+					{
+						"ENDPOINT_IP": "10.244.0.1",
+						"HOST_ID": "test-host-id",
+						"RELEASE_VERSION": "4.0.0",
+						"STATUS": "NORMAL,4241053645453754050",
+						"RPC_ADDRESS": "10.244.0.1"
+					}
+				]
+			}`)
+
+			endpointsJson := modernEndpointsJson
+			if !tc.supportAsyncFlush {
+				endpointsJson = legacyEndpointsJson
+			}
+
+			mockHttpClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(featuresJson)),
+			}, nil).Once()
+
+			mockHttpClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(endpointsJson)),
+			}, nil).Once()
+
+			rc, _, cleanupMockScr := setupTest()
+			defer cleanupMockScr()
+
+			rc.Datacenter.Status.NodeStatuses = map[string]api.CassandraNodeStatus{}
+
+			rc.NodeMgmtClient.Client = mockHttpClient
+			rc.dcPods = []*corev1.Pod{testPod}
+
+			err := rc.UpdateCassandraNodeStatus(false)
+
+			assert.NoError(t, err, "Unexpected error")
+			assert.Contains(t, rc.Datacenter.Status.NodeStatuses, podName, "Node status not added")
+			assert.Equal(t, tc.expectedHostID, rc.Datacenter.Status.NodeStatuses[podName].HostID, "Host ID not correctly set")
+		})
+	}
 }

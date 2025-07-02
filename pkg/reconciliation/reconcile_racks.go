@@ -5,7 +5,6 @@ package reconciliation
 
 import (
 	"fmt"
-	"net"
 	"reflect"
 	"sort"
 	"strconv"
@@ -1072,18 +1071,6 @@ func (rc *ReconciliationContext) CreateUsers() result.ReconcileResult {
 	return result.Continue()
 }
 
-func findHostIdForIpFromEndpointsData(endpointsData []httphelper.EndpointState, ip string) (bool, string) {
-	for _, data := range endpointsData {
-		if net.ParseIP(data.GetRpcAddress()).Equal(net.ParseIP(ip)) {
-			if data.HasStatus(httphelper.StatusNormal) {
-				return true, data.HostID
-			}
-			return false, data.HostID
-		}
-	}
-	return false, ""
-}
-
 func getRpcAddress(dc *api.CassandraDatacenter, pod *corev1.Pod) string {
 	nc := dc.Spec.Networking
 	if nc != nil {
@@ -1130,10 +1117,25 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 			// moderately expensive, so if we already have a HostID, don't bother. This
 			// would only change if something has gone horribly horribly wrong.
 			if force || nodeStatus.HostID == "" {
+				features, err := rc.NodeMgmtClient.FeatureSet(pod)
+				if err != nil {
+					logger.Error(err, "error getting feature set for pod", "pod", pod.Name)
+					return err
+				}
 				endpointsResponse, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
-				if err == nil {
-					ready, hostId := findHostIdForIpFromEndpointsData(
-						endpointsResponse.Entity, ip)
+				if err != nil {
+					logger.Error(err, "error getting metadata endpoints for pod", "pod", pod.Name)
+					return err
+				}
+
+				if features.Supports(httphelper.AsyncFlush) {
+					// Versions older than mgmt-api v0.1.69 do not support this and async_flush matches that version
+					hostId := findHostIdFromEndpointsData(endpointsResponse.Entity)
+					if hostId != "" {
+						nodeStatus.HostID = hostId
+					}
+				} else {
+					ready, hostId := findHostIdForIpFromEndpointsData(endpointsResponse.Entity, ip)
 					if nodeStatus.HostID == "" {
 						logger.Info("Failed to find host ID", "pod", pod.Name)
 					}

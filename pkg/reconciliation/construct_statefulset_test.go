@@ -413,7 +413,7 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 		assert.Equal(t, "/var/log/cassandra", got.Spec.Template.Spec.InitContainers[0].VolumeMounts[0].MountPath)
 
 		assert.Equal(t, "server-config-init", got.Spec.Template.Spec.InitContainers[1].Name)
-		assert.Equal(t, "localhost:5000/datastax/cass-config-builder:1.0-ubi8", got.Spec.Template.Spec.InitContainers[1].Image)
+		assert.Equal(t, "localhost:5000/datastax/cass-config-builder:1.0-ubi", got.Spec.Template.Spec.InitContainers[1].Image)
 		assert.Equal(t, 1, len(got.Spec.Template.Spec.InitContainers[1].VolumeMounts))
 		assert.Equal(t, "server-config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].Name)
 		assert.Equal(t, "/config", got.Spec.Template.Spec.InitContainers[1].VolumeMounts[0].MountPath)

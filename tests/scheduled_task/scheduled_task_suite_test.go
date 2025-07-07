@@ -117,15 +117,15 @@ var _ = Describe(testName, func() {
 				return len(runningTasks)
 			}, time.Second*30, time.Second*5).Should(BeNumerically("<=", 1))
 
-			step = "verify ScheduledTask owner reference is set to CassandraDatacenter"
+			// step = "verify ScheduledTask owner reference is set to CassandraDatacenter"
 			json = "jsonpath={.metadata.ownerReferences[0].name}"
 			k = kubectl.Get(scheduledTaskResource).FormatOutput(json)
-			ns.WaitForOutput(k, dcName, 60)
+			Expect(ns.WaitForOutput(k, dcName, 60)).ToNot(HaveOccurred())
 
-			step = "verify ScheduledTask owner reference kind is CassandraDatacenter"
+			// step = "verify ScheduledTask owner reference kind is CassandraDatacenter"
 			json = "jsonpath={.metadata.ownerReferences[0].kind}"
 			k = kubectl.Get(scheduledTaskResource).FormatOutput(json)
-			ns.WaitForOutput(k, "CassandraDatacenter", 60)
+			Expect(ns.WaitForOutput(k, "CassandraDatacenter", 60)).ToNot(HaveOccurred())
 
 			step = "deleting the ScheduledTask"
 			k = kubectl.DeleteFromFiles(scheduledTaskYaml)

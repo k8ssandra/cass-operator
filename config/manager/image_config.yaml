@@ -4,7 +4,7 @@ metadata:
   name: image-config
 images:
   system-logger: "k8ssandra/system-logger:latest"
-  config-builder: "datastax/cass-config-builder:1.0-ubi8"
+  config-builder: "datastax/cass-config-builder:1.0-ubi"
   k8ssandra-client: "k8ssandra/k8ssandra-client:v0.7.0"
   # cassandra:
   #   "4.0.0": "k8ssandra/cassandra-ubi:latest"

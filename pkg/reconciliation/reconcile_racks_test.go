@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -3774,6 +3775,222 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 			assert.NoError(t, err, "Unexpected error")
 			assert.Contains(t, rc.Datacenter.Status.NodeStatuses, podName, "Node status not added")
 			assert.Equal(t, tc.expectedHostID, rc.Datacenter.Status.NodeStatuses[podName].HostID, "Host ID not correctly set")
+		})
+	}
+}
+
+func TestFailureDetection(t *testing.T) {
+	// Define test cases with different pod configurations
+	testCases := []struct {
+		name            string
+		pod             *corev1.Pod
+		events          []*corev1.Event
+		expectedFailure bool
+		expectedRack    string
+	}{
+		{
+			name: "PendingPod",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster1-dc1-rack1-0",
+					Namespace: "default",
+					Labels: map[string]string{
+						api.ClusterLabel:    "cluster1",
+						api.DatacenterLabel: "dc1",
+						api.RackLabel:       "rack1",
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase:     corev1.PodPending,
+					StartTime: &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
+				},
+			},
+			events: []*corev1.Event{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "failedSchedulingEvent",
+						Namespace: "default",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind:      "Pod",
+						Name:      "cluster1-dc1-rack1-0",
+						Namespace: "default",
+					},
+					Reason:  "FailedScheduling",
+					Message: "0/3 nodes are available: 3 Insufficient memory.",
+					Type:    "Warning",
+				},
+			},
+			expectedFailure: true,
+			expectedRack:    "rack1",
+		},
+		{
+			name: "CrashLoopBackOff",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster1-dc1-rack1-0",
+					Namespace: "default",
+					Labels: map[string]string{
+						api.ClusterLabel:    "cluster1",
+						api.DatacenterLabel: "dc1",
+						api.RackLabel:       "rack1",
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "cassandra",
+							State: corev1.ContainerState{
+								Waiting: &corev1.ContainerStateWaiting{
+									Reason:  "CrashLoopBackOff",
+									Message: "Back-off 5m0s restarting failed container",
+								},
+							},
+							RestartCount: 1,
+						},
+					},
+				},
+			},
+			events:          []*corev1.Event{},
+			expectedFailure: true,
+			expectedRack:    "rack1",
+		},
+		{
+			name: "ImagePullBackOff",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster1-dc1-rack1-0",
+					Namespace: "default",
+					Labels: map[string]string{
+						api.ClusterLabel:    "cluster1",
+						api.DatacenterLabel: "dc1",
+						api.RackLabel:       "rack1",
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPending,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "cassandra",
+							State: corev1.ContainerState{
+								Waiting: &corev1.ContainerStateWaiting{
+									Reason:  "ImagePullBackOff",
+									Message: "Back-off pulling image",
+								},
+							},
+						},
+					},
+				},
+			},
+			events:          []*corev1.Event{},
+			expectedFailure: true,
+			expectedRack:    "rack1",
+		},
+		{
+			name: "FailedInitContainer",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster1-dc1-rack1-0",
+					Namespace: "default",
+					Labels: map[string]string{
+						api.ClusterLabel:    "cluster1",
+						api.DatacenterLabel: "dc1",
+						api.RackLabel:       "rack1",
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPending,
+					InitContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "init-container",
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: 1,
+									Reason:   "Error",
+									Message:  "Command failed",
+								},
+							},
+							RestartCount: 1,
+						},
+					},
+				},
+			},
+			events:          []*corev1.Event{},
+			expectedFailure: true,
+			expectedRack:    "rack1",
+		},
+		{
+			name: "NoFailures",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster1-dc1-rack1-0",
+					Namespace: "default",
+					Labels: map[string]string{
+						api.ClusterLabel:    "cluster1",
+						api.DatacenterLabel: "dc1",
+						api.RackLabel:       "rack1",
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "cassandra",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{
+									StartedAt: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+								},
+							},
+							Ready: true,
+						},
+					},
+				},
+			},
+			events:          []*corev1.Event{},
+			expectedFailure: false,
+			expectedRack:    "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			rc, _, cleanupMockScr := setupTest()
+			defer cleanupMockScr()
+
+			objects := []client.Object{tc.pod}
+			for _, event := range tc.events {
+				objects = append(objects, event)
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(rc.Scheme).
+				WithObjects(objects...).
+				WithStatusSubresource(tc.pod).
+				WithIndex(&corev1.Event{}, "involvedObject.name", func(obj client.Object) []string {
+					event := obj.(*corev1.Event)
+					if event.InvolvedObject.Kind == "Pod" {
+						return []string{event.InvolvedObject.Name}
+					}
+					return []string{}
+				}).
+				Build()
+
+			rc.Client = fakeClient
+
+			rc.desiredRackInformation = []*RackInformation{
+				{
+					RackName:  "rack1",
+					NodeCount: 1,
+					SeedCount: 1,
+				},
+			}
+
+			rc.dcPods = []*corev1.Pod{tc.pod}
+
+			failed, rackName := rc.failureModeDetection()
+			assert.Equal(t, tc.expectedFailure, failed, "Failure detection mismatch")
+			assert.Equal(t, tc.expectedRack, rackName, "Rack name mismatch")
 		})
 	}
 }

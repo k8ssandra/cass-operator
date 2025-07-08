@@ -17,6 +17,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#778](https://github.com/k8ssandra/cass-operator/issues/778) Migrate to golangici-lint 2.x series and use stricter rules.
 * [ENHANCEMENT] [#814](https://github.com/k8ssandra/cass-operator/issues/814) If IS_LOCAL is supported by the mgmt-api, use that information for the HostID Status updates instead of trying to find the IPs.
 * [BUGFIX] [#808](https://github.com/k8ssandra/cass-operator/issues/808) Decommission of the Datacenter might hang on last pod being decommissioned due to a check in startOneNodePerRack for eligible pods to be started
+* [BUGFIX] [#806](https://github.com/k8ssandra/cass-operator/issues/806) If cassandra container crashes during Starting phase we could get stuck in findStartingNodes for a long period of time. Modify the behavior to kill these pods instantly.
+* [BUGFIX] [#816](https://github.com/k8ssandra/cass-operator/issues/816) If pod terminated, we would not usually be allowed to override rack settings because the deleteStuckNodes would clean up the error code before conditions to do forced upgrade were met.
 
 ## v1.25.0
 

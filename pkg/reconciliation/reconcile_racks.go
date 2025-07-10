@@ -208,7 +208,7 @@ func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
 						return true, rackName
 					}
 				}
-				if containerStatus.RestartCount > 2 {
+				if containerStatus.RestartCount > 0 {
 					if containerStatus.State.Terminated != nil {
 						if containerStatus.State.Terminated.ExitCode != 0 {
 							rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
@@ -229,7 +229,7 @@ func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
 						return true, rackName
 					}
 				}
-				if containerStatus.RestartCount > 2 {
+				if containerStatus.RestartCount > 0 {
 					if containerStatus.State.Terminated != nil {
 						if containerStatus.State.Terminated.ExitCode != 0 {
 							rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
@@ -1333,11 +1333,11 @@ func hasBeenXMinutesSinceReady(x int, pod *corev1.Pod) bool {
 	return false
 }
 
-func hasBeenXMinutesSinceTerminated(x int, pod *corev1.Pod) bool {
+func hasCassandraContainerTerminated(pod *corev1.Pod) bool {
 	if status := getCassContainerStatus(pod); status != nil {
 		lastState := status.LastTerminationState
 		if lastState.Terminated != nil {
-			return hasBeenXMinutes(x, lastState.Terminated.FinishedAt.Time)
+			return true
 		}
 	}
 	return false
@@ -1358,7 +1358,7 @@ func isNodeStuckAfterTerminating(pod *corev1.Pod) bool {
 		return false
 	}
 
-	return hasBeenXMinutesSinceTerminated(10, pod)
+	return hasCassandraContainerTerminated(pod)
 }
 
 func isNodeStuckAfterLosingReadiness(pod *corev1.Pod) bool {

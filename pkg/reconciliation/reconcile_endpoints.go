@@ -4,10 +4,15 @@
 package reconciliation
 
 import (
+	"context"
+
+	"github.com/go-logr/logr"
 	"github.com/k8ssandra/cass-operator/internal/result"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
@@ -21,51 +26,69 @@ func (rc *ReconciliationContext) CheckAdditionalSeedEndpointSlices() result.Reco
 	slices := newEndpointSlicesForAdditionalSeeds(rc.Datacenter)
 
 	for _, slice := range slices {
+		if err := controllerutil.SetControllerReference(rc.Datacenter, slice, rc.Scheme); err != nil {
+			logger.Error(err, "Could not set owner reference for additional seed endpoint slice",
+				"slice", slice.Name,
+			)
+			return result.Error(err)
+		}
+	}
+
+	if err := ReconcileEndpointSlices(rc.Ctx, client, logger, slices); err != nil {
+		return result.Error(err)
+	}
+
+	return result.Continue()
+}
+
+// ReconcileEndpointSlices reconciles the provided EndpointSlices for additional seeds. This is exported to be used in k8ssandra-operator also
+func ReconcileEndpointSlices(ctx context.Context, client client.Client, logger logr.Logger, endpoints []*discoveryv1.EndpointSlice) error {
+	for _, slice := range endpoints {
 		hasAddresses := len(slice.Endpoints) > 0 && len(slice.Endpoints[0].Addresses) > 0
 
 		nsName := types.NamespacedName{Name: slice.Name, Namespace: slice.Namespace}
 		currentSlice := &discoveryv1.EndpointSlice{}
 
-		err := client.Get(rc.Ctx, nsName, currentSlice)
+		err := client.Get(ctx, nsName, currentSlice)
 		if err != nil && errors.IsNotFound(err) {
 			if hasAddresses {
 				logger.Info("Additional seed endpoint slice not found, creating it", "slice", nsName)
-				if err := client.Create(rc.Ctx, slice); err != nil {
+				if err := client.Create(ctx, slice); err != nil {
 					logger.Error(err, "Could not create additional seed endpoint slice",
 						"slice", nsName,
 					)
-					return result.Error(err)
+					return err
 				}
 			}
 		} else if err != nil {
 			logger.Error(err, "Could not get additional seed endpoint slice",
 				"slice", nsName,
 			)
-			return result.Error(err)
+			return err
 		} else {
 			if !hasAddresses {
 				logger.Info("Deleting endpoint slice as it should now be empty", "slice", nsName)
-				if err := client.Delete(rc.Ctx, currentSlice); err != nil {
+				if err := client.Delete(ctx, currentSlice); err != nil {
 					logger.Error(err, "Could not delete additional seed endpoint slice",
 						"slice", nsName,
 					)
-					return result.Error(err)
+					return err
 				}
 			} else if !utils.ResourcesHaveSameHash(currentSlice, slice) {
 				resourceVersion := currentSlice.GetResourceVersion()
 				slice.DeepCopyInto(currentSlice)
 				currentSlice.SetResourceVersion(resourceVersion)
 
-				if err := client.Update(rc.Ctx, currentSlice); err != nil {
+				if err := client.Update(ctx, currentSlice); err != nil {
 					logger.Error(err, "Unable to update additional seed endpoint slice",
 						"slice", currentSlice)
-					return result.Error(err)
+					return err
 				}
 			}
 		}
 	}
 
-	return result.Continue()
+	return nil
 }
 
 // GetAdditionalSeedAddressCount fetches all EndpointSlices for the additional seeds service

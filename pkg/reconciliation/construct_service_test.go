@@ -675,7 +675,7 @@ func TestCreateEndpointSlice(t *testing.T) {
 	}
 
 	addresses := []string{"192.168.1.1", "192.168.1.2"}
-	slice := createEndpointSlice(dc, discoveryv1.AddressTypeIPv4, addresses)
+	slice := CreateEndpointSlice(dc, dc.GetAdditionalSeedsServiceName(), discoveryv1.AddressTypeIPv4, addresses)
 
 	assert.Equal(t, discoveryv1.AddressTypeIPv4, slice.AddressType)
 	assert.Equal(t, "test", slice.Namespace)

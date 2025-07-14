@@ -182,20 +182,20 @@ func newEndpointSlicesForAdditionalSeeds(dc *api.CassandraDatacenter) []*discove
 
 	endpointSlices := make([]*discoveryv1.EndpointSlice, 0)
 
-	ipv4Slice := createEndpointSlice(dc, discoveryv1.AddressTypeIPv4, ipv4Addresses)
+	ipv4Slice := CreateEndpointSlice(dc, dc.GetAdditionalSeedsServiceName(), discoveryv1.AddressTypeIPv4, ipv4Addresses)
 	endpointSlices = append(endpointSlices, ipv4Slice)
 
-	ipv6Slice := createEndpointSlice(dc, discoveryv1.AddressTypeIPv6, ipv6Addresses)
+	ipv6Slice := CreateEndpointSlice(dc, dc.GetAdditionalSeedsServiceName(), discoveryv1.AddressTypeIPv6, ipv6Addresses)
 	endpointSlices = append(endpointSlices, ipv6Slice)
 
-	fqdnSlice := createEndpointSlice(dc, discoveryv1.AddressTypeFQDN, fqdnAddresses)
+	fqdnSlice := CreateEndpointSlice(dc, dc.GetAdditionalSeedsServiceName(), discoveryv1.AddressTypeFQDN, fqdnAddresses)
 	endpointSlices = append(endpointSlices, fqdnSlice)
 
 	return endpointSlices
 }
 
 // Helper function to create an EndpointSlice of a specific address type
-func createEndpointSlice(dc *api.CassandraDatacenter, addressType discoveryv1.AddressType, addresses []string) *discoveryv1.EndpointSlice {
+func CreateEndpointSlice(dc *api.CassandraDatacenter, prefixName string, addressType discoveryv1.AddressType, addresses []string) *discoveryv1.EndpointSlice {
 	labels := dc.GetDatacenterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
 
@@ -207,7 +207,7 @@ func createEndpointSlice(dc *api.CassandraDatacenter, addressType discoveryv1.Ad
 	labels[discoveryv1.LabelServiceName] = serviceName
 
 	// Create a unique name based on service name and address type
-	name := fmt.Sprintf("%s-%s", serviceName, strings.ToLower(string(addressType)))
+	name := fmt.Sprintf("%s-%s", prefixName, strings.ToLower(string(addressType)))
 
 	endpointSlice := discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{

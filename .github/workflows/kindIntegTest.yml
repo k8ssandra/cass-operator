@@ -345,7 +345,7 @@ jobs:
         with:
           repository: topolvm/topolvm
           path: topolvm
-          ref: topolvm-chart-v15.5.4
+          ref: topolvm-chart-v15.5.6
       - name: Create LVM from TopoLVM's example setup
         run: |
           cd topolvm/example

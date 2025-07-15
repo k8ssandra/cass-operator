@@ -205,7 +205,7 @@ func CreateEndpointSlice(dc *api.CassandraDatacenter, prefixName string, address
 		labels = make(map[string]string)
 	}
 	labels[discoveryv1.LabelServiceName] = serviceName
-	labels["endpointslice.kubernetes.io/managed-by"] = "cass-operator"
+	labels[discoveryv1.LabelManagedBy] = "cass-operator"
 
 	// Create a unique name based on service name and address type
 	name := fmt.Sprintf("%s-%s", prefixName, strings.ToLower(string(addressType)))

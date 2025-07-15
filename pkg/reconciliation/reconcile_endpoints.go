@@ -8,8 +8,11 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/k8ssandra/cass-operator/internal/result"
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -38,7 +41,36 @@ func (rc *ReconciliationContext) CheckAdditionalSeedEndpointSlices() result.Reco
 		return result.Error(err)
 	}
 
+	if err := rc.removeLegacyEndpoints(rc.Ctx, client); err != nil {
+		return result.Error(err)
+	}
+
 	return result.Continue()
+}
+
+func (rc *ReconciliationContext) removeLegacyEndpoints(ctx context.Context, cli client.Client) error {
+	endpoints := &corev1.EndpointsList{}
+	labels := rc.Datacenter.GetDatacenterLabels()
+	labels[oplabels.ManagedByLabel] = oplabels.ManagedByLabelValue
+
+	err := cli.List(ctx, endpoints,
+		&client.ListOptions{
+			Namespace:     rc.Datacenter.Namespace,
+			LabelSelector: k8slabels.SelectorFromSet(labels),
+		})
+	if err != nil {
+		rc.ReqLogger.Error(err, "failed to list legacy endpoints")
+		return err
+	}
+
+	for _, ep := range endpoints.Items {
+		if err := cli.Delete(ctx, &ep); err != nil {
+			rc.ReqLogger.Error(err, "failed to delete legacy endpoint", "endpoint", ep.Name)
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ReconcileEndpointSlices reconciles the provided EndpointSlices for additional seeds. This is exported to be used in k8ssandra-operator also

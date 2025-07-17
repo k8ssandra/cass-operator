@@ -1,8 +1,6 @@
 module github.com/k8ssandra/cass-operator
 
-go 1.24.0
-
-toolchain go1.24.4
+go 1.24.5
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -14,9 +12,9 @@ require (
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/oauth2 v0.29.0 // indirect
 	golang.org/x/term v0.31.0
-	k8s.io/api v0.33.2
-	k8s.io/apimachinery v0.33.2
-	k8s.io/client-go v0.33.2
+	k8s.io/api v0.33.3
+	k8s.io/apimachinery v0.33.3
+	k8s.io/client-go v0.33.3
 	sigs.k8s.io/controller-runtime v0.21.0
 )
 

@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.26.0
 
 * [CHANGE] [#807](https://github.com/k8ssandra/cass-operator/issues/807) EndpointSlices are now separated by type (IPv4, IPv6, FQDN). FQDN addresses (DNS) are no longer resolved by the cass-operator, but left to the Kubernetes' own implementation. Use of FQDN is not recommended.

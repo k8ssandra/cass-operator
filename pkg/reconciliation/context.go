@@ -97,6 +97,11 @@ func CreateReconciliationContext(
 
 	log.IntoContext(ctx, rc.ReqLogger)
 
+	if dc.DeletionTimestamp != nil {
+		rc.ReqLogger.Info("Datacenter is being deleted, skipping mgmt client creation")
+		return rc, nil
+	}
+
 	var err error
 	rc.NodeMgmtClient, err = httphelper.NewMgmtClient(rc.Ctx, cli, dc, nil)
 	if err != nil {

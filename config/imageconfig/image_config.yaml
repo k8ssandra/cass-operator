@@ -24,7 +24,7 @@ defaults:
   pullPolicy: IfNotPresent
   # -- pullSecrets allow configuring the secret to use for pulling images from private registries.
   # pullSecrets:
-  #   - name: my-secret-pull-registry
+  #   - my-secret-pull-registry
 # -- overrides will apply to all images discarding the settings in defaults or what individual images might have.
 # overrides:
   # -- registry to pull from

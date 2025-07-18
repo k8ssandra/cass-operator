@@ -55,9 +55,6 @@ rules:
 - apiGroups:
   - apps
   resources:
-  - daemonsets
-  - deployments
-  - replicasets
   - statefulsets
   verbs:
   - create
@@ -67,12 +64,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments/finalizers
-  verbs:
-  - update
 - apiGroups:
   - cassandra.datastax.com
   resources:

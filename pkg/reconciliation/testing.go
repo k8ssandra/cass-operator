@@ -9,8 +9,10 @@ package reconciliation
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -33,9 +35,19 @@ import (
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	discoveryv1 "k8s.io/api/discovery/v1"
 )
+
+func newTestImageRegistry() images.ImageRegistry {
+	imageConfigFile := filepath.Join("..", "..", "tests", "testdata", "image_config_parsing.yaml")
+	registry, err := images.NewImageRegistry(imageConfigFile)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create image registry: %v", err))
+	}
+	return registry
+}
 
 // MockSetControllerReference returns a method that will automatically reverse the mock
 func MockSetControllerReference() func() {
@@ -130,6 +142,7 @@ func CreateMockReconciliationContext(
 	rc.Datacenter = cassandraDatacenter
 	rc.Recorder = record.NewFakeRecorder(100)
 	rc.Ctx = context.Background()
+	rc.ImageRegistry = newTestImageRegistry()
 
 	res := &http.Response{
 		StatusCode: http.StatusOK,

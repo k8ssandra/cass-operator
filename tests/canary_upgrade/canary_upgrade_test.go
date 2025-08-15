@@ -86,11 +86,11 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)
 
 			imageConfigFile := filepath.Join("..", "..", "config", "manager", "image_config.yaml")
-			err = images.ParseImageConfig(imageConfigFile)
+			registry, err := images.NewImageRegistry(imageConfigFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			old, _ := images.GetCassandraImage("cassandra", "4.0.1")
-			updated, _ := images.GetCassandraImage("cassandra", "4.0.7")
+			old, _ := registry.GetCassandraImage("cassandra", "4.0.1")
+			updated, _ := registry.GetCassandraImage("cassandra", "4.0.7")
 
 			images := []string{
 				old,

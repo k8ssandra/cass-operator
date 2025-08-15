@@ -220,7 +220,8 @@ func TestReconcileRacks_ReconcilePods(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		1)
+		1,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Spec.Replicas = ptr.To[int32](1)
@@ -458,7 +459,8 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	require.NoErrorf(err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Generation = 1
@@ -541,7 +543,8 @@ func TestReconcilePods(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	statefulSet.Status.Replicas = int32(1)
 
@@ -559,7 +562,8 @@ func TestReconcilePods_WithVolumes(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		1)
+		1,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	statefulSet.Status.Replicas = int32(1)
 
@@ -617,7 +621,8 @@ func TestReconcileNextRack(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	err = rc.ReconcileNextRack(statefulSet)
@@ -640,7 +645,8 @@ func TestReconcileNextRack_CreateError(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	mockClient := mocks.NewClient(t)
@@ -716,7 +722,8 @@ func TestReconcileRacks(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -789,7 +796,8 @@ func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -831,7 +839,8 @@ func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -866,7 +875,8 @@ func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -907,7 +917,8 @@ func TestReconcileRacks_NeedToPark(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		3)
+		3,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	trackObjects := []runtime.Object{
@@ -952,7 +963,8 @@ func TestReconcileRacks_AlreadyReconciled(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = 2
@@ -993,7 +1005,8 @@ func TestReconcileStatefulSet_ImmutableSpec(t *testing.T) {
 		nil,
 		"rack0",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(err, "error occurred creating statefulset")
 
 	assert.NotEqual("immutable-service", origStatefulSet.Spec.ServiceName)
@@ -1003,7 +1016,8 @@ func TestReconcileStatefulSet_ImmutableSpec(t *testing.T) {
 		origStatefulSet,
 		"rack0",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(err, "error occurred creating statefulset")
 
 	assert.Equal("immutable-service", modifiedStatefulSet.Spec.ServiceName)
@@ -1019,7 +1033,8 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 		nil,
 		"rack0",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = 2
@@ -1028,7 +1043,8 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 		nil,
 		"rack1",
 		rc.Datacenter,
-		1)
+		1,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	secondDesiredStatefulSet.Status.ReadyReplicas = 1
 
@@ -1130,7 +1146,8 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 		nil,
 		"rack0",
 		rc.Datacenter,
-		2)
+		2,
+		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = 2
@@ -3098,7 +3115,7 @@ func TestCheckVolumeClaimSizesValidation(t *testing.T) {
 	require := require.New(t)
 
 	// No changes test - should not result in any error
-	originalStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	originalStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
 	require.NoErrorf(err, "error occurred creating statefulset")
 	require.NoError(rc.Client.Create(rc.Ctx, originalStatefulSet))
 
@@ -3108,7 +3125,7 @@ func TestCheckVolumeClaimSizesValidation(t *testing.T) {
 	// Use case, we do not have expansion allowed in our StorageClass, should get Valid False state in CassandraDatacenter
 	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("2Gi")}
 	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
-	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
 	require.NoErrorf(err, "error occurred creating statefulset")
 
 	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
@@ -3133,7 +3150,7 @@ func TestCheckVolumeClaimSizesValidation(t *testing.T) {
 
 	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("0.5Gi")}
 	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
-	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
 	require.NoErrorf(err, "error occurred creating statefulset")
 	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
 	_, err = res.Output()
@@ -3157,7 +3174,7 @@ func TestCheckVolumeClaimSizesValidation(t *testing.T) {
 		},
 	}
 	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
-	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
 	require.NoErrorf(err, "error occurred creating statefulset")
 	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
 	require.Equal(result.Continue(), res, "No resize changes, we should continue")
@@ -3176,7 +3193,7 @@ func TestCheckVolumeClaimSizesValidation(t *testing.T) {
 			},
 		})
 	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
-	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	desiredStatefulSet, err = newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
 	require.NoErrorf(err, "error occurred creating statefulset")
 	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
 	require.Equal(result.Continue(), res, "No resize changes, we should continue")
@@ -3189,7 +3206,7 @@ func TestVolumeClaimSizesExpansion(t *testing.T) {
 	require := require.New(t)
 
 	// Sanity check, no changes yet - should not result in any error
-	originalStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	originalStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
 	require.NoErrorf(err, "error occurred creating statefulset")
 	require.NoError(rc.Client.Create(rc.Ctx, originalStatefulSet))
 
@@ -3219,7 +3236,7 @@ func TestVolumeClaimSizesExpansion(t *testing.T) {
 
 	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("2Gi")}
 	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
-	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2)
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
 	require.NoErrorf(err, "error occurred creating statefulset")
 	res = rc.CheckVolumeClaimSizes(originalStatefulSet, desiredStatefulSet)
 	require.Equal(result.Continue(), res, "We made changes to the PVC size")
@@ -3443,7 +3460,8 @@ func TestDatacenterPods(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		3)
+		3,
+		imageRegistry)
 	assert.NoErrorf(err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
@@ -3487,7 +3505,8 @@ func TestDatacenterPodsOldLabels(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		3)
+		3,
+		imageRegistry)
 	assert.NoErrorf(err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
@@ -3538,7 +3557,8 @@ func TestCheckRackLabels(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		3)
+		3,
+		imageRegistry)
 	require.NoErrorf(err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
@@ -3571,7 +3591,8 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 		nil,
 		"default",
 		rc.Datacenter,
-		3)
+		3,
+		imageRegistry)
 	assert.NoErrorf(err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas

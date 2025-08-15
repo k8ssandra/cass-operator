@@ -10,6 +10,7 @@ import (
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/serverconfig"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
@@ -66,6 +67,7 @@ func newStatefulSetForCassandraDatacenter(
 	rackName string,
 	dc *api.CassandraDatacenter,
 	replicaCount int,
+	imageRegistry images.ImageRegistry,
 ) (*appsv1.StatefulSet, error) {
 	replicaCountInt32 := int32(replicaCount)
 
@@ -118,7 +120,7 @@ func newStatefulSetForCassandraDatacenter(
 
 	nsName := NewNamespacedNameForStatefulSet(dc, rackName)
 
-	template, err := buildPodTemplateSpec(dc, rack, legacyInternodeMount(dc, sts))
+	template, err := buildPodTemplateSpec(dc, rack, legacyInternodeMount(dc, sts), imageRegistry)
 	if err != nil {
 		return nil, err
 	}

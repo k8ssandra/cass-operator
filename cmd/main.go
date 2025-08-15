@@ -207,7 +207,9 @@ func main() {
 		operConfig.ImageConfigFile = "/configs/image_config.yaml"
 	}
 
-	if err := images.ParseImageConfig(operConfig.ImageConfigFile); err != nil {
+	// TODO Add here the logic to select the correct image registry - v1beta1 or v1beta2
+	registry, err := images.NewImageRegistry(operConfig.ImageConfigFile)
+	if err != nil {
 		setupLog.Error(err, "unable to load the image config file")
 		os.Exit(1)
 	}
@@ -238,10 +240,11 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 
 	if err = (&controllers.CassandraDatacenterReconciler{
-		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cass-operator"),
+		Client:        mgr.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
+		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor("cass-operator"),
+		ImageRegistry: registry,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraDatacenter")
 		os.Exit(1)

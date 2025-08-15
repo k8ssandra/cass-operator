@@ -22,6 +22,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/pkg/images"
 )
 
 // ReconciliationContext contains all of the input necessary to calculate a list of ReconciliationActions
@@ -34,6 +35,7 @@ type ReconciliationContext struct {
 	Recorder       record.EventRecorder
 	ReqLogger      logr.Logger
 	SecretWatches  dynamicwatch.DynamicWatches
+	ImageRegistry  images.ImageRegistry
 
 	// According to golang recommendations the context should not be stored in a struct but given that
 	// this is passed around as a parameter we feel that its a fair compromise. For further discussion
@@ -56,6 +58,7 @@ func CreateReconciliationContext(
 	scheme *runtime.Scheme,
 	rec record.EventRecorder,
 	secretWatches dynamicwatch.DynamicWatches,
+	imageRegistry images.ImageRegistry,
 ) (*ReconciliationContext, error) {
 	reqLogger := log.FromContext(ctx)
 	rc := &ReconciliationContext{}

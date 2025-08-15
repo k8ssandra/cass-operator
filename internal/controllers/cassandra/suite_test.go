@@ -75,7 +75,8 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
-	Expect(images.ParseImageConfig(filepath.Join("..", "..", "..", "tests", "testdata", "image_config_parsing.yaml"))).To(Succeed())
+	_, err := images.NewImageRegistry(filepath.Join("..", "..", "..", "tests", "testdata", "image_config_parsing.yaml"))
+	Expect(err).To(Succeed())
 
 	cfg, err := testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())

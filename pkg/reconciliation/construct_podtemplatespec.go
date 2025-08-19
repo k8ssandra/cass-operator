@@ -499,9 +499,7 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 			}
 
 			configContainer.Image = serverImage
-			if imageRegistry.GetImageConfig() != nil && imageRegistry.GetImageConfig().ImagePullPolicy != "" {
-				configContainer.ImagePullPolicy = imageRegistry.GetImageConfig().ImagePullPolicy
-			}
+			configContainer.ImagePullPolicy = imageRegistry.GetImagePullPolicy(dc.Spec.ServerType)
 
 			configContainer.Command = []string{"/bin/sh"}
 			switch dc.Spec.ServerType {
@@ -530,9 +528,7 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 			}
 
 			configContainer.Image = serverImage
-			if imageRegistry.GetImageConfig() != nil && imageRegistry.GetImageConfig().ImagePullPolicy != "" {
-				configContainer.ImagePullPolicy = imageRegistry.GetImageConfig().ImagePullPolicy
-			}
+			configContainer.ImagePullPolicy = imageRegistry.GetImagePullPolicy(dc.Spec.ServerType)
 
 			configContainer.Command = []string{"/bin/sh"}
 			configContainer.Args = []string{"-c", "cp -rf /opt/dse/resources/cassandra/conf/* /config/"}

@@ -69,6 +69,7 @@ func CreateReconciliationContext(
 	rc.SecretWatches = secretWatches
 	rc.ReqLogger = reqLogger
 	rc.Ctx = ctx
+	rc.ImageRegistry = imageRegistry
 
 	rc.ReqLogger = rc.ReqLogger.
 		WithValues("namespace", req.Namespace)

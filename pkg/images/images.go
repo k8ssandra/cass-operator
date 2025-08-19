@@ -247,10 +247,6 @@ func (i *imageRegistry) GetCassandraImage(serverType, version string) (string, e
 	return i.applyOverrides(serverType, fmt.Sprintf("%s:%s%s", prefix, version, suffix)), nil
 }
 
-func (i *imageRegistry) GetConfiguredImage(imageType, image string) string {
-	return i.applyOverrides(imageType, image)
-}
-
 func (i *imageRegistry) GetImage(imageType string) string {
 	return i.applyOverrides(imageType, i.GetImageConfig().Images.Others[imageType])
 }

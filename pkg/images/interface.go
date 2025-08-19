@@ -9,8 +9,6 @@ import (
 )
 
 type ImageRegistry interface {
-	GetCassandraImage(serverType, version string) (string, error)
-	GetConfiguredImage(imageType, image string) string
 	GetImage(imageType string) string
 	GetImagePullPolicy(imageType string) corev1.PullPolicy
 	GetImagePullSecrets(imageTypes ...string) []string
@@ -19,6 +17,7 @@ type ImageRegistry interface {
 	GetConfigBuilderImage() string
 	GetClientImage() string
 	GetSystemLoggerImage() string
+	GetCassandraImage(serverType, version string) (string, error)
 
 	// This should only be used for testing purposes
 	GetImageConfig() *configv1beta1.ImageConfig

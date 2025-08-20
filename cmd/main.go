@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -30,10 +31,12 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	toolscache "k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
@@ -229,7 +232,19 @@ func main() {
 		options.Cache.DefaultNamespaces[ns] = cache.Config{}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
+	watchErrCh := make(chan error, 1)
+	options.Cache.DefaultWatchErrorHandler = func(ctx context.Context, r *toolscache.Reflector, err error) {
+		toolscache.DefaultWatchErrorHandler(ctx, r, err)
+		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+			select {
+			case watchErrCh <- err:
+			default:
+			}
+		}
+	}
+
+	cfg := ctrl.GetConfigOrDie()
+	mgr, err := ctrl.NewManager(cfg, options)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
@@ -326,9 +341,22 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
+	startErrCh := make(chan error, 1)
+	go func() {
+		startErrCh <- mgr.Start(ctx)
+	}()
+
+	select {
+	case err := <-startErrCh:
+		if err != nil {
+			setupLog.Error(err, "problem running manager")
+			os.Exit(1)
+		}
+	case err := <-watchErrCh:
+		setupLog.Error(err, "fatal cache watch error; exiting")
 		os.Exit(1)
+	case <-ctx.Done():
+		// graceful shutdown
 	}
 }
 

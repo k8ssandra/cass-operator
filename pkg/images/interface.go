@@ -4,7 +4,6 @@
 package images
 
 import (
-	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -18,7 +17,4 @@ type ImageRegistry interface {
 	GetClientImage() string
 	GetSystemLoggerImage() string
 	GetCassandraImage(serverType, version string) (string, error)
-
-	// This should only be used for testing purposes
-	GetImageConfig() *configv1beta1.ImageConfig
 }

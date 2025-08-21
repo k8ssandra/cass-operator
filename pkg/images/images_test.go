@@ -33,7 +33,7 @@ func newTestImageRegistry() ImageRegistry {
 func TestDefaultRegistryOverride(t *testing.T) {
 	assert := assert.New(t)
 	registry := newTestImageRegistry()
-	imageConfig := registry.GetImageConfig()
+	imageConfig := &registry.(*imageRegistry).imageConfig
 	imageConfig.ImageRegistry = "localhost:5000"
 	imageConfig.Images = &configv1beta1.Images{}
 	imageConfig.DefaultImages = &configv1beta1.DefaultImages{}
@@ -53,7 +53,7 @@ func TestCassandraOverride(t *testing.T) {
 	customImageName := "my-custom-image:4.0.0"
 
 	registry := newTestImageRegistry()
-	imageConfig := registry.GetImageConfig()
+	imageConfig := &registry.(*imageRegistry).imageConfig
 	imageConfig.Images = &configv1beta1.Images{}
 	imageConfig.DefaultImages = &configv1beta1.DefaultImages{}
 
@@ -105,14 +105,15 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 	assert.NoError(err, "imageConfig parsing should succeed")
 
 	// Verify some default values are set
-	assert.NotNil(registry.GetImageConfig())
-	assert.NotNil(registry.GetImageConfig().Images)
-	assert.True(strings.Contains(registry.GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
-	assert.True(strings.Contains(registry.GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
-	assert.True(strings.Contains(registry.GetImageConfig().Images.Client, "k8ssandra/k8ssandra-client:"))
+	imageConfig := &registry.(*imageRegistry).imageConfig
+	assert.NotNil(imageConfig)
+	assert.NotNil(imageConfig)
+	assert.True(strings.Contains(imageConfig.Images.SystemLogger, "k8ssandra/system-logger:"))
+	assert.True(strings.Contains(imageConfig.Images.ConfigBuilder, "datastax/cass-config-builder:"))
+	assert.True(strings.Contains(imageConfig.Images.Client, "k8ssandra/k8ssandra-client:"))
 
-	assert.Equal("ghcr.io/k8ssandra/cass-management-api", registry.GetImageConfig().DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
-	assert.Equal("datastax/dse-mgmtapi-6_8", registry.GetImageConfig().DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
+	assert.Equal("ghcr.io/k8ssandra/cass-management-api", registry.(*imageRegistry).imageConfig.DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
+	assert.Equal("datastax/dse-mgmtapi-6_8", registry.(*imageRegistry).imageConfig.DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
 
 	path, err := registry.GetCassandraImage("dse", "6.8.47")
 	assert.NoError(err)
@@ -134,18 +135,19 @@ func TestImageConfigParsing(t *testing.T) {
 	assert.NoError(err, "imageConfig parsing should succeed")
 
 	// Verify some default values are set
-	assert.NotNil(registry.GetImageConfig())
-	assert.NotNil(registry.GetImageConfig().Images)
-	assert.True(strings.HasPrefix(registry.GetImageConfig().Images.SystemLogger, "k8ssandra/system-logger:"))
-	assert.True(strings.HasPrefix(registry.GetImageConfig().Images.ConfigBuilder, "datastax/cass-config-builder:"))
-	assert.True(strings.Contains(registry.GetImageConfig().Images.Client, "k8ssandra/k8ssandra-client:"))
+	imageConfig := &registry.(*imageRegistry).imageConfig
+	assert.NotNil(imageConfig)
+	assert.NotNil(imageConfig.Images)
+	assert.True(strings.HasPrefix(imageConfig.Images.SystemLogger, "k8ssandra/system-logger:"))
+	assert.True(strings.HasPrefix(imageConfig.Images.ConfigBuilder, "datastax/cass-config-builder:"))
+	assert.True(strings.Contains(imageConfig.Images.Client, "k8ssandra/k8ssandra-client:"))
 
-	assert.Equal("cr.k8ssandra.io/k8ssandra/cass-management-api", registry.GetImageConfig().DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
-	assert.Equal("cr.dtsx.io/datastax/dse-mgmtapi-6_8", registry.GetImageConfig().DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
+	assert.Equal("cr.k8ssandra.io/k8ssandra/cass-management-api", imageConfig.DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
+	assert.Equal("cr.dtsx.io/datastax/dse-mgmtapi-6_8", imageConfig.DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
 
-	assert.Equal("localhost:5000", registry.GetImageConfig().ImageRegistry)
-	assert.Equal(corev1.PullAlways, registry.GetImageConfig().ImagePullPolicy)
-	assert.Equal("my-secret-pull-registry", registry.GetImageConfig().ImagePullSecret.Name)
+	assert.Equal("localhost:5000", imageConfig.ImageRegistry)
+	assert.Equal(corev1.PullAlways, imageConfig.ImagePullPolicy)
+	assert.Equal("my-secret-pull-registry", imageConfig.ImagePullSecret.Name)
 
 	path, err := registry.GetCassandraImage("dse", "6.8.43")
 	assert.NoError(err)
@@ -167,9 +169,9 @@ func TestExtendedImageConfigParsing(t *testing.T) {
 	assert.NoError(err, "imageConfig parsing should succeed")
 
 	// Verify some default values are set
-	assert.NotNil(registry.GetImageConfig())
-	assert.NotNil(registry.GetImageConfig().Images)
-	assert.NotNil(registry.GetImageConfig().DefaultImages)
+	assert.NotNil(&registry.(*imageRegistry).imageConfig)
+	assert.NotNil(&registry.(*imageRegistry).imageConfig.Images)
+	assert.NotNil(&registry.(*imageRegistry).imageConfig.DefaultImages)
 
 	medusaImage := registry.GetImage("medusa")
 	assert.Equal("localhost:5005/enterprise/medusa:latest", medusaImage)
@@ -183,7 +185,7 @@ func TestExtendedImageConfigParsing(t *testing.T) {
 func TestDefaultRepositories(t *testing.T) {
 	assert := assert.New(t)
 	registry := newTestImageRegistry()
-	imageConfig := registry.GetImageConfig()
+	imageConfig := &registry.(*imageRegistry).imageConfig
 	imageConfig.Images = &configv1beta1.Images{}
 	imageConfig.DefaultImages = &configv1beta1.DefaultImages{}
 
@@ -219,7 +221,7 @@ func TestPullPolicyOverride(t *testing.T) {
 func TestRepositoryAndNamespaceOverride(t *testing.T) {
 	assert := assert.New(t)
 	registry := newTestImageRegistry()
-	imageConfig := registry.GetImageConfig()
+	imageConfig := &registry.(*imageRegistry).imageConfig
 	imageConfig.Images = &configv1beta1.Images{}
 	imageConfig.DefaultImages = &configv1beta1.DefaultImages{}
 
@@ -238,7 +240,7 @@ func TestRepositoryAndNamespaceOverride(t *testing.T) {
 	assert.Equal("ghcr.io/enterprise/dse-mgmtapi-6_8:6.8.44", path)
 
 	registry = newTestImageRegistry()
-	imageConfig = registry.GetImageConfig()
+	imageConfig = &registry.(*imageRegistry).imageConfig
 	imageConfig.Images = &configv1beta1.Images{}
 	imageConfig.DefaultImages = &configv1beta1.DefaultImages{}
 	imageConfig.ImageNamespace = ptr.To[string]("enterprise")
@@ -247,7 +249,7 @@ func TestRepositoryAndNamespaceOverride(t *testing.T) {
 	assert.Equal("enterprise/dse-mgmtapi-6_8:6.8.44", path)
 
 	registry = newTestImageRegistry()
-	imageConfig = registry.GetImageConfig()
+	imageConfig = &registry.(*imageRegistry).imageConfig
 	imageConfig.Images = &configv1beta1.Images{}
 	imageConfig.DefaultImages = &configv1beta1.DefaultImages{
 		ImageComponents: map[string]configv1beta1.ImageComponent{
@@ -273,7 +275,7 @@ func TestRepositoryAndNamespaceOverride(t *testing.T) {
 
 func TestImageConfigByteParsing(t *testing.T) {
 	require := require.New(t)
-	registry := newTestImageRegistry().(*imageRegistry)
+	registry := newTestImageRegistry()
 	imageConfig := configv1beta1.ImageConfig{
 		Images: &configv1beta1.Images{
 			SystemLogger:  "k8ssandra/system-logger:next",
@@ -295,7 +297,7 @@ func TestImageConfigByteParsing(t *testing.T) {
 	require.NoError(err)
 	require.True(len(b) > 1)
 
-	parsedImageConfig, err := registry.loadImageConfig(b)
+	parsedImageConfig, err := registry.(*imageRegistry).loadImageConfig(b)
 	require.NoError(err)
 
 	// Some sanity checks
@@ -306,5 +308,5 @@ func TestImageConfigByteParsing(t *testing.T) {
 	require.Equal(imageConfig.ImageRegistry, parsedImageConfig.ImageRegistry)
 
 	// And now check that images.GetImageConfig() works also..
-	require.True(reflect.DeepEqual(parsedImageConfig, registry.GetImageConfig()))
+	require.True(reflect.DeepEqual(parsedImageConfig, &registry.(*imageRegistry).imageConfig))
 }

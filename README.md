@@ -5,7 +5,7 @@ The DataStax Kubernetes Operator for Apache Cassandra&reg;. This repository repl
 
 ## Getting Started
 
-``cass-operator`` can be used as standalone product to manage your Cassandra cluster or as part of the (https://docs.k8ssandra.io/install/)[k8ssandra-operator]. With tooling such as managed repairs and automated backups, see k8ssandra-operator as the recommended approach. 
+``cass-operator`` can be used as standalone product to manage your Cassandra cluster or as part of the [k8ssandra-operator](https://docs.k8ssandra.io/install/). With tooling such as managed repairs and automated backups, see k8ssandra-operator as the recommended approach. 
 
 If updating from previous versions, please see ``Upgrade instructions`` section first.
 

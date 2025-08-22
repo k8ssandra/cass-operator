@@ -2,8 +2,6 @@ apiVersion: config.k8ssandra.io/v1beta2
 kind: ImageConfig
 metadata:
   name: image-config
-  labels:
-    k8ssandra.io/config: "image"    
 images:
   system-logger:
     registry: "ghcr.io"
@@ -20,17 +18,23 @@ images:
     tag: "v0.8.2"
     # pullSecret: "k8ssandra-client-pull-secret" # Use of pullSecret removes the default pullSecrets for this image
     # pullPolicy: Always
+  medusa: 
+    repository: "thelastpickle"
+    name: "cassandra-medusa"
+    tag: "latest"
+  reaper: 
+    repository: "thelastpickle"
+    name: "cassandra-reaper"
+    tag: "latest"
 # -- defaults are used when other no override is present for the configured image or image type. All these values can be overridden under any image or image type.
 defaults:
   registry: "docker.io"
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # -- pullSecrets allow configuring the secret to use for pulling images from private registries.
-  # pullSecrets:
-  #   - name: my-secret-pull-registry
-  # -- repository allows to override the repository for all images
-  # repository: "enterprise"
+  pullSecrets:
+    - "my-secret-pull-registry"
 # -- overrides will apply to all images discarding the settings in defaults or what individual images might have. 
-# overrides:
+overrides:
   # -- registry to pull from
   # registry: "private-registry.local"
   # -- repository to use discarding all the other settings. If set to empty, repository part will be removed from the image path.
@@ -47,13 +51,15 @@ types:
     repository: "k8ssandra"
     name: "cass-management-api"
     suffix: "-ubi"
+    pullPolicy: IfNotPresent
   dse:
+    registry: "cr.dtsx.io"
     repository: "datastax"
     name: "dse-mgmtapi-6_8"
     suffix: "-ubi"
-  # hcd:
-  #   repository: "datastax"
-  #   name: "hcd"
-  #   suffix: "-ubi"
-  #   pullSecret: "hcd-pull-secret" # Use of pullSecret removes the default pullSecrets for this image
-  #   pullPolicy: IfNotPresent
+  hcd:
+    repository: "datastax"
+    name: "hcd"
+    suffix: "-ubi"
+    prefix: "v"
+    pullSecret: "hcd-pull-secret" # Use of pullSecret removes the default pullSecrets for this image

@@ -8,17 +8,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	configv1beta2 "github.com/k8ssandra/cass-operator/apis/config/v1beta2"
+	api "github.com/k8ssandra/cass-operator/apis/config/v1beta2"
 )
 
 type imageRegistryV1Beta2 struct {
-	imageConfig configv1beta2.ImageConfig
+	imageConfig api.ImageConfig
 	scheme      *runtime.Scheme
 }
 
-func (r *imageRegistryV1Beta2) loadImageConfig(content []byte) (*configv1beta2.ImageConfig, error) {
+func (r *imageRegistryV1Beta2) loadImageConfig(content []byte) (*api.ImageConfig, error) {
 	codecs := serializer.NewCodecFactory(r.scheme)
-	cfg := &configv1beta2.ImageConfig{}
+	cfg := &api.ImageConfig{}
 	if err := runtime.DecodeInto(codecs.UniversalDecoder(), content, cfg); err != nil {
 		return nil, fmt.Errorf("could not decode file into runtime.Object: %v", err)
 	}
@@ -28,7 +28,7 @@ func (r *imageRegistryV1Beta2) loadImageConfig(content []byte) (*configv1beta2.I
 
 func NewImageRegistryV2(content []byte) (ImageRegistry, error) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(configv1beta2.AddToScheme(scheme))
+	utilruntime.Must(api.AddToScheme(scheme))
 	r := &imageRegistryV1Beta2{scheme: scheme}
 	imageConfig, err := r.loadImageConfig(content)
 	if err != nil {
@@ -38,77 +38,100 @@ func NewImageRegistryV2(content []byte) (ImageRegistry, error) {
 	return r, nil
 }
 
-// mergeDefaults applies Defaults and optional Namespace override.
-func (r *imageRegistryV1Beta2) mergeDefaults(img configv1beta2.Image) configv1beta2.Image {
-	out := img
-	if r.imageConfig.Defaults != nil {
-		d := r.imageConfig.Defaults
-		if out.Registry == "" && d.Registry != "" {
-			out.Registry = d.Registry
-		}
-		if d.Namespace != nil {
-			// Replace repository namespace according to defaults
-			if *d.Namespace == "" {
-				out.Repository = ""
-			} else {
-				out.Repository = *d.Namespace
-			}
-		}
-		if out.PullPolicy == "" && d.PullPolicy != "" {
-			out.PullPolicy = d.PullPolicy
-		}
-		if out.PullSecret == "" && len(d.PullSecrets) > 0 {
-			out.PullSecret = d.PullSecrets[0]
+func (r *imageRegistryV1Beta2) mergeGlobalValues(img api.Image) api.Image {
+	defaults := r.imageConfig.Defaults
+	overrides := r.imageConfig.Overrides
+	if img.Registry == "" && defaults.Registry != nil {
+		img.Registry = *defaults.Registry
+	}
+	if img.Repository == "" && defaults.Repository != nil {
+		img.Repository = *defaults.Repository
+		// Replace repository namespace according to defaults
+		if *defaults.Repository == "" {
+			img.Repository = ""
+		} else {
+			img.Repository = *defaults.Repository
 		}
 	}
-	return out
+	if img.PullPolicy == "" && defaults.PullPolicy != "" {
+		img.PullPolicy = defaults.PullPolicy
+	}
+	if img.PullSecret == "" && len(defaults.PullSecrets) > 0 {
+		img.PullSecret = defaults.PullSecrets[0]
+	}
+
+	if overrides != nil {
+		if overrides.Repository != nil {
+			// Replace repository namespace according to defaults
+			img.Repository = *overrides.Repository
+		}
+		if overrides.Registry != nil {
+			img.Registry = *overrides.Registry
+		}
+		if overrides.PullPolicy != "" {
+			img.PullPolicy = overrides.PullPolicy
+		}
+	}
+
+	return img
 }
 
-func (r *imageRegistryV1Beta2) buildServerImage(serverType, version string) (configv1beta2.Image, error) {
+func (r *imageRegistryV1Beta2) buildServerImage(serverType, version string) (api.Image, error) {
 	types := r.imageConfig.Types
-	var imageComponent *configv1beta2.ImageComponent
+	var imageComponent *api.ImageComponent
 	if types != nil {
 		imageComponent = types[serverType]
 		if imageComponent == nil {
-			return configv1beta2.Image{}, fmt.Errorf("unknown server type: %s", serverType)
+			return api.Image{}, fmt.Errorf("unknown server type: %s", serverType)
 		}
 	}
 
-	img := configv1beta2.Image{
+	img := api.Image{
 		Registry:   imageComponent.Registry,
 		Repository: imageComponent.Repository,
 		Name:       imageComponent.Name,
-		Tag:        version + imageComponent.Suffix,
+		Tag:        imageComponent.Prefix + version + imageComponent.Suffix,
 	}
 
-	return r.mergeDefaults(img), nil
+	return r.mergeGlobalValues(img), nil
 }
 
 // Typed accessors
-func (r *imageRegistryV1Beta2) imageGetImage(imageType string) configv1beta2.Image {
+func (r *imageRegistryV1Beta2) imageGetImage(imageType string) api.Image {
 	base := r.imageConfig.Images[imageType]
-	return r.mergeDefaults(base)
+	return r.mergeGlobalValues(base)
 }
 
-func (r *imageRegistryV1Beta2) ImageGetConfigBuilderImage() configv1beta2.Image {
-	return r.imageGetImage(configv1beta2.ConfigBuilderImageComponent)
+func (r *imageRegistryV1Beta2) ImageGetConfigBuilderImage() api.Image {
+	return r.imageGetImage(api.ConfigBuilderImageComponent)
 }
 
-func (r *imageRegistryV1Beta2) ImageGetClientImage() configv1beta2.Image {
-	return r.imageGetImage(configv1beta2.ClientImageComponent)
+func (r *imageRegistryV1Beta2) ImageGetClientImage() api.Image {
+	return r.imageGetImage(api.ClientImageComponent)
 }
 
-func (r *imageRegistryV1Beta2) ImageGetSystemLoggerImage() configv1beta2.Image {
-	return r.imageGetImage(configv1beta2.SystemLoggerImageComponent)
+func (r *imageRegistryV1Beta2) ImageGetSystemLoggerImage() api.Image {
+	return r.imageGetImage(api.SystemLoggerImageComponent)
 }
 
 func (r *imageRegistryV1Beta2) GetImagePullPolicy(imageType string) corev1.PullPolicy {
+	if image, found := r.imageConfig.Types[imageType]; found {
+		if image.PullPolicy != "" {
+			return image.PullPolicy
+		}
+	}
 	img := r.imageGetImage(imageType)
 	return img.PullPolicy
 }
 
 func (r *imageRegistryV1Beta2) ImagePullSecrets(imageType string) []string {
 	secretNames := make([]string, 0)
+
+	if r.imageConfig.Overrides != nil && r.imageConfig.Overrides.PullSecrets != nil {
+		secretNames = append(secretNames, r.imageConfig.Overrides.PullSecrets...)
+		return secretNames
+	}
+
 	if imageType != "" {
 		if image, found := r.imageConfig.Images[imageType]; found {
 			if image.PullSecret != "" {
@@ -127,7 +150,7 @@ func (r *imageRegistryV1Beta2) ImagePullSecrets(imageType string) []string {
 	}
 
 	// We only add defaults if the specific type didn't have a pullSecret defined
-	if r.imageConfig.Defaults != nil {
+	if len(r.imageConfig.Defaults.PullSecrets) > 0 {
 		secretNames = append(secretNames, r.imageConfig.Defaults.PullSecrets...)
 	}
 	return secretNames

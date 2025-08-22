@@ -46,7 +46,18 @@ type Image struct {
 
 func (i Image) String() string {
 	// These values are initialized by the ImageRegistry so the Image type always has the correct overridden values
-	return i.Registry + "/" + i.Repository + "/" + i.Name + ":" + i.Tag
+
+	registry := i.Registry
+	if i.Registry != "" {
+		registry = i.Registry + "/"
+	}
+
+	repository := i.Repository
+	if i.Repository != "" {
+		repository = i.Repository + "/"
+	}
+
+	return registry + repository + i.Name + ":" + i.Tag
 }
 
 // ImageConfig is the Schema for the imageconfigs API
@@ -60,22 +71,25 @@ type ImageConfig struct {
 	Images Images `json:"images,omitempty"`
 
 	// Defaults contains default values for images.
-	// +optional
-	Defaults *ImagePolicy `json:"defaults,omitempty"`
+	Defaults ImagePolicy `json:"defaults"`
 
 	// Types defines image types that can be referenced. These types are not matched to a tag
 	// +optional
 	Types ImageTypes `json:"types,omitempty"`
+
+	// Overrides contains values that override any setting images might otherwise have
+	// +optional
+	Overrides *ImagePolicy `json:"overrides,omitempty"`
 }
 
 type ImagePolicy struct {
-	Registry string `json:"registry,omitempty"`
+	Registry *string `json:"registry,omitempty"`
 
 	PullSecrets []string `json:"pullSecrets,omitempty"`
 
 	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
 
-	Namespace *string `json:"namespace,omitempty"`
+	Repository *string `json:"repository,omitempty"`
 }
 
 // Images defines a map of images.
@@ -94,6 +108,7 @@ type ImageTypes map[string]*ImageComponent
 
 type ImageComponent struct {
 	Suffix string `json:"suffix,omitempty"`
+	Prefix string `json:"prefix,omitempty"`
 	// We ignore Tag from the Image, but other fields are preserved.
 	Image
 }

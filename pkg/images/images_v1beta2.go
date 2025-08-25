@@ -14,6 +14,8 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/config/v1beta2"
 )
 
+var _ ImageRegistry = &imageRegistryV1Beta2{}
+
 type imageRegistryV1Beta2 struct {
 	imageConfig api.ImageConfig
 	scheme      *runtime.Scheme
@@ -67,7 +69,7 @@ func NewImageRegistryV2(content []byte) (ImageRegistry, error) {
 	return r, nil
 }
 
-func (r *imageRegistryV1Beta2) mergeGlobalValues(img api.Image) api.Image {
+func (r *imageRegistryV1Beta2) mergeGlobalValues(img api.Image) *api.Image {
 	defaults := r.imageConfig.Defaults
 	overrides := r.imageConfig.Overrides
 	if img.Registry == "" && defaults.Registry != nil {
@@ -101,17 +103,16 @@ func (r *imageRegistryV1Beta2) mergeGlobalValues(img api.Image) api.Image {
 			img.PullPolicy = overrides.PullPolicy
 		}
 	}
-
-	return img
+	return &img
 }
 
-func (r *imageRegistryV1Beta2) buildServerImage(serverType, version string) (api.Image, error) {
+func (r *imageRegistryV1Beta2) buildServerImage(serverType, version string) (*api.Image, error) {
 	types := r.imageConfig.Types
 	var imageComponent *api.ImageComponent
 	if types != nil {
 		imageComponent = types[serverType]
 		if imageComponent == nil {
-			return api.Image{}, fmt.Errorf("unknown server type: %s", serverType)
+			return nil, fmt.Errorf("unknown server type: %s", serverType)
 		}
 	}
 
@@ -126,21 +127,21 @@ func (r *imageRegistryV1Beta2) buildServerImage(serverType, version string) (api
 }
 
 // Typed accessors
-func (r *imageRegistryV1Beta2) imageGetImage(imageType string) api.Image {
+func (r *imageRegistryV1Beta2) Image(imageType string) *api.Image {
 	base := r.imageConfig.Images[imageType]
 	return r.mergeGlobalValues(base)
 }
 
-func (r *imageRegistryV1Beta2) ImageGetConfigBuilderImage() api.Image {
-	return r.imageGetImage(api.ConfigBuilderImageComponent)
+func (r *imageRegistryV1Beta2) ConfigBuilderImage() *api.Image {
+	return r.Image(api.ConfigBuilderImageComponent)
 }
 
-func (r *imageRegistryV1Beta2) ImageGetClientImage() api.Image {
-	return r.imageGetImage(api.ClientImageComponent)
+func (r *imageRegistryV1Beta2) ClientImage() *api.Image {
+	return r.Image(api.ClientImageComponent)
 }
 
-func (r *imageRegistryV1Beta2) ImageGetSystemLoggerImage() api.Image {
-	return r.imageGetImage(api.SystemLoggerImageComponent)
+func (r *imageRegistryV1Beta2) SystemLoggerImage() *api.Image {
+	return r.Image(api.SystemLoggerImageComponent)
 }
 
 func (r *imageRegistryV1Beta2) GetImagePullPolicy(imageType string) corev1.PullPolicy {
@@ -149,7 +150,7 @@ func (r *imageRegistryV1Beta2) GetImagePullPolicy(imageType string) corev1.PullP
 			return image.PullPolicy
 		}
 	}
-	img := r.imageGetImage(imageType)
+	img := r.Image(imageType)
 	return img.PullPolicy
 }
 
@@ -188,19 +189,19 @@ func (r *imageRegistryV1Beta2) ImagePullSecrets(imageType string) []string {
 // Interface methods..
 
 func (r *imageRegistryV1Beta2) GetImage(imageType string) string {
-	return r.imageGetImage(imageType).String()
+	return r.Image(imageType).String()
 }
 
 func (r *imageRegistryV1Beta2) GetConfigBuilderImage() string {
-	return r.ImageGetConfigBuilderImage().String()
+	return r.ConfigBuilderImage().String()
 }
 
 func (r *imageRegistryV1Beta2) GetClientImage() string {
-	return r.ImageGetClientImage().String()
+	return r.ClientImage().String()
 }
 
 func (r *imageRegistryV1Beta2) GetSystemLoggerImage() string {
-	return r.ImageGetSystemLoggerImage().String()
+	return r.SystemLoggerImage().String()
 }
 
 func (r *imageRegistryV1Beta2) GetCassandraImage(serverType, version string) (string, error) {

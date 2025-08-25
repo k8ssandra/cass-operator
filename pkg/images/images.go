@@ -15,8 +15,11 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
+	configv1beta2 "github.com/k8ssandra/cass-operator/apis/config/v1beta2"
 	"github.com/pkg/errors"
 )
+
+var _ ImageRegistry = &imageRegistry{}
 
 type imageRegistry struct {
 	imageConfig configv1beta1.ImageConfig
@@ -281,6 +284,10 @@ func (i *imageRegistry) GetClientImage() string {
 
 func (i *imageRegistry) GetSystemLoggerImage() string {
 	return i.applyOverrides(configv1beta1.SystemLoggerImageComponent, i.GetImageConfig().Images.SystemLogger)
+}
+
+func (i *imageRegistry) Image(imageType string) *configv1beta2.Image {
+	return nil
 }
 
 func (i *imageRegistry) GetImagePullSecrets(imageTypes ...string) []string {

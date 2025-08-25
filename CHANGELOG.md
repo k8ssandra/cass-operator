@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [BUGFIX] [#827](https://github.com/k8ssandra/cass-operator/issues/827) Add a new watch handler for caches in the startup of controller-runtime. If the caches have failures, we should exit the operator and let it restart. This would alert the user that the operator has issues instead of simply logging these errors.
+
 ## v1.26.0
 
 * [CHANGE] [#807](https://github.com/k8ssandra/cass-operator/issues/807) EndpointSlices are now separated by type (IPv4, IPv6, FQDN). FQDN addresses (DNS) are no longer resolved by the cass-operator, but left to the Kubernetes' own implementation. Use of FQDN is not recommended.

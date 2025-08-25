@@ -19,7 +19,7 @@ type imageRegistryV1Beta2 struct {
 	scheme      *runtime.Scheme
 }
 
-func NewImageRegistryFromClient(ctx context.Context, c client.Client) (ImageRegistry, error) {
+func NewImageRegistryFromConfigMap(ctx context.Context, c client.Client) (ImageRegistry, error) {
 	cmList := &corev1.ConfigMapList{}
 	sel := labels.SelectorFromSet(labels.Set{"k8ssandra.io/config": "image"})
 	if err := c.List(ctx, cmList, &client.ListOptions{LabelSelector: sel}); err != nil {

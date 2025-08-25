@@ -353,7 +353,7 @@ func TestNewImageRegistryFromClient_UsesConfigMapV2(t *testing.T) {
 
 	// The function should return a v2 registry parsed from the ConfigMap
 	ctx := context.Background()
-	reg, err := NewImageRegistryFromClient(ctx, c)
+	reg, err := NewImageRegistryFromConfigMap(ctx, c)
 	require.NoError(err)
 
 	// Validate a few fields parsed from the v2 config

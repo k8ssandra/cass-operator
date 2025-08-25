@@ -232,7 +232,13 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	registry, err := images.NewImageRegistryFromClient(ctx, mgr.GetClient())
+	uncachedClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "unable to fetch config connection")
+		os.Exit(1)
+	}
+
+	registry, err := images.NewImageRegistryFromConfigMap(ctx, uncachedClient)
 	if err != nil {
 		setupLog.Error(err, "unable to load the image config file")
 		os.Exit(1)

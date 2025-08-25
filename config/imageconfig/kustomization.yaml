@@ -1,0 +1,12 @@
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+- files:
+  - image_config.yaml
+  name: image-config
+  options:
+    labels:
+      k8ssandra.io/config: "image"
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization

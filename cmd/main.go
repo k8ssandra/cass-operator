@@ -207,13 +207,6 @@ func main() {
 		operConfig.ImageConfigFile = "/configs/image_config.yaml"
 	}
 
-	// TODO Add here the logic to select the correct image registry - v1beta1 or v1beta2
-	registry, err := images.NewImageRegistry(operConfig.ImageConfigFile)
-	if err != nil {
-		setupLog.Error(err, "unable to load the image config file")
-		os.Exit(1)
-	}
-
 	options.Cache = cache.Options{
 		DefaultNamespaces: map[string]cache.Config{},
 	}
@@ -238,6 +231,21 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
+
+	registry, err := images.NewImageRegistryFromClient(ctx, mgr.GetClient())
+	if err != nil {
+		setupLog.Error(err, "unable to load the image config file")
+		os.Exit(1)
+	}
+
+	if registry == nil {
+		setupLog.Info("v1beta2 image config not found, falling back to v1beta1 from the disk")
+		registry, err = images.NewImageRegistry(operConfig.ImageConfigFile)
+		if err != nil {
+			setupLog.Error(err, "unable to load the image config file")
+			os.Exit(1)
+		}
+	}
 
 	if err = (&controllers.CassandraDatacenterReconciler{
 		Client:        mgr.GetClient(),

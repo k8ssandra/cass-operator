@@ -1,12 +1,15 @@
 package images
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/k8ssandra/cass-operator/apis/config/v1beta2"
 )
@@ -14,6 +17,32 @@ import (
 type imageRegistryV1Beta2 struct {
 	imageConfig api.ImageConfig
 	scheme      *runtime.Scheme
+}
+
+func NewImageRegistryFromClient(ctx context.Context, c client.Client) (ImageRegistry, error) {
+	cmList := &corev1.ConfigMapList{}
+	sel := labels.SelectorFromSet(labels.Set{"k8ssandra.io/config": "image"})
+	if err := c.List(ctx, cmList, &client.ListOptions{LabelSelector: sel}); err != nil {
+		return nil, fmt.Errorf("listing image config configmaps: %w", err)
+	}
+
+	if len(cmList.Items) == 0 {
+		// Not found, we don't want an error here, this is perfectly acceptable situation. User might be using the v1beta1 configuration
+		return nil, nil
+	}
+
+	for _, cm := range cmList.Items {
+		if data, ok := cm.Data["image_config.yaml"]; ok && data != "" {
+			reg, err := NewImageRegistryV2([]byte(data))
+			if err != nil {
+				return nil, fmt.Errorf("parsing v1beta2 image config: %w", err)
+			}
+			return reg, nil
+		}
+	}
+
+	// This is different, we found the ConfigMap but it was incorrectly formatted. Now we do want an error.
+	return nil, fmt.Errorf("no ConfigMap with label k8ssandra.io/config=image and key image_config.yaml found")
 }
 
 func (r *imageRegistryV1Beta2) loadImageConfig(content []byte) (*api.ImageConfig, error) {

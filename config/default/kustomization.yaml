@@ -10,6 +10,7 @@ resources:
 - ../rbac
 - ../manager
 - metrics_service.yaml
+- ../imageconfig
 
 # Uncomment the patches line if you enable Metrics, and/or are using webhooks and cert-manager
 patches:

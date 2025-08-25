@@ -9,6 +9,9 @@ configMapGenerator:
   - controller_manager_config.yaml
   - image_config.yaml
   name: manager-config
+  options:
+    labels:
+      k8ssandra.io/config: "manager"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:

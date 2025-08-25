@@ -33,6 +33,7 @@ type OperatorConfig struct {
 	DisableWebhooks bool `json:"disableWebhooks,omitempty"`
 
 	// ImageConfigFile indicates the path where to load the imageConfig from
+	// +optional
 	ImageConfigFile string `json:"imageConfigFile,omitempty"`
 }
 

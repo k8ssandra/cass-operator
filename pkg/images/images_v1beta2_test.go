@@ -1,6 +1,7 @@
 package images
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,7 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	api "github.com/k8ssandra/cass-operator/apis/config/v1beta2"
 )
@@ -326,4 +329,33 @@ types:
 	cassandraImage, err := registry.GetCassandraImage("cassandra", "4.0.0")
 	require.NoError(err)
 	require.Equal("localhost:5000/k8ssandra/management-api:4.0.0-next", cassandraImage)
+}
+
+func TestNewImageRegistryFromClient_UsesConfigMapV2(t *testing.T) {
+	require := require.New(t)
+
+	// Load v2 ImageConfig content from testdata
+	imageConfigFile := filepath.Join("..", "..", "tests", "testdata", "image_config_parsing_v2.yaml")
+	content, err := os.ReadFile(imageConfigFile)
+	require.NoError(err)
+
+	// Build a fake client with a labeled ConfigMap containing the v2 config
+	scheme := runtime.NewScheme()
+	require.NoError(corev1.AddToScheme(scheme))
+
+	cm := &corev1.ConfigMap{}
+	cm.Name = "k8ssandra-image-config"
+	cm.Namespace = "default"
+	cm.Labels = map[string]string{"k8ssandra.io/config": "image"}
+	cm.Data = map[string]string{"image_config.yaml": string(content)}
+
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
+
+	// The function should return a v2 registry parsed from the ConfigMap
+	ctx := context.Background()
+	reg, err := NewImageRegistryFromClient(ctx, c)
+	require.NoError(err)
+
+	// Validate a few fields parsed from the v2 config
+	require.Equal("ghcr.io/k8ssandra/system-logger:latest", reg.GetSystemLoggerImage())
 }

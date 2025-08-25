@@ -5,6 +5,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	K8ssandraConfigLabel     = "k8ssandra.io/config"
+	K8ssandraImageLabelValue = "image"
+)
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:images
 

@@ -49,6 +49,32 @@ type Image struct {
 	PullSecret string `json:"pullSecret,omitempty"`
 }
 
+// ApplyOverrides modifies the image by applying overrides from a higher-priority image. Higher priority could be something
+// that's defined in the CRD for example
+func (i *Image) ApplyOverrides(higher *Image) {
+	if higher == nil {
+		return
+	}
+	if higher.Registry != "" {
+		i.Registry = higher.Registry
+	}
+	if higher.Repository != "" {
+		i.Repository = higher.Repository
+	}
+	if higher.Name != "" {
+		i.Name = higher.Name
+	}
+	if higher.Tag != "" {
+		i.Tag = higher.Tag
+	}
+	if higher.PullPolicy != "" {
+		i.PullPolicy = higher.PullPolicy
+	}
+	if higher.PullSecret != "" {
+		i.PullSecret = higher.PullSecret
+	}
+}
+
 func (i Image) String() string {
 	// These values are initialized by the ImageRegistry so the Image type always has the correct overridden values
 

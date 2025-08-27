@@ -232,13 +232,19 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
+	operatorNs, err := utils.GetOperatorNamespace()
+	if err != nil {
+		setupLog.Error(err, "unable to get operator namespace")
+		os.Exit(1)
+	}
+
 	uncachedClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
 	if err != nil {
 		setupLog.Error(err, "unable to fetch config connection")
 		os.Exit(1)
 	}
 
-	registry, err := images.NewImageRegistryFromConfigMap(ctx, uncachedClient)
+	registry, err := images.NewImageRegistryFromConfigMap(ctx, client.NewNamespacedClient(uncachedClient, operatorNs))
 	if err != nil {
 		setupLog.Error(err, "unable to load the image config file")
 		os.Exit(1)

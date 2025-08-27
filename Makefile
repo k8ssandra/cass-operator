@@ -44,12 +44,13 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 REGISTRY ?=
 ORG ?= k8ssandra
 IMAGE_TAG_BASE ?= $(ORG)/cass-operator
+TAG ?= v$(VERSION)
 
 M_INTEG_DIR ?= all
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(TAG)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -69,7 +70,7 @@ CRD_OPTIONS ?= "crd:generateEmbeddedObjectMeta=true"
 
 # Logger image
 LOG_IMG_BASE ?= $(ORG)/system-logger
-LOG_IMG ?= $(LOG_IMG_BASE):v$(VERSION)
+LOG_IMG ?= $(LOG_IMG_BASE):$(TAG)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -214,6 +215,8 @@ uninstall: manifests ## Uninstall CRDs from the K8s cluster specified in ~/.kube
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	LOG_IMG=${LOG_IMG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
+	TAG=${TAG} yq eval -i '.images.system-logger.tag = env(TAG)' config/imageconfig/image_config.yaml
+	yq eval -i 'del(.images.system-logger.registry)' config/imageconfig/image_config.yaml
 	kubectl apply --force-conflicts --server-side -k config/deployments/cluster
 
 .PHONY: undeploy
@@ -227,6 +230,8 @@ ifneq ($(strip $(NAMESPACE)),)
 endif
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	LOG_IMG=${LOG_IMG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
+	TAG=${TAG} yq eval -i '.images.system-logger.tag = env(TAG)' config/imageconfig/image_config.yaml
+	yq eval -i 'del(.images.system-logger.registry)' config/imageconfig/image_config.yaml
 	kubectl apply --force-conflicts --server-side -k tests/$(TEST_DIR)
 
 .PHONY: undeploy-test

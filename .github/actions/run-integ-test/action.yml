@@ -66,4 +66,4 @@ runs:
     - name: Run integration test ( ${{ inputs.integration_test }} )
       shell: bash
       run: |
-        IMG=${{ steps.load.outputs.operator_img }} LOG_IMG=${{ steps.load.outputs.logger_img }} make integ-test
+        IMG=${{ steps.load.outputs.operator_img }} make integ-test

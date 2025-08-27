@@ -25,8 +25,7 @@ import (
 )
 
 const (
-	EnvNoCleanup        = "M_NO_CLEANUP"
-	ImagePullSecretName = "imagepullsecret"
+	EnvNoCleanup = "M_NO_CLEANUP"
 )
 
 func duplicate(value string, count int) string {

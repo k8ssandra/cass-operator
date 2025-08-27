@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [FEATURE] [#830](https://github.com/k8ssandra/cass-operator/issues/830) Implement new ImageConfig structure where all the parts of the configured images are split to individual components to allow simpler configuration. This allows to override a single value only (such as registry for single image) in the Helm charts. The configuration is moved to a separate ConfigMap with `k8ssandra.io/config: image` label and this same ImageConfig is then used in the k8ssandra-operator to ensure all the components are configured from a single place.
+
 ## v1.26.0
 
 * [CHANGE] [#807](https://github.com/k8ssandra/cass-operator/issues/807) EndpointSlices are now separated by type (IPv4, IPv6, FQDN). FQDN addresses (DNS) are no longer resolved by the cass-operator, but left to the Kubernetes' own implementation. Use of FQDN is not recommended.

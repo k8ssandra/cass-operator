@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	toolscache "k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -247,31 +248,10 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	operatorNs, err := utils.GetOperatorNamespace()
+	registry, err := setupImageRegistry(ctx, cfg, operConfig)
 	if err != nil {
-		setupLog.Error(err, "unable to get operator namespace")
+		setupLog.Error(err, "unable to set up image registry")
 		os.Exit(1)
-	}
-
-	uncachedClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
-	if err != nil {
-		setupLog.Error(err, "unable to fetch config connection")
-		os.Exit(1)
-	}
-
-	registry, err := images.NewImageRegistryFromConfigMap(ctx, client.NewNamespacedClient(uncachedClient, operatorNs))
-	if err != nil {
-		setupLog.Error(err, "unable to load the image config file")
-		os.Exit(1)
-	}
-
-	if registry == nil {
-		setupLog.Info("v1beta2 image config not found, falling back to v1beta1 from the disk")
-		registry, err = images.NewImageRegistry(operConfig.ImageConfigFile)
-		if err != nil {
-			setupLog.Error(err, "unable to load the image config file")
-			os.Exit(1)
-		}
 	}
 
 	if err = (&controllers.CassandraDatacenterReconciler{
@@ -381,6 +361,37 @@ func main() {
 	case <-ctx.Done():
 		// graceful shutdown
 	}
+}
+
+func setupImageRegistry(ctx context.Context, cfg *rest.Config, operConfig *configv1beta1.OperatorConfig) (images.ImageRegistry, error) {
+	operatorNs, err := utils.GetOperatorNamespace()
+	if err != nil {
+		setupLog.Error(err, "unable to get operator namespace")
+		return nil, err
+	}
+
+	uncachedClient, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "unable to fetch config connection")
+		return nil, err
+	}
+
+	registry, err := images.NewImageRegistryFromConfigMap(ctx, client.NewNamespacedClient(uncachedClient, operatorNs))
+	if err != nil {
+		setupLog.Error(err, "unable to load the image config file")
+		return nil, err
+	}
+
+	if registry == nil {
+		setupLog.Info("v1beta2 image config not found, falling back to v1beta1 from the disk")
+		registry, err = images.NewImageRegistry(operConfig.ImageConfigFile)
+		if err != nil {
+			setupLog.Error(err, "unable to load the image config file")
+			return nil, err
+		}
+	}
+
+	return registry, nil
 }
 
 func readOperConfig(configFile string) (*configv1beta1.OperatorConfig, error) {

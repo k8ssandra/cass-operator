@@ -32,6 +32,7 @@ rules:
   resources:
   - configmaps
   - endpoints
+  - endpoints/restricted
   - events
   - persistentvolumeclaims
   - pods
@@ -132,6 +133,7 @@ rules:
   - discovery.k8s.io
   resources:
   - endpointslices
+  - endpointslices/restricted
   verbs:
   - create
   - delete

@@ -15,13 +15,16 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
+	configv1beta2 "github.com/k8ssandra/cass-operator/apis/config/v1beta2"
 	"github.com/pkg/errors"
 )
 
-var (
+var _ ImageRegistry = &imageRegistry{}
+
+type imageRegistry struct {
 	imageConfig configv1beta1.ImageConfig
-	scheme      = runtime.NewScheme()
-)
+	scheme      *runtime.Scheme
+}
 
 const (
 	ValidDseVersionRegexp      = "(6\\.[89]\\.\\d+)"
@@ -32,17 +35,24 @@ const (
 	DefaultHCDRepository       = "datastax/hcd"
 )
 
-func init() {
+// NewImageRegistry creates a new ImageRegistry.
+func NewImageRegistry(imageConfigFile string) (ImageRegistry, error) {
+	scheme := runtime.NewScheme()
 	utilruntime.Must(configv1beta1.AddToScheme(scheme))
+	i := &imageRegistry{
+		scheme: scheme,
+	}
+	err := i.parseImageConfig(imageConfigFile)
+	return i, err
 }
 
-func ParseImageConfig(imageConfigFile string) error {
+func (i *imageRegistry) parseImageConfig(imageConfigFile string) error {
 	content, err := os.ReadFile(imageConfigFile)
 	if err != nil {
 		return fmt.Errorf("could not read file at %s", imageConfigFile)
 	}
 
-	if _, err = LoadImageConfig(content); err != nil {
+	if _, err = i.loadImageConfig(content); err != nil {
 		err = errors.Wrapf(err, "unable to load imageConfig from %s", imageConfigFile)
 		return err
 	}
@@ -50,15 +60,15 @@ func ParseImageConfig(imageConfigFile string) error {
 	return nil
 }
 
-func LoadImageConfig(content []byte) (*configv1beta1.ImageConfig, error) {
-	codecs := serializer.NewCodecFactory(scheme)
+func (i *imageRegistry) loadImageConfig(content []byte) (*configv1beta1.ImageConfig, error) {
+	codecs := serializer.NewCodecFactory(i.scheme)
 
 	parsedImageConfig := &configv1beta1.ImageConfig{}
 	if err := runtime.DecodeInto(codecs.UniversalDecoder(), content, parsedImageConfig); err != nil {
 		return nil, fmt.Errorf("could not decode file into runtime.Object: %v", err)
 	}
 
-	imageConfig = *parsedImageConfig
+	i.imageConfig = *parsedImageConfig
 
 	return parsedImageConfig, nil
 }
@@ -78,7 +88,7 @@ func IsHCDVersionSupported(version string) bool {
 	return validVersions.MatchString(version)
 }
 
-func splitRegistry(image string) (registry string, imageNoRegistry string) {
+func (i *imageRegistry) splitRegistry(image string) (registry string, imageNoRegistry string) {
 	comps := strings.Split(image, "/")
 
 	if len(comps) > 1 && (strings.Contains(comps[0], ".") || strings.Contains(comps[0], ":")) {
@@ -89,12 +99,12 @@ func splitRegistry(image string) (registry string, imageNoRegistry string) {
 }
 
 // applyNamespaceOverride takes only input without registry
-func applyNamespaceOverride(imageNoRegistry string) string {
-	if GetImageConfig().ImageNamespace == nil {
+func (i *imageRegistry) applyNamespaceOverride(imageNoRegistry string) string {
+	if i.GetImageConfig().ImageNamespace == nil {
 		return imageNoRegistry
 	}
 
-	namespace := *GetImageConfig().ImageNamespace
+	namespace := *i.GetImageConfig().ImageNamespace
 
 	comps := strings.Split(imageNoRegistry, "/")
 	if len(comps) > 1 {
@@ -109,23 +119,23 @@ func applyNamespaceOverride(imageNoRegistry string) string {
 	}
 }
 
-func applyDefaultRegistryOverride(customRegistry, imageNoRegistry string) string {
+func (i *imageRegistry) applyDefaultRegistryOverride(customRegistry, imageNoRegistry string) string {
 	if customRegistry == "" {
 		return imageNoRegistry
 	}
 	return fmt.Sprintf("%s/%s", customRegistry, imageNoRegistry)
 }
 
-func getRegistryOverride(imageType string) string {
+func (i *imageRegistry) getRegistryOverride(imageType string) string {
 	customRegistry := ""
-	defaults := GetImageConfig().DefaultImages
+	defaults := i.GetImageConfig().DefaultImages
 	if defaults != nil {
 		if component, found := defaults.ImageComponents[imageType]; found {
 			customRegistry = component.ImageRegistry
 		}
 	}
 
-	defaultRegistry := GetImageConfig().ImageRegistry
+	defaultRegistry := i.GetImageConfig().ImageRegistry
 
 	if customRegistry != "" {
 		return customRegistry
@@ -134,34 +144,34 @@ func getRegistryOverride(imageType string) string {
 	return defaultRegistry
 }
 
-func applyOverrides(imageType, image string) string {
-	registryOverride := getRegistryOverride(imageType)
+func (i *imageRegistry) applyOverrides(imageType, image string) string {
+	registryOverride := i.getRegistryOverride(imageType)
 	registryOverride = strings.TrimSuffix(registryOverride, "/")
-	registry, imageNoRegistry := splitRegistry(image)
+	registry, imageNoRegistry := i.splitRegistry(image)
 
-	if registryOverride == "" && GetImageConfig().ImageNamespace == nil {
+	if registryOverride == "" && i.GetImageConfig().ImageNamespace == nil {
 		return image
 	}
 
-	if GetImageConfig().ImageNamespace != nil {
-		imageNoRegistry = applyNamespaceOverride(imageNoRegistry)
+	if i.GetImageConfig().ImageNamespace != nil {
+		imageNoRegistry = i.applyNamespaceOverride(imageNoRegistry)
 	}
 
 	if registryOverride != "" {
-		return applyDefaultRegistryOverride(registryOverride, imageNoRegistry)
+		return i.applyDefaultRegistryOverride(registryOverride, imageNoRegistry)
 	}
 
-	return applyDefaultRegistryOverride(registry, imageNoRegistry)
+	return i.applyDefaultRegistryOverride(registry, imageNoRegistry)
 }
 
-func GetImageConfig() *configv1beta1.ImageConfig {
+func (i *imageRegistry) GetImageConfig() *configv1beta1.ImageConfig {
 	// For now, this is static configuration (updated only on start of the pod), even if the actual ConfigMap underneath is updated.
-	return &imageConfig
+	return &i.imageConfig
 }
 
-func getCassandraContainerImageOverride(serverType, version string) (bool, string) {
+func (i *imageRegistry) getCassandraContainerImageOverride(serverType, version string) (bool, string) {
 	// If there's a mapped volume with overrides in the ConfigMap, use these. Otherwise only calculate
-	images := GetImageConfig().Images
+	images := i.GetImageConfig().Images
 	if images != nil {
 		if serverType == "dse" {
 			if value, found := images.DSEVersions[version]; found {
@@ -182,7 +192,7 @@ func getCassandraContainerImageOverride(serverType, version string) (bool, strin
 	return false, ""
 }
 
-func getImageComponents(serverType string) (string, string) {
+func (i *imageRegistry) getImageComponents(serverType string) (string, string) {
 	var defaultPrefix string
 
 	if serverType == "dse" {
@@ -192,7 +202,7 @@ func getImageComponents(serverType string) (string, string) {
 		defaultPrefix = DefaultCassandraRepository
 	}
 
-	defaults := GetImageConfig().DefaultImages
+	defaults := i.GetImageConfig().DefaultImages
 	if defaults != nil {
 		var component configv1beta1.ImageComponent
 		if serverType == "dse" {
@@ -213,9 +223,9 @@ func getImageComponents(serverType string) (string, string) {
 	return defaultPrefix, ""
 }
 
-func GetCassandraImage(serverType, version string) (string, error) {
-	if found, image := getCassandraContainerImageOverride(serverType, version); found {
-		return applyOverrides(serverType, image), nil
+func (i *imageRegistry) GetCassandraImage(serverType, version string) (string, error) {
+	if found, image := i.getCassandraContainerImageOverride(serverType, version); found {
+		return i.applyOverrides(serverType, image), nil
 	}
 
 	switch serverType {
@@ -235,29 +245,25 @@ func GetCassandraImage(serverType, version string) (string, error) {
 		return "", fmt.Errorf("server type '%s' is not supported", serverType)
 	}
 
-	prefix, suffix := getImageComponents(serverType)
+	prefix, suffix := i.getImageComponents(serverType)
 
-	return applyOverrides(serverType, fmt.Sprintf("%s:%s%s", prefix, version, suffix)), nil
+	return i.applyOverrides(serverType, fmt.Sprintf("%s:%s%s", prefix, version, suffix)), nil
 }
 
-func GetConfiguredImage(imageType, image string) string {
-	return applyOverrides(imageType, image)
+func (i *imageRegistry) GetImage(imageType string) string {
+	return i.applyOverrides(imageType, i.GetImageConfig().Images.Others[imageType])
 }
 
-func GetImage(imageType string) string {
-	return applyOverrides(imageType, GetImageConfig().Images.Others[imageType])
-}
-
-func GetImagePullPolicy(imageType string) corev1.PullPolicy {
+func (i *imageRegistry) GetImagePullPolicy(imageType string) corev1.PullPolicy {
 	var customPolicy corev1.PullPolicy
-	defaults := GetImageConfig().DefaultImages
+	defaults := i.GetImageConfig().DefaultImages
 	if defaults != nil {
 		if component, found := defaults.ImageComponents[imageType]; found {
 			customPolicy = component.ImagePullPolicy
 		}
 	}
 
-	defaultOverridePolicy := GetImageConfig().ImagePullPolicy
+	defaultOverridePolicy := i.GetImageConfig().ImagePullPolicy
 
 	if customPolicy != "" {
 		return customPolicy
@@ -268,29 +274,33 @@ func GetImagePullPolicy(imageType string) corev1.PullPolicy {
 	return ""
 }
 
-func GetConfigBuilderImage() string {
-	return applyOverrides(configv1beta1.ConfigBuilderImageComponent, GetImageConfig().Images.ConfigBuilder)
+func (i *imageRegistry) GetConfigBuilderImage() string {
+	return i.applyOverrides(configv1beta1.ConfigBuilderImageComponent, i.GetImageConfig().Images.ConfigBuilder)
 }
 
-func GetClientImage() string {
-	return applyOverrides(configv1beta1.ClientImageComponent, GetImageConfig().Images.Client)
+func (i *imageRegistry) GetClientImage() string {
+	return i.applyOverrides(configv1beta1.ClientImageComponent, i.GetImageConfig().Images.Client)
 }
 
-func GetSystemLoggerImage() string {
-	return applyOverrides(configv1beta1.SystemLoggerImageComponent, GetImageConfig().Images.SystemLogger)
+func (i *imageRegistry) GetSystemLoggerImage() string {
+	return i.applyOverrides(configv1beta1.SystemLoggerImageComponent, i.GetImageConfig().Images.SystemLogger)
 }
 
-func AddDefaultRegistryImagePullSecrets(podSpec *corev1.PodSpec, imageTypes ...string) {
+func (i *imageRegistry) Image(imageType string) *configv1beta2.Image {
+	return nil
+}
+
+func (i *imageRegistry) GetImagePullSecrets(imageTypes ...string) []string {
 	secretNames := make([]string, 0)
-	secretName := GetImageConfig().ImagePullSecret.Name
+	secretName := i.GetImageConfig().ImagePullSecret.Name
 	if secretName != "" {
 		secretNames = append(secretNames, secretName)
 	}
 
 	imageTypesToAdd := make(map[string]bool, len(imageTypes))
 	if len(imageTypes) < 1 {
-		if GetImageConfig().DefaultImages != nil {
-			for name := range GetImageConfig().DefaultImages.ImageComponents {
+		if i.GetImageConfig().DefaultImages != nil {
+			for name := range i.GetImageConfig().DefaultImages.ImageComponents {
 				imageTypesToAdd[name] = true
 			}
 		}
@@ -300,8 +310,8 @@ func AddDefaultRegistryImagePullSecrets(podSpec *corev1.PodSpec, imageTypes ...s
 		}
 	}
 
-	if GetImageConfig().DefaultImages != nil {
-		for name, component := range GetImageConfig().DefaultImages.ImageComponents {
+	if i.GetImageConfig().DefaultImages != nil {
+		for name, component := range i.GetImageConfig().DefaultImages.ImageComponents {
 			if _, found := imageTypesToAdd[name]; found {
 				if component.ImagePullSecret.Name != "" {
 					secretNames = append(secretNames, component.ImagePullSecret.Name)
@@ -310,9 +320,5 @@ func AddDefaultRegistryImagePullSecrets(podSpec *corev1.PodSpec, imageTypes ...s
 		}
 	}
 
-	for _, s := range secretNames {
-		podSpec.ImagePullSecrets = append(
-			podSpec.ImagePullSecrets,
-			corev1.LocalObjectReference{Name: s})
-	}
+	return secretNames
 }

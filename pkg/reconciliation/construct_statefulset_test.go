@@ -51,7 +51,7 @@ func Test_newStatefulSetForCassandraDatacenter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount)
+		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount, imageRegistry)
 		assert.NoError(t, err, "newStatefulSetForCassandraDatacenter should not have errored")
 		assert.NotNil(t, got, "newStatefulSetForCassandraDatacenter should not have returned a nil statefulset")
 		assert.Equal(t, map[string]string{"dedicated": "cassandra"}, got.Spec.Template.Spec.NodeSelector)
@@ -113,7 +113,7 @@ func Test_newStatefulSetForCassandraDatacenter_additionalLabels(t *testing.T) {
 	}
 
 	statefulset, newStatefulSetForCassandraDatacenterError := newStatefulSetForCassandraDatacenter(nil,
-		"rack1", dc, 1)
+		"rack1", dc, 1, imageRegistry)
 
 	assert.NoError(t, newStatefulSetForCassandraDatacenterError,
 		"should not have gotten error when creating the new statefulset")
@@ -175,7 +175,7 @@ func Test_newStatefulSetForCassandraDatacenter_ServiceName(t *testing.T) {
 		},
 	}
 
-	sts, err := newStatefulSetForCassandraDatacenter(&appsv1.StatefulSet{}, "default", dc, 1)
+	sts, err := newStatefulSetForCassandraDatacenter(&appsv1.StatefulSet{}, "default", dc, 1, imageRegistry)
 
 	require.NoError(t, err)
 	assert.Equal(t, dc.GetAllPodsServiceName(), sts.Spec.ServiceName)
@@ -213,7 +213,7 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 		},
 	}
 
-	sts, err := newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3)
+	sts, err := newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3, imageRegistry)
 	assert.NoError(err)
 
 	assert.Equal(6, len(sts.Spec.Template.Spec.Volumes))
@@ -280,7 +280,7 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 		},
 	}
 
-	sts, err = newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3)
+	sts, err = newStatefulSetForCassandraDatacenter(nil, "r1", dc, 3, imageRegistry)
 	assert.NoError(err)
 
 	assert.Equal(3, len(sts.Spec.VolumeClaimTemplates))
@@ -380,7 +380,7 @@ func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount)
+		got, err := newStatefulSetForCassandraDatacenter(nil, tt.args.rackName, tt.args.dc, tt.args.replicaCount, imageRegistry)
 		assert.NoError(t, err, "newStatefulSetForCassandraDatacenter should not have errored")
 		assert.NotNil(t, got, "newStatefulSetForCassandraDatacenter should not have returned a nil statefulset")
 
@@ -556,7 +556,7 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Log(tt.name)
-		statefulSet, err := newStatefulSetForCassandraDatacenter(nil, rack, tt.dc, replicas)
+		statefulSet, err := newStatefulSetForCassandraDatacenter(nil, rack, tt.dc, replicas, imageRegistry)
 		assert.NoError(t, err, fmt.Sprintf("%s: failed to create new statefulset", tt.name))
 		assert.NotNil(t, statefulSet, fmt.Sprintf("%s: statefulset is nil", tt.name))
 
@@ -674,7 +674,7 @@ func Test_newStatefulSetForCassandraDatacenter_dcNameOverride(t *testing.T) {
 	}
 
 	statefulset, newStatefulSetForCassandraDatacenterError := newStatefulSetForCassandraDatacenter(nil,
-		"rack1", dc, 1)
+		"rack1", dc, 1, imageRegistry)
 
 	assert.NoError(t, newStatefulSetForCassandraDatacenterError,
 		"should not have gotten error when creating the new statefulset")
@@ -706,7 +706,7 @@ func TestPodTemplateSpecHashAnnotationChanges(t *testing.T) {
 		},
 	}
 
-	sts, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3)
+	sts, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3, imageRegistry)
 	assert.NoError(err, "failed to build statefulset")
 
 	// Test that the hash annotation is set
@@ -715,14 +715,14 @@ func TestPodTemplateSpecHashAnnotationChanges(t *testing.T) {
 
 	// Add PodTemplateSpec labels
 	dc.Spec.PodTemplateSpec.Labels = map[string]string{"abc": "123"}
-	sts, err = newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3)
+	sts, err = newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3, imageRegistry)
 	assert.NoError(err)
 	updatedHash := sts.Annotations[utils.ResourceHashAnnotationKey]
 	assert.NotEqual(currentHash, updatedHash, "expected hash to change when PodTemplateSpec labels change")
 
 	// Add more labels
 	dc.Spec.PodTemplateSpec.Labels["more"] = "labels"
-	sts, err = newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3)
+	sts, err = newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3, imageRegistry)
 	// spec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false)
 	assert.NoError(err)
 	updatedHash = sts.Annotations[utils.ResourceHashAnnotationKey]
@@ -748,14 +748,14 @@ func TestMinReadySecondsChange(t *testing.T) {
 		},
 	}
 
-	sts, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3)
+	sts, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3, imageRegistry)
 	assert.NoError(err, "failed to build statefulset")
 
 	assert.Equal(int32(5), sts.Spec.MinReadySeconds)
 
 	dc.Spec.MinReadySeconds = ptr.To[int32](10)
 
-	sts, err = newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3)
+	sts, err = newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3, imageRegistry)
 	assert.NoError(err, "failed to build statefulset")
 
 	assert.Equal(int32(10), sts.Spec.MinReadySeconds)

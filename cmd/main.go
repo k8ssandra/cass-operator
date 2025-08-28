@@ -210,11 +210,6 @@ func main() {
 		operConfig.ImageConfigFile = "/configs/image_config.yaml"
 	}
 
-	if err := images.ParseImageConfig(operConfig.ImageConfigFile); err != nil {
-		setupLog.Error(err, "unable to load the image config file")
-		os.Exit(1)
-	}
-
 	options.Cache = cache.Options{
 		DefaultNamespaces: map[string]cache.Config{},
 	}
@@ -252,11 +247,39 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
+	operatorNs, err := utils.GetOperatorNamespace()
+	if err != nil {
+		setupLog.Error(err, "unable to get operator namespace")
+		os.Exit(1)
+	}
+
+	uncachedClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "unable to fetch config connection")
+		os.Exit(1)
+	}
+
+	registry, err := images.NewImageRegistryFromConfigMap(ctx, client.NewNamespacedClient(uncachedClient, operatorNs))
+	if err != nil {
+		setupLog.Error(err, "unable to load the image config file")
+		os.Exit(1)
+	}
+
+	if registry == nil {
+		setupLog.Info("v1beta2 image config not found, falling back to v1beta1 from the disk")
+		registry, err = images.NewImageRegistry(operConfig.ImageConfigFile)
+		if err != nil {
+			setupLog.Error(err, "unable to load the image config file")
+			os.Exit(1)
+		}
+	}
+
 	if err = (&controllers.CassandraDatacenterReconciler{
-		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cass-operator"),
+		Client:        mgr.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
+		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor("cass-operator"),
+		ImageRegistry: registry,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraDatacenter")
 		os.Exit(1)

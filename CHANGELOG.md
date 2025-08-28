@@ -11,7 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
-* [BUGFIX] [#827](https://github.com/k8ssandra/cass-operator/issues/827) Add a new watch handler for caches in the startup of controller-runtime. If the caches have failures, we should exit the operator and let it restart. This would alert the user that the operator has issues instead of simply logging these errors.
+* [FEATURE] [#830](https://github.com/k8ssandra/cass-operator/issues/830) Implement new ImageConfig structure where all the parts of the configured images are split to individual components to allow simpler configuration. This allows to override a single value only (such as registry for single image) in the Helm charts. The configuration is moved to a separate ConfigMap with `k8ssandra.io/config: image` label and this same ImageConfig is then used in the k8ssandra-operator to ensure all the components are configured from a single place.
+* [ENHANCEMENT] [#827](https://github.com/k8ssandra/cass-operator/issues/827) Add a new watch handler for caches in the startup of controller-runtime. If the caches have failures, we should exit the operator and let it restart. This would alert the user that the operator has issues instead of simply logging these errors.
 
 ## v1.26.0
 

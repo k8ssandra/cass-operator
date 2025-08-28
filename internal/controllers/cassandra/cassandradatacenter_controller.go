@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
+	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/reconciliation"
 	appsv1 "k8s.io/api/apps/v1"
@@ -77,6 +78,8 @@ type CassandraDatacenterReconciler struct {
 	// during reconciliation where we update the mappings for the watches.
 	// Putting it here allows us to get it to both places.
 	SecretWatches dynamicwatch.DynamicWatches
+
+	ImageRegistry images.ImageRegistry
 }
 
 // Reconcile reads that state of the cluster for a Datacenter object
@@ -107,7 +110,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 	logger.Info("======== handler::Reconcile has been called")
 
-	rc, err := reconciliation.CreateReconciliationContext(ctx, &request, r.Client, r.Scheme, r.Recorder, r.SecretWatches)
+	rc, err := reconciliation.CreateReconciliationContext(ctx, &request, r.Client, r.Scheme, r.Recorder, r.SecretWatches, r.ImageRegistry)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.

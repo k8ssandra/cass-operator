@@ -75,7 +75,9 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
-	Expect(images.ParseImageConfig(filepath.Join("..", "..", "..", "tests", "testdata", "image_config_parsing.yaml"))).To(Succeed())
+	registry, err := images.NewImageRegistry(filepath.Join("..", "..", "..", "tests", "testdata", "image_config_parsing.yaml"))
+	Expect(err).To(Succeed())
+	Expect(registry).NotTo(BeNil())
 
 	cfg, err := testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -100,10 +102,11 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&CassandraDatacenterReconciler{
-		Client:   k8sManager.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("cass-operator"),
+		Client:        k8sManager.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
+		Scheme:        k8sManager.GetScheme(),
+		Recorder:      k8sManager.GetEventRecorderFor("cass-operator"),
+		ImageRegistry: registry,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

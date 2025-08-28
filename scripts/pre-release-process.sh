@@ -53,9 +53,16 @@ if [[ ! $CLIENT_VALUE == cr.k8ssandra.io* ]]; then
     yq eval -i '.defaults.cassandra.repository |= sub("ghcr.io/", "")' config/manager/image_config.yaml
     yq eval -i '.defaults.cassandra.repository |= "cr.k8ssandra.io/" + .' config/manager/image_config.yaml
 
+    # v2
+    yq eval -i '.images.k8ssandra-client.registry = "cr.k8ssandra.io"' config/imageconfig/image_config.yaml
+    yq eval -i '.defaults.cassandra.registry = "cr.k8ssandra.io"' config/imageconfig/image_config.yaml
+
     # Add cr.dstx.io prefixes
     yq eval -i '.images.config-builder |= "cr.dtsx.io/" + .' config/manager/image_config.yaml
     yq eval -i '.defaults.dse.repository |= "cr.dtsx.io/" + .' config/manager/image_config.yaml
+
+    yq eval -i '.images.config-builder.registry = "cr.dtsx.io"' config/imageconfig/image_config.yaml
+    yq eval -i '.defaults.dse.registry = "cr.dtsx.io"' config/imageconfig/image_config.yaml
 fi
 
 # Modify the controller

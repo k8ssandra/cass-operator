@@ -422,7 +422,7 @@ func symmetricDifference(list1 []corev1.Volume, list2 []corev1.Volume) []corev1.
 }
 
 // This ensure that the server-config-builder init container is properly configured.
-func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTemplate *corev1.PodTemplateSpec) error {
+func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTemplate *corev1.PodTemplateSpec, imageRegistry images.ImageRegistry) error {
 	serverCfg := &corev1.Container{}
 	configContainer := &corev1.Container{}
 
@@ -445,13 +445,13 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 
 	if serverCfg.Image == "" {
 		if dc.UseClientImage() {
-			if images.GetClientImage() != "" {
-				serverCfg.Image = images.GetClientImage()
+			if imageRegistry.GetClientImage() != "" {
+				serverCfg.Image = imageRegistry.GetClientImage()
 				serverCfg.Args = []string{
 					"config",
 					"build",
 				}
-				pullPolicy := images.GetImagePullPolicy(configapi.ClientImageComponent)
+				pullPolicy := imageRegistry.GetImagePullPolicy(configapi.ClientImageComponent)
 				if pullPolicy != "" {
 					serverCfg.ImagePullPolicy = pullPolicy
 				}
@@ -461,9 +461,9 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 			if dc.GetConfigBuilderImage() != "" {
 				serverCfg.Image = dc.GetConfigBuilderImage()
 			} else {
-				serverCfg.Image = images.GetConfigBuilderImage()
+				serverCfg.Image = imageRegistry.GetConfigBuilderImage()
 			}
-			pullPolicy := images.GetImagePullPolicy(configapi.ConfigBuilderImageComponent)
+			pullPolicy := imageRegistry.GetImagePullPolicy(configapi.ConfigBuilderImageComponent)
 			if pullPolicy != "" {
 				serverCfg.ImagePullPolicy = pullPolicy
 			}
@@ -493,15 +493,13 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		}
 
 		if configContainer.Image == "" {
-			serverImage, err := makeImage(dc)
+			serverImage, err := makeImage(dc, imageRegistry)
 			if err != nil {
 				return err
 			}
 
 			configContainer.Image = serverImage
-			if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
-				configContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
-			}
+			configContainer.ImagePullPolicy = imageRegistry.GetImagePullPolicy(dc.Spec.ServerType)
 
 			configContainer.Command = []string{"/bin/sh"}
 			switch dc.Spec.ServerType {
@@ -524,15 +522,13 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		}
 
 		if configContainer.Image == "" {
-			serverImage, err := makeImage(dc)
+			serverImage, err := makeImage(dc, imageRegistry)
 			if err != nil {
 				return err
 			}
 
 			configContainer.Image = serverImage
-			if images.GetImageConfig() != nil && images.GetImageConfig().ImagePullPolicy != "" {
-				configContainer.ImagePullPolicy = images.GetImageConfig().ImagePullPolicy
-			}
+			configContainer.ImagePullPolicy = imageRegistry.GetImagePullPolicy(dc.Spec.ServerType)
 
 			configContainer.Command = []string{"/bin/sh"}
 			configContainer.Args = []string{"-c", "cp -rf /opt/dse/resources/cassandra/conf/* /config/"}
@@ -644,9 +640,9 @@ func getConfigDataEnVars(dc *api.CassandraDatacenter) ([]corev1.EnvVar, error) {
 // serverImage should be an empty string, or [hostname[:port]/][path/with/repo]:[Server container img tag]
 // If serverImage is empty, we attempt to find an appropriate container image based on the serverVersion
 // In the event that no image is found, an error is returned
-func makeImage(dc *api.CassandraDatacenter) (string, error) {
+func makeImage(dc *api.CassandraDatacenter, imageRegistry images.ImageRegistry) (string, error) {
 	if dc.GetServerImage() == "" {
-		return images.GetCassandraImage(dc.Spec.ServerType, dc.Spec.ServerVersion)
+		return imageRegistry.GetCassandraImage(dc.Spec.ServerType, dc.Spec.ServerVersion)
 	}
 	return dc.GetServerImage(), nil
 }
@@ -664,7 +660,7 @@ func securityContext(dc *api.CassandraDatacenter, container *corev1.Container) {
 
 // If values are provided in the matching containers in the
 // PodTemplateSpec field of the dc, they will override defaults.
-func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpec) error {
+func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpec, imageRegistry images.ImageRegistry) error {
 	// Create new Container structs or get references to existing ones
 
 	cassContainer := &corev1.Container{}
@@ -687,13 +683,13 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 
 	cassContainer.Name = CassandraContainerName
 	if cassContainer.Image == "" {
-		serverImage, err := makeImage(dc)
+		serverImage, err := makeImage(dc, imageRegistry)
 		if err != nil {
 			return err
 		}
 
 		cassContainer.Image = serverImage
-		pullPolicy := images.GetImagePullPolicy(dc.Spec.ServerType)
+		pullPolicy := imageRegistry.GetImagePullPolicy(dc.Spec.ServerType)
 		if pullPolicy != "" {
 			cassContainer.ImagePullPolicy = pullPolicy
 		}
@@ -872,9 +868,9 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		if specImage != "" {
 			loggerContainer.Image = specImage
 		} else {
-			loggerContainer.Image = images.GetSystemLoggerImage()
+			loggerContainer.Image = imageRegistry.GetSystemLoggerImage()
 		}
-		pullPolicy := images.GetImagePullPolicy(configapi.SystemLoggerImageComponent)
+		pullPolicy := imageRegistry.GetImagePullPolicy(configapi.SystemLoggerImageComponent)
 		if pullPolicy != "" {
 			loggerContainer.ImagePullPolicy = pullPolicy
 		}
@@ -906,7 +902,8 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	return nil
 }
 
-func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount bool) (*corev1.PodTemplateSpec, error) {
+func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyInternodeMount bool, imageRegistry images.ImageRegistry) (*corev1.PodTemplateSpec, error) {
+	// Create a podTemplateSpec for the rack.
 	baseTemplate := dc.Spec.PodTemplateSpec.DeepCopy()
 
 	if baseTemplate == nil {
@@ -944,10 +941,6 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 		}
 	}
 
-	// Adds custom registry pull secret if needed
-
-	images.AddDefaultRegistryImagePullSecrets(&baseTemplate.Spec)
-
 	// Labels
 
 	podLabels := dc.GetRackLabels(rack.Name)
@@ -981,15 +974,18 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 	addVolumes(dc, baseTemplate, addLegacyInternodeMount)
 
 	// Init Containers
-
-	if err := buildInitContainers(dc, rack.Name, baseTemplate); err != nil {
+	if err := buildInitContainers(dc, rack.Name, baseTemplate, imageRegistry); err != nil {
 		return nil, err
 	}
 
 	// Containers
-
-	if err := buildContainers(dc, baseTemplate); err != nil {
+	if err := buildContainers(dc, baseTemplate, imageRegistry); err != nil {
 		return nil, err
+	}
+
+	secrets := imageRegistry.GetImagePullSecrets()
+	for _, secret := range secrets {
+		baseTemplate.Spec.ImagePullSecrets = append(baseTemplate.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: secret})
 	}
 
 	return baseTemplate, nil

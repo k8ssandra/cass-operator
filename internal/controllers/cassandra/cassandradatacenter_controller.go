@@ -57,9 +57,9 @@ var (
 //+kubebuilder:rbac:groups=cassandra.datastax.com,namespace=cass-operator,resources=cassandradatacenters/finalizers,verbs=update;delete
 
 // Kubernetes core
-// +kubebuilder:rbac:groups=apps,namespace=cass-operator,resources=statefulsets;replicasets;deployments;daemonsets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,namespace=cass-operator,resources=deployments/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods;endpoints;endpoints/restricted;services;configmaps;secrets;persistentvolumeclaims;events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,namespace=cass-operator,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods;endpoints;endpoints/restricted;services;configmaps;secrets;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=events,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=namespaces,verbs=get
 // +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
@@ -240,13 +240,6 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		}
 		return requests
 	}
-
-	/*
-		// Watch ReplicaSets and enqueue ReplicaSet object key
-		if err := c.Watch(source.Kind(mgr.GetCache(), &appsv1.ReplicaSet{}), &handler.EnqueueRequestForObject{}); err != nil {
-			entryLog.Error(err, "unable to watch ReplicaSets")
-			os.Exit(1)
-		}	*/
 
 	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(toRequests))
 

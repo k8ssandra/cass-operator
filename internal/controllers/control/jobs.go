@@ -328,13 +328,21 @@ func flush(taskConfig *TaskConfiguration) {
 func callGarbageCollectAsync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) (string, error) {
 	keyspaceName := taskConfig.Arguments.KeyspaceName
 	tables := taskConfig.Arguments.Tables
-	return nodeMgmtClient.CallGarbageCollect(pod, keyspaceName, tables)
+	jobCount := -1
+	if taskConfig.Arguments.JobsCount != nil {
+		jobCount = *taskConfig.Arguments.JobsCount
+	}
+	return nodeMgmtClient.CallGarbageCollect(pod, jobCount, keyspaceName, tables)
 }
 
 func callGarbageCollectSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
 	keyspaceName := taskConfig.Arguments.KeyspaceName
 	tables := taskConfig.Arguments.Tables
-	return nodeMgmtClient.CallGarbageCollectEndpoint(pod, keyspaceName, tables)
+	jobCount := -1
+	if taskConfig.Arguments.JobsCount != nil {
+		jobCount = *taskConfig.Arguments.JobsCount
+	}
+	return nodeMgmtClient.CallGarbageCollectEndpoint(pod, jobCount, keyspaceName, tables)
 }
 
 func gc(taskConfig *TaskConfiguration) {

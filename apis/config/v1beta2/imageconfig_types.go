@@ -32,7 +32,6 @@ type Image struct {
 	Name string `json:"name,omitempty"`
 
 	// The image tag to use. Defaults to "latest".
-	// +kubebuilder:default="latest"
 	// +optional
 	Tag string `json:"tag,omitempty"`
 

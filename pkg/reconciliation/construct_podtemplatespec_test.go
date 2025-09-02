@@ -335,6 +335,7 @@ func TestCassandraDatacenter_buildContainers_use_cassandra_settings(t *testing.T
 func TestServerConfigInitContainerEnvVars(t *testing.T) {
 	rack := "rack1"
 	podIPEnvVar := corev1.EnvVar{Name: "POD_IP", ValueFrom: selectorFromFieldPath("status.podIP")}
+	podNameEnvVar := corev1.EnvVar{Name: "POD_NAME", ValueFrom: selectorFromFieldPath("metadata.name")}
 	hostIPEnvVar := corev1.EnvVar{Name: "HOST_IP", ValueFrom: selectorFromFieldPath("status.hostIP")}
 
 	tests := []struct {
@@ -366,6 +367,7 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 					Name:  "PRODUCT_NAME",
 					Value: "cassandra",
 				},
+				podNameEnvVar,
 			},
 		},
 		{
@@ -393,6 +395,7 @@ func TestServerConfigInitContainerEnvVars(t *testing.T) {
 					Name:  "PRODUCT_NAME",
 					Value: "cassandra",
 				},
+				podNameEnvVar,
 			},
 		},
 	}

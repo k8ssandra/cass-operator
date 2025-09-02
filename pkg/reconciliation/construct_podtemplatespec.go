@@ -477,6 +477,15 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 
 	configMounts := []corev1.VolumeMount{serverCfgMount}
 
+	for _, vol := range dc.Spec.StorageConfig.AdditionalVolumes {
+		if vol.VolumeSource != nil {
+			configMounts = append(configMounts, corev1.VolumeMount{
+				Name:      vol.Name,
+				MountPath: vol.MountPath,
+			})
+		}
+	}
+
 	if dc.UseClientImage() {
 		configBaseMount := corev1.VolumeMount{
 			Name:      "server-config-base",
@@ -560,6 +569,7 @@ func buildInitContainers(dc *api.CassandraDatacenter, rackName string, baseTempl
 		{Name: "RACK_NAME", Value: rackName},
 		{Name: "PRODUCT_VERSION", Value: serverVersion},
 		{Name: "PRODUCT_NAME", Value: dc.Spec.ServerType},
+		{Name: "POD_NAME", ValueFrom: selectorFromFieldPath("metadata.name")},
 	}
 
 	envDefaults = append(envDefaults, configEnvVar...)

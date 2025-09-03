@@ -33,7 +33,9 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -4014,4 +4016,57 @@ func TestFailureDetection(t *testing.T) {
 			assert.Equal(t, tc.expectedRack, rackName, "Rack name mismatch")
 		})
 	}
+}
+
+func TestCheckDcPodDisruptionBudget(t *testing.T) {
+	require := require.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	res := rc.CheckDcPodDisruptionBudget()
+	require.Equal(result.Continue(), res)
+
+	pdbName := types.NamespacedName{Name: rc.Datacenter.Name + "-pdb", Namespace: rc.Datacenter.Namespace}
+
+	pdb := &policyv1.PodDisruptionBudget{}
+	require.NoError(rc.Client.Get(rc.Ctx, pdbName, pdb))
+
+	// PDB exists, is the same, annotation not present -> nothing happens.
+	res = rc.CheckDcPodDisruptionBudget()
+	require.Equal(result.Continue(), res)
+
+	// PDB exists, is different, annotation not present -> PDB is deleted and recreated.
+	metav1.SetMetaDataAnnotation(&pdb.ObjectMeta, utils.ResourceHashAnnotationKey, "incorrect")
+	require.NoError(rc.Client.Update(rc.Ctx, pdb))
+	res = rc.CheckDcPodDisruptionBudget()
+	require.Equal(result.Continue(), res)
+
+	pdb = &policyv1.PodDisruptionBudget{}
+	require.NoError(rc.Client.Get(rc.Ctx, pdbName, pdb))
+	require.NotEqual(pdb.Annotations[utils.ResourceHashAnnotationKey], "incorrect")
+
+	// PDB exists, annotation is added -> PDB is deleted.
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.DisablePodDisruptionBudgetAnnotation, "true")
+	res = rc.CheckDcPodDisruptionBudget()
+	require.Equal(result.Continue(), res)
+
+	pdb = &policyv1.PodDisruptionBudget{}
+	err := rc.Client.Get(rc.Ctx, pdbName, pdb)
+	require.True(apierrors.IsNotFound(err))
+
+	// PDB does not exist, annotation is present -> PDB is not created.
+	res = rc.CheckDcPodDisruptionBudget()
+	require.Equal(result.Continue(), res)
+
+	pdb = &policyv1.PodDisruptionBudget{}
+	err = rc.Client.Get(rc.Ctx, pdbName, pdb)
+	require.True(apierrors.IsNotFound(err))
+
+	// PDB does not exist, annotation is removed -> PDB is created
+	delete(rc.Datacenter.Annotations, api.DisablePodDisruptionBudgetAnnotation)
+	res = rc.CheckDcPodDisruptionBudget()
+	require.Equal(result.Continue(), res)
+
+	pdb = &policyv1.PodDisruptionBudget{}
+	require.NoError(rc.Client.Get(rc.Ctx, pdbName, pdb))
 }

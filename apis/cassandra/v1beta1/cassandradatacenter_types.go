@@ -81,6 +81,9 @@ const (
 	// DeletePVCAnnotation determines if the operator should delete the PVCs when the CassandraDatacenter is deleted. Default is true, set to false to skip deletion.
 	DeletePVCAnnotation = "cassandra.datastax.com/delete-pvc"
 
+	// Allow disabling the creation of PodDisruptionBudget for the datacenter
+	DisablePodDisruptionBudgetAnnotation = "cassandra.datastax.com/disable-pdb-creation"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 

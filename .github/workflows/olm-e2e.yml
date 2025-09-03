@@ -1,0 +1,241 @@
+name: OLM E2E
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  olm-e2e:
+    name: OLM bundle, catalog, deploy, scorecard
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY_HOST: localhost:5001
+      NAMESPACE: cass-operator
+      CHANNELS: dev
+      DEFAULT_CHANNEL: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Set version vars
+        id: vars
+        run: |
+          echo "version=$(make version)" >> $GITHUB_OUTPUT
+          echo "sha_short=$(git rev-parse --short=8 ${{ github.sha }})" >> $GITHUB_OUTPUT
+          echo "bundle_img=${{ env.REGISTRY_HOST }}/k8ssandra/cass-operator-bundle:v$(make version)" >> $GITHUB_OUTPUT
+          echo "catalog_img=${{ env.REGISTRY_HOST }}/k8ssandra/cass-operator-catalog:v$(make version)" >> $GITHUB_OUTPUT
+          echo "manager_img=${{ env.REGISTRY_HOST }}/k8ssandra/cass-operator:v$(make version)" >> $GITHUB_OUTPUT
+          echo "logger_img=${{ env.REGISTRY_HOST }}/k8ssandra/system-logger:v$(make version)" >> $GITHUB_OUTPUT
+
+      - name: Start local registry
+        run: |
+          docker rm -f kind-registry || true
+          docker run -d --restart=always -p 127.0.0.1:5001:5000 --name kind-registry registry:2
+
+      - name: Create kind cluster with local registry config
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kind
+          wait: true
+          config: |
+            kind: Cluster
+            apiVersion: kind.x-k8s.io/v1alpha4
+            containerdConfigPatches:
+            - |-
+              [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+                [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${{ env.REGISTRY_HOST }}"]
+                  endpoint = ["http://kind-registry:5000"]
+
+      - name: Connect registry to kind network
+        run: |
+          docker network connect kind kind-registry || true
+
+      - name: Install tools (operator-sdk, kustomize, opm)
+        run: |
+          # Force local install of kustomize even in GHA
+          GITHUB_ACTIONS= make kustomize
+          make operator-sdk opm
+
+      - name: Build and push operator images to local registry
+        run: |
+          export VERSION=${{ steps.vars.outputs.version }}
+          export IMG=${{ steps.vars.outputs.manager_img }}
+          export LOG_IMG=${{ steps.vars.outputs.logger_img }}
+          make docker-build docker-logger-build
+          docker push $IMG
+          docker push $LOG_IMG
+
+      - name: Generate OLM bundle
+        run: |
+          export VERSION=${{ steps.vars.outputs.version }}
+          export IMG=${{ steps.vars.outputs.manager_img }}
+          export CHANNELS=${{ env.CHANNELS }}
+          export DEFAULT_CHANNEL=${{ env.DEFAULT_CHANNEL }}
+          export REGISTRY=${{ env.REGISTRY_HOST }}
+          make bundle
+          bin/operator-sdk bundle validate ./bundle --select-optional suite=operatorframework
+
+      - name: Build and push bundle image to local registry
+        run: |
+          export VERSION=${{ steps.vars.outputs.version }}
+          export BUNDLE_IMG=${{ steps.vars.outputs.bundle_img }}
+          make bundle-build
+          docker push $BUNDLE_IMG
+
+      - name: Build and push catalog (index) image to local registry
+        run: |
+          export VERSION=${{ steps.vars.outputs.version }}
+          export BUNDLE_IMGS=${{ steps.vars.outputs.bundle_img }}
+          export CATALOG_IMG=${{ steps.vars.outputs.catalog_img }}
+          make catalog-build
+          docker push $CATALOG_IMG
+
+      - name: Install OLM
+        run: |
+          bin/operator-sdk olm install --timeout 5m
+          kubectl get pods -n olm
+
+      - name: Run OLM deployment from bundle image
+        run: |
+          kubectl create ns ${{ env.NAMESPACE }} || true
+          bin/operator-sdk run bundle ${{ steps.vars.outputs.bundle_img }} --namespace ${{ env.NAMESPACE }} --timeout 10m
+          # Wait for CSV to succeed
+          kubectl -n ${{ env.NAMESPACE }} wait --for=jsonpath='{.status.phase}'=Succeeded csv --all --timeout=300s
+          kubectl -n ${{ env.NAMESPACE }} get csv
+          kubectl -n ${{ env.NAMESPACE }} get deploy,po
+
+      - name: Run scorecard (olm suite)
+        run: |
+          bin/operator-sdk scorecard ./bundle --selector=suite=olm --verbose
+
+      - name: Red Hat static checks (bundle)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install operator static tests
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install git+https://github.com/redhat-openshift-ecosystem/operator-pipelines.git
+
+      - name: Prepare bundle for static checks
+        id: prep_static
+        run: |
+          OP_NAME=$(yq -r '."operators.operatorframework.io.bundle.package.v1"' bundle/metadata/annotations.yaml)
+          CSV_VERSION=$(yq -r '.spec.version' bundle/manifests/*.clusterserviceversion.yaml)
+          echo "op_name=${OP_NAME}" >> $GITHUB_OUTPUT
+          echo "csv_version=${CSV_VERSION}" >> $GITHUB_OUTPUT
+          mkdir -p /tmp/community-operators-prod/operators/${OP_NAME}/${CSV_VERSION}
+          cp -r bundle/manifests /tmp/community-operators-prod/operators/${OP_NAME}/${CSV_VERSION}/
+          cp -r bundle/metadata /tmp/community-operators-prod/operators/${OP_NAME}/${CSV_VERSION}/
+          echo "Prepared repo structure at /tmp/community-operators-prod"
+
+      - name: Run static checks
+        run: |
+          static-tests \
+            --repo-path /tmp/community-operators-prod \
+            --suites operatorcert.static_tests.community \
+            --output-file /tmp/operator-static.json \
+            --verbose \
+            ${{ steps.prep_static.outputs.op_name }} ${{ steps.prep_static.outputs.csv_version }}
+          echo "Static checks output:"
+          cat /tmp/operator-static.json || true
+
+      - name: Cleanup bundle install (pre-catalog)
+        if: always()
+        run: |
+          set +e
+          # Remove the operator deployed via run bundle
+          bin/operator-sdk cleanup cass-operator --namespace ${{ env.NAMESPACE }} || true
+          # Ensure namespace is clean for catalog stage
+          kubectl delete csv --all -n ${{ env.NAMESPACE }} || true
+          kubectl delete deploy --all -n ${{ env.NAMESPACE }} || true
+          kubectl delete po --all -n ${{ env.NAMESPACE }} || true
+
+      - name: Create CatalogSource for local catalog
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: CatalogSource
+          metadata:
+            name: cass-operator-local
+            namespace: olm
+          spec:
+            displayName: Cass Operator Local
+            publisher: k8ssandra
+            sourceType: grpc
+            image: ${{ steps.vars.outputs.catalog_img }}
+            updateStrategy:
+              registryPoll:
+                interval: 1m
+          EOF
+          kubectl -n olm rollout status deploy/catalog-operator --timeout=120s || true
+          # Wait for the CatalogSource to be ready
+          kubectl -n olm wait --for=condition=READY catalogsource/cass-operator-local --timeout=120s || true
+
+      - name: Create OperatorGroup and Subscription
+        run: |
+          # OperatorGroup in target namespace
+          cat <<EOF | kubectl apply -f -
+          apiVersion: operators.coreos.com/v1
+          kind: OperatorGroup
+          metadata:
+            name: cass-operator-og
+            namespace: ${{ env.NAMESPACE }}
+          spec:
+            targetNamespaces:
+              - ${{ env.NAMESPACE }}
+          EOF
+
+          # Subscription referencing local CatalogSource and dev channel
+          cat <<EOF | kubectl apply -f -
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: cass-operator
+            namespace: ${{ env.NAMESPACE }}
+          spec:
+            channel: dev
+            name: cass-operator-community
+            source: cass-operator-local
+            sourceNamespace: olm
+            installPlanApproval: Automatic
+          EOF
+
+      - name: Wait for catalog-based install to succeed
+        run: |
+          # Wait for a CSV to appear in the namespace
+          end=$((SECONDS+600))
+          while [ $SECONDS -lt $end ]; do
+            CSV=$(kubectl -n ${{ env.NAMESPACE }} get csv -o jsonpath='{.items[0].metadata.name}' || true)
+            if [ -n "$CSV" ]; then
+              echo "Found CSV: $CSV"; break;
+            fi
+            echo "Waiting for CSV to appear..."; sleep 5;
+          done
+          kubectl -n ${{ env.NAMESPACE }} wait --for=jsonpath='{.status.phase}'=Succeeded csv --all --timeout=600s
+          kubectl -n ${{ env.NAMESPACE }} get csv
+          kubectl -n ${{ env.NAMESPACE }} get deploy,po
+
+      - name: Cleanup catalog and OLM
+        if: always()
+        run: |
+          set +e
+          # Delete Subscription and CSVs from the namespace
+          kubectl -n ${{ env.NAMESPACE }} delete subscription cass-operator --ignore-not-found
+          kubectl -n ${{ env.NAMESPACE }} delete csv --all --ignore-not-found
+          kubectl -n ${{ env.NAMESPACE }} delete operatorgroup cass-operator-og --ignore-not-found
+          kubectl -n olm delete catalogsource cass-operator-local --ignore-not-found
+          kubectl delete ns ${{ env.NAMESPACE }} --ignore-not-found
+          bin/operator-sdk olm uninstall || true

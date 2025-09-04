@@ -62,7 +62,7 @@ jobs:
         run: |
           BUNDLE_IMG=${{ env.REGISTRY }}/k8ssandra/cass-operator-bundle:v$(make version)
           kubectl create ns ${{ env.NAMESPACE }} || true
-          bin/operator-sdk run bundle $BUNDLE_IMG --namespace ${{ env.NAMESPACE }} --timeout 10m
+          bin/operator-sdk run bundle $BUNDLE_IMG --namespace ${{ env.NAMESPACE }} --timeout 10m --use-http
           # Wait for CSV to succeed
           kubectl -n ${{ env.NAMESPACE }} wait --for=jsonpath='{.status.phase}'=Succeeded csv --all --timeout=300s
           kubectl -n ${{ env.NAMESPACE }} get csv

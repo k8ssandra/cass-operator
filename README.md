@@ -5,7 +5,7 @@ The DataStax Kubernetes Operator for Apache Cassandra&reg;. This repository repl
 
 ## Getting Started
 
-``cass-operator`` can be used as standalone product to manage your Cassandra cluster or as part of the (https://docs.k8ssandra.io/install/)[k8ssandra-operator]. With tooling such as managed repairs and automated backups, see k8ssandra-operator as the recommended approach. 
+``cass-operator`` can be used as standalone product to manage your Cassandra cluster or as part of the [k8ssandra-operator](https://docs.k8ssandra.io/install/). With tooling such as managed repairs and automated backups, see k8ssandra-operator as the recommended approach. 
 
 If updating from previous versions, please see ``Upgrade instructions`` section first.
 
@@ -24,9 +24,9 @@ Then to install the cass-operator using the default settings to namespace ``cass
 helm install cass-operator k8ssandra/cass-operator -n cass-operator --create-namespace
 ```
 
-You can modify the installation using the values from our (values.yaml)[https://github.com/k8ssandra/k8ssandra/blob/main/charts/cass-operator/values.yaml] file.
+You can modify the installation using the values from our [values.yaml](https://github.com/k8ssandra/k8ssandra/blob/main/charts/cass-operator/values.yaml) file.
 
-By default, the Helm installation requires ``cert-manager`` to be present in the Kubernetes installation. If you do not have cert-manager installed, follow the steps at (https://cert-manager.io/docs/installation/helm/)[cert-manager's] documentation. If you do not wish to use cert-manager, either disable the webhooks using ``--set admissionWebhooks.enabled=false`` or provide your own certificate in a secret and set it with ``--set admissionWebhooks.customCertificate=namespace/certificate-name``. 
+By default, the Helm installation requires ``cert-manager`` to be present in the Kubernetes installation. If you do not have cert-manager installed, follow the steps at [cert-manager's documentation](https://cert-manager.io/docs/installation/helm/). If you do not wish to use cert-manager, either disable the webhooks using ``--set admissionWebhooks.enabled=false`` or provide your own certificate in a secret and set it with ``--set admissionWebhooks.customCertificate=namespace/certificate-name``. 
 
 ### Installing the operator with Kustomize
 
@@ -172,7 +172,7 @@ Run ``kubectl apply -k our_installation`` to install cass-operator.
 
 cass-operator is available in the OperatorHub as a community version as well as certified version. You can install these directly from the Openshift's UI.
 
-For other distributions of Kubernetes, you can find cass-operator from the OperatorHub under the name (https://operatorhub.io/operator/cass-operator-community)[cass-operator-community].
+For other distributions of Kubernetes, you can find cass-operator from the OperatorHub under the name [cass-operator-community](https://operatorhub.io/operator/cass-operator-community).
 
 If OLM is already installed in your cluster, the operator can be installed with the following command:
 

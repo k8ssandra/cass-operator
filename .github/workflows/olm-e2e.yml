@@ -49,9 +49,7 @@ jobs:
           hack/cluster.sh
       - name: Build and push operator images to local registry
         run: |
-          make REGISTRY=${{ env.REGISTRY }} docker-build docker-logger-build
-          docker push $IMG
-          docker push $LOG_IMG
+          make REGISTRY=${{ env.REGISTRY }} ORG=localhost:5001/k8ssandra docker-build docker-logger-build docker-push docker-logger-push
 
       - name: Generate OLM bundle
         run: |
@@ -61,13 +59,11 @@ jobs:
       - name: Build and push bundle image to local registry
         run: |
           BUNDLE_IMG=${{ steps.vars.outputs.bundle_img }}
-          make REGISTRY=${{ env.REGISTRY }} bundle-build
-          docker push $BUNDLE_IMG
+          make REGISTRY=${{ env.REGISTRY }} BUNDLE_IMG=$BUNDLE_IMG bundle-build bundle-push
 
       - name: Build and push catalog (index) image to local registry
         run: |
-          make REGISTRY=${{ env.REGISTRY }} catalog-build
-          docker push $CATALOG_IMG
+          make REGISTRY=${{ env.REGISTRY }} catalog-build catalog-push
 
       - name: Install OLM
         run: |

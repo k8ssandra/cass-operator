@@ -1417,13 +1417,13 @@ func (client *NodeMgmtClient) CallFlushEndpoint(pod *corev1.Pod, keyspaceName st
 	return err
 }
 
-func (client *NodeMgmtClient) CallGarbageCollect(pod *corev1.Pod, keyspaceName string, tables []string) (string, error) {
+func (client *NodeMgmtClient) CallGarbageCollect(pod *corev1.Pod, jobs int, keyspaceName string, tables []string) (string, error) {
 	client.Log.Info(
 		"calling Management API keyspace flush - POST /api/v1/ops/tables/garbagecollect",
 		"pod", pod.Name,
 	)
 
-	req, err := createKeySpaceRequest(pod, -1, keyspaceName, tables, "/api/v1/ops/tables/garbagecollect")
+	req, err := createKeySpaceRequest(pod, jobs, keyspaceName, tables, "/api/v1/ops/tables/garbagecollect")
 	if err != nil {
 		return "", err
 	}
@@ -1434,13 +1434,13 @@ func (client *NodeMgmtClient) CallGarbageCollect(pod *corev1.Pod, keyspaceName s
 	return string(jobId), err
 }
 
-func (client *NodeMgmtClient) CallGarbageCollectEndpoint(pod *corev1.Pod, keyspaceName string, tables []string) error {
+func (client *NodeMgmtClient) CallGarbageCollectEndpoint(pod *corev1.Pod, jobs int, keyspaceName string, tables []string) error {
 	client.Log.Info(
 		"calling Management API keyspace flush - POST /api/v0/ops/tables/garbagecollect",
 		"pod", pod.Name,
 	)
 
-	req, err := createKeySpaceRequest(pod, -1, keyspaceName, tables, "/api/v0/ops/tables/garbagecollect")
+	req, err := createKeySpaceRequest(pod, jobs, keyspaceName, tables, "/api/v0/ops/tables/garbagecollect")
 	if err != nil {
 		return err
 	}

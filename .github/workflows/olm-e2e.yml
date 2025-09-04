@@ -9,14 +9,19 @@ jobs:
     name: OLM bundle, catalog, deploy, scorecard
     runs-on: ubuntu-latest
     env:
-      REGISTRY_HOST: localhost:5001
+      REGISTRY: localhost:5001
       NAMESPACE: cass-operator
       CHANNELS: dev
       DEFAULT_CHANNEL: dev
     steps:
+      - name: Free diskspace by removing unused packages
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc      
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -31,73 +36,36 @@ jobs:
       - name: Set version vars
         id: vars
         run: |
-          echo "version=$(make version)" >> $GITHUB_OUTPUT
-          echo "sha_short=$(git rev-parse --short=8 ${{ github.sha }})" >> $GITHUB_OUTPUT
-          echo "bundle_img=${{ env.REGISTRY_HOST }}/k8ssandra/cass-operator-bundle:v$(make version)" >> $GITHUB_OUTPUT
-          echo "catalog_img=${{ env.REGISTRY_HOST }}/k8ssandra/cass-operator-catalog:v$(make version)" >> $GITHUB_OUTPUT
-          echo "manager_img=${{ env.REGISTRY_HOST }}/k8ssandra/cass-operator:v$(make version)" >> $GITHUB_OUTPUT
-          echo "logger_img=${{ env.REGISTRY_HOST }}/k8ssandra/system-logger:v$(make version)" >> $GITHUB_OUTPUT
-
-      - name: Start local registry
+          echo "bundle_img=${{ env.REGISTRY }}/k8ssandra/cass-operator-bundle:v$(make version)" >> $GITHUB_OUTPUT
+       # The runners already have the latest versions of tools, no need to reinstall them
+      - name: Link tools
+        shell: bash
         run: |
-          docker rm -f kind-registry || true
-          docker run -d --restart=always -p 127.0.0.1:5001:5000 --name kind-registry registry:2
-
-      - name: Create kind cluster with local registry config
-        uses: helm/kind-action@v1
-        with:
-          cluster_name: kind
-          wait: true
-          config: |
-            kind: Cluster
-            apiVersion: kind.x-k8s.io/v1alpha4
-            containerdConfigPatches:
-            - |-
-              [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
-                [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${{ env.REGISTRY_HOST }}"]
-                  endpoint = ["http://kind-registry:5000"]
-
-      - name: Connect registry to kind network
+          mkdir bin
+          ln -s /usr/local/bin/kustomize bin/kustomize
+      - name: Create kind cluster
+        shell: bash
         run: |
-          docker network connect kind kind-registry || true
-
-      - name: Install tools (operator-sdk, kustomize, opm)
-        run: |
-          # Force local install of kustomize even in GHA
-          GITHUB_ACTIONS= make kustomize
-          make operator-sdk opm
-
+          hack/cluster.sh
       - name: Build and push operator images to local registry
         run: |
-          export VERSION=${{ steps.vars.outputs.version }}
-          export IMG=${{ steps.vars.outputs.manager_img }}
-          export LOG_IMG=${{ steps.vars.outputs.logger_img }}
           make docker-build docker-logger-build
           docker push $IMG
           docker push $LOG_IMG
 
       - name: Generate OLM bundle
         run: |
-          export VERSION=${{ steps.vars.outputs.version }}
-          export IMG=${{ steps.vars.outputs.manager_img }}
-          export CHANNELS=${{ env.CHANNELS }}
-          export DEFAULT_CHANNEL=${{ env.DEFAULT_CHANNEL }}
-          export REGISTRY=${{ env.REGISTRY_HOST }}
           make bundle
           bin/operator-sdk bundle validate ./bundle --select-optional suite=operatorframework
 
       - name: Build and push bundle image to local registry
         run: |
-          export VERSION=${{ steps.vars.outputs.version }}
-          export BUNDLE_IMG=${{ steps.vars.outputs.bundle_img }}
+          BUNDLE_IMG=${{ steps.vars.outputs.bundle_img }}
           make bundle-build
           docker push $BUNDLE_IMG
 
       - name: Build and push catalog (index) image to local registry
         run: |
-          export VERSION=${{ steps.vars.outputs.version }}
-          export BUNDLE_IMGS=${{ steps.vars.outputs.bundle_img }}
-          export CATALOG_IMG=${{ steps.vars.outputs.catalog_img }}
           make catalog-build
           docker push $CATALOG_IMG
 

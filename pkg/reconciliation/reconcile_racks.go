@@ -1610,9 +1610,16 @@ func (rc *ReconciliationContext) CheckDcPodDisruptionBudget() result.ReconcileRe
 		return result.Error(err)
 	}
 
+	createPdb := true
+	if metav1.HasAnnotation(dc.ObjectMeta, api.DisablePodDisruptionBudgetAnnotation) {
+		if _, ok := dc.Annotations[api.DisablePodDisruptionBudgetAnnotation]; ok {
+			createPdb = false
+		}
+	}
+
 	found := err == nil
 
-	if found && utils.ResourcesHaveSameHash(currentBudget, desiredBudget) {
+	if found && utils.ResourcesHaveSameHash(currentBudget, desiredBudget) && createPdb {
 		return result.Continue()
 	}
 
@@ -1631,19 +1638,21 @@ func (rc *ReconciliationContext) CheckDcPodDisruptionBudget() result.ReconcileRe
 		}
 	}
 
-	// Create the Budget
-	rc.ReqLogger.Info(
-		"Creating a new PodDisruptionBudget.",
-		"pdbNamespace", desiredBudget.Namespace,
-		"pdbName", desiredBudget.Name)
+	if createPdb {
+		// Create the Budget
+		rc.ReqLogger.Info(
+			"Creating a new PodDisruptionBudget.",
+			"pdbNamespace", desiredBudget.Namespace,
+			"pdbName", desiredBudget.Name)
 
-	err = rc.Client.Create(ctx, desiredBudget)
-	if err != nil {
-		return result.Error(err)
+		err = rc.Client.Create(ctx, desiredBudget)
+		if err != nil {
+			return result.Error(err)
+		}
+
+		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.CreatedResource,
+			"Created PodDisruptionBudget %s", desiredBudget.Name)
 	}
-
-	rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.CreatedResource,
-		"Created PodDisruptionBudget %s", desiredBudget.Name)
 
 	return result.Continue()
 }

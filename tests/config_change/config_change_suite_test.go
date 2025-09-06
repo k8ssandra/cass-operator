@@ -84,7 +84,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionFalse))
 
 			step = "checking that the init container got the updated config roles_validity=256000ms"
-			json = "jsonpath={.spec.initContainers[1].env[6].value}"
+			json = "jsonpath={.spec.initContainers[1].env[7].value}"
 			k = kubectl.Get(fmt.Sprintf("pod/%s-%s-r1-sts-0", clusterName, dcName)).
 				FormatOutput(json)
 			ns.WaitForOutputContainsAndLog(step, k, "\"roles_validity\":\"256000ms\"", 30)

@@ -310,6 +310,14 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 	assert.Equal("tmp", cassandraVolumeMounts[3].Name)
 	assert.Equal("server-data", cassandraVolumeMounts[4].Name)
 	assert.Equal("server-config", cassandraVolumeMounts[5].Name)
+
+	serverConfigInitContainer := findContainer(sts.Spec.Template.Spec.InitContainers, ServerConfigContainerName)
+	assert.NotNil(serverConfigInitContainer)
+
+	serverConfigInitVolumeMounts := serverConfigInitContainer.VolumeMounts
+	assert.Equal(2, len(serverConfigInitVolumeMounts))
+	assert.Equal("server-config", serverConfigInitVolumeMounts[0].Name)
+	assert.Equal("metrics-config", serverConfigInitVolumeMounts[1].Name)
 }
 
 func Test_newStatefulSetForCassandraDatacenterWithAdditionalVolumes(t *testing.T) {

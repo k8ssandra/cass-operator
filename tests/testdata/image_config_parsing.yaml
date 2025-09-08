@@ -21,4 +21,4 @@ defaults:
     suffix: "-ubi"
   dse:
     repository: "cr.dtsx.io/datastax/dse-mgmtapi-6_8"
-    suffix: "-ubi8"
+    suffix: "-ubi"

@@ -11,10 +11,10 @@ configMapGenerator:
   name: manager-config
   options:
     labels:
-      k8ssandra.io/config: "manager"
+      k8ssandra.io/config: manager
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: k8ssandra/cass-operator
-  newTag: latest
+  newName: cr.k8ssandra.io/k8ssandra/cass-operator
+  newTag: v1.27.0

@@ -117,7 +117,7 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 
 	path, err := registry.GetCassandraImage("dse", "6.8.47")
 	assert.NoError(err)
-	assert.Equal("datastax/dse-mgmtapi-6_8:6.8.47-ubi8", path)
+	assert.Equal("datastax/dse-mgmtapi-6_8:6.8.47-ubi", path)
 
 	path, err = registry.GetCassandraImage("hcd", "1.0.0")
 	assert.NoError(err)
@@ -151,7 +151,7 @@ func TestImageConfigParsing(t *testing.T) {
 
 	path, err := registry.GetCassandraImage("dse", "6.8.43")
 	assert.NoError(err)
-	assert.Equal("localhost:5000/datastax/dse-mgmtapi-6_8:6.8.43-ubi8", path)
+	assert.Equal("localhost:5000/datastax/dse-mgmtapi-6_8:6.8.43-ubi", path)
 
 	path, err = registry.GetCassandraImage("dse", "6.8.999")
 	assert.NoError(err)

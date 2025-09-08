@@ -1557,7 +1557,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "dse",
 				serverVersion: "6.8.0",
 			},
-			want:      "localhost:5000/datastax/dse-mgmtapi-6_8:6.8.0-ubi8",
+			want:      "localhost:5000/datastax/dse-mgmtapi-6_8:6.8.0-ubi",
 			errString: "",
 		},
 		{
@@ -1607,7 +1607,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "dse",
 				serverVersion: "6.8.1234",
 			},
-			want:      "localhost:5000/datastax/dse-mgmtapi-6_8:6.8.1234-ubi8",
+			want:      "localhost:5000/datastax/dse-mgmtapi-6_8:6.8.1234-ubi",
 			errString: "",
 		},
 		{
@@ -1617,7 +1617,7 @@ func Test_makeImage(t *testing.T) {
 				serverType:    "dse",
 				serverVersion: "6.8.26",
 			},
-			want:      "localhost:5000/datastax/dse-mgmtapi-6_8:6.8.26-ubi8",
+			want:      "localhost:5000/datastax/dse-mgmtapi-6_8:6.8.26-ubi",
 			errString: "",
 		},
 	}

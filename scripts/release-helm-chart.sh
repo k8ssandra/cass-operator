@@ -129,3 +129,8 @@ CONFIG_BUILDER_IMAGE=$(yq '.images.config-builder' config/manager/image_config.y
 yq -i '.imageConfig.systemLogger = "'"$SYSTEM_LOGGER_IMAGE"'"' $CHART_HOME/values.yaml
 yq -i '.imageConfig.k8ssandraClient = "'"$K8SSANDRA_CLIENT_IMAGE"'"' $CHART_HOME/values.yaml
 yq -i '.imageConfig.configBuilder = "'"$CONFIG_BUILDER_IMAGE"'"' $CHART_HOME/values.yaml
+
+echo "Updating .global.imageConfig to match config/imageconfig/image_config.yaml"
+yq -i '.global.imageConfig.images = (load("config/imageconfig/image_config.yaml") | .images)' $CHART_HOME/values.yaml
+yq -i '.global.imageConfig.types = (load("config/imageconfig/image_config.yaml") | .types)' $CHART_HOME/values.yaml
+yq -i '.global.imageConfig.defaults = (load("config/imageconfig/image_config.yaml") | .defaults)' $CHART_HOME/values.yaml

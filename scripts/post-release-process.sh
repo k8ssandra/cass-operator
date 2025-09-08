@@ -42,11 +42,12 @@ yq eval -i '.images.config-builder |= sub("cr.dtsx.io/", "")' config/manager/ima
 yq eval -i '.defaults.dse.repository |= sub("cr.dtsx.io/", "")' config/manager/image_config.yaml
 
 # Update new imageconfig
-yq eval -i '.images.k8ssandra-client.tag = "latest"' config/imageconfig/image_config.yaml
+yq eval -i '.images.system-logger.tag = "latest"' config/imageconfig/image_config.yaml
 yq eval -i "del(.images.config-builder.registry)" config/imageconfig/image_config.yaml
 yq eval -i "del(.types.dse.registry)" config/imageconfig/image_config.yaml
 yq eval -i "del(.images.k8ssandra-client.registry)" config/imageconfig/image_config.yaml
 yq eval -i '.types.cassandra.registry = "ghcr.io"' config/imageconfig/image_config.yaml
+yq eval -i '.images.system-logger.registry = "ghcr.io"' config/imageconfig/image_config.yaml
 
 # Commit to git
 NEXT_VERSION=$(gawk 'match($0, /^VERSION \?= /) { print substr($0, RLENGTH+1)}' Makefile)

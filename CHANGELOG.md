@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.27.0
 
 * [CHANGE] [#822](https://github.com/k8ssandra/cass-operator/issues/822) Remove certain RBAC rights from our Role/ClusterRole that are no longer necessary for the operations in cass-operator

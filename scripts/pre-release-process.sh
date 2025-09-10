@@ -21,7 +21,7 @@ fi
 
 TAG=$1
 PREVTAG=$(git describe --abbrev=0 --tags)
-IMG=cr.k8ssandra.io/k8ssandra/cass-operator:${TAG}
+IMG=docker.io/k8ssandra/cass-operator:${TAG}
 
 if [ ! -z "$2" ]; then
     PREVTAG=$2
@@ -42,32 +42,8 @@ sed -i '' -e "s/$PREVTAG/$TAG/g" README.md
 cd config/manager && $KUSTOMIZE edit set image controller=$IMG && cd -
 
 # Modify config/manager/image_config.yaml to have proper version for server-system-logger
-LOG_IMG=k8ssandra/system-logger:${TAG} yq eval -i '.images.system-logger = "cr.k8ssandra.io/" + env(LOG_IMG)' config/manager/image_config.yaml
+LOG_IMG=k8ssandra/system-logger:${TAG} yq eval -i '.images.system-logger = "env(LOG_IMG)' config/manager/image_config.yaml
 yq eval -i '.images.system-logger.tag = "'$TAG'"' config/imageconfig/image_config.yaml
-
-# Add prefixes to image_config if not already set
-CLIENT_VALUE=$(yq '.images.k8ssandra-client' config/manager/image_config.yaml)
-
-if [[ ! $CLIENT_VALUE == cr.k8ssandra.io* ]]; then
-    # Add cr.k8ssandra.io prefixes
-    yq eval -i '.images.k8ssandra-client |= "cr.k8ssandra.io/" + .' config/manager/image_config.yaml
-    yq eval -i '.defaults.cassandra.repository |= sub("ghcr.io/", "")' config/manager/image_config.yaml
-    yq eval -i '.defaults.cassandra.repository |= "cr.k8ssandra.io/" + .' config/manager/image_config.yaml
-
-    # v2
-    yq eval -i '.images.k8ssandra-client.registry = "cr.k8ssandra.io"' config/imageconfig/image_config.yaml
-    yq eval -i '.types.cassandra.registry = "cr.k8ssandra.io"' config/imageconfig/image_config.yaml
-    yq eval -i '.images.system-logger.registry = "cr.k8ssandra.io"' config/imageconfig/image_config.yaml
-
-    # Add cr.dstx.io prefixes
-    yq eval -i '.images.config-builder |= "cr.dtsx.io/" + .' config/manager/image_config.yaml
-    yq eval -i '.defaults.dse.repository |= "cr.dtsx.io/" + .' config/manager/image_config.yaml
-
-    yq eval -i '.images.config-builder.registry = "cr.dtsx.io"' config/imageconfig/image_config.yaml
-    yq eval -i '.types.dse.registry = "cr.dtsx.io"' config/imageconfig/image_config.yaml
-fi
-
-# Modify the controller
 
 # Now add everything and create a commit + tag
 git add CHANGELOG.md

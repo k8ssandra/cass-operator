@@ -32,15 +32,6 @@ cd config/manager && $KUSTOMIZE edit set image controller=$IMG && cd -
 # Return config/manager/image_config.yaml to :latest
 LOG_IMG=k8ssandra/system-logger:latest yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 
-# Remove cr.k8ssandra.io prefixes
-yq eval -i '.images.k8ssandra-client |= sub("cr.k8ssandra.io/", "")' config/manager/image_config.yaml
-yq eval -i '.defaults.cassandra.repository |= sub("cr.k8ssandra.io/", "")' config/manager/image_config.yaml
-yq eval -i '.defaults.cassandra.repository |= "ghcr.io/" + .' config/manager/image_config.yaml
-
-# Remove cr.dstx.io prefixes
-yq eval -i '.images.config-builder |= sub("cr.dtsx.io/", "")' config/manager/image_config.yaml
-yq eval -i '.defaults.dse.repository |= sub("cr.dtsx.io/", "")' config/manager/image_config.yaml
-
 # Update new imageconfig
 yq eval -i '.images.system-logger.tag = "latest"' config/imageconfig/image_config.yaml
 yq eval -i "del(.images.config-builder.registry)" config/imageconfig/image_config.yaml

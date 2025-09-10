@@ -112,20 +112,16 @@ func TestDefaultImageConfigParsing(t *testing.T) {
 	assert.True(strings.Contains(imageConfig.Images.ConfigBuilder, "datastax/cass-config-builder:"))
 	assert.True(strings.Contains(imageConfig.Images.Client, "k8ssandra/k8ssandra-client:"))
 
-	assert.Equal("ghcr.io/k8ssandra/cass-management-api", registry.(*imageRegistry).imageConfig.DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
-	assert.Equal("datastax/dse-mgmtapi-6_8", registry.(*imageRegistry).imageConfig.DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
+	assert.Equal("docker.io/k8ssandra/cass-management-api", registry.(*imageRegistry).imageConfig.DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
+	assert.Equal("docker.io/datastax/dse-mgmtapi-6_8", registry.(*imageRegistry).imageConfig.DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
 
 	path, err := registry.GetCassandraImage("dse", "6.8.47")
 	assert.NoError(err)
-	assert.Equal("datastax/dse-mgmtapi-6_8:6.8.47-ubi", path)
-
-	path, err = registry.GetCassandraImage("hcd", "1.0.0")
-	assert.NoError(err)
-	assert.Equal("datastax/hcd:1.0.0-ubi", path)
+	assert.Equal("docker.io/datastax/dse-mgmtapi-6_8:6.8.47-ubi", path)
 
 	path, err = registry.GetCassandraImage("cassandra", "4.1.4")
 	assert.NoError(err)
-	assert.Equal("ghcr.io/k8ssandra/cass-management-api:4.1.4-ubi", path)
+	assert.Equal("docker.io/k8ssandra/cass-management-api:4.1.4-ubi", path)
 }
 
 func TestImageConfigParsing(t *testing.T) {
@@ -142,8 +138,8 @@ func TestImageConfigParsing(t *testing.T) {
 	assert.True(strings.HasPrefix(imageConfig.Images.ConfigBuilder, "datastax/cass-config-builder:"))
 	assert.True(strings.Contains(imageConfig.Images.Client, "k8ssandra/k8ssandra-client:"))
 
-	assert.Equal("cr.k8ssandra.io/k8ssandra/cass-management-api", imageConfig.DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
-	assert.Equal("cr.dtsx.io/datastax/dse-mgmtapi-6_8", imageConfig.DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
+	assert.Equal("docker.io/k8ssandra/cass-management-api", imageConfig.DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
+	assert.Equal("docker.io/datastax/dse-mgmtapi-6_8", imageConfig.DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
 
 	assert.Equal("localhost:5000", imageConfig.ImageRegistry)
 	assert.Equal(corev1.PullAlways, imageConfig.ImagePullPolicy)

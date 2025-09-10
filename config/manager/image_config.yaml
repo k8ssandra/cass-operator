@@ -18,11 +18,8 @@ images:
 defaults:
   # Note, postfix is ignored if repository is not set
   cassandra:
-    repository: "ghcr.io/k8ssandra/cass-management-api"
+    repository: "docker.io/k8ssandra/cass-management-api"
     suffix: "-ubi"
   dse:
-    repository: "datastax/dse-mgmtapi-6_8"
-    suffix: "-ubi"
-  hcd:
-    repository: "datastax/hcd"
+    repository: "docker.io/datastax/dse-mgmtapi-6_8"
     suffix: "-ubi"

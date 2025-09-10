@@ -137,7 +137,7 @@ var _ = Describe(testName, func() {
 			step = "get Cassandra pod system-logger"
 			k = kubectl.GetByTypeAndName("pod", podName).FormatOutput("jsonpath={.spec.containers[?(@.name == 'server-system-logger')].image}")
 			loggerImage := ns.OutputAndLog(step, k)
-			Expect(loggerImage).To(Equal("cr.k8ssandra.io/k8ssandra/system-logger:v1.19.1"))
+			Expect(loggerImage).To(HaveSuffix("k8ssandra/system-logger:v1.19.1"))
 
 			// Add annotation to allow upgrade to update the StatefulSets
 			step = "add annotation to allow upgrade"

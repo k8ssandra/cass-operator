@@ -114,6 +114,10 @@ type JobArguments struct {
 	// command, ignored otherwise. Pods referenced in this map must exist; any existing pod not
 	// referenced in this map will not be moved.
 	NewTokens map[string]string `json:"new_tokens,omitempty"`
+
+	// Fast modifies the behavior of rolling restart to restart multiple nodes (or entire rack) at the same time.
+	// If the cluster is degraded in availability, the fast path isn't used
+	Fast bool `json:"fast,omitempty"`
 }
 
 // CassandraTaskStatus defines the observed state of CassandraJob

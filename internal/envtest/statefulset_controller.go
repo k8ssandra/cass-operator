@@ -273,5 +273,6 @@ func createPVC(ctx context.Context, cli client.Client, mountName string, pod *co
 func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.StatefulSet{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		Owns(&corev1.Pod{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Complete(r)
 }

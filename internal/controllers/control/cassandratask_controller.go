@@ -470,6 +470,14 @@ func (r *CassandraTaskReconciler) getDatacenterStatefulSets(ctx context.Context,
 	return sts.Items, nil
 }
 
+func (r *CassandraTaskReconciler) getStatefulSetPods(ctx context.Context, dc *cassapi.CassandraDatacenter, st *appsv1.StatefulSet) ([]corev1.Pod, error) {
+	var pods corev1.PodList
+	if err := r.List(ctx, &pods, client.InNamespace(dc.Namespace), client.MatchingLabels(st.Spec.Selector.MatchLabels)); err != nil {
+		return nil, err
+	}
+	return pods.Items, nil
+}
+
 // cleanupJobAnnotations removes the job annotations from the pod once it has finished
 func (r *CassandraTaskReconciler) cleanupJobAnnotations(ctx context.Context, dc *cassapi.CassandraDatacenter, taskId string) error {
 	logger := log.FromContext(ctx)

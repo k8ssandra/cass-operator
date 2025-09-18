@@ -122,6 +122,11 @@ spec:
                       properties:
                         end_token:
                           type: string
+                        fast:
+                          description: |-
+                            Fast modifies the behavior of rolling restart to restart multiple nodes (or entire rack) at the same time.
+                            If the cluster is degraded in availability, the fast path isn't used
+                          type: boolean
                         jobs:
                           type: integer
                         keyspace_name:

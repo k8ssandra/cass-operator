@@ -11,7 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
-* [ENHANCEMENT] [#]() Add the ability for the rolling restart to restart an entire rack at once. This speeds up the rolling restart process in a cluster that has large amount of nodes in a single rack.
+* [ENHANCEMENT] [#841](https://github.com/k8ssandra/cass-operator/issues/841) Add the ability for the rolling restart to restart an entire rack at once. This speeds up the rolling restart process in a cluster that has large amount of nodes in a single rack.
 
 ## v1.27.0
 

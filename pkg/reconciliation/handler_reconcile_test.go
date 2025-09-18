@@ -92,7 +92,6 @@ func TestReconcile(t *testing.T) {
 		}}
 		pod.Labels[api.CassNodeState] = "Started"
 		pod.Status.PodIP = fmt.Sprintf("192.168.1.%d", i)
-		fmt.Printf("Adding pod %s\n", pod.Name)
 		trackObjects = append(trackObjects, pod)
 	}
 

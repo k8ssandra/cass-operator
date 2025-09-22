@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [BUGFIX] [#843](https://github.com/k8ssandra/cass-operator/issues/843) If MetadataVersion was for some reason missing from Status while the DatacenterName was set to same value as dc.Name and the count of nodes was same as maximum seed count for a rack, the seed labeler would overflow thinking it had too many seeds and remove the existing seeds from such racks.
+
 ## v1.27.0
 
 * [CHANGE] [#822](https://github.com/k8ssandra/cass-operator/issues/822) Remove certain RBAC rights from our Role/ClusterRole that are no longer necessary for the operations in cass-operator

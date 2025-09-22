@@ -58,7 +58,7 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
-var _ = BeforeSuite(func() {
+var _ = BeforeSuite(func(ctx context.Context) {
 	opts := zap.Options{
 		Development: true,
 		TimeEncoder: zapcore.ISO8601TimeEncoder,
@@ -67,7 +67,7 @@ var _ = BeforeSuite(func() {
 
 	logf.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	ctx, cancel = context.WithCancel(context.TODO())
+	ctx, cancel = context.WithCancel(ctx)
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

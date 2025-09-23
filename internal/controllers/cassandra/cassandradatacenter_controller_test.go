@@ -58,7 +58,7 @@ func createStorageClass(ctx context.Context, storageClassName string) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: storageClassName,
 		},
-		AllowVolumeExpansion: ptr.To[bool](true),
+		AllowVolumeExpansion: ptr.To(true),
 		Provisioner:          "kubernetes.io/no-provisioner",
 	}
 	Expect(k8sClient.Create(ctx, sc)).To(Succeed())
@@ -97,7 +97,7 @@ func waitForDatacenterCondition(ctx context.Context, dcName string, condition ca
 
 var _ = Describe("CassandraDatacenter tests", func() {
 	Describe("Creating a new datacenter", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			testNamespaceName = fmt.Sprintf("test-cassdc-%d", rand.Int31())
 			testNamespace := &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{

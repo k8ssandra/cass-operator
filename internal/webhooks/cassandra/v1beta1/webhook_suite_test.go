@@ -38,9 +38,9 @@ import (
 var (
 	cancel    context.CancelFunc
 	cfg       *rest.Config
-	ctx       context.Context
 	k8sClient client.Client
 	testEnv   *envtest.Environment
+	ctx       context.Context
 )
 
 func TestAPIs(t *testing.T) {
@@ -49,10 +49,10 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Webhook Suite")
 }
 
-var _ = BeforeSuite(func(ctx context.Context) {
+var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	ctx, cancel = context.WithCancel(ctx)
+	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

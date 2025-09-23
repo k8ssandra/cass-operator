@@ -9,8 +9,9 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.27.1
 
+* [CHANGE] [#845](https://github.com/k8ssandra/cass-operator/issues/845) Set default registry to be docker.io on the releases to allow easier modification using new ImageConfig
 * [BUGFIX] [#843](https://github.com/k8ssandra/cass-operator/issues/843) If MetadataVersion was for some reason missing from Status while the DatacenterName was set to same value as dc.Name and the count of nodes was same as maximum seed count for a rack, the seed labeler would overflow thinking it had too many seeds and remove the existing seeds from such racks.
 
 ## v1.27.0

@@ -4,7 +4,6 @@
 package httphelper
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"net/http"
@@ -149,7 +148,7 @@ func TestBuildMTLSClient(t *testing.T) {
 	}
 
 	client := fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
-	ctx := context.TODO()
+	ctx := t.Context()
 
 	httpClient, err := BuildManagementApiHttpClient(ctx, client, dc, nil)
 	require.NoError(err)

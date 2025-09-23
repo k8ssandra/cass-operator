@@ -2628,10 +2628,15 @@ func (rc *ReconciliationContext) datacenterPods() []*corev1.Pod {
 	dcSelector := rc.Datacenter.GetDatacenterLabels()
 	dcPods := FilterPodListByLabels(rc.clusterPods, dcSelector)
 
-	if rc.Datacenter.Status.MetadataVersion < 1 && rc.Datacenter.Status.DatacenterName != nil && *rc.Datacenter.Status.DatacenterName == rc.Datacenter.Spec.DatacenterName {
+	if rc.Datacenter.Status.MetadataVersion < 1 && rc.Datacenter.Status.ObservedGeneration > 0 &&
+		rc.Datacenter.Status.DatacenterName != nil && *rc.Datacenter.Status.DatacenterName == rc.Datacenter.Spec.DatacenterName &&
+		rc.Datacenter.Spec.DatacenterName != rc.Datacenter.Name {
 		rc.ReqLogger.Info("Fetching datacenter pods with the old metadata version labels")
-		dcSelector[api.DatacenterLabel] = api.CleanLabelValue(rc.Datacenter.Spec.DatacenterName)
-		dcPods = append(dcPods, FilterPodListByLabels(rc.clusterPods, dcSelector)...)
+
+		if dcSelector[api.DatacenterLabel] != api.CleanLabelValue(rc.Datacenter.Spec.DatacenterName) {
+			dcSelector[api.DatacenterLabel] = api.CleanLabelValue(rc.Datacenter.Spec.DatacenterName)
+			dcPods = append(dcPods, FilterPodListByLabels(rc.clusterPods, dcSelector)...)
+		}
 	}
 
 	return dcPods

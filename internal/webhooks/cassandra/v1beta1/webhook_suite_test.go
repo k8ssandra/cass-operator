@@ -38,9 +38,9 @@ import (
 var (
 	cancel    context.CancelFunc
 	cfg       *rest.Config
-	ctx       context.Context
 	k8sClient client.Client
 	testEnv   *envtest.Environment
+	ctx       context.Context
 )
 
 func TestAPIs(t *testing.T) {

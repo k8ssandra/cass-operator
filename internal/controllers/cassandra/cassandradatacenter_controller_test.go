@@ -58,7 +58,7 @@ func createStorageClass(ctx context.Context, storageClassName string) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: storageClassName,
 		},
-		AllowVolumeExpansion: ptr.To[bool](true),
+		AllowVolumeExpansion: ptr.To(true),
 		Provisioner:          "kubernetes.io/no-provisioner",
 	}
 	Expect(k8sClient.Create(ctx, sc)).To(Succeed())

@@ -174,7 +174,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, err
 		}
 
-		if err := r.Create(context.TODO(), pod); err != nil {
+		if err := r.Create(ctx, pod); err != nil {
 			logger.Error(err, "Failed to create a Pod")
 			return ctrl.Result{}, err
 		}

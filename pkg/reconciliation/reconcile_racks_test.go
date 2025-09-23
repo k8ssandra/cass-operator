@@ -3541,8 +3541,63 @@ func TestDatacenterPodsOldLabels(t *testing.T) {
 	// Lets modify the Datacenter names and set the status like it used to be in some older versions
 	rc.Datacenter.Spec.DatacenterName = "overrideMe"
 	rc.Datacenter.Name = "dc1"
-	rc.Datacenter.Status.DatacenterName = ptr.To[string]("overrideMe")
+	rc.Datacenter.Status.DatacenterName = ptr.To("overrideMe")
 	rc.Datacenter.Status.MetadataVersion = 0
+	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
+
+	// We should still find the pods
+	assert.Equal(int(*desiredStatefulSet.Spec.Replicas), len(rc.datacenterPods()))
+}
+
+func TestDatacenterPodsNoDualFetch(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	assert := assert.New(t)
+
+	// We fake the process a bit to get old style naming and labels
+	rc.Datacenter.Name = "overrideMe"
+
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+		nil,
+		"default",
+		rc.Datacenter,
+		3,
+		imageRegistry)
+	assert.NoErrorf(err, "error occurred creating statefulset")
+
+	desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
+
+	trackObjects := []runtime.Object{
+		desiredStatefulSet,
+		rc.Datacenter,
+	}
+
+	mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
+	for idx := range mockPods {
+		mp := mockPods[idx]
+		trackObjects = append(trackObjects, mp)
+	}
+
+	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+
+	nextRack := &RackInformation{}
+	nextRack.RackName = "default"
+	nextRack.NodeCount = 1
+	nextRack.SeedCount = 1
+
+	rackInfo := []*RackInformation{nextRack}
+
+	rc.desiredRackInformation = rackInfo
+	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
+
+	rc.clusterPods = mockPods
+
+	// Lets modify the Datacenter names and set the status like it used to be in some older versions
+	rc.Datacenter.Spec.DatacenterName = "overrideMe"
+	rc.Datacenter.Name = "overrideMe" // Setting all these values to the same triggers in 1.27.0 a race condition that returns 6 pods instead of 3
+	rc.Datacenter.Status.DatacenterName = ptr.To("overrideMe")
+	rc.Datacenter.Status.MetadataVersion = 0
+	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
 
 	// We should still find the pods
 	assert.Equal(int(*desiredStatefulSet.Spec.Replicas), len(rc.datacenterPods()))

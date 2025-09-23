@@ -97,7 +97,7 @@ func waitForDatacenterCondition(ctx context.Context, dcName string, condition ca
 
 var _ = Describe("CassandraDatacenter tests", func() {
 	Describe("Creating a new datacenter", func() {
-		BeforeEach(func(ctx SpecContext) {
+		BeforeEach(func() {
 			testNamespaceName = fmt.Sprintf("test-cassdc-%d", rand.Int31())
 			testNamespace := &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{

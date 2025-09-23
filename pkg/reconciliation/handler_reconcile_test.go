@@ -115,7 +115,7 @@ func TestReconcile(t *testing.T) {
 		},
 	}
 
-	result, err := r.Reconcile(context.TODO(), request)
+	result, err := r.Reconcile(t.Context(), request)
 	if err != nil {
 		t.Fatalf("Reconciliation Failure: (%v)", err)
 	}
@@ -179,7 +179,7 @@ func TestReconcile_NotFound(t *testing.T) {
 		},
 	}
 
-	result, err := r.Reconcile(context.TODO(), request)
+	result, err := r.Reconcile(t.Context(), request)
 	require.Error(t, err)
 	require.Equal(t, reconcile.Result{}, result)
 }
@@ -252,6 +252,6 @@ func TestReconcile_Error(t *testing.T) {
 		},
 	}
 
-	_, err := r.Reconcile(context.TODO(), request)
+	_, err := r.Reconcile(t.Context(), request)
 	require.Error(t, err, "Reconciliation should have failed")
 }

@@ -62,11 +62,6 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 	rc.Datacenter.Status.CassandraOperatorProgress = newState
 
 	if newState == api.ProgressReady {
-		if rc.Datacenter.Status.MetadataVersion < 1 {
-			if rc.Datacenter.Status.GetConditionStatus(api.DatacenterRequiresUpdate) == corev1.ConditionFalse {
-				rc.Datacenter.Status.MetadataVersion = 1
-			}
-		}
 		if rc.Datacenter.Status.DatacenterName == nil {
 			rc.Datacenter.Status.DatacenterName = &rc.Datacenter.Name
 		}
@@ -84,6 +79,9 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 func setDatacenterStatus(rc *ReconciliationContext) error {
 	if rc.Datacenter.Status.ObservedGeneration != rc.Datacenter.Generation {
 		patch := client.MergeFrom(rc.Datacenter.DeepCopy())
+		if rc.Datacenter.Status.MetadataVersion < 1 {
+			rc.Datacenter.Status.MetadataVersion = 1
+		}
 		rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
 		if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {
 			rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")

@@ -4,9 +4,10 @@ metadata:
   name: image-config
 images:
   system-logger:
+    registry: "ghcr.io"
     repository: "k8ssandra"
     name: "system-logger"
-    tag: "v1.27.0"
+    tag: "latest"
   config-builder:
     repository: "datastax"
     name: "cass-config-builder"
@@ -38,6 +39,7 @@ defaults:
 # -- types are used as building blocks when serverVersion + serverType in the CassandraDatacenter is used
 types:
   cassandra:
+    registry: "ghcr.io"
     repository: "k8ssandra"
     name: "cass-management-api"
     suffix: "-ubi"

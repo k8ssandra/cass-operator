@@ -589,7 +589,7 @@ func TestCustomTransport(t *testing.T) {
 
 	mockClient := mocks.NewClient(t)
 
-	mgmtClient, err := NewMgmtClient(context.TODO(), mockClient, dc, customTransport)
+	mgmtClient, err := NewMgmtClient(t.Context(), mockClient, dc, customTransport)
 	mgmtClient.Log = logr.Discard()
 	require.NoError(err)
 

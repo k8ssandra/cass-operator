@@ -34,9 +34,6 @@ LOG_IMG=k8ssandra/system-logger:latest yq eval -i '.images.system-logger = env(L
 
 # Update new imageconfig
 yq eval -i '.images.system-logger.tag = "latest"' config/imageconfig/image_config.yaml
-yq eval -i "del(.images.config-builder.registry)" config/imageconfig/image_config.yaml
-yq eval -i "del(.types.dse.registry)" config/imageconfig/image_config.yaml
-yq eval -i "del(.images.k8ssandra-client.registry)" config/imageconfig/image_config.yaml
 yq eval -i '.types.cassandra.registry = "ghcr.io"' config/imageconfig/image_config.yaml
 yq eval -i '.images.system-logger.registry = "ghcr.io"' config/imageconfig/image_config.yaml
 

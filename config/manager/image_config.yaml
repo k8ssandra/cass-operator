@@ -3,7 +3,7 @@ kind: ImageConfig
 metadata:
   name: image-config
 images:
-  system-logger: "env(LOG_IMG)"
+  system-logger: "docker.io/k8ssandra/system-logger:v1.27.1"
   config-builder: "docker.io/datastax/cass-config-builder:1.0-ubi"
   k8ssandra-client: "docker.io/k8ssandra/k8ssandra-client:v0.8.3"
   # cassandra:

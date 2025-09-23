@@ -6,7 +6,8 @@ images:
   system-logger:
     repository: "k8ssandra"
     name: "system-logger"
-    tag: "v1.27.1"
+    tag: "latest"
+    registry: ghcr.io
   config-builder:
     repository: "datastax"
     name: "cass-config-builder"
@@ -41,6 +42,7 @@ types:
     repository: "k8ssandra"
     name: "cass-management-api"
     suffix: "-ubi"
+    registry: ghcr.io
   dse:
     repository: "datastax"
     name: "dse-mgmtapi-6_8"

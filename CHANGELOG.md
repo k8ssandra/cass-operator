@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.27.1
 
 * [CHANGE] [#845](https://github.com/k8ssandra/cass-operator/issues/845) Set default registry to be docker.io on the releases to allow easier modification using new ImageConfig

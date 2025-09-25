@@ -261,7 +261,7 @@ OPM ?= $(LOCALBIN)/opm
 CERT_MANAGER_VERSION ?= v1.18.1
 KUSTOMIZE_VERSION ?= v5.6.0
 CONTROLLER_TOOLS_VERSION ?= v0.18.0
-OPERATOR_SDK_VERSION ?= 1.40.0
+OPERATOR_SDK_VERSION ?= 1.41.1
 HELM_VERSION ?= 3.18.3
 OPM_VERSION ?= 1.55.0
 GOLANGCI_LINT_VERSION ?= v2.4.0
@@ -366,7 +366,7 @@ endif
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests --interactive=false -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(BUNDLE_GEN_FLAGS)
+	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	scripts/postprocess-bundle.sh $(REGISTRY)
 	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
 

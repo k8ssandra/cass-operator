@@ -111,6 +111,10 @@ spec:
                                 Fast modifies the behavior of rolling restart to restart multiple nodes (or entire rack) at the same time.
                                 If the cluster is degraded in availability, the fast path isn't used
                               type: boolean
+                            force:
+                              description: Force is used to force the execution of
+                                a command even if the operator thinks it is unsafe
+                              type: boolean
                             jobs:
                               type: integer
                             keyspace_name:

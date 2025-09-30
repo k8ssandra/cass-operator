@@ -62,7 +62,7 @@ func TestDefaultImageConfigParsingV2(t *testing.T) {
 	assert.NotNil(imageConfig.Images)
 	assert.Contains(registry.GetSystemLoggerImage(), "k8ssandra/system-logger:")
 	assert.Contains(registry.GetConfigBuilderImage(), "datastax/cass-config-builder:")
-	assert.Contains(registry.GetClientImage(), "k8ssandra/k8ssandra-client:")
+	assert.Contains(registry.GetClientImage(), "k8ssandra/k8ssandra-client@sha256:")
 
 	assert.Equal("ghcr.io", imageConfig.Types["cassandra"].Registry)
 	assert.Equal("k8ssandra", imageConfig.Types["cassandra"].Repository)
@@ -70,7 +70,7 @@ func TestDefaultImageConfigParsingV2(t *testing.T) {
 
 	path, err := registry.GetCassandraImage("dse", "6.8.47")
 	assert.NoError(err)
-	assert.Equal("cr.dtsx.io/datastax/dse-mgmtapi-6_8:6.8.47-ubi", path)
+	assert.Equal("docker.io/datastax/dse-mgmtapi-6_8:6.8.47-ubi", path)
 
 	path, err = registry.GetCassandraImage("hcd", "1.0.0")
 	assert.NoError(err)
@@ -96,11 +96,10 @@ func TestImageConfigParsingV2(t *testing.T) {
 	assert.NotNil(imageConfig.Images)
 	assert.Equal("ghcr.io/k8ssandra/system-logger:latest", registry.GetSystemLoggerImage())
 	assert.Contains(registry.GetConfigBuilderImage(), "datastax/cass-config-builder:")
-	assert.Contains(registry.GetClientImage(), "k8ssandra/k8ssandra-client:")
+	assert.Contains(registry.GetClientImage(), "k8ssandra/k8ssandra-client@sha256:")
 
 	assert.Equal("ghcr.io", imageConfig.Types["cassandra"].Registry)
 	assert.Equal("k8ssandra", imageConfig.Types["cassandra"].Repository)
-	assert.Equal("cr.dtsx.io", imageConfig.Types["dse"].Registry)
 	assert.Equal("datastax", imageConfig.Types["dse"].Repository)
 
 	assert.Equal("docker.io", *imageConfig.Defaults.Registry)
@@ -109,7 +108,7 @@ func TestImageConfigParsingV2(t *testing.T) {
 
 	path, err := registry.GetCassandraImage("dse", "6.8.43")
 	assert.NoError(err)
-	assert.Equal("cr.dtsx.io/datastax/dse-mgmtapi-6_8:6.8.43-ubi", path)
+	assert.Equal("docker.io/datastax/dse-mgmtapi-6_8:6.8.43-ubi", path)
 }
 
 func TestExtendedImageConfigParsingV2(t *testing.T) {
@@ -251,14 +250,14 @@ apiVersion: config.k8ssandra.io/v1beta2
 kind: ImageConfig
 types:
   dse:
-    repository: cr.dtsx.io/datastax
+    repository: docker.io/datastax
     name: dse-mgmtapi-6_8
 `
 	registry, err = newTestImageRegistryV2([]byte(yamlConfig))
 	require.NoError(t, err)
 	path, err = registry.GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
-	assert.Equal("cr.dtsx.io/datastax/dse-mgmtapi-6_8:6.8.44", path)
+	assert.Equal("docker.io/datastax/dse-mgmtapi-6_8:6.8.44", path)
 
 	yamlConfig = `
 apiVersion: config.k8ssandra.io/v1beta2
@@ -267,7 +266,7 @@ overrides:
   repository: internal
 types:
   dse:
-    registry: cr.dtsx.io
+    registry: docker.io
     repository: datastax
     name: dse-mgmtapi-6_8
 `
@@ -275,7 +274,7 @@ types:
 	require.NoError(t, err)
 	path, err = registry.GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
-	assert.Equal("cr.dtsx.io/internal/dse-mgmtapi-6_8:6.8.44", path)
+	assert.Equal("docker.io/internal/dse-mgmtapi-6_8:6.8.44", path)
 
 	yamlConfig = `
 apiVersion: config.k8ssandra.io/v1beta2
@@ -284,7 +283,7 @@ overrides:
   repository: ""
 types:
   dse:
-    registry: cr.dtsx.io
+    registry: docker.io
     repository: "datastax"
     name: dse-mgmtapi-6_8
 `
@@ -292,7 +291,7 @@ types:
 	require.NoError(t, err)
 	path, err = registry.GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
-	assert.Equal("cr.dtsx.io/dse-mgmtapi-6_8:6.8.44", path)
+	assert.Equal("docker.io/dse-mgmtapi-6_8:6.8.44", path)
 }
 
 func TestImageConfigByteParsingV2(t *testing.T) {

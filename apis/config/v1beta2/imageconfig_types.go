@@ -1,6 +1,9 @@
 package v1beta2
 
 import (
+	"regexp"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -8,6 +11,11 @@ import (
 const (
 	K8ssandraConfigLabel     = "k8ssandra.io/config"
 	K8ssandraImageLabelValue = "image"
+)
+
+var (
+	digestAlgorithmRegexp = regexp.MustCompile(`^[a-z0-9]+(?:[._+-][a-z0-9]+)*$`)
+	digestEncodedRegexp   = regexp.MustCompile(`^[a-zA-Z0-9=_-]+$`)
 )
 
 //+kubebuilder:object:root=true
@@ -34,6 +42,10 @@ type Image struct {
 	// The image tag to use. Defaults to "latest".
 	// +optional
 	Tag string `json:"tag,omitempty"`
+
+	// The image digest to use. When set, it takes precedence over Tag.
+	// +optional
+	Digest string `json:"digest,omitempty"`
 
 	// The image pull policy to use. Defaults to "Always" if the tag is "latest", otherwise to "IfNotPresent".
 	// +optional
@@ -66,12 +78,28 @@ func (i *Image) ApplyOverrides(higher *Image) {
 	if higher.Tag != "" {
 		i.Tag = higher.Tag
 	}
+	if higher.Digest != "" {
+		i.Digest = higher.Digest
+	}
 	if higher.PullPolicy != "" {
 		i.PullPolicy = higher.PullPolicy
 	}
 	if higher.PullSecret != "" {
 		i.PullSecret = higher.PullSecret
 	}
+}
+
+func isDigest(value string) bool {
+	parts := strings.SplitN(value, ":", 2)
+	if len(parts) != 2 {
+		return false
+	}
+
+	// Next ones are slightly overkill, but they follow the spec from https://github.com/opencontainers/image-spec/blob/main/descriptor.md#digests
+	if !digestAlgorithmRegexp.MatchString(parts[0]) {
+		return false
+	}
+	return digestEncodedRegexp.MatchString(parts[1])
 }
 
 func (i Image) String() string {
@@ -87,7 +115,17 @@ func (i Image) String() string {
 		repository = i.Repository + "/"
 	}
 
-	return registry + repository + i.Name + ":" + i.Tag
+	reference := i.Tag
+	delimiter := ":"
+
+	if i.Digest != "" {
+		reference = i.Digest
+		delimiter = "@"
+	} else if isDigest(i.Tag) {
+		delimiter = "@"
+	}
+
+	return registry + repository + i.Name + delimiter + reference
 }
 
 // ImageConfig is the Schema for the imageconfigs API

@@ -13,6 +13,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [FEATURE] [#838](https://github.com/k8ssandra/cass-operator/issues/838) If cass-operator is not deployed in clusterScoped mode, disable features that require such rights and continue functioning correctly otherwise. 
 * [ENHANCEMENT] [#848](https://github.com/k8ssandra/cass-operator/issues/848) Detect more error cases in the PVC resizing operation and notify the user with an event and a change in the Datacenter status.
+* [ENHANCEMENT] [#846](https://github.com/k8ssandra/cass-operator/issues/846) Detect the usage of a digest in the ImageConfig tag field and correctly deploy it without requiring a separate tag to be set. In previous versions, setting tag to for example: `v1.0@sha256:hash` would be required to deploy with digest only.
 
 ## v1.27.1
 

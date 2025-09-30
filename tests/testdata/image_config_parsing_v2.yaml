@@ -16,6 +16,7 @@ images:
     repository: "k8ssandra"
     name: "k8ssandra-client"
     tag: "v0.8.3"
+    digest: "sha256:93a57444c14cec724942103543db6bb140ea444dca19b001701cc736b9e0d959"
     # pullSecret: "k8ssandra-client-pull-secret" # Use of pullSecret removes the default pullSecrets for this image
     # pullPolicy: Always
   medusa: 
@@ -53,7 +54,6 @@ types:
     suffix: "-ubi"
     pullPolicy: IfNotPresent
   dse:
-    registry: "cr.dtsx.io"
     repository: "datastax"
     name: "dse-mgmtapi-6_8"
     suffix: "-ubi"

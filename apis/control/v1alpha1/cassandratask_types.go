@@ -118,6 +118,9 @@ type JobArguments struct {
 	// Fast modifies the behavior of rolling restart to restart multiple nodes (or entire rack) at the same time.
 	// If the cluster is degraded in availability, the fast path isn't used
 	Fast bool `json:"fast,omitempty"`
+
+	// Force is used to force the execution of a command even if the operator thinks it is unsafe
+	Force bool `json:"force,omitempty"`
 }
 
 // CassandraTaskStatus defines the observed state of CassandraJob

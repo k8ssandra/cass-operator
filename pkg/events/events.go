@@ -20,6 +20,7 @@ const (
 	LabeledPodAsDecommissioning       string = "LabeledPodAsDecommissioning"
 	DeletedPvc                        string = "DeletedPvc"
 	ResizingPVC                       string = "ResizingPVC"
+	ResizingPVCFailed                 string = "ResizingPVCFailed"
 	UnlabeledPodAsSeed                string = "UnlabeledPodAsSeed"
 	LabeledRackResource               string = "LabeledRackResource"
 	ScalingUpRack                     string = "ScalingUpRack"

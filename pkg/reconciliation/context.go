@@ -27,15 +27,16 @@ import (
 
 // ReconciliationContext contains all of the input necessary to calculate a list of ReconciliationActions
 type ReconciliationContext struct {
-	Request        *reconcile.Request
-	Client         client.Client
-	Scheme         *runtime.Scheme
-	Datacenter     *api.CassandraDatacenter
-	NodeMgmtClient httphelper.NodeMgmtClient
-	Recorder       record.EventRecorder
-	ReqLogger      logr.Logger
-	SecretWatches  dynamicwatch.DynamicWatches
-	ImageRegistry  images.ImageRegistry
+	Request          *reconcile.Request
+	Client           client.Client
+	Scheme           *runtime.Scheme
+	Datacenter       *api.CassandraDatacenter
+	NodeMgmtClient   httphelper.NodeMgmtClient
+	Recorder         record.EventRecorder
+	ReqLogger        logr.Logger
+	SecretWatches    dynamicwatch.DynamicWatches
+	ImageRegistry    images.ImageRegistry
+	ClusterResources bool
 
 	// According to golang recommendations the context should not be stored in a struct but given that
 	// this is passed around as a parameter we feel that its a fair compromise. For further discussion
@@ -59,6 +60,7 @@ func CreateReconciliationContext(
 	rec record.EventRecorder,
 	secretWatches dynamicwatch.DynamicWatches,
 	imageRegistry images.ImageRegistry,
+	clusterScoped bool,
 ) (*ReconciliationContext, error) {
 	reqLogger := log.FromContext(ctx)
 	rc := &ReconciliationContext{}
@@ -70,6 +72,7 @@ func CreateReconciliationContext(
 	rc.ReqLogger = reqLogger
 	rc.Ctx = ctx
 	rc.ImageRegistry = imageRegistry
+	rc.ClusterResources = clusterScoped
 
 	rc.ReqLogger = rc.ReqLogger.
 		WithValues("namespace", req.Namespace)

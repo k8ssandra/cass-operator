@@ -111,9 +111,9 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)
 
 			images = []string{
-				updated,
-				updated,
-				updated,
+				strings.Replace(updated, "docker.io/", "ghcr.io/", 1),
+				strings.Replace(updated, "docker.io/", "ghcr.io/", 1),
+				strings.Replace(updated, "docker.io/", "ghcr.io/", 1),
 			}
 			ns.WaitForCassandraImages(dcName, images, 300)
 

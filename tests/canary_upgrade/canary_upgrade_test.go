@@ -6,6 +6,7 @@ package canary_upgrade
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -93,9 +94,9 @@ var _ = Describe(testName, func() {
 			updated, _ := registry.GetCassandraImage("cassandra", "4.0.7")
 
 			images := []string{
-				old,
-				old,
-				updated,
+				strings.Replace(old, "docker.io/", "ghcr.io/", 1),
+				strings.Replace(old, "docker.io/", "ghcr.io/", 1),
+				strings.Replace(updated, "docker.io/", "ghcr.io/", 1),
 			}
 			ns.WaitForCassandraImages(dcName, images, 300)
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)

@@ -373,12 +373,12 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 			continue
 		}
 
-		serverDataPv, err := rc.getServerDataPv(pod)
+		serverDataPvc, err := rc.getServerDataPvc(pod)
 		if err != nil {
 			return err
 		}
 
-		pvCapacity := serverDataPv.Spec.Capacity
+		pvCapacity := serverDataPvc.Status.Capacity
 		if pvCapacity == nil {
 			return fmt.Errorf("could not determine storage capacity when checking if scale-down attempt is valid")
 		}
@@ -432,7 +432,7 @@ func (rc *ReconciliationContext) GetUsedStorageForPods(epData httphelper.CassMet
 	return podStorageMap, nil
 }
 
-func (rc *ReconciliationContext) getServerDataPv(pod *corev1.Pod) (*corev1.PersistentVolume, error) {
+func (rc *ReconciliationContext) getServerDataPvc(pod *corev1.Pod) (*corev1.PersistentVolumeClaim, error) {
 	pvcName := types.NamespacedName{
 		Name:      fmt.Sprintf("server-data-%s", pod.Name),
 		Namespace: rc.Datacenter.Namespace,
@@ -443,17 +443,7 @@ func (rc *ReconciliationContext) getServerDataPv(pod *corev1.Pod) (*corev1.Persi
 		return nil, err
 	}
 
-	pvName := types.NamespacedName{
-		Name:      pvc.Spec.VolumeName,
-		Namespace: "",
-	}
-	pv := &corev1.PersistentVolume{}
-	if err := rc.Client.Get(rc.Ctx, pvName, pv); err != nil {
-		rc.ReqLogger.Error(err, "Failed to get server-data pv", "pod", pod.Name)
-		return nil, err
-	}
-
-	return pv, nil
+	return pvc, nil
 }
 
 func (rc *ReconciliationContext) getClusterDatacenters(pods []*corev1.Pod) ([]string, error) {

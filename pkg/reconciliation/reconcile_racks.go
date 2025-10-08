@@ -257,9 +257,17 @@ func (rc *ReconciliationContext) CheckPVCResizing() result.ReconcileResult {
 	}
 
 	for _, pvc := range pvcList {
-		if isPVCResizing(&pvc) {
-			rc.ReqLogger.Info("Waiting for PVC resize to complete",
-				"pvc", pvc.Name)
+		if pvcResizingFailed(&pvc) {
+			msg := fmt.Sprintf("PVC resize failed for pvc %s, check events for more details", pvc.Name)
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.ResizingPVCFailed, msg)
+			if err := rc.setCondition(
+				api.NewDatacenterConditionWithReason(api.DatacenterValid, corev1.ConditionFalse, "pvcResizeFailed", msg)); err != nil {
+				return result.Error(err)
+			}
+		}
+
+		if pvcResizing(&pvc) {
+			rc.ReqLogger.Info("Waiting for PVC resize to complete", "pvc", pvc.Name)
 			return result.RequeueSoon(10)
 		}
 	}
@@ -271,7 +279,14 @@ func (rc *ReconciliationContext) CheckPVCResizing() result.ReconcileResult {
 	return result.Continue()
 }
 
-func isPVCResizing(pvc *corev1.PersistentVolumeClaim) bool {
+func pvcResizingFailed(pvc *corev1.PersistentVolumeClaim) bool {
+	return isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimControllerResizeError) ||
+		isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimNodeResizeError) ||
+		pvc.Status.AllocatedResourceStatuses["storage"] == corev1.PersistentVolumeClaimNodeResizeInfeasible ||
+		pvc.Status.AllocatedResourceStatuses["storage"] == corev1.PersistentVolumeClaimControllerResizeInfeasible
+}
+
+func pvcResizing(pvc *corev1.PersistentVolumeClaim) bool {
 	return isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimResizing) ||
 		isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimFileSystemResizePending)
 }
@@ -319,21 +334,24 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 				return result.Error(pkgerrors.New(msg))
 			}
 
-			supportsExpansion, err := rc.storageExpansion()
-			if err != nil {
-				return result.Error(err)
-			}
-
-			if !supportsExpansion {
-				msg := fmt.Sprintf("PVC resize requested, but StorageClass %s does not support expansion", *claim.Spec.StorageClassName)
-				rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
-				if err := rc.setCondition(
-					api.NewDatacenterConditionWithReason(api.DatacenterValid,
-						corev1.ConditionFalse, "storageClassDoesNotSupportExpansion", msg,
-					)); err != nil {
+			// We can't do this check without ClusterRole for StorageClass. Some environments don't want these.
+			if rc.ClusterResources {
+				supportsExpansion, err := rc.storageExpansion()
+				if err != nil {
 					return result.Error(err)
 				}
-				return result.Error(pkgerrors.New(msg))
+
+				if !supportsExpansion {
+					msg := fmt.Sprintf("PVC resize requested, but StorageClass %s does not support expansion", *claim.Spec.StorageClassName)
+					rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
+					if err := rc.setCondition(
+						api.NewDatacenterConditionWithReason(api.DatacenterValid,
+							corev1.ConditionFalse, "storageClassDoesNotSupportExpansion", msg,
+						)); err != nil {
+						return result.Error(err)
+					}
+					return result.Error(pkgerrors.New(msg))
+				}
 			}
 
 			if err := rc.setConditionStatus(api.DatacenterResizingVolumes, corev1.ConditionTrue); err != nil {
@@ -356,7 +374,7 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 			}
 
 			for _, pvc := range targetPVCs {
-				if isPVCResizing(pvc) {
+				if pvcResizing(pvc) {
 					return result.RequeueSoon(10)
 				}
 

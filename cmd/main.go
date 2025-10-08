@@ -215,6 +215,8 @@ func main() {
 		DefaultNamespaces: map[string]cache.Config{},
 	}
 
+	clusterScoped := len(ns) == 0
+
 	// Add support for MultiNamespace set in WATCH_NAMESPACE (e.g ns1,ns2)
 	if strings.Contains(ns, ",") {
 		setupLog.Info("manager set up with multiple namespaces", "namespaces", ns)
@@ -255,11 +257,12 @@ func main() {
 	}
 
 	if err = (&controllers.CassandraDatacenterReconciler{
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
-		Scheme:        mgr.GetScheme(),
-		Recorder:      mgr.GetEventRecorderFor("cass-operator"),
-		ImageRegistry: registry,
+		Client:           mgr.GetClient(),
+		Log:              ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
+		Scheme:           mgr.GetScheme(),
+		Recorder:         mgr.GetEventRecorderFor("cass-operator"),
+		ImageRegistry:    registry,
+		ClusterResources: clusterScoped,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraDatacenter")
 		os.Exit(1)

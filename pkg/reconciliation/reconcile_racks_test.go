@@ -3113,6 +3113,7 @@ func TestFindHostIdForIpFromEndpointsData(t *testing.T) {
 
 func TestCheckVolumeClaimSizesValidation(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
+	rc.ClusterResources = true
 	defer cleanupMockScr()
 	require := require.New(t)
 
@@ -3341,6 +3342,7 @@ func TestCheckPVCResizing(t *testing.T) {
 func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
 	require := require.New(t)
 	rc, _, cleanpMockSrc := setupTest()
+	rc.ClusterResources = true
 	defer cleanpMockSrc()
 
 	require.NoError(rc.CalculateRackInformation())

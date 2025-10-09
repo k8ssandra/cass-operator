@@ -250,23 +250,23 @@ func TestRepositoryAndNamespaceOverride(t *testing.T) {
 	imageConfig.DefaultImages = &configv1beta1.DefaultImages{
 		ImageComponents: map[string]configv1beta1.ImageComponent{
 			configv1beta1.DSEImageComponent: {
-				Repository: "cr.dtsx.io/datastax/dse-mgmtapi-6_8",
+				Repository: "docker.io/datastax/dse-mgmtapi-6_8",
 			},
 		},
 	}
 	path, err = registry.GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
-	assert.Equal("cr.dtsx.io/datastax/dse-mgmtapi-6_8:6.8.44", path)
+	assert.Equal("docker.io/datastax/dse-mgmtapi-6_8:6.8.44", path)
 
 	imageConfig.ImageNamespace = ptr.To("internal")
 	path, err = registry.GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
-	assert.Equal("cr.dtsx.io/internal/dse-mgmtapi-6_8:6.8.44", path)
+	assert.Equal("docker.io/internal/dse-mgmtapi-6_8:6.8.44", path)
 
 	imageConfig.ImageNamespace = ptr.To("")
 	path, err = registry.GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
-	assert.Equal("cr.dtsx.io/dse-mgmtapi-6_8:6.8.44", path)
+	assert.Equal("docker.io/dse-mgmtapi-6_8:6.8.44", path)
 }
 
 func TestImageConfigByteParsing(t *testing.T) {

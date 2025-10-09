@@ -104,6 +104,25 @@ func TestImage_ApplyOverrides(t *testing.T) {
 				PullSecret: "my-secret",
 			},
 		},
+		{
+			name: "digest override",
+			original: &Image{
+				Registry:   "docker.io",
+				Repository: "library",
+				Name:       "cassandra",
+				Tag:        "4.0.0",
+			},
+			overrides: &Image{
+				Digest: "sha256:a94a8fe5ccb19ba61c4c0873d391e987982fbbd3f6ce540cc88fb1cf6fbb4e26",
+			},
+			expected: &Image{
+				Registry:   "docker.io",
+				Repository: "library",
+				Name:       "cassandra",
+				Tag:        "4.0.0",
+				Digest:     "sha256:a94a8fe5ccb19ba61c4c0873d391e987982fbbd3f6ce540cc88fb1cf6fbb4e26",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -164,6 +183,25 @@ func TestImage_String(t *testing.T) {
 				Name:       "cassandra",
 			},
 			expected: "docker.io/library/cassandra:",
+		},
+		{
+			name: "tag is digest",
+			image: Image{
+				Registry:   "docker.io",
+				Repository: "library",
+				Name:       "cassandra",
+				Tag:        "sha256:a94a8fe5ccb19ba61c4c0873d391e987982fbbd3f6ce540cc88fb1cf6fbb4e26",
+			},
+			expected: "docker.io/library/cassandra@sha256:a94a8fe5ccb19ba61c4c0873d391e987982fbbd3f6ce540cc88fb1cf6fbb4e26",
+		},
+		{
+			name: "digest field takes precedence",
+			image: Image{
+				Name:   "cassandra",
+				Tag:    "4.0.0",
+				Digest: "sha256:2d711642b726b04401627ca9fbac32f5da7d61d74a0f5120e7131095d5f14f3f",
+			},
+			expected: "cassandra@sha256:2d711642b726b04401627ca9fbac32f5da7d61d74a0f5120e7131095d5f14f3f",
 		},
 	}
 

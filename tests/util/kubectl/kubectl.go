@@ -344,7 +344,7 @@ func DumpClusterInfo(path string, namespace string) {
 	dumpCmd.ExecVPanic()
 
 	// Dump all objects that we need to investigate failures as a flat list and as yaml manifests
-	for _, objectType := range []string{"statefulsets", "pvc", "pv", "pods", "CassandraDatacenter", "CassandraTask"} {
+	for _, objectType := range []string{"statefulsets", "pvc", "pv", "pods", "CassandraDatacenter", "CassandraTask", "jobs"} {
 		// Get the list of objects
 		output, _ := Get(objectType, "-o", "wide", "-n", namespace).Output()
 		storeOutput(path, objectType, "out", output)

@@ -6,6 +6,10 @@ spec:
   backoffLimit: 0
   template:
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       restartPolicy: Never
       containers:
         - name: cassandra-easy-stress
@@ -17,3 +21,12 @@ spec:
             - 100M
             - --host
             - cluster1-dc1-all-pods-service
+          securityContext:
+            runAsNonRoot: true
+            runAsGroup: 65534
+            runAsUser: 65534
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - "ALL"

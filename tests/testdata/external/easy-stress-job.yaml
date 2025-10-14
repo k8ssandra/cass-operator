@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cassandra-easy-stress
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      restartPolicy: Never
+      containers:
+        - name: cassandra-easy-stress
+          image: docker.io/michaelburman290/cassandra-easy-stress:latest
+          args:
+            - run
+            - BasicTimeSeries
+            - -i
+            - 1B
+            - --host
+            - cluster1-dc1-all-pods-service
+          securityContext:
+            runAsNonRoot: true
+            runAsGroup: 65534
+            runAsUser: 65534
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - "ALL"

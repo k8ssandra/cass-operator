@@ -18,13 +18,15 @@ import (
 )
 
 var (
-	testName   = "Scale down datacenter"
-	namespace  = "test-scale-down"
-	dcName     = "dc1"
-	dcYaml     = "../testdata/default-three-rack-four-node-dc.yaml"
-	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
-	ns         = ginkgo_util.NewWrapper(testName, namespace)
+	testName          = "Scale down datacenter"
+	namespace         = "test-scale-down"
+	dcName            = "dc1"
+	dcYaml            = "../testdata/default-three-rack-three-node-dc.yaml"
+	easyStressJobYaml = "../testdata/external/easy-stress-job.yaml"
+	easyStressJobName = "cassandra-easy-stress"
+	dcResource        = fmt.Sprintf("CassandraDatacenter/%s", dcName)
+	dcLabel           = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
+	ns                = ginkgo_util.NewWrapper(testName, namespace)
 )
 
 func TestLifecycle(t *testing.T) {
@@ -56,7 +58,7 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForOperatorReady()
 
-			step := "creating a datacenter resource with 3 racks/4 nodes"
+			step := "creating a datacenter resource with 3 racks/3 nodes"
 			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -65,8 +67,32 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReady(dcName)
 
+			step = "run easy-stress job"
+			k = kubectl.ApplyFiles(easyStressJobYaml)
+			ns.ExecAndLog(step, k)
+
+			step = "wait for easy-stress job completion"
+			jobStatusJSON := "jsonpath={.status.conditions[?(@.type=='Complete')].status}"
+			k = kubectl.Get("job", easyStressJobName).FormatOutput(jobStatusJSON)
+			ns.WaitForOutputAndLog(step, k, "True", 1800)
+
+			step = "cleanup easy-stress job"
+			k = kubectl.Delete("job", easyStressJobName)
+			ns.ExecAndLog(step, k)
+
+			step = "scale up to 4 nodes"
+			json := "{\"spec\": {\"size\": 4}}"
+			k = kubectl.PatchMerge(dcResource, json)
+			ns.ExecAndLog(step, k)
+
+			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionTrue))
+
+			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
+			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
+			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 360)
+
 			step = "scale down to 3 nodes"
-			json := "{\"spec\": {\"size\": 3}}"
+			json = "{\"spec\": {\"size\": 3}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
@@ -104,6 +130,9 @@ var _ = Describe(testName, func() {
 			json = "jsonpath={.status.nodeStatuses['cluster1-dc1-r1-sts-1']}"
 			k = kubectl.Get("CassandraDatacenter", dcName).FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "", 30)
+
+			nodeInfos := ns.RetrieveStatusFromNodetool("cluster1-dc1-r1-sts-0")
+			Expect(nodeInfos).To(HaveLen(3), "Expect nodetool to return info on exactly 3 nodes")
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)

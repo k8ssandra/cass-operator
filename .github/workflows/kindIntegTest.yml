@@ -54,190 +54,190 @@ jobs:
           name: system-logger
           path: /tmp/k8ssandra-system-logger.tar
   # This job is only for tests that don't run or don't pass against 4.0 yet
-  # kind_311_tests:
-  #   needs: build_docker_images
-  #   strategy:
-  #     matrix:
-  #       integration_test:
-  #         - scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     CGO_ENABLED: 0
-  #     M_INTEG_DIR: ${{ matrix.integration_test }}
-  #     M_SERVER_VERSION: 3.11.17
-  #     M_SERVER_TYPE: cassandra
-  #     M_SERVER_IMAGE: docker.io/k8ssandra/cass-management-api:3.11.17-ubi8
-  #     SKIP_GATEKEEPER: true
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       if: github.event_name == 'pull_request'
-  #       with:
-  #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
-  #       if: github.event_name != 'pull_request'
-  #     - uses: ./.github/actions/run-integ-test
-  #       with:
-  #         integration_test: ${{ matrix.integration_test }}
-  #     - name: Archive k8s logs
-  #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: k8s-logs-${{ matrix.integration_test }}
-  #         path: ./build/kubectl_dump
-  # # # This job is only for tests that don't run or don't pass against 4.1 yet
-  # kind_40_tests:
-  #   needs: build_docker_images
-  #   strategy:
-  #     matrix:
-  #       version:
-  #         - "4.0.17"
-  #       integration_test:
-  #         - cdc_successful # OSS only
-  #         - config_fql
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     CGO_ENABLED: 0
-  #     M_INTEG_DIR: ${{ matrix.integration_test }}
-  #     SKIP_GATEKEEPER: true
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       if: github.event_name == 'pull_request'
-  #       with:
-  #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
-  #       if: github.event_name != 'pull_request'
-  #     - uses: ./.github/actions/run-integ-test
-  #       with:
-  #         integration_test: ${{ matrix.integration_test }}
-  #     - name: Archive k8s logs
-  #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: k8s-logs-${{ matrix.integration_test }}
-  #         path: ./build/kubectl_dump
-  # kind_dse_tests:
-  #   needs: build_docker_images
-  #   strategy:
-  #     matrix:
-  #       version:
-  #         - "6.8.54"
-  #       integration_test:
-  #         - cdc_successful
-  #       include:
-  #         - version: 6.8.54
-  #           serverType: dse
-  #           integration_test: "cdc_successful"
-  #     fail-fast: true
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     CGO_ENABLED: 0
-  #     M_INTEG_DIR: ${{ matrix.integration_test }}
-  #     M_SERVER_VERSION: ${{ matrix.version }}
-  #     M_SERVER_IMAGE: ${{ matrix.serverImage }}
-  #     M_SERVER_TYPE: ${{ matrix.serverType }}
-  #     SKIP_GATEKEEPER: true
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       if: github.event_name == 'pull_request'
-  #       with:
-  #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
-  #       if: github.event_name != 'pull_request'
-  #     - uses: ./.github/actions/run-integ-test
-  #       with:
-  #         integration_test: ${{ matrix.integration_test }}
-  #     - name: Archive k8s logs
-  #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: k8s-logs-smoke_test-${{ matrix.version }}
-  #         path: ./build/kubectl_dump
+  kind_311_tests:
+    needs: build_docker_images
+    strategy:
+      matrix:
+        integration_test:
+          - scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE 6.8, fix in https://github.com/k8ssandra/cass-operator/issues/459
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: 3.11.17
+      M_SERVER_TYPE: cassandra
+      M_SERVER_IMAGE: docker.io/k8ssandra/cass-management-api:3.11.17-ubi8
+      SKIP_GATEKEEPER: true
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+      - uses: ./.github/actions/run-integ-test
+        with:
+          integration_test: ${{ matrix.integration_test }}
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-logs-${{ matrix.integration_test }}
+          path: ./build/kubectl_dump
+  # # This job is only for tests that don't run or don't pass against 4.1 yet
+  kind_40_tests:
+    needs: build_docker_images
+    strategy:
+      matrix:
+        version:
+          - "4.0.17"
+        integration_test:
+          - cdc_successful # OSS only
+          - config_fql
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      SKIP_GATEKEEPER: true
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+      - uses: ./.github/actions/run-integ-test
+        with:
+          integration_test: ${{ matrix.integration_test }}
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-logs-${{ matrix.integration_test }}
+          path: ./build/kubectl_dump
+  kind_dse_tests:
+    needs: build_docker_images
+    strategy:
+      matrix:
+        version:
+          - "6.8.54"
+        integration_test:
+          - cdc_successful
+        include:
+          - version: 6.8.54
+            serverType: dse
+            integration_test: "cdc_successful"
+      fail-fast: true
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: ${{ matrix.version }}
+      M_SERVER_IMAGE: ${{ matrix.serverImage }}
+      M_SERVER_TYPE: ${{ matrix.serverType }}
+      SKIP_GATEKEEPER: true
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+      - uses: ./.github/actions/run-integ-test
+        with:
+          integration_test: ${{ matrix.integration_test }}
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-logs-smoke_test-${{ matrix.version }}
+          path: ./build/kubectl_dump
 
-  # kind_int_no_gatekeeper_tests:
-  #   needs: build_docker_images
-  #   strategy:
-  #     matrix:
-  #       version:
-  #         - "5.0.3"
-  #       integration_test:
-  #         - canary_upgrade
-  #         - podspec_simple
-  #         - upgrade_operator
-  #     fail-fast: false
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     CGO_ENABLED: 0
-  #     M_INTEG_DIR: ${{ matrix.integration_test }}
-  #     M_SERVER_VERSION: ${{ matrix.version }}
-  #     SKIP_GATEKEEPER: true
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       if: github.event_name == 'pull_request'
-  #       with:
-  #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
-  #       if: github.event_name != 'pull_request'
-  #     - uses: ./.github/actions/run-integ-test
-  #       with:
-  #         integration_test: ${{ matrix.integration_test }}
-  #     - name: Archive k8s logs
-  #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
-  #         path: ./build/kubectl_dump
+  kind_int_no_gatekeeper_tests:
+    needs: build_docker_images
+    strategy:
+      matrix:
+        version:
+          - "5.0.3"
+        integration_test:
+          - canary_upgrade
+          - podspec_simple
+          - upgrade_operator
+      fail-fast: false
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: ${{ matrix.version }}
+      SKIP_GATEKEEPER: true
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+      - uses: ./.github/actions/run-integ-test
+        with:
+          integration_test: ${{ matrix.integration_test }}
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
+          path: ./build/kubectl_dump
   kind_int_tests:
     needs: build_docker_images
     strategy:
       matrix:
         version:
-          - "5.0.4"
+          - "5.0.3"
         integration_test:
           # Single worker tests:
-          # - additional_serviceoptions
-          # - scheduled_task
-          # - additional_volumes
-          # # - delete_node_terminated_container # This does not test any operator behavior
-          # # - podspec_simple
-          # # - terminate
-          # # - timeout_prestop_termination
-          # # - upgrade_operator # See kind_311_tests job, Only works for 3.11 right now
-          # - webhook_validation
-          # # Three worker tests:
-          # # - canary_upgrade
-          # - config_change_condition
-          # #- cdc_successful # OSS only
-          # # - delete_node_lost_readiness # DSE specific behavior
-          # - host_network
-          # - internode-encryption-generated
-          # #- no_infinite_reconcile # smoke_test_* should take care of this
-          # - node_replace
-          # - nodeport_service
-          # - rolling_restart
-          # - rolling_restart_with_override
-          # # - stop_resume
-          # - superuser-secret-generated
-          # - superuser-secret-provided
-          # - test_bad_config_and_fix
-          # - test_mtls_mgmt_api
-          # # - upgrade_operator
-          # # More than 3 workers tests:
-          # - add_racks
-          # - additional_seeds
-          # - cluster_wide_install
-          # - config_change
-          # - config_secret
+          - additional_serviceoptions
+          - scheduled_task
+          - additional_volumes
+          # - delete_node_terminated_container # This does not test any operator behavior
+          # - podspec_simple
+          # - terminate
+          # - timeout_prestop_termination
+          # - upgrade_operator # See kind_311_tests job, Only works for 3.11 right now
+          - webhook_validation
+          # Three worker tests:
+          # - canary_upgrade
+          - config_change_condition
+          #- cdc_successful # OSS only
+          # - delete_node_lost_readiness # DSE specific behavior
+          - host_network
+          - internode-encryption-generated
+          #- no_infinite_reconcile # smoke_test_* should take care of this
+          - node_replace
+          - nodeport_service
+          - rolling_restart
+          - rolling_restart_with_override
+          # - stop_resume
+          - superuser-secret-generated
+          - superuser-secret-provided
+          - test_bad_config_and_fix
+          - test_mtls_mgmt_api
+          # - upgrade_operator
+          # More than 3 workers tests:
+          - add_racks
+          - additional_seeds
+          - cluster_wide_install
+          - config_change
+          - config_secret
           # - multi_cluster_management
           #- oss_test_all_the_things # This is now the smoke test, see kind_smoke_tests job
           - scale_down
           # - scale_down_not_enough_space # Not enough stable test
           #- scale_down_unbalanced_racks #TODO: Fails against C* 4.0 and DSE, fix in https://github.com/k8ssandra/cass-operator/issues/459
-          # - scale_up
-          # - scale_up_stop_resume
-          # - seed_selection
+          - scale_up
+          - scale_up_stop_resume
+          - seed_selection
           # - smoke_test_read_only_fs
           #- config_fql # OSS only
-          # - decommission_dc
+          - decommission_dc
         # - stop_resume_scale_up # Odd insufficient CPU issues in kind+GHA
         # let other tests continue to run
       # even if one fails
@@ -263,146 +263,146 @@ jobs:
         with:
           name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
           path: ./build/kubectl_dump
-  # kind_smoke_tests:
-  #   needs: build_docker_images
-  #   strategy:
-  #     matrix:
-  #       version:
-  #         - "4.0.17"
-  #         - "4.1.8"
-  #         - "5.0.3"
-  #         - "6.8.54"
-  #         - "6.9.7"
-  #         # - "5.1.0"
-  #       integration_test:
-  #         - test_all_the_things
-  #         - smoke_test_read_only_fs
-  #       include:
-  #         - version: 6.8.54
-  #           serverType: dse
-  #         - version: 6.9.7
-  #           serverType: dse
-  #         # - version: 5.1.0
-  #         #   serverImage: ghcr.io/k8ssandra/cass-management-api:5.1-nightly-latest
-  #         - version: 4.0.17
-  #           skipGatekeeper: true
-  #       exclude:
-  #         - version: 4.0.17
-  #           integration_test: "smoke_test_read_only_fs"
-  #     fail-fast: true
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     CGO_ENABLED: 0
-  #     M_INTEG_DIR: ${{ matrix.integration_test }}
-  #     M_SERVER_VERSION: ${{ matrix.version }}
-  #     M_SERVER_IMAGE: ${{ matrix.serverImage }}
-  #     M_SERVER_TYPE: ${{ matrix.serverType }}
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       if: github.event_name == 'pull_request'
-  #       with:
-  #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
-  #       if: github.event_name != 'pull_request'
-  #     - name: Set SKIP_GATEKEEPER
-  #       if: ${{ matrix.skipGatekeeper }}
-  #       run: echo "SKIP_GATEKEEPER=true" >> $GITHUB_ENV
-  #     - uses: ./.github/actions/run-integ-test
-  #       with:
-  #         integration_test: ${{ matrix.integration_test }}
-  #     - name: Archive k8s logs
-  #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: k8s-logs-smoke_test-${{ matrix.version }}
-  #         path: ./build/kubectl_dump
-  # kind_topolvm_tests:
-  #   name: TopoLVM kind installation with volumeExpansion
-  #   needs: build_docker_images
-  #   strategy:
-  #     matrix:
-  #       version:
-  #         - "5.0.3"
-  #       integration_test:
-  #         - pvc_expansion
-  #     fail-fast: true
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     CGO_ENABLED: 0
-  #     M_INTEG_DIR: ${{ matrix.integration_test }}
-  #     M_SERVER_VERSION: ${{ matrix.version }}
-  #   steps:
-  #     - name: Install necessary tools for LVM setup
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y lvm2 xfsprogs thin-provisioning-tools
-  #     - name: Check out code into the Go module directory
-  #       uses: actions/checkout@v4
-  #       with:
-  #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - name: Check out code into the Go module directory
-  #       uses: actions/checkout@v4
-  #       with:
-  #         repository: topolvm/topolvm
-  #         path: topolvm
-  #         ref: topolvm-chart-v15.5.6
-  #     - name: Create LVM from TopoLVM's example setup
-  #       run: |
-  #         cd topolvm/example
-  #         mkdir -p build
-  #         mkdir -p bin
-  #         make start-lvmd
-  #         make KIND=$(type -a -P kind) launch-kind
-  #     - name: Set up Go
-  #       uses: actions/setup-go@v5
-  #       with:
-  #         go-version-file: 'go.mod'
-  #         cache: false
-  #     - name: Install TopoLVM controller
-  #       run: |
-  #         make cert-manager
-  #         helm repo add topolvm https://topolvm.github.io/topolvm
-  #         helm repo update
-  #         kubectl create namespace topolvm-system
-  #         kubectl label namespace topolvm-system topolvm.io/webhook=ignore
-  #         kubectl label namespace kube-system topolvm.io/webhook=ignore
-  #         helm install --namespace=topolvm-system topolvm topolvm/topolvm -f topolvm/example/values.yaml
-  #         kubectl wait --for=condition=available --timeout=120s -n topolvm-system deployments/topolvm-controller
-  #         kubectl wait --for=condition=ready --timeout=120s -n topolvm-system -l="app.kubernetes.io/component=controller,app.kubernetes.io/name=topolvm" pod
-  #         kubectl wait --for=condition=ready --timeout=120s -n topolvm-system certificate/topolvm-mutatingwebhook
-  #     - name: Link tools
-  #       shell: bash
-  #       run: |
-  #         mkdir bin
-  #         ln -s /usr/local/bin/kustomize bin/kustomize
-  #     - name: Download cass-operator image
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: cass-operator
-  #         path: /tmp
-  #     - name: Download system-logger image
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: system-logger
-  #         path: /tmp
-  #     - name: Load Docker images
-  #       shell: bash
-  #       id: load
-  #       run: |
-  #         echo "operator_img=$(docker load --input /tmp/k8ssandra-cass-operator.tar | cut -f 3 -d' ')" >> $GITHUB_OUTPUT
-  #         echo "logger_img=$(docker load --input /tmp/k8ssandra-system-logger.tar | cut -f 3 -d' ')" >> $GITHUB_OUTPUT
-  #     - name: Load image on the nodes of the cluster
-  #       shell: bash
-  #       run: |
-  #         kind load docker-image --name=topolvm-example ${{ steps.load.outputs.operator_img }}
-  #         kind load docker-image --name=topolvm-example ${{ steps.load.outputs.logger_img }}
-  #     - name: Run integration test
-  #       shell: bash
-  #       run: |
-  #         IMG=${{ steps.load.outputs.operator_img }} LOG_IMG=${{ steps.load.outputs.logger_img }} make integ-test
-  #     - name: Archive k8s logs
-  #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: k8s-logs-topolvm-test-${{ matrix.version }}
-  #         path: ./build/kubectl_dump
+  kind_smoke_tests:
+    needs: build_docker_images
+    strategy:
+      matrix:
+        version:
+          - "4.0.17"
+          - "4.1.8"
+          - "5.0.3"
+          - "6.8.54"
+          - "6.9.7"
+          # - "5.1.0"
+        integration_test:
+          - test_all_the_things
+          - smoke_test_read_only_fs
+        include:
+          - version: 6.8.54
+            serverType: dse
+          - version: 6.9.7
+            serverType: dse
+          # - version: 5.1.0
+          #   serverImage: ghcr.io/k8ssandra/cass-management-api:5.1-nightly-latest
+          - version: 4.0.17
+            skipGatekeeper: true
+        exclude:
+          - version: 4.0.17
+            integration_test: "smoke_test_read_only_fs"
+      fail-fast: true
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: ${{ matrix.version }}
+      M_SERVER_IMAGE: ${{ matrix.serverImage }}
+      M_SERVER_TYPE: ${{ matrix.serverType }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+      - name: Set SKIP_GATEKEEPER
+        if: ${{ matrix.skipGatekeeper }}
+        run: echo "SKIP_GATEKEEPER=true" >> $GITHUB_ENV
+      - uses: ./.github/actions/run-integ-test
+        with:
+          integration_test: ${{ matrix.integration_test }}
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-logs-smoke_test-${{ matrix.version }}
+          path: ./build/kubectl_dump
+  kind_topolvm_tests:
+    name: TopoLVM kind installation with volumeExpansion
+    needs: build_docker_images
+    strategy:
+      matrix:
+        version:
+          - "5.0.3"
+        integration_test:
+          - pvc_expansion
+      fail-fast: true
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: ${{ matrix.version }}
+    steps:
+      - name: Install necessary tools for LVM setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lvm2 xfsprogs thin-provisioning-tools
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+        with:
+          repository: topolvm/topolvm
+          path: topolvm
+          ref: topolvm-chart-v15.5.6
+      - name: Create LVM from TopoLVM's example setup
+        run: |
+          cd topolvm/example
+          mkdir -p build
+          mkdir -p bin
+          make start-lvmd
+          make KIND=$(type -a -P kind) launch-kind
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+      - name: Install TopoLVM controller
+        run: |
+          make cert-manager
+          helm repo add topolvm https://topolvm.github.io/topolvm
+          helm repo update
+          kubectl create namespace topolvm-system
+          kubectl label namespace topolvm-system topolvm.io/webhook=ignore
+          kubectl label namespace kube-system topolvm.io/webhook=ignore
+          helm install --namespace=topolvm-system topolvm topolvm/topolvm -f topolvm/example/values.yaml
+          kubectl wait --for=condition=available --timeout=120s -n topolvm-system deployments/topolvm-controller
+          kubectl wait --for=condition=ready --timeout=120s -n topolvm-system -l="app.kubernetes.io/component=controller,app.kubernetes.io/name=topolvm" pod
+          kubectl wait --for=condition=ready --timeout=120s -n topolvm-system certificate/topolvm-mutatingwebhook
+      - name: Link tools
+        shell: bash
+        run: |
+          mkdir bin
+          ln -s /usr/local/bin/kustomize bin/kustomize
+      - name: Download cass-operator image
+        uses: actions/download-artifact@v4
+        with:
+          name: cass-operator
+          path: /tmp
+      - name: Download system-logger image
+        uses: actions/download-artifact@v4
+        with:
+          name: system-logger
+          path: /tmp
+      - name: Load Docker images
+        shell: bash
+        id: load
+        run: |
+          echo "operator_img=$(docker load --input /tmp/k8ssandra-cass-operator.tar | cut -f 3 -d' ')" >> $GITHUB_OUTPUT
+          echo "logger_img=$(docker load --input /tmp/k8ssandra-system-logger.tar | cut -f 3 -d' ')" >> $GITHUB_OUTPUT
+      - name: Load image on the nodes of the cluster
+        shell: bash
+        run: |
+          kind load docker-image --name=topolvm-example ${{ steps.load.outputs.operator_img }}
+          kind load docker-image --name=topolvm-example ${{ steps.load.outputs.logger_img }}
+      - name: Run integration test
+        shell: bash
+        run: |
+          IMG=${{ steps.load.outputs.operator_img }} LOG_IMG=${{ steps.load.outputs.logger_img }} make integ-test
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-logs-topolvm-test-${{ matrix.version }}
+          path: ./build/kubectl_dump

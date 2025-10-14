@@ -132,7 +132,6 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "", 30)
 
 			nodeInfos := ns.RetrieveStatusFromNodetool("cluster1-dc1-r1-sts-0")
-			fmt.Printf("NodeInfos: %+v\n", nodeInfos)
 			Expect(nodeInfos).To(HaveLen(3), "Expect nodetool to return info on exactly 3 nodes")
 
 			step = "deleting the dc"

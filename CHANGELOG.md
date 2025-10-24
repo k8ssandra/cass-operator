@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.28.0
 
 * [FEATURE] [#838](https://github.com/k8ssandra/cass-operator/issues/838) If cass-operator is not deployed in clusterScoped mode, disable features that require such rights and continue functioning correctly otherwise. 
 * [ENHANCEMENT] [#848](https://github.com/k8ssandra/cass-operator/issues/848) Detect more error cases in the PVC resizing operation and notify the user with an event and a change in the Datacenter status.

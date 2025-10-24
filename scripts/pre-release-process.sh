@@ -42,7 +42,7 @@ sed -i '' -e "s/$PREVTAG/$TAG/g" README.md
 cd config/manager && $KUSTOMIZE edit set image controller=$IMG && cd -
 
 # Modify config/manager/image_config.yaml to have proper version for server-system-logger
-LOG_IMG=k8ssandra/system-logger:${TAG} yq eval -i '.images.system-logger = "env(LOG_IMG)"' config/manager/image_config.yaml
+LOG_IMG=k8ssandra/system-logger:${TAG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 yq eval -i '.images.system-logger.tag = "'$TAG'"' config/imageconfig/image_config.yaml
 yq eval -i "del(.images.system-logger.registry)" config/imageconfig/image_config.yaml
 yq eval -i 'del(.types.cassandra.registry)' config/imageconfig/image_config.yaml

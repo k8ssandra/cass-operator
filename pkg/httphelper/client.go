@@ -377,7 +377,6 @@ type User struct {
 func parseListRoles(body []byte) ([]User, error) {
 	var users []User
 	if err := json.Unmarshal(body, &users); err != nil {
-		fmt.Printf("Received an error: %v\n", err)
 		return nil, err
 	}
 	return users, nil

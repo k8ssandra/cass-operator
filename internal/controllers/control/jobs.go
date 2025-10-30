@@ -67,6 +67,8 @@ func (r *CassandraTaskReconciler) restartSts(taskConfig *TaskConfiguration, sts 
 		return sts[i].Name < sts[j].Name
 	})
 
+	logger := log.FromContext(taskConfig.Context)
+
 	restartTime := taskConfig.TaskStartTime.Format(time.RFC3339)
 
 	if taskConfig.Arguments.RackName != "" {
@@ -86,7 +88,6 @@ func (r *CassandraTaskReconciler) restartSts(taskConfig *TaskConfiguration, sts 
 		}
 		if st.Spec.Template.Annotations[api.RestartedAtAnnotation] == restartTime {
 			// This one has been called to restart already - is it ready?
-
 			status := st.Status
 			if status.CurrentRevision == status.UpdateRevision &&
 				status.UpdatedReplicas == status.Replicas &&
@@ -104,9 +105,42 @@ func (r *CassandraTaskReconciler) restartSts(taskConfig *TaskConfiguration, sts 
 			// This is still restarting
 			return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
 		}
+
 		st.Spec.Template.Annotations[api.RestartedAtAnnotation] = restartTime
 		if err := r.Update(taskConfig.Context, &st); err != nil {
 			return ctrl.Result{}, err
+		}
+
+		if taskConfig.Arguments.Fast {
+			force := taskConfig.Arguments.Force
+			for _, stToCheck := range sts {
+				status := stToCheck.Status
+				if stToCheck.Name != st.Name {
+					// If any other rack has pods down, we cannot continue with this fast path
+					if !force && int(status.Replicas-status.ReadyReplicas) > 0 {
+						logger.Info("Cannot continue with rack-at-once restart since another rack has pods down", "statefulset", stToCheck.Name)
+						return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
+					}
+					continue
+				}
+			}
+
+			// Fetch the pods of the StatefulSet and delete all of them at once
+			metav1.SetMetaDataAnnotation(&st.Spec.Template.ObjectMeta, api.RestartedAtAnnotation, restartTime)
+			if err := r.Update(taskConfig.Context, &st); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			pods, err := r.getStatefulSetPods(taskConfig.Context, taskConfig.Datacenter, &st)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			for _, pod := range pods {
+				if err := r.Delete(taskConfig.Context, &pod); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
 		}
 
 		return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil

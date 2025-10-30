@@ -665,6 +665,10 @@ var _ = Describe("CassandraTask controller tests", func() {
 				mockServer.Start()
 				By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
 			})
+			AfterEach(func() {
+				mockServer.Close()
+				deleteDatacenter(testNamespaceName)
+			})
 			It("Runs a ts reload task against a pod", func() {
 				By("Creating a task for tsreload")
 				taskKey, task := buildTask(api.CommandTSReload, testNamespaceName)
@@ -732,11 +736,20 @@ var _ = Describe("CassandraTask controller tests", func() {
 	Describe("Execute jobs against all StatefulSets", func() {
 		var testNamespaceName string
 		BeforeEach(func() {
+			By("Creating a fake mgmt-api server")
+			var err error
+			callDetails = httphelper.NewCallDetails()
+			mockServer, err = httphelper.FakeExecutorServerWithDetails(callDetails)
+			Expect(err).ToNot(HaveOccurred())
+			mockServer.Start()
+			JobRunningRequeue = 1 * time.Millisecond
+			TaskRunningRequeue = 1 * time.Millisecond
 			testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
 			By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
 		})
 
 		AfterEach(func() {
+			mockServer.Close()
 			deleteDatacenter(testNamespaceName)
 		})
 
@@ -833,11 +846,81 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				_ = waitForTaskCompletion(taskKey)
 			})
+			It("Restarts datacenter fast path", func() {
+				var stsAll appsv1.StatefulSetList
+				Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
+				Expect(stsAll.Items).To(HaveLen(rackCount))
+
+				podList := &corev1.PodList{}
+				Expect(k8sClient.List(context.TODO(), podList, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
+
+				// Create task to restart all
+				taskKey, task := buildTask(api.CommandRestart, testNamespaceName)
+				task.Spec.Jobs[0].Arguments.Fast = true
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+				Eventually(func() bool {
+					Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
+
+					inflight := 0
+
+					for _, sts := range stsAll.Items {
+						if _, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]; found {
+							if sts.Status.UpdateRevision == "" {
+								inflight++
+							}
+						}
+					}
+
+					Expect(inflight).To(BeNumerically("<=", 1))
+
+					for _, sts := range stsAll.Items {
+						if _, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]; found {
+							// Imitate statefulset_controller
+							stsPods := &corev1.PodList{}
+							Expect(k8sClient.List(context.TODO(), stsPods, client.InNamespace(testNamespaceName), client.MatchingLabels(sts.Spec.Selector.MatchLabels))).To(Succeed())
+							if len(stsPods.Items) == 0 {
+								// Recreate the pods
+								for i := 0; i < int(*sts.Spec.Replicas); i++ {
+									createPod(testNamespaceName, sts.Spec.Template.Labels[cassdcapi.ClusterLabel], sts.Spec.Template.Labels[cassdcapi.DatacenterLabel], sts.Spec.Template.Labels[cassdcapi.RackLabel], i)
+									// Read the Pod, update it with the annotation, and update it
+									pod := &corev1.Pod{}
+									podKey := types.NamespacedName{
+										Name:      fmt.Sprintf("%s-%d", sts.Name, i),
+										Namespace: testNamespaceName,
+									}
+									Expect(k8sClient.Get(context.TODO(), podKey, pod)).To(Succeed())
+									metav1.SetMetaDataAnnotation(&pod.ObjectMeta, api.RestartedAtAnnotation, time.Now().Format(time.RFC3339))
+									Expect(k8sClient.Update(context.TODO(), pod)).To(Succeed())
+								}
+							}
+
+							if sts.Status.UpdateRevision != "1" {
+								sts.Status.UpdatedReplicas = sts.Status.Replicas
+								sts.Status.ReadyReplicas = sts.Status.Replicas
+								sts.Status.CurrentReplicas = sts.Status.Replicas
+								sts.Status.UpdateRevision = "1"
+								sts.Status.CurrentRevision = sts.Status.UpdateRevision
+								sts.Status.ObservedGeneration = sts.GetObjectMeta().GetGeneration()
+
+								Expect(k8sClient.Status().Update(context.TODO(), &sts)).Should(Succeed())
+							}
+						} else if !found {
+							return false
+						}
+					}
+					return true
+				}, "5s", "50ms").Should(BeTrue())
+
+				_ = waitForTaskCompletion(taskKey)
+			})
 		})
 	})
 	Describe("Execute jobs against Datacenters", func() {
 		var testNamespaceName string
 		BeforeEach(func() {
+			JobRunningRequeue = 1 * time.Millisecond
+			TaskRunningRequeue = 1 * time.Millisecond
 			testNamespaceName = fmt.Sprintf("test-task-%d", rand.Int31())
 			By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
 		})

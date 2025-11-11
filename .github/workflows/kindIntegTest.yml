@@ -90,7 +90,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.17"
+          - "4.0.18"
         integration_test:
           - cdc_successful # OSS only
           - config_fql
@@ -158,7 +158,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "5.0.3"
+          - "5.0.5"
         integration_test:
           - canary_upgrade
           - podspec_simple
@@ -191,7 +191,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "5.0.3"
+          - "5.0.5"
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
@@ -268,9 +268,9 @@ jobs:
     strategy:
       matrix:
         version:
-          - "4.0.17"
-          - "4.1.8"
-          - "5.0.3"
+          - "4.0.18"
+          - "4.1.9"
+          - "5.0.5"
           - "6.8.54"
           - "6.9.7"
           # - "5.1.0"
@@ -310,6 +310,39 @@ jobs:
       - uses: ./.github/actions/run-integ-test
         with:
           integration_test: ${{ matrix.integration_test }}
+      - name: Archive k8s logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-logs-smoke_test-${{ matrix.version }}
+          path: ./build/kubectl_dump
+  kind_smoke_ipv6_tests:
+    needs: build_docker_images
+    strategy:
+      matrix:
+        version:
+          - "5.0.5"
+        integration_test:
+          - test_all_the_things
+      fail-fast: true
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_INTEG_DIR: ${{ matrix.integration_test }}
+      M_SERVER_VERSION: ${{ matrix.version }}
+      M_SERVER_IMAGE: ${{ matrix.serverImage }}
+      M_SERVER_TYPE: ${{ matrix.serverType }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+      - uses: ./.github/actions/run-integ-test
+        with:
+          integration_test: ${{ matrix.integration_test }}
+          networking: ipv6
       - name: Archive k8s logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4

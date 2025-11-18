@@ -12,6 +12,9 @@ inputs:
   serverImage:
     description: "Override server image used in the test file"
     required: false
+  networking:
+    description: "Set networking mode for kind cluster (default: ipv4)"
+    required: false
 
 runs:
   using: "composite"
@@ -36,7 +39,7 @@ runs:
     - name: Create kind cluster
       shell: bash
       run: |
-        hack/cluster.sh
+        hack/cluster.sh ${{ inputs.networking }}
     - name: Install gatekeeper rules
       if: ${{ !env.SKIP_GATEKEEPER }}
       shell: bash

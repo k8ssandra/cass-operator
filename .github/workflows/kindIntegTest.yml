@@ -284,10 +284,10 @@ jobs:
             serverType: dse
           # - version: 5.1.0
           #   serverImage: ghcr.io/k8ssandra/cass-management-api:5.1-nightly-latest
-          - version: 4.0.17
+          - version: 4.0.18
             skipGatekeeper: true
         exclude:
-          - version: 4.0.17
+          - version: 4.0.18
             integration_test: "smoke_test_read_only_fs"
       fail-fast: true
     runs-on: ubuntu-latest
@@ -347,7 +347,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: k8s-logs-smoke_test-${{ matrix.version }}
+          name: k8s-logs-smoke_test_ipv6-${{ matrix.version }}
           path: ./build/kubectl_dump
   kind_topolvm_tests:
     name: TopoLVM kind installation with volumeExpansion

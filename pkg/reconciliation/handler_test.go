@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -126,7 +125,12 @@ func TestProcessDeletion_FailedDelete(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			_, ok := args.Get(1).(*corev1.PodList)
 			if ok {
-				if strings.HasPrefix(args.Get(2).(*client.ListOptions).FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
+				opts := listOptionsFromArg(args.Get(2))
+				if opts == nil {
+					t.Fail()
+					return
+				}
+				if strings.HasPrefix(opts.FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
 					arg := args.Get(1).(*corev1.PodList)
 					arg.Items = []corev1.Pod{}
 				} else {
@@ -179,7 +183,12 @@ func TestProcessDeletion(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			_, ok := args.Get(1).(*corev1.PodList)
 			if ok {
-				if strings.HasPrefix(args.Get(2).(*client.ListOptions).FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
+				opts := listOptionsFromArg(args.Get(2))
+				if opts == nil {
+					t.Fail()
+					return
+				}
+				if strings.HasPrefix(opts.FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
 					arg := args.Get(1).(*corev1.PodList)
 					arg.Items = []corev1.Pod{}
 				} else {

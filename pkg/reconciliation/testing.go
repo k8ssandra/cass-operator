@@ -294,12 +294,30 @@ func k8sMockClientList(mockClient *mocks.Client, returnArg interface{}) *mock.Ca
 			func(obj runtime.Object) bool {
 				return obj != nil
 			}),
-		mock.MatchedBy(
-			func(opts *client.ListOptions) bool {
-				return opts != nil
-			})).
+		mock.MatchedBy(matchListOptionsArg)).
 		Return(returnArg).
 		Once()
+}
+
+func matchListOptionsArg(arg interface{}) bool {
+	return listOptionsFromArg(arg) != nil
+}
+
+func listOptionsFromArg(arg interface{}) *client.ListOptions {
+	switch v := arg.(type) {
+	case *client.ListOptions:
+		return v
+	case []client.ListOption:
+		opts := &client.ListOptions{}
+		for _, opt := range v {
+			if opt != nil {
+				opt.ApplyToList(opts)
+			}
+		}
+		return opts
+	default:
+		return nil
+	}
 }
 
 func setupScheme(scheme *runtime.Scheme) *runtime.Scheme {

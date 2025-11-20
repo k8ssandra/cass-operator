@@ -1,0 +1,53 @@
+# Example CassandraTask showing all fields and available commands/arguments.
+# API group: control.k8ssandra.io/v1alpha1
+---
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: CassandraTask
+metadata:
+  name: example-task
+  namespace: cass-operator
+spec:
+  # Datacenter this task targets (must be reachable by this operator).
+  datacenter:
+    name: example-dc
+    namespace: cass-operator
+  # Run the task no earlier than this time (omit to start immediately).
+  scheduledTime: "2024-06-01T12:00:00Z"
+  # Restart policy for the Job pods spawned by this task (Never | OnFailure).
+  restartPolicy: Never
+  # Cleanup TTL in seconds after task completion (0 disables auto-cleanup).
+  ttlSecondsAfterFinished: 86400
+  # Concurrency policy for tasks running against the same cluster (Allow | Forbid).
+  concurrencyPolicy: Forbid
+  # Only a single job is accepted at this point.
+  jobs:
+    - name: cleanup-rack1
+      # Available commands: cleanup, rebuild, restart, upgradesstables, replacenode,
+      # compact, scrub, move, garbagecollect, flush, refresh, tsreload
+      command: cleanup
+      args:
+        keyspace_name: inventory
+        # Rack is optional. If omitted, all racks are processed.
+        rack: rack1
+        # Tables are optional. If omitted, all tables in the keyspace are processed.
+        tables:
+          - orders
+          - stock
+        # How many compaction threads to use in Cassandra for the operation. Default is all available.
+        jobs: 4
+        # Optional scrub flags (apply only to scrub).
+        no_validate: false
+        no_snapshot: false
+        skip_corrupted: false
+        # Optional compaction flags (apply only to compaction).
+        split_output: false
+        start_token: ""
+        end_token: ""
+        # Parameter for the rebuild command where to stream the source data from
+        source_datacenter: dc2
+        # Pod name to replace (or otherwise a single pod to target for the operation)
+        pod_name: demo-cluster-example-dc-rack1-sts-0
+        # Move command with new token assignments
+        new_tokens:
+          demo-cluster-example-dc-rack2-sts-0: "123"
+          demo-cluster-example-dc-rack2-sts-1: "456"

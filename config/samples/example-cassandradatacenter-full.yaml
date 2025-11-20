@@ -1,0 +1,227 @@
+# Example CassandraDatacenter manifest with most fields shown and annotated.
+# API group: cassandra.datastax.com/v1beta1
+---
+apiVersion: cassandra.datastax.com/v1beta1
+kind: CassandraDatacenter
+metadata:
+  name: example-dc
+  namespace: cass-operator
+  annotations:
+    # Skip creating built-in Cassandra users (useful when joining an existing cluster).
+    cassandra.datastax.com/skip-user-creation: "false"
+    # Proceed with decommission of nodes on delete in multi-datacenter clusters.
+    cassandra.datastax.com/decommission-on-delete: "false"
+    # Prevent cass-operator from re-adding its finalizer if removed.
+    cassandra.datastax.com/no-finalizer: "false"
+    # Prevent automatic cleanup tasks after scale up.
+    cassandra.datastax.com/no-cleanup: "false"
+    # Permit StatefulSet spec updates without spec changes ("once" or "always"). This can happen when operator is upgraded.
+    cassandra.datastax.com/autoupdate-spec: "once"
+    # Allow starting multiple already-bootstrapped nodes in parallel. Default is true.
+    cassandra.datastax.com/allow-parallel-starts: "false"
+    # Allow storage changes to existing data PVCs. This includes PVC expansion in StatefulSets.
+    cassandra.datastax.com/allow-storage-changes: "false"
+    # Force use of the new config builder on DSE/Cassandra <= 4.1
+    cassandra.datastax.com/use-new-config-builder: "false"
+    # Track cleanup tasks after scale up before further operations proceed.
+    cassandra.datastax.com/track-cleanup-tasks: "true"
+    # Delete PVCs on datacenter deletion (set to false to retain). Default is true.
+    cassandra.datastax.com/delete-pvc: "true"
+    # Disable PDB creation for this datacenter.
+    cassandra.datastax.com/disable-pdb-creation: "false"
+spec:
+  # Desired number of Cassandra nodes.
+  size: 9
+  # Cassandra/DSE/HCD server version
+  serverVersion: "5.0.2"
+  # Optional: explicit server image override; ImageConfig is preferred. Note, setting this disables readOnlyRootFilesystem by default.
+  serverImage: "k8ssandra/cass-management-api:5.0.6"
+  # Server type: cassandra | dse | hcd.
+  serverType: cassandra
+  # Inline configuration (YAML). ConfigSecret takes precedence if both are set.
+  config:
+    jvm-server-options:
+      initial_heap_size: "512m"
+      max_heap_size: "512m"
+    cassandra-yaml:
+      num_tokens: 16
+      authenticator: PasswordAuthenticator
+      authorizer: CassandraAuthorizer
+  # External secret holding JSON config (key: config). Overrides .spec.config.
+  configSecret: cassandra-config-secret
+  # Management API authentication strategy.
+  managementApiAuth:
+    # Use manual TLS secrets for client/server auth.
+    manual:
+      clientSecretName: mgmt-api-client
+      serverSecretName: mgmt-api-server
+      # Skip secret content validation.
+      skipSecretValidation: false
+    # Or set insecure: {} to disable auth (default).
+    # insecure: {}
+  # Node affinity shared by all racks.
+  nodeAffinityLabels:
+    topology.kubernetes.io/zone: zone-a
+  # Pod resource requests/limits for cassandra containers.
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+    limits:
+      cpu: "4"
+      memory: 16Gi
+  # Resource requests/limits for the system logger sidecar.
+  systemLoggerResources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  # Resource requests/limits for the config-builder init container.
+  configBuilderResources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  # Rack topology. Defaults to a single rack named "default" if empty.
+  racks:
+    - name: rack1
+      nodeAffinityLabels:
+        topology.kubernetes.io/zone: zone-a
+      # Optional: custom affinity merged with defaults.
+      affinity:
+        # Full corev1.Affinity can be supplied here.
+        # nodeAffinity:
+        #   requiredDuringSchedulingIgnoredDuringExecution: {}
+        # podAntiAffinity:
+        #   requiredDuringSchedulingIgnoredDuringExecution: []
+        # podAffinity:
+        #   preferredDuringSchedulingIgnoredDuringExecution: []
+        {}
+    - name: rack2
+      nodeAffinityLabels:
+        topology.kubernetes.io/zone: zone-b
+    - name: rack3
+      nodeAffinityLabels:
+        topology.kubernetes.io/zone: zone-c
+  # Persistent storage for Cassandra data plus optional additional volumes.
+  storageConfig:
+    cassandraDataVolumeClaimSpec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 500Gi
+      storageClassName: fast-disks
+    additionalVolumes:
+      - name: metrics-config
+        mountPath: /opt/management-api/configs
+        volumeSource:
+          configMap:
+            name: "my-metrics-config"
+      - name: vector-config
+        mountPath: /etc/vector
+        volumeSource:
+          configMap:
+            name: "vector-config"
+      - name: logs
+        mountPath: /var/log/cassandra
+        pvcSpec:
+          accessModes: [ "ReadWriteOnce" ]
+          resources:
+            requests:
+              storage: 100Gi
+          storageClassName: standard
+  # Cluster name shared across datacenters.
+  clusterName: demoCluster
+  # Stop all server pods while keeping other resources intact.
+  stopped: false
+  # Override config-builder image.
+  configBuilderImage: ghcr.io/k8ssandra/config-builder:v1.0.0
+  # Canary upgrade flags only first rack
+  canaryUpgrade: true
+  # Restrict the number of pods to update in the first rack
+  canaryUpgradeCount: 2
+  # Allow multiple pods per Kubernetes worker node (disables default anti-affinity).
+  allowMultipleNodesPerWorker: false
+  # Provide an existing superuser secret (otherwise operator generates one).
+  superuserSecretName: cassandra-superuser
+  # ServiceAccount to run server pods under.
+  serviceAccountName: cassandra-node
+  # Hard nodeSelector applied to all server pods.
+  nodeSelector:
+    node-type: cassandra
+  # Force specific racks to update even if cluster isn't healthy.
+  forceUpgradeRacks:
+    - rack1
+  # Enable DSE workloads when serverType == dse.
+  dseWorkloads:
+    analyticsEnabled: false
+    graphEnabled: false
+    searchEnabled: false
+  # Optional pod template override merged into generated pods.
+  podTemplateSpec:
+    # Full corev1.PodTemplateSpec goes here (metadata, spec, containers, etc).
+    metadata:
+      annotations:
+        example.com/pod-annotation: "demo"
+    spec:
+      # Add initContainers, sidecars, tolerations, etc.
+      containers:
+        - name: cassandra
+      #     lifecycle:
+      #       preStop: {}
+      # {}
+  # Bootstrap additional Cassandra users.
+  users:
+    - secretName: app-user-secret
+      superuser: false
+    - secretName: readonly-user-secret
+      superuser: false
+  # Networking options and overrides (NodePort + hostNetwork).
+  networking:
+    hostNetwork: false
+    nodePort:
+      native: 30001
+      nativeSSL: 30443
+      internode: 30002
+      internodeSSL: 30003
+  # Additional seed nodes, must be IP addresses
+  additionalSeeds:
+    - 192.168.1.100
+  # Disable system logger sidecar.
+  disableSystemLoggerSidecar: false
+  # Override system logger sidecar image.
+  systemLoggerImage: ghcr.io/k8ssandra/system-logger:latest
+  # Extra service labels/annotations for generated services.
+  additionalServiceConfig:
+    dcService:
+      additionalLabels:
+        monitor: "true"
+      additionalAnnotations:
+        external-dns.alpha.kubernetes.io/hostname: cassandra.example.com
+    seedService:
+      additionalLabels:
+        type: seed
+    allpodsService:
+      additionalAnnotations:
+        service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+    additionalSeedService:
+      additionalLabels:
+        purpose: extra-seeds
+    nodePortService:
+      additionalAnnotations:
+        service.kubernetes.io/topology-aware-hints: "auto"
+  # Pod tolerations. Note: cannot be set via podTemplateSpec.
+  tolerations:
+    - key: "node-role.kubernetes.io/storage"
+      operator: "Exists"
+      effect: "NoSchedule"
+  # Extra labels to include on all managed resources.
+  additionalLabels:
+    business-unit: analytics
+  # Extra annotations to include on all managed resources.
+  additionalAnnotations:
+    owner: data-team
+  # Override Cassandra DC name inside the cluster (metadata.name used if empty). Not recommended.
+  datacenterName: dc1
+  # Minimum ready seconds per pod before considered available.
+  minReadySeconds: 5
+  # Run Cassandra container with read-only root filesystem. Default is true for Cassandra 4.1+ and DSE, unless ServerImage is overridden.
+  readOnlyRootFilesystem: true

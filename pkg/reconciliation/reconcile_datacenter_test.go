@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
@@ -35,7 +34,12 @@ func TestDeletePVCs(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			_, ok := args.Get(1).(*corev1.PodList)
 			if ok {
-				if strings.HasPrefix(args.Get(2).(*client.ListOptions).FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
+				opts := listOptionsFromArg(args.Get(2))
+				if opts == nil {
+					t.Fail()
+					return
+				}
+				if strings.HasPrefix(opts.FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
 					arg := args.Get(1).(*corev1.PodList)
 					arg.Items = []corev1.Pod{}
 				} else {
@@ -114,7 +118,12 @@ func TestDeletePVCs_FailedToDelete(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			_, ok := args.Get(1).(*corev1.PodList)
 			if ok {
-				if strings.HasPrefix(args.Get(2).(*client.ListOptions).FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
+				opts := listOptionsFromArg(args.Get(2))
+				if opts == nil {
+					t.Fail()
+					return
+				}
+				if strings.HasPrefix(opts.FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
 					arg := args.Get(1).(*corev1.PodList)
 					arg.Items = []corev1.Pod{}
 				} else {
@@ -152,7 +161,12 @@ func TestDeletePVCs_FailedToDeleteBeingUsed(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			_, ok := args.Get(1).(*corev1.PodList)
 			if ok {
-				if strings.HasPrefix(args.Get(2).(*client.ListOptions).FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
+				opts := listOptionsFromArg(args.Get(2))
+				if opts == nil {
+					t.Fail()
+					return
+				}
+				if strings.HasPrefix(opts.FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
 					arg := args.Get(1).(*corev1.PodList)
 					arg.Items = []corev1.Pod{
 						{

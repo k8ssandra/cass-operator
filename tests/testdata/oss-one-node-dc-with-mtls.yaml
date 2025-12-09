@@ -5,7 +5,7 @@ metadata:
 spec:
   clusterName: cluster1
   serverType: cassandra
-  serverVersion: "3.11.7"
+  serverVersion: "5.0.6"
   managementApiAuth:
     manual:
       clientSecretName: mgmt-api-client-credentials
@@ -19,9 +19,23 @@ spec:
       resources:
         requests:
           storage: 1Gi
+    additionalVolumes:
+      - mountPath: /management-api-client-certs
+        name: management-api-client-certs
+        volumeSource:
+          secret:
+            secretName: mgmt-api-client-credentials
+  podTemplateSpec:
+    spec:
+      containers:
+        - name: cassandra
+        - name: server-system-logger
+          volumeMounts:
+          - mountPath: /management-api-certs
+            name: management-api-client-certs
   racks:
     - name: r1
   config:
-    jvm-options:
+    jvm-server-options:
       initial_heap_size: "512m"
       max_heap_size: "512m"

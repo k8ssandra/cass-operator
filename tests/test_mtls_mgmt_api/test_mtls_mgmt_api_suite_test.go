@@ -80,6 +80,16 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
 			ns.WaitForDatacenterReady(dcName)
 
+			// Verify the server-system-logger and cassandra container have different mount paths for certs
+			step = "verifying cert volume mount paths"
+			json = "jsonpath={.spec.containers[?(@.name=='cassandra')].volumeMounts[?(@.name=='management-api-client-certs')].mountPath}"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "/management-api-client-certs", 30)
+
+			json = "jsonpath={.spec.containers[?(@.name=='server-system-logger')].volumeMounts[?(@.name=='management-api-client-certs')].mountPath}"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "/management-api-certs", 30)
+
 			// TODO FIXME: re-enable this when the following issue is fixed:
 			// https://github.com/datastax/management-api-for-apache-cassandra/issues/42
 			// logOutput := ""

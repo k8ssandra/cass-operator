@@ -212,7 +212,7 @@ uninstall: manifests ## Uninstall CRDs from the K8s cluster specified in ~/.kube
 	kubectl delete --ignore-not-found=$(ignore-not-found) -k config/crd
 
 .PHONY: deploy
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: manifests kustomize cert-manager ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	LOG_IMG=${LOG_IMG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 	TAG=${TAG} yq eval -i '.images.system-logger.tag = env(TAG)' config/imageconfig/image_config.yaml
@@ -240,6 +240,10 @@ ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
 	kubectl delete -k tests/$(TEST_DIR)
+
+.PHONY: reload
+reload: ## Deploy new build of cass-operator in development
+	kubectl rollout restart deployment.apps/cass-operator-controller-manager -n cass-operator
 
 ##@ Tools / Dependencies
 

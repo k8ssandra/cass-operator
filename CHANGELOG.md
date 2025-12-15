@@ -9,6 +9,10 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
+* [BUGFIX] [#862](https://github.com/k8ssandra/cass-operator/issues/862) If volumeMount was provided in PodTemplateSpec and AdditionalVolumes, the latter would override the PodTemplateSpec one. This was unintentional, the PodTemplateSpec selection should be the final one.
+
 ## v1.28.0
 
 * [FEATURE] [#838](https://github.com/k8ssandra/cass-operator/issues/838) If cass-operator is not deployed in clusterScoped mode, disable features that require such rights and continue functioning correctly otherwise. 

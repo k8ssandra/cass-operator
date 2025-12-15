@@ -2423,3 +2423,62 @@ func TestReadOnlyRootFilesystemWithSecurityContext(t *testing.T) {
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 	})
 }
+
+func TestPodTemplateSpecAdditionalVolumeMount(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "pleasenobob",
+			ServerType:    "cassandra",
+			ServerVersion: "5.0.6",
+			StorageConfig: api.StorageConfig{
+				AdditionalVolumes: api.AdditionalVolumesSlice{
+					{
+						Name:      "management-api-client-certs",
+						MountPath: "/management-api-client-certs",
+						VolumeSource: &corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{
+								SecretName: "mgmt-api-client-credentials",
+							},
+						},
+					},
+				},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: CassandraContainerName,
+						},
+						{
+							Name: SystemLoggerContainerName,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/management-api-certs",
+									Name:      "management-api-client-certs",
+								},
+							},
+						},
+					},
+				},
+			},
+			ReadOnlyRootFilesystem: ptr.To(true),
+			Racks: []api.Rack{
+				{
+					Name: "r1",
+				},
+			},
+		},
+	}
+
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, imageRegistry)
+	assert.NoError(err, "failed to build PodTemplateSpec")
+
+	assert.Equal("management-api-client-certs", podTemplateSpec.Spec.Containers[0].VolumeMounts[0].Name)
+	assert.Equal("management-api-client-certs", podTemplateSpec.Spec.Containers[1].VolumeMounts[0].Name)
+	assert.Equal("/management-api-client-certs", podTemplateSpec.Spec.Containers[0].VolumeMounts[0].MountPath)
+	assert.Equal("/management-api-certs", podTemplateSpec.Spec.Containers[1].VolumeMounts[0].MountPath)
+}

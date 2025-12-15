@@ -891,9 +891,9 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		MountPath: "/var/lib/vector",
 	}
 
-	volumeMounts = combineVolumeMountSlices([]corev1.VolumeMount{cassServerLogsMount, vectorMount}, loggerContainer.VolumeMounts)
+	volumeMounts = combineVolumeMountSlices([]corev1.VolumeMount{cassServerLogsMount, vectorMount}, generateStorageConfigVolumesMount(dc))
 
-	loggerContainer.VolumeMounts = combineVolumeMountSlices(volumeMounts, generateStorageConfigVolumesMount(dc))
+	loggerContainer.VolumeMounts = combineVolumeMountSlices(volumeMounts, loggerContainer.VolumeMounts)
 
 	loggerContainer.Resources = *getResourcesOrDefault(&dc.Spec.SystemLoggerResources, &DefaultsLoggerContainer)
 

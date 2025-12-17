@@ -130,7 +130,9 @@ func newStatefulSetForCassandraDatacenter(
 		template.Spec.NodeSelector = utils.MergeMap(map[string]string{}, dc.Spec.NodeSelector)
 	}
 
-	_ = httphelper.AddManagementApiServerSecurity(dc, template)
+	if err := httphelper.AddManagementApiServerSecurity(dc, template); err != nil {
+		return nil, err
+	}
 
 	result := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{

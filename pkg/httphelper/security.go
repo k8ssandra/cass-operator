@@ -240,18 +240,6 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(endp
 }
 
 func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *corev1.PodTemplateSpec) error {
-	// find the container
-	var container *corev1.Container = nil
-	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name == "cassandra" {
-			container = &pod.Spec.Containers[i]
-		}
-	}
-
-	if container == nil {
-		return fmt.Errorf("could not find cassandra container")
-	}
-
 	// Add volume containing certificates
 	secretVolumeName := "management-api-server-certs-volume"
 	secretVolume := corev1.Volume{
@@ -276,11 +264,22 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 		MountPath: "/management-api-certs",
 	}
 
-	if container.VolumeMounts == nil {
-		container.VolumeMounts = []corev1.VolumeMount{}
+	var cassContainer *corev1.Container = nil
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		if pod.Spec.Containers[i].Name == "cassandra" {
+			cassContainer = container
+		}
+		if container.VolumeMounts == nil {
+			container.VolumeMounts = []corev1.VolumeMount{}
+		}
+
+		container.VolumeMounts = append(container.VolumeMounts, secretVolumeMount)
 	}
 
-	container.VolumeMounts = append(container.VolumeMounts, secretVolumeMount)
+	if cassContainer == nil {
+		return fmt.Errorf("could not find cassandra container")
+	}
 
 	// Configure Management API to use certificates
 	envVars := []corev1.EnvVar{
@@ -296,59 +295,46 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 			Name:  "MGMT_API_TLS_KEY_FILE",
 			Value: tlsKey,
 		},
-		// TODO remove the below stuff post 1.0
-		{
-			Name:  "DSE_MGMT_TLS_CA_CERT_FILE",
-			Value: caCertPath,
-		},
-		{
-			Name:  "DSE_MGMT_TLS_CERT_FILE",
-			Value: tlsCrt,
-		},
-		{
-			Name:  "DSE_MGMT_TLS_KEY_FILE",
-			Value: tlsKey,
-		},
 	}
 
-	if container.Env == nil {
-		container.Env = []corev1.EnvVar{}
+	if cassContainer.Env == nil {
+		cassContainer.Env = []corev1.EnvVar{}
 	}
 
-	container.Env = append(envVars, container.Env...)
+	cassContainer.Env = append(envVars, cassContainer.Env...)
 
 	// Update Liveness probe to account for mutual auth (can't just use HTTP probe now)
-	if container.LivenessProbe == nil {
-		container.LivenessProbe = &corev1.Probe{
+	if cassContainer.LivenessProbe == nil {
+		cassContainer.LivenessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{},
 		}
 	}
 
-	livenessTimeout := int(container.LivenessProbe.TimeoutSeconds)
+	livenessTimeout := int(cassContainer.LivenessProbe.TimeoutSeconds)
 	if livenessTimeout < 1 {
 		livenessTimeout = DefaultTimeout
 	}
 
-	container.LivenessProbe.HTTPGet = nil
-	container.LivenessProbe.TCPSocket = nil
-	container.LivenessProbe.Exec = provider.BuildMgmtApiGetAction(LivenessEndpoint, livenessTimeout)
+	cassContainer.LivenessProbe.HTTPGet = nil
+	cassContainer.LivenessProbe.TCPSocket = nil
+	cassContainer.LivenessProbe.Exec = provider.BuildMgmtApiGetAction(LivenessEndpoint, livenessTimeout)
 
 	// Update Readiness probe to account for mutual auth (can't just use HTTP probe now)
 	// TODO: Get endpoint from configured HTTPGet probe
-	if container.ReadinessProbe == nil {
-		container.ReadinessProbe = &corev1.Probe{
+	if cassContainer.ReadinessProbe == nil {
+		cassContainer.ReadinessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{},
 		}
 	}
 
-	readinessTimeout := int(container.ReadinessProbe.TimeoutSeconds)
+	readinessTimeout := int(cassContainer.ReadinessProbe.TimeoutSeconds)
 	if readinessTimeout < 1 {
 		readinessTimeout = DefaultTimeout
 	}
 
-	container.ReadinessProbe.HTTPGet = nil
-	container.ReadinessProbe.TCPSocket = nil
-	container.ReadinessProbe.Exec = provider.BuildMgmtApiGetAction(ReadinessEndpoint, readinessTimeout)
+	cassContainer.ReadinessProbe.HTTPGet = nil
+	cassContainer.ReadinessProbe.TCPSocket = nil
+	cassContainer.ReadinessProbe.Exec = provider.BuildMgmtApiGetAction(ReadinessEndpoint, readinessTimeout)
 
 	return nil
 }

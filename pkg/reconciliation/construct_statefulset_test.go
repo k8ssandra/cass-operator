@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	"github.com/stretchr/testify/require"
@@ -767,4 +768,57 @@ func TestMinReadySecondsChange(t *testing.T) {
 	assert.NoError(err, "failed to build statefulset")
 
 	assert.Equal(int32(10), sts.Spec.MinReadySeconds)
+}
+
+func TestAddManagementApiServerSecurity(t *testing.T) {
+	require := require.New(t)
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "pleasenobob",
+			ServerType:    "cassandra",
+			ServerVersion: "5.0.6",
+			ManagementApiAuth: api.ManagementApiAuthConfig{
+				Manual: &api.ManagementApiAuthManualConfig{
+					ClientSecretName: "mgmt-api-client-credentials",
+					ServerSecretName: "mgmt-api-server-credentials",
+				},
+			},
+			Racks: []api.Rack{
+				{
+					Name: "default",
+				},
+			},
+		},
+	}
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, imageRegistry)
+	require.NoError(err, "failed to build PodTemplateSpec")
+	require.NoError(httphelper.AddManagementApiServerSecurity(dc, podTemplateSpec), "failed to add management api certs")
+
+	volumes := podTemplateSpec.Spec.Volumes
+	require.Len(volumes, 7, "expected 7 volumes in PodTemplateSpec")
+
+	foundServerCertVolume := false
+	for _, v := range volumes {
+		if v.Name == "management-api-server-certs-volume" {
+			foundServerCertVolume = true
+			require.NotNil(v.Secret, "expected server cert volume to be a secret volume")
+			require.Equal(dc.Spec.ManagementApiAuth.Manual.ServerSecretName, v.Secret.SecretName, "unexpected server cert secret name")
+		}
+	}
+	require.True(foundServerCertVolume, "did not find management api server certs")
+
+	for _, c := range podTemplateSpec.Spec.Containers {
+		foundServerCertsMount := false
+		require.True(len(c.VolumeMounts) >= 1, "expected at least one volume mount in container %s", c.Name)
+		for _, vm := range c.VolumeMounts {
+			if vm.Name == "management-api-server-certs-volume" {
+				require.Equal("/management-api-certs", vm.MountPath, "unexpected mount path for management api server certs")
+				foundServerCertsMount = true
+			}
+		}
+		require.True(foundServerCertsMount, "did not find management api server certs volume mount in container %s", c.Name)
+	}
 }

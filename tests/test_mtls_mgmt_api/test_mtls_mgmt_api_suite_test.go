@@ -88,7 +88,7 @@ var _ = Describe(testName, func() {
 
 			json = "jsonpath={.spec.containers[?(@.name=='server-system-logger')].volumeMounts[?(@.name=='management-api-client-certs')].mountPath}"
 			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "/management-api-certs", 30)
+			ns.WaitForOutputAndLog(step, k, "/management-api-certs-client", 30) // This is intentionally "wrong" to verify the correct priority of volumeMount processing
 
 			// TODO FIXME: re-enable this when the following issue is fixed:
 			// https://github.com/datastax/management-api-for-apache-cassandra/issues/42

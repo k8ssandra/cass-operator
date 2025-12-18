@@ -31,7 +31,7 @@ spec:
         - name: cassandra
         - name: server-system-logger
           volumeMounts:
-          - mountPath: /management-api-certs
+          - mountPath: /management-api-certs-client
             name: management-api-client-certs
   racks:
     - name: r1

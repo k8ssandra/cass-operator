@@ -134,7 +134,11 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 	isCassandra3 := dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "3.")
 
 	var c map[string]interface{}
-	_ = json.Unmarshal(dc.Spec.Config, &c)
+	if dc.Spec.Config != nil {
+		if err := json.Unmarshal(dc.Spec.Config, &c); err != nil {
+			return fmt.Errorf("unable to parse config json: %v", err)
+		}
+	}
 
 	_, hasJvmOptions := c["jvm-options"]
 	_, hasJvmServerOptions := c["jvm-server-options"]

@@ -36,9 +36,6 @@ spec:
         name: manager
         imagePullPolicy: IfNotPresent
         securityContext:
-          runAsNonRoot: true
-          runAsGroup: 65534
-          runAsUser: 65534
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
           capabilities:

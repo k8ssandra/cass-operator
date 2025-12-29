@@ -1,6 +1,0 @@
-apiVersion: config.k8ssandra.io/v1beta1
-kind: OperatorConfig
-metadata:
-  name: operator-config
-disableWebhooks: true
-imageConfigFile: /configs/image_config.yaml

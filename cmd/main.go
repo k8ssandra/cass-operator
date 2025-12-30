@@ -78,6 +78,7 @@ func main() {
 	var enableLeaderElection bool
 	var probeAddr string
 	var secureMetrics bool
+	var secureMetricsAuth bool
 	var enableHTTP2 bool
 	var configFile string
 	var tlsOpts []func(*tls.Config)
@@ -89,6 +90,9 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&secureMetrics, "metrics-secure", true,
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
+	flag.BoolVar(&secureMetricsAuth, "metrics-secure-auth", false,
+		"If set, the metrics endpoint is secured with authentication and authorization. "+
+			"Only applies when --metrics-secure=true. Use --metrics-secure-auth=true to also enable authentication and authorization.")
 	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
 	flag.StringVar(&webhookCertName, "webhook-cert-name", "tls.crt", "The name of the webhook certificate file.")
 	flag.StringVar(&webhookCertKey, "webhook-cert-key", "tls.key", "The name of the webhook key file.")
@@ -162,7 +166,7 @@ func main() {
 		TLSOpts:       tlsOpts,
 	}
 
-	if secureMetrics {
+	if secureMetrics && secureMetricsAuth {
 		// FilterProvider is used to protect the metrics endpoint with authn/authz.
 		// These configurations ensure that only authorized users and service accounts
 		// can access the metrics endpoint. The RBAC are configured in 'config/rbac/kustomization.yaml'. More info:
@@ -256,6 +260,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := setupCacheIndexers(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to set up field indexers")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.CassandraDatacenterReconciler{
 		Client:           mgr.GetClient(),
 		Log:              ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
@@ -279,24 +288,6 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraTask")
-		os.Exit(1)
-	}
-
-	if err := mgr.GetCache().IndexField(ctx, &corev1.Pod{}, "spec.volumes.persistentVolumeClaim.claimName", func(obj client.Object) []string {
-		pod, ok := obj.(*corev1.Pod)
-		if !ok {
-			return nil
-		}
-
-		var pvcNames []string
-		for _, volume := range pod.Spec.Volumes {
-			if volume.PersistentVolumeClaim != nil {
-				pvcNames = append(pvcNames, volume.PersistentVolumeClaim.ClaimName)
-			}
-		}
-		return pvcNames
-	}); err != nil {
-		setupLog.Error(err, "unable to set up field indexer")
 		os.Exit(1)
 	}
 
@@ -335,17 +326,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := mgr.GetCache().IndexField(ctx, &corev1.Event{}, "involvedObject.name", func(obj client.Object) []string {
-		event := obj.(*corev1.Event)
-		if event.InvolvedObject.Kind == "Pod" {
-			return []string{event.InvolvedObject.Name}
-		}
-		return []string{}
-	}); err != nil {
-		setupLog.Error(err, "unable to set up event index")
-		os.Exit(1)
-	}
-
 	setupLog.Info("starting manager")
 	startErrCh := make(chan error, 1)
 	go func() {
@@ -364,6 +344,37 @@ func main() {
 	case <-ctx.Done():
 		// graceful shutdown
 	}
+}
+
+func setupCacheIndexers(ctx context.Context, mgr ctrl.Manager) error {
+	if err := mgr.GetCache().IndexField(ctx, &corev1.Pod{}, "spec.volumes.persistentVolumeClaim.claimName", func(obj client.Object) []string {
+		pod, ok := obj.(*corev1.Pod)
+		if !ok {
+			return nil
+		}
+
+		var pvcNames []string
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim != nil {
+				pvcNames = append(pvcNames, volume.PersistentVolumeClaim.ClaimName)
+			}
+		}
+		return pvcNames
+	}); err != nil {
+		return err
+	}
+
+	if err := mgr.GetCache().IndexField(ctx, &corev1.Event{}, "involvedObject.name", func(obj client.Object) []string {
+		event := obj.(*corev1.Event)
+		if event.InvolvedObject.Kind == "Pod" {
+			return []string{event.InvolvedObject.Name}
+		}
+		return []string{}
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func setupImageRegistry(ctx context.Context, cfg *rest.Config, operConfig *configv1beta1.OperatorConfig) (images.ImageRegistry, error) {

@@ -11,5 +11,5 @@ type Client interface {
 }
 
 type HttpClient interface {
-	http.Client
+	Do(req *http.Request) (*http.Response, error)
 }

@@ -397,6 +397,48 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 			},
 			errString: "",
 		},
+		{
+			name: "Valid config should be allowed",
+			dc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					ServerType:    "cassandra",
+					ServerVersion: "5.0.6",
+					Config: json.RawMessage(`
+					{
+						"cassandra-yaml": {},
+						"jvm-server-options": {
+							"key1": "value1"
+						}
+					}
+					`),
+				},
+			},
+			errString: "",
+		},
+		{
+			name: "Invalid JSON/YAML in the config should be caught",
+			dc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					ServerType:    "cassandra",
+					ServerVersion: "5.0.6",
+					Config: json.RawMessage(`
+					{
+						"cassandra-yaml": {}
+						"jvm-server-options": {
+							"key1": "value1"
+						}
+					}
+					`),
+				},
+			},
+			errString: "unable to parse config json: invalid character '\"' after object key:value pair",
+		},
 	}
 
 	for _, tt := range tests {
@@ -962,9 +1004,9 @@ func CreateCassDc(serverType string) *api.CassandraDatacenter {
 	}
 
 	if serverType == "dse" {
-		dc.Spec.ServerVersion = "6.8.13"
+		dc.Spec.ServerVersion = "6.9.16"
 	} else {
-		dc.Spec.ServerVersion = "4.0.1"
+		dc.Spec.ServerVersion = "5.0.6"
 	}
 
 	return dc

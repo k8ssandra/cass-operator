@@ -214,7 +214,6 @@ uninstall: manifests ## Uninstall CRDs from the K8s cluster specified in ~/.kube
 .PHONY: deploy
 deploy: manifests kustomize cert-manager ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	LOG_IMG=${LOG_IMG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 	TAG=${TAG} yq eval -i '.images.system-logger.tag = env(TAG)' config/imageconfig/image_config.yaml
 	yq eval -i 'del(.images.system-logger.registry)' config/imageconfig/image_config.yaml
 	kubectl apply --force-conflicts --server-side -k config/deployments/cluster
@@ -229,7 +228,6 @@ ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	LOG_IMG=${LOG_IMG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 	TAG=${TAG} yq eval -i '.images.system-logger.tag = env(TAG)' config/imageconfig/image_config.yaml
 	yq eval -i 'del(.images.system-logger.registry)' config/imageconfig/image_config.yaml
 	kubectl apply --force-conflicts --server-side -k tests/$(TEST_DIR)

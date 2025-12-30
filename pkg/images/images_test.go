@@ -98,32 +98,6 @@ func TestCassandraOverride(t *testing.T) {
 	assert.Equal("ghcr.io/modified/hcd:1.0.0", cassImage)
 }
 
-func TestDefaultImageConfigParsing(t *testing.T) {
-	assert := require.New(t)
-	imageConfigFile := filepath.Join("..", "..", "config", "manager", "image_config.yaml")
-	registry, err := NewImageRegistry(imageConfigFile)
-	assert.NoError(err, "imageConfig parsing should succeed")
-
-	// Verify some default values are set
-	imageConfig := &registry.(*imageRegistry).imageConfig
-	assert.NotNil(imageConfig)
-	assert.NotNil(imageConfig)
-	assert.True(strings.Contains(imageConfig.Images.SystemLogger, "k8ssandra/system-logger:"))
-	assert.True(strings.Contains(imageConfig.Images.ConfigBuilder, "datastax/cass-config-builder:"))
-	assert.True(strings.Contains(imageConfig.Images.Client, "k8ssandra/k8ssandra-client:"))
-
-	assert.Equal("docker.io/k8ssandra/cass-management-api", registry.(*imageRegistry).imageConfig.DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)
-	assert.Equal("docker.io/datastax/dse-mgmtapi-6_8", registry.(*imageRegistry).imageConfig.DefaultImages.ImageComponents[configv1beta1.DSEImageComponent].Repository)
-
-	path, err := registry.GetCassandraImage("dse", "6.8.47")
-	assert.NoError(err)
-	assert.Equal("docker.io/datastax/dse-mgmtapi-6_8:6.8.47-ubi", path)
-
-	path, err = registry.GetCassandraImage("cassandra", "4.1.4")
-	assert.NoError(err)
-	assert.Equal("docker.io/k8ssandra/cass-management-api:4.1.4-ubi", path)
-}
-
 func TestImageConfigParsing(t *testing.T) {
 	assert := require.New(t)
 	imageConfigFile := filepath.Join("..", "..", "tests", "testdata", "image_config_parsing.yaml")

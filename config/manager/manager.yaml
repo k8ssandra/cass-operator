@@ -11,16 +11,16 @@ metadata:
 spec:
   selector:
     matchLabels:
-      name: cass-operator
       control-plane: controller-manager
+      app.kubernetes.io/name: cass-operator
   replicas: 1
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
-        name: cass-operator
         control-plane: controller-manager
+        app.kubernetes.io/name: cass-operator
     spec:
       securityContext:
         runAsNonRoot: true

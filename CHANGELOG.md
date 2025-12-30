@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#875](https://github.com/k8ssandra/cass-operator/issues/875) Update to Go 1.25, Kubernetes 1.34 and UBI10 as the base image. Also, Vector updates and other smaller dependency updates.
+* [CHANGE] [#876](https://github.com/k8ssandra/cass-operator/issues/876) Drop support for ImageConfig v1beta1, the only supported version from now on is v1beta2
 * [CHANGE] [#865](https://github.com/k8ssandra/cass-operator/issues/865) Add VolumeMount for the management-api-server-certs-volume volume to all containers instead of only cassandra container
 * [CHANGE] [#850](https://github.com/k8ssandra/cass-operator/issues/850) The default retry policy for CassandraTask has changed to OnFailure
 * [CHANGE] [#775](https://github.com/k8ssandra/cass-operator/issues/775) Set generic podFilter as default filter for CassandraTask

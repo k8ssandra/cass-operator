@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#865](https://github.com/k8ssandra/cass-operator/issues/865) Add VolumeMount for the management-api-server-certs-volume volume to all containers instead of only cassandra container
+* [CHANGE] [#867](https://github.com/k8ssandra/cass-operator/issues/867) Upgrade go go v1.25.6 to fix CVE-2025-61729
 * [ENHANCEMENT] [#868](https://github.com/k8ssandra/cass-operator/issues/868) Add new flag to the controller, --metrics-secure-auth to enable/disable the authentication/authorization of metrics endpoint. Default is disabled (TLS is still enabled by default)
 * [BUGFIX] [#862](https://github.com/k8ssandra/cass-operator/issues/862) If volumeMount was provided in PodTemplateSpec and AdditionalVolumes, the latter would override the PodTemplateSpec one. This was unintentional, the PodTemplateSpec selection should be the final one.
 

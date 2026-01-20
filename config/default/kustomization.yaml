@@ -19,6 +19,6 @@ patches:
 - path: manager_metrics_patch.yaml
   target:
     kind: Deployment
-- path: manager_config_patch.yaml
-  target:
-    kind: Deployment
+# - path: manager_config_patch.yaml
+#   target:
+#     kind: Deployment

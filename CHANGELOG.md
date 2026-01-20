@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.28.1
 
 * [ENHANCEMENT] [#868](https://github.com/k8ssandra/cass-operator/issues/868) Add new flag to the controller, --metrics-secure-auth to enable/disable the authentication/authorization of metrics endpoint. Default is disabled (TLS is still enabled by default)
 * [BUGFIX] [#862](https://github.com/k8ssandra/cass-operator/issues/862) If volumeMount was provided in PodTemplateSpec and AdditionalVolumes, the latter would override the PodTemplateSpec one. This was unintentional, the PodTemplateSpec selection should be the final one.

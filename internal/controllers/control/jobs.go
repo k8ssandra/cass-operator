@@ -106,11 +106,6 @@ func (r *CassandraTaskReconciler) restartSts(taskConfig *TaskConfiguration, sts 
 			return ctrl.Result{RequeueAfter: JobRunningRequeue}, nil
 		}
 
-		st.Spec.Template.Annotations[api.RestartedAtAnnotation] = restartTime
-		if err := r.Update(taskConfig.Context, &st); err != nil {
-			return ctrl.Result{}, err
-		}
-
 		if taskConfig.Arguments.Fast {
 			force := taskConfig.Arguments.Force
 			for _, stToCheck := range sts {
@@ -124,13 +119,16 @@ func (r *CassandraTaskReconciler) restartSts(taskConfig *TaskConfiguration, sts 
 					continue
 				}
 			}
+		}
 
-			// Fetch the pods of the StatefulSet and delete all of them at once
-			metav1.SetMetaDataAnnotation(&st.Spec.Template.ObjectMeta, api.RestartedAtAnnotation, restartTime)
-			if err := r.Update(taskConfig.Context, &st); err != nil {
-				return ctrl.Result{}, err
-			}
+		// Fetch the pods of the StatefulSet and delete all of them at once
+		metav1.SetMetaDataAnnotation(&st.Spec.Template.ObjectMeta, api.RestartedAtAnnotation, restartTime)
+		if err := r.Update(taskConfig.Context, &st); err != nil {
+			return ctrl.Result{}, err
+		}
 
+		if taskConfig.Arguments.Fast {
+			// We have already checked if we have force or not and that other racks are healthy
 			pods, err := r.getStatefulSetPods(taskConfig.Context, taskConfig.Datacenter, &st)
 			if err != nil {
 				return ctrl.Result{}, err

@@ -809,8 +809,8 @@ var _ = Describe("CassandraTask controller tests", func() {
 				taskKey, task := buildTask(api.CommandRestart, testNamespaceName)
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
-				Eventually(func() bool {
-					Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
 
 					inflight := 0
 
@@ -822,27 +822,24 @@ var _ = Describe("CassandraTask controller tests", func() {
 						}
 					}
 
-					Expect(inflight).To(BeNumerically("<=", 1))
+					g.Expect(inflight).To(BeNumerically("<=", 1))
 
 					for _, sts := range stsAll.Items {
-						if _, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]; found {
-							// Imitate statefulset_controller
-							if sts.Status.UpdateRevision != "1" {
-								sts.Status.UpdatedReplicas = sts.Status.Replicas
-								sts.Status.ReadyReplicas = sts.Status.Replicas
-								sts.Status.CurrentReplicas = sts.Status.Replicas
-								sts.Status.UpdateRevision = "1"
-								sts.Status.CurrentRevision = sts.Status.UpdateRevision
-								sts.Status.ObservedGeneration = sts.GetObjectMeta().GetGeneration()
+						_, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]
+						g.Expect(found).To(BeTrue())
+						// Imitate statefulset_controller
+						if sts.Status.UpdateRevision != "1" {
+							sts.Status.UpdatedReplicas = sts.Status.Replicas
+							sts.Status.ReadyReplicas = sts.Status.Replicas
+							sts.Status.CurrentReplicas = sts.Status.Replicas
+							sts.Status.UpdateRevision = "1"
+							sts.Status.CurrentRevision = sts.Status.UpdateRevision
+							sts.Status.ObservedGeneration = sts.GetObjectMeta().GetGeneration()
 
-								Expect(k8sClient.Status().Update(context.TODO(), &sts)).Should(Succeed())
-							}
-						} else if !found {
-							return false
+							g.Expect(k8sClient.Status().Update(context.TODO(), &sts)).Should(Succeed())
 						}
 					}
-					return true
-				}, "5s", "50ms").Should(BeTrue())
+				}, "5s", "50ms").Should(Succeed())
 
 				_ = waitForTaskCompletion(taskKey)
 			})
@@ -859,8 +856,8 @@ var _ = Describe("CassandraTask controller tests", func() {
 				task.Spec.Jobs[0].Arguments.Fast = true
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
-				Eventually(func() bool {
-					Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.List(context.TODO(), &stsAll, client.MatchingLabels(map[string]string{cassdcapi.DatacenterLabel: testDc.Name}), client.InNamespace(testNamespaceName))).To(Succeed())
 
 					inflight := 0
 
@@ -872,45 +869,42 @@ var _ = Describe("CassandraTask controller tests", func() {
 						}
 					}
 
-					Expect(inflight).To(BeNumerically("<=", 1))
+					g.Expect(inflight).To(BeNumerically("<=", 1))
 
 					for _, sts := range stsAll.Items {
-						if _, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]; found {
-							// Imitate statefulset_controller
-							stsPods := &corev1.PodList{}
-							Expect(k8sClient.List(context.TODO(), stsPods, client.InNamespace(testNamespaceName), client.MatchingLabels(sts.Spec.Selector.MatchLabels))).To(Succeed())
-							if len(stsPods.Items) == 0 {
-								// Recreate the pods
-								for i := 0; i < int(*sts.Spec.Replicas); i++ {
-									createPod(testNamespaceName, sts.Spec.Template.Labels[cassdcapi.ClusterLabel], sts.Spec.Template.Labels[cassdcapi.DatacenterLabel], sts.Spec.Template.Labels[cassdcapi.RackLabel], i)
-									// Read the Pod, update it with the annotation, and update it
-									pod := &corev1.Pod{}
-									podKey := types.NamespacedName{
-										Name:      fmt.Sprintf("%s-%d", sts.Name, i),
-										Namespace: testNamespaceName,
-									}
-									Expect(k8sClient.Get(context.TODO(), podKey, pod)).To(Succeed())
-									metav1.SetMetaDataAnnotation(&pod.ObjectMeta, api.RestartedAtAnnotation, time.Now().Format(time.RFC3339))
-									Expect(k8sClient.Update(context.TODO(), pod)).To(Succeed())
+						_, found := sts.Spec.Template.ObjectMeta.Annotations[api.RestartedAtAnnotation]
+						g.Expect(found).To(BeTrue())
+						// Imitate statefulset_controller
+						stsPods := &corev1.PodList{}
+						g.Expect(k8sClient.List(context.TODO(), stsPods, client.InNamespace(testNamespaceName), client.MatchingLabels(sts.Spec.Selector.MatchLabels))).To(Succeed())
+						if len(stsPods.Items) == 0 {
+							// Recreate the pods
+							for i := 0; i < int(*sts.Spec.Replicas); i++ {
+								createPod(testNamespaceName, sts.Spec.Template.Labels[cassdcapi.ClusterLabel], sts.Spec.Template.Labels[cassdcapi.DatacenterLabel], sts.Spec.Template.Labels[cassdcapi.RackLabel], i)
+								// Read the Pod, update it with the annotation, and update it
+								pod := &corev1.Pod{}
+								podKey := types.NamespacedName{
+									Name:      fmt.Sprintf("%s-%d", sts.Name, i),
+									Namespace: testNamespaceName,
 								}
+								g.Expect(k8sClient.Get(context.TODO(), podKey, pod)).To(Succeed())
+								metav1.SetMetaDataAnnotation(&pod.ObjectMeta, api.RestartedAtAnnotation, time.Now().Format(time.RFC3339))
+								g.Expect(k8sClient.Update(context.TODO(), pod)).To(Succeed())
 							}
+						}
 
-							if sts.Status.UpdateRevision != "1" {
-								sts.Status.UpdatedReplicas = sts.Status.Replicas
-								sts.Status.ReadyReplicas = sts.Status.Replicas
-								sts.Status.CurrentReplicas = sts.Status.Replicas
-								sts.Status.UpdateRevision = "1"
-								sts.Status.CurrentRevision = sts.Status.UpdateRevision
-								sts.Status.ObservedGeneration = sts.GetObjectMeta().GetGeneration()
+						if sts.Status.UpdateRevision != "1" {
+							sts.Status.UpdatedReplicas = sts.Status.Replicas
+							sts.Status.ReadyReplicas = sts.Status.Replicas
+							sts.Status.CurrentReplicas = sts.Status.Replicas
+							sts.Status.UpdateRevision = "1"
+							sts.Status.CurrentRevision = sts.Status.UpdateRevision
+							sts.Status.ObservedGeneration = sts.GetObjectMeta().GetGeneration()
 
-								Expect(k8sClient.Status().Update(context.TODO(), &sts)).Should(Succeed())
-							}
-						} else if !found {
-							return false
+							g.Expect(k8sClient.Status().Update(context.TODO(), &sts)).Should(Succeed())
 						}
 					}
-					return true
-				}, "5s", "50ms").Should(BeTrue())
+				}, "5s", "50ms").Should(Succeed())
 
 				_ = waitForTaskCompletion(taskKey)
 			})

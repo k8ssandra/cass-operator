@@ -18,10 +18,8 @@ package control
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
-	"strconv"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -30,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -92,8 +91,10 @@ type TaskConfiguration struct {
 	Context       context.Context
 
 	// Input parameters
-	RestartPolicy corev1.RestartPolicy
-	Arguments     api.JobArguments
+	RestartPolicy     corev1.RestartPolicy
+	Arguments         api.JobArguments
+	MaxConcurrentPods *int
+	Retries           *int
 
 	// Execution functionality per pod
 	AsyncFeature httphelper.Feature
@@ -199,7 +200,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Name:      cassTask.Spec.Datacenter.Name,
 	}
 	if err := r.Get(ctx, dcNamespacedName, dc); err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "unable to fetch target CassandraDatacenter: %s", cassTask.Spec.Datacenter)
+		return ctrl.Result{}, errors.Wrapf(err, "unable to fetch target CassandraDatacenter: %s", cassTask.Spec.Datacenter.Name)
 	}
 
 	logger = log.FromContext(ctx, "datacenterName", dc.LabelResourceName(), "clusterName", dc.Spec.ClusterName)
@@ -250,6 +251,10 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		cassTask.Status.StartTime = &timeNow
 		cassTask.Status.Active = 1 // We don't have concurrency inside a task at the moment
+
+		if err := r.Status().Update(ctx, &cassTask); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	var res ctrl.Result
@@ -259,11 +264,16 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, fmt.Errorf("only a single job can be defined in this version of cass-operator")
 	}
 
-	taskId := string(cassTask.UID)
+	taskName := cassTask.Name
 
-	res, failed, completed, errMsg, err := r.processJobs(ctx, dc, &cassTask, taskId)
+	res, failed, completed, err := r.processJobs(ctx, dc, &cassTask, taskName)
 	if err != nil && !errors.Is(err, reconcile.TerminalError(nil)) {
 		return ctrl.Result{}, err
+	}
+
+	// Since we do patch/update calls on the processJobs, re-fetch the cassTask
+	if err := r.Get(ctx, req.NamespacedName, &cassTask); err != nil {
+		return res, err
 	}
 
 	if res.RequeueAfter == 0 {
@@ -273,18 +283,14 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return res, errUpdate
 		}
 
-		if errCleanup := r.cleanupJobAnnotations(ctx, dc, taskId); errCleanup != nil {
-			// Not the end of the world
-			logger.Error(errCleanup, "Failed to cleanup job annotations from pods")
-		}
-
 		cassTask.Status.Active = 0
 		cassTask.Status.CompletionTime = &timeNow
 		SetCondition(&cassTask, api.JobComplete, metav1.ConditionTrue, "")
 		SetCondition(&cassTask, api.JobRunning, metav1.ConditionFalse, "")
 
 		if failed > 0 {
-			if err != nil {
+			errMsg := fmt.Sprintf("%d pods failed during processing", failed)
+			if err != nil && errors.Is(err, reconcile.TerminalError(nil)) {
 				errMsg = err.Error()
 			}
 			SetCondition(&cassTask, api.JobFailed, metav1.ConditionTrue, errMsg)
@@ -400,15 +406,7 @@ func (r *CassandraTaskReconciler) activeTasks(ctx context.Context, dc *cassapi.C
 
 *
 */
-const (
-	// PodJobAnnotationPrefix defines the prefix key for a job data (json serialized) in the annotations of the pod
-	PodJobAnnotationPrefix = "control.k8ssandra.io/job"
-	jobHandlerMgmtApi      = "management-api"
-
-	podJobCompleted = "COMPLETED"
-	podJobError     = "ERROR"
-	podJobWaiting   = "WAITING"
-)
+var jobRunner chan int = make(chan int, 1) // Sync tasks are still limited to no concurrency
 
 type JobStatus struct {
 	Id      string `json:"id,omitempty"`
@@ -416,39 +414,6 @@ type JobStatus struct {
 	Handler string `json:"handler,omitempty"`
 	Retries int    `json:"retries,omitempty"`
 }
-
-func getJobAnnotationKey(taskId string) string {
-	return fmt.Sprintf("%s-%s", PodJobAnnotationPrefix, taskId)
-}
-
-// GetJobStatusFromPodAnnotations gets the json serialized pod job statusfrom Pod.Annotations
-// and converts it to the Affinity type in api.
-func GetJobStatusFromPodAnnotations(taskId string, annotations map[string]string) (JobStatus, error) {
-	annotationKey := getJobAnnotationKey(taskId)
-	var jobStatus JobStatus
-	if jobData, found := annotations[annotationKey]; found {
-		err := json.Unmarshal([]byte(jobData), &jobStatus)
-		if err != nil {
-			return jobStatus, err
-		}
-	}
-	return jobStatus, nil
-}
-
-func JobStatusToPodAnnotations(taskId string, annotations map[string]string, jobStatus JobStatus) error {
-	outputVal, err := json.Marshal(jobStatus)
-	if err != nil {
-		return err
-	}
-	annotationKey := getJobAnnotationKey(taskId)
-	annotations[annotationKey] = string(outputVal)
-	return nil
-}
-
-// TODO This should be per Datacenter for sync tasks also
-var jobRunner chan int = make(chan int, 1)
-
-// jobRunningRequeue          = time.Duration(10 * time.Second)
 
 func (r *CassandraTaskReconciler) getDatacenterPods(ctx context.Context, dc *cassapi.CassandraDatacenter) ([]corev1.Pod, error) {
 	var pods corev1.PodList
@@ -478,36 +443,14 @@ func (r *CassandraTaskReconciler) getStatefulSetPods(ctx context.Context, dc *ca
 	return pods.Items, nil
 }
 
-// cleanupJobAnnotations removes the job annotations from the pod once it has finished
-func (r *CassandraTaskReconciler) cleanupJobAnnotations(ctx context.Context, dc *cassapi.CassandraDatacenter, taskId string) error {
-	logger := log.FromContext(ctx)
-
-	// We sort to ensure we process the dcPods in the same order
-	dcPods, err := r.getDatacenterPods(ctx, dc)
-	if err != nil {
-		return err
-	}
-	for _, pod := range dcPods {
-		podPatch := client.MergeFrom(pod.DeepCopy())
-		annotationKey := getJobAnnotationKey(taskId)
-		delete(pod.GetAnnotations(), annotationKey)
-		err = r.Patch(ctx, &pod, podPatch)
-		if err != nil {
-			logger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
-			return err
-		}
-	}
-	return nil
-}
-
 // reconcileEveryPodTask executes the given task against all the Datacenter pods
-func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, int, int, string, error) {
+func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, cassTask *api.CassandraTask, dc *cassapi.CassandraDatacenter, taskConfig *TaskConfiguration) (ctrl.Result, int, int, error) {
 	logger := log.FromContext(ctx)
 
 	// We sort to ensure we process the dcPods in the same order
 	dcPods, err := r.getDatacenterPods(ctx, dc)
 	if err != nil {
-		return ctrl.Result{}, 0, 0, "", err
+		return ctrl.Result{}, 0, 0, err
 	}
 
 	sort.Slice(dcPods, func(i, j int) bool {
@@ -521,273 +464,73 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, dc 
 		return dcPods[i].Name < dcPods[j].Name
 	})
 
+	podsByRack := make(map[string][]corev1.Pod)
+	for _, pod := range dcPods {
+		rack := pod.Labels[cassapi.RackLabel]
+		podsByRack[rack] = append(podsByRack[rack], pod)
+	}
+
+	// Get concurrency limit (default is 1)
+	maxConcurrent := 1
+	if taskConfig.MaxConcurrentPods != nil {
+		maxConcurrent = *taskConfig.MaxConcurrentPods
+	}
+
 	nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc, nil)
 	if err != nil {
-		return ctrl.Result{}, 0, 0, "", err
+		return ctrl.Result{}, 0, 0, err
 	}
 
 	failed, completed := 0, 0
-	errMsg := ""
 
-	for idx, pod := range dcPods {
-		features, err := nodeMgmtClient.FeatureSet(&pod)
+	// Process each rack sequentially, but pods within rack in parallel
+	for _, rack := range getSortedRacks(podsByRack) {
+		rackPods := make([]corev1.Pod, 0, len(podsByRack[rack]))
+
+		for _, pod := range podsByRack[rack] {
+			if taskConfig.Filter(&pod) {
+				rackPods = append(rackPods, pod)
+			}
+		}
+
+		rackResult, rackFailed, rackCompleted, rackRunning, err := r.processRack(ctx, cassTask, rackPods, taskConfig, nodeMgmtClient, maxConcurrent)
 		if err != nil {
-			return ctrl.Result{}, failed, completed, errMsg, err
+			logger.Error(err, "Error processing rack", "rack", rack)
+			return ctrl.Result{}, failed, completed, err
 		}
 
-		res, f, c, em, err := r.processPod(ctx, pod, idx, taskConfig, nodeMgmtClient, features, failed, completed, errMsg)
-		if err != nil {
-			return ctrl.Result{}, failed, completed, errMsg, err
+		failed += rackFailed
+		completed += rackCompleted
+
+		if rackRunning > 0 || rackResult.RequeueAfter > 0 {
+			// Some pods in this rack are still processing
+			logger.V(1).Info("Rack still processing, requeueing", "rack", rack, "requeueAfter", rackResult.RequeueAfter)
+			return rackResult, failed, completed, nil
 		}
 
-		failed = f
-		completed = c
-		errMsg = em
-
-		if res.RequeueAfter > 0 {
-			// This job isn't complete yet or there's an error, do not continue
-			logger.V(1).Info("This job isn't complete yet or there's an error, requeueing", "requeueAfter", res.RequeueAfter)
-			return res, failed, completed, errMsg, nil
-		}
+		logger.V(1).Info("Rack completed", "rack", rack, "failed", rackFailed, "completed", rackCompleted)
 	}
 
-	return ctrl.Result{}, failed, completed, errMsg, nil
+	return ctrl.Result{}, failed, completed, nil
 }
 
-// processPod handles the processing of a single pod within the reconcileEveryPodTask function
-func (r *CassandraTaskReconciler) processPod(
-	ctx context.Context,
-	pod corev1.Pod,
-	idx int,
-	taskConfig *TaskConfiguration,
-	nodeMgmtClient httphelper.NodeMgmtClient,
-	features *httphelper.FeatureSet,
-	failed int,
-	completed int,
-	errMsg string,
-) (ctrl.Result, int, int, string, error) {
-	logger := log.FromContext(ctx)
-
-	if !taskConfig.Filter(&pod) {
-		return ctrl.Result{}, failed, completed, errMsg, nil
-	}
-
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	}
-
-	jobStatus, err := GetJobStatusFromPodAnnotations(taskConfig.Id, pod.Annotations)
-	if err != nil {
-		return ctrl.Result{}, failed, completed, errMsg, err
-	}
-
-	if jobStatus.Id != "" {
-		// Check the completed statuses
-		switch jobStatus.Status {
-		case podJobCompleted:
-			completed++
-			return ctrl.Result{}, failed, completed, errMsg, nil
-		case podJobError:
-			failed++
-			return ctrl.Result{}, failed, completed, errMsg, nil
-		}
-
-		// Only if we have "Running" status should we check the jobDetails
-		if features.Supports(taskConfig.AsyncFeature) {
-			// Pod is currently processing something, or has finished processing.. update the status
-			details, err := nodeMgmtClient.JobDetails(&pod, jobStatus.Id)
-			if err != nil {
-				logger.Error(err, "Could not get JobDetails for pod", "Pod", pod)
-				return ctrl.Result{}, failed, completed, errMsg, err
-			}
-
-			if details.Id == "" {
-				// This job was not found, pod most likely restarted. Let's retry..
-				delete(pod.Annotations, getJobAnnotationKey(taskConfig.Id))
-				err = r.Update(ctx, &pod)
-				if err != nil {
-					return ctrl.Result{}, failed, completed, errMsg, err
-				}
-				return ctrl.Result{RequeueAfter: 1 * time.Second}, failed, completed, errMsg, nil
-			} else if details.Status == podJobError {
-				// Log the error, move on
-				errMsg = details.Error
-				err = fmt.Errorf("task failed: %s", errMsg)
-				logger.Error(err, "Job failed to successfully complete the task", "Pod", pod)
-				if taskConfig.RestartPolicy != corev1.RestartPolicyOnFailure || jobStatus.Retries >= 1 {
-					jobStatus.Status = podJobError
-				} else {
-					logger.V(1).Info("Restarting the pod due to the RestartPolicy", "Pod", pod)
-					jobStatus.Retries++
-					jobStatus.Status = podJobWaiting
-					jobStatus.Id = "" // Remove id, so next requeue restarts it
-				}
-
-				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-					return ctrl.Result{}, failed, completed, errMsg, err
-				}
-
-				if err = r.Update(ctx, &pod); err != nil {
-					return ctrl.Result{}, failed, completed, errMsg, err
-				}
-
-				if jobStatus.Status == podJobError {
-					failed++
-					return ctrl.Result{}, failed, completed, errMsg, nil
-				}
-			} else if details.Status == podJobCompleted {
-				// Pod has finished, remove the job_id and let us move to the next pod
-				jobStatus.Status = podJobCompleted
-				if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-					return ctrl.Result{}, failed, completed, errMsg, err
-				}
-
-				if err = r.Update(ctx, &pod); err != nil {
-					return ctrl.Result{}, failed, completed, errMsg, err
-				}
-				completed++
-				return ctrl.Result{}, failed, completed, errMsg, nil
-			} else if details.Status == podJobWaiting {
-				// Job is still running or waiting
-				return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
-			}
-		} else {
-			if len(jobRunner) > 0 {
-				// Something is still holding the worker
-				return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
-			}
-
-			// Nothing is holding the job, this pod has finished
-			jobStatus.Status = podJobCompleted
-			if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
-			}
-
-			if err = r.Update(ctx, &pod); err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
-			}
-			completed++
-			return ctrl.Result{}, failed, completed, errMsg, nil
-		}
-	}
-
-	if features.Supports(taskConfig.AsyncFeature) {
-		// Pod isn't running anything at the moment, this pod should run next
-		jobId, err := taskConfig.AsyncFunc(nodeMgmtClient, &pod, taskConfig)
-		if err != nil {
-			return ctrl.Result{}, failed, completed, errMsg, err
-		}
-		jobStatus.Handler = jobHandlerMgmtApi
-		jobStatus.Id = jobId
-
-		if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-			return ctrl.Result{}, failed, completed, errMsg, err
-		}
-
-		err = r.Update(ctx, &pod)
-		if err != nil {
-			logger.Error(err, "Failed to patch pod's status to include jobId", "Pod", pod)
-			return ctrl.Result{}, failed, completed, errMsg, err
-		}
-	} else {
-		if len(jobRunner) > 0 {
-			// Something is still holding the worker
-			return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
-		}
-
-		if taskConfig.SyncFunc == nil {
-			// This feature is not supported in sync mode, mark everything as done
-			err := fmt.Errorf("this job isn't supported by the target pod")
-			logger.Error(err, "unable to execute requested job against pod", "Pod", pod)
-			failed++
-			return ctrl.Result{}, failed, completed, errMsg, err
-		}
-
-		if taskConfig.SyncFeature != "" {
-			if !features.Supports(taskConfig.SyncFeature) {
-				logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
-				jobStatus.Status = podJobError
-				failed++
-				errMsg = fmt.Sprintf("Pod %s doesn't support %s feature", pod.Name, taskConfig.SyncFeature)
-				return ctrl.Result{}, failed, completed, errMsg, err
-			}
-		}
-
-		jobId := strconv.Itoa(idx)
-
-		// This pod should run next, mark it
-		jobStatus.Handler = oplabels.ManagedByLabelValue
-		jobStatus.Id = jobId
-
-		if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-			return ctrl.Result{}, failed, completed, errMsg, err
-		}
-
-		err = r.Update(ctx, &pod)
-		if err != nil {
-			logger.Error(err, "Failed to patch pod's status to indicate its running a local job", "Pod", pod)
-			return ctrl.Result{}, failed, completed, errMsg, err
-		}
-
-		pod := pod
-
-		go func() {
-			// Write value to the jobRunner to indicate we're running
-			podKey := types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}
-			logger.V(1).Info("starting execution of sync blocking job", "Pod", pod)
-			jobRunner <- idx
-			defer func() {
-				// Remove the value from the jobRunner
-				<-jobRunner
-			}()
-
-			if err = taskConfig.SyncFunc(nodeMgmtClient, &pod, taskConfig); err != nil {
-				// We only log, nothing else to do - we won't even retry this pod
-				logger.Error(err, "executing the sync task failed", "Pod", pod)
-				jobStatus.Status = podJobError
-			} else {
-				jobStatus.Status = podJobCompleted
-			}
-
-			if err := r.Get(context.Background(), podKey, &pod); err != nil {
-				logger.Error(err, "Failed to get pod for annotation update", "Pod", pod)
-			}
-
-			podPatch := client.MergeFrom(pod.DeepCopy())
-
-			if pod.Annotations == nil {
-				pod.Annotations = make(map[string]string)
-			}
-			if err = JobStatusToPodAnnotations(taskConfig.Id, pod.Annotations, jobStatus); err != nil {
-				logger.Error(err, "Failed to update local job's status", "Pod", pod)
-			}
-
-			if err = r.Patch(ctx, &pod, podPatch); err != nil {
-				logger.Error(err, "Failed to update local job's status", "Pod", pod)
-			}
-		}()
-	}
-
-	// We have a job going on, return back later to check the status
-	return ctrl.Result{RequeueAfter: JobRunningRequeue}, failed, completed, errMsg, nil
-}
-
-func (r *CassandraTaskReconciler) processJobs(ctx context.Context, dc *cassapi.CassandraDatacenter, cassTask *api.CassandraTask, taskId string) (ctrl.Result, int, int, string, error) {
+func (r *CassandraTaskReconciler) processJobs(ctx context.Context, dc *cassapi.CassandraDatacenter, cassTask *api.CassandraTask, taskName string) (ctrl.Result, int, int, error) {
 	var res ctrl.Result
 	var err error
-	var errMsg string
 	var failed, completed int
 	logger := log.FromContext(ctx)
 
 JobDefinition:
 	for _, job := range cassTask.Spec.Jobs {
 		taskConfig := &TaskConfiguration{
-			RestartPolicy: cassTask.Spec.RestartPolicy,
-			Id:            taskId,
-			Datacenter:    dc,
-			TaskStartTime: cassTask.Status.StartTime,
-			Context:       ctx,
-			Arguments:     job.Arguments,
+			RestartPolicy:     cassTask.Spec.RestartPolicy,
+			Id:                taskName,
+			Datacenter:        dc,
+			TaskStartTime:     cassTask.Status.StartTime,
+			Context:           ctx,
+			Arguments:         job.Arguments,
+			MaxConcurrentPods: cassTask.Spec.MaxConcurrentPods,
+			Retries:           cassTask.Spec.Retries,
 		}
 
 		// Process all the reconcileEveryPodTasks
@@ -800,13 +543,13 @@ JobDefinition:
 			// This job is targeting StatefulSets and not Pods
 			sts, err := r.getDatacenterStatefulSets(ctx, dc)
 			if err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
+				return ctrl.Result{}, failed, completed, err
 			}
 
 			var restartRes ctrl.Result
 			restartRes, err = r.restartSts(taskConfig, sts)
 			if err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
+				return ctrl.Result{}, failed, completed, err
 			}
 			res = restartRes
 			completed = taskConfig.Completed
@@ -830,7 +573,7 @@ JobDefinition:
 			var refreshRes ctrl.Result
 			refreshRes, err = r.refreshDatacenter(ctx, dc, cassTask)
 			if err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
+				return ctrl.Result{}, failed, completed, err
 			}
 			res = refreshRes
 			completed = taskConfig.Completed
@@ -839,14 +582,14 @@ JobDefinition:
 			inodeTsReload(taskConfig)
 		default:
 			err = fmt.Errorf("unknown job command: %s", job.Command)
-			return ctrl.Result{}, failed, completed, errMsg, err
+			return ctrl.Result{}, failed, completed, err
 		}
 
 		if !r.HasCondition(cassTask, api.JobRunning, metav1.ConditionTrue) {
 			valid, errValidate := taskConfig.Validate()
 			if errValidate != nil && valid {
 				// Retry, this is a transient error
-				return ctrl.Result{}, failed, completed, errMsg, errValidate
+				return ctrl.Result{}, failed, completed, errValidate
 			}
 
 			if !valid {
@@ -857,32 +600,32 @@ JobDefinition:
 			}
 
 			if err := taskConfig.PreProcess(); err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
+				return ctrl.Result{}, failed, completed, err
 			}
 		}
 
 		if modified := SetCondition(cassTask, api.JobRunning, metav1.ConditionTrue, ""); modified {
 			if err = r.Status().Update(ctx, cassTask); err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
+				return ctrl.Result{}, failed, completed, err
 			}
 		}
 
 		if job.Command == api.CommandReplaceNode {
 			// Special handling for replace process since it targets a single pod
 			if err := r.replacePreProcess(taskConfig); err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
+				return ctrl.Result{}, failed, completed, err
 			}
 			nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc, nil)
 			if err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
+				return ctrl.Result{}, failed, completed, err
 			}
 
 			pod := &corev1.Pod{}
 			if err := r.Get(taskConfig.Context, types.NamespacedName{Name: taskConfig.Arguments.PodName, Namespace: dc.Namespace}, pod); err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
+				return ctrl.Result{}, failed, completed, err
 			}
 			if err := r.replacePod(nodeMgmtClient, pod, taskConfig); err != nil {
-				return ctrl.Result{}, failed, completed, errMsg, err
+				return ctrl.Result{}, failed, completed, err
 			}
 
 			completed++
@@ -891,9 +634,9 @@ JobDefinition:
 		}
 
 		var podTaskRes ctrl.Result
-		podTaskRes, failed, completed, errMsg, err = r.reconcileEveryPodTask(ctx, dc, taskConfig)
+		podTaskRes, failed, completed, err = r.reconcileEveryPodTask(ctx, cassTask, dc, taskConfig)
 		if err != nil {
-			return podTaskRes, failed, completed, errMsg, err
+			return podTaskRes, failed, completed, err
 		}
 		res = podTaskRes
 
@@ -904,5 +647,286 @@ JobDefinition:
 		}
 	}
 
-	return res, failed, completed, errMsg, err
+	return res, failed, completed, err
+}
+
+func getSortedRacks(podsByRack map[string][]corev1.Pod) []string {
+	racks := make([]string, 0, len(podsByRack))
+	for rack := range podsByRack {
+		racks = append(racks, rack)
+	}
+	sort.Strings(racks)
+	return racks
+}
+
+func (r *CassandraTaskReconciler) processRack(
+	ctx context.Context,
+	cassTask *api.CassandraTask,
+	pods []corev1.Pod,
+	taskConfig *TaskConfiguration,
+	nodeMgmtClient httphelper.NodeMgmtClient,
+	maxConcurrent int,
+) (ctrl.Result, int, int, int, error) {
+	logger := log.FromContext(ctx)
+
+	cassTaskPatch := client.MergeFromWithOptions(cassTask.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	// cassTaskPatch := client.MergeFrom(cassTask.DeepCopy())
+
+	if cassTask.Status.PodStatuses == nil {
+		cassTask.Status.PodStatuses = make(map[string]api.PodProcessingStatus)
+	}
+
+	// Check completion status
+	rackRemaining, rackFailed, rackCompleted, runningCount, err := r.checkRackCompletion(ctx, cassTask, pods, taskConfig, nodeMgmtClient)
+	if err != nil {
+		return ctrl.Result{}, 0, 0, 0, err
+	}
+
+	// If at concurrency limit, wait
+	if runningCount >= maxConcurrent {
+		return ctrl.Result{RequeueAfter: JobRunningRequeue}, 0, 0, 0, nil
+	}
+
+	// If remaining is zero, but some are still running, we can't create more work yet
+	if rackRemaining > 0 && rackRemaining == runningCount {
+		return ctrl.Result{RequeueAfter: JobRunningRequeue}, 0, 0, 0, nil
+	}
+
+	// Start new pods (up to available slots)
+	availableSlots := maxConcurrent - runningCount
+	started := 0
+
+	for _, pod := range pods {
+		if started >= availableSlots {
+			break
+		}
+
+		status, exists := cassTask.Status.PodStatuses[pod.Name]
+
+		// Skip if already completed or errored
+		if exists && (status.Status == api.PodCompleted || status.Status == api.PodError) {
+			continue
+		}
+
+		// Skip if already running
+		if exists && status.Status == api.PodRunning {
+			continue
+		}
+
+		// Start processing this pod
+		logger.V(1).Info("Starting pod task", "pod", pod.Name)
+		if err := r.startPodTask(ctx, cassTask, &pod, taskConfig, nodeMgmtClient); err != nil {
+			return ctrl.Result{}, 0, 0, 0, err
+		}
+		started++
+	}
+
+	if started > 0 {
+		logger.V(1).Info("Started pod tasks", "count", started)
+	}
+
+	// Update task status to persist all changes
+	// TODO Move this to the caller?
+	if err := r.Status().Patch(ctx, cassTask, cassTaskPatch); err != nil {
+		return ctrl.Result{}, 0, 0, 0, err
+	}
+
+	if rackRemaining > 0 {
+		return ctrl.Result{RequeueAfter: JobRunningRequeue}, rackFailed, rackCompleted, runningCount + started, nil
+	}
+
+	return ctrl.Result{}, rackFailed, rackCompleted, runningCount + started, nil
+}
+
+func (r *CassandraTaskReconciler) startPodTask(
+	ctx context.Context,
+	cassTask *api.CassandraTask,
+	pod *corev1.Pod,
+	taskConfig *TaskConfiguration,
+	nodeMgmtClient httphelper.NodeMgmtClient,
+) error {
+	logger := log.FromContext(ctx)
+	features, err := nodeMgmtClient.FeatureSet(pod)
+	if err != nil {
+		return err
+	}
+
+	status, found := cassTask.Status.PodStatuses[pod.Name]
+	if !found {
+		status = api.PodProcessingStatus{
+			Status:  api.PodRunning,
+			Retries: 0,
+		}
+	}
+
+	if status.Status == api.PodWaiting {
+		status.Status = api.PodRunning
+	}
+
+	if status.StartTime == nil {
+		status.StartTime = ptr.To(metav1.Now())
+	}
+
+	if features.Supports(taskConfig.AsyncFeature) {
+		jobId, err := taskConfig.AsyncFunc(nodeMgmtClient, pod, taskConfig)
+		if err != nil {
+			return err
+		}
+
+		status.JobID = jobId
+		logger.V(1).Info("Started async task for pod", "pod", pod.Name, "jobId", jobId)
+	} else {
+		if taskConfig.SyncFunc == nil {
+			// This feature is not supported in sync mode, mark everything as done
+			err := fmt.Errorf("this job isn't supported by the target pod")
+			logger.Error(err, "unable to execute requested job against pod", "Pod", pod)
+			status.Error = err.Error()
+			status.Status = api.PodError
+		}
+
+		if taskConfig.SyncFeature != "" {
+			if !features.Supports(taskConfig.SyncFeature) {
+				err := fmt.Errorf("this job isn't supported by the target pod")
+				logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
+				status.Error = err.Error()
+				status.Status = api.PodError
+			}
+		}
+
+		if status.Status == api.PodRunning {
+			go func() {
+				// Write value to the jobRunner to indicate we're running
+				taskKey := types.NamespacedName{Name: cassTask.Name, Namespace: cassTask.Namespace}
+				logger.V(1).Info("starting execution of sync blocking job", "Pod", pod)
+				jobRunner <- 1
+				defer func() {
+					// Remove the value from the jobRunner
+					<-jobRunner
+				}()
+
+				if err = taskConfig.SyncFunc(nodeMgmtClient, pod, taskConfig); err != nil {
+					// We only log, nothing else to do - we won't even retry this pod
+					logger.Error(err, "executing the sync task failed", "Pod", pod)
+					status.Error = err.Error()
+					status.Status = api.PodError
+				} else {
+					status.Status = api.PodCompleted
+				}
+
+				cassTask := &api.CassandraTask{}
+				if err := r.Get(context.Background(), taskKey, cassTask); err != nil {
+					logger.Error(err, "Failed to get task for status update", "CassandraTask", cassTask)
+				}
+
+				taskPatch := client.MergeFrom(cassTask.DeepCopy())
+				if cassTask.Status.PodStatuses == nil {
+					cassTask.Status.PodStatuses = make(map[string]api.PodProcessingStatus)
+				}
+				cassTask.Status.PodStatuses[pod.Name] = status
+
+				if err = r.Status().Patch(ctx, cassTask, taskPatch); err != nil {
+					logger.Error(err, "Failed to update cassandraTask's status", "CassandraTask", cassTask)
+				}
+			}()
+		}
+	}
+
+	cassTask.Status.PodStatuses[pod.Name] = status
+	return nil
+}
+
+func (r *CassandraTaskReconciler) checkRackCompletion(
+	ctx context.Context,
+	cassTask *api.CassandraTask,
+	pods []corev1.Pod,
+	taskConfig *TaskConfiguration,
+	nodeMgmtClient httphelper.NodeMgmtClient,
+) (int, int, int, int, error) {
+	logger := log.FromContext(ctx)
+
+	failed := 0
+	completed := 0
+	running := 0
+	remaining := len(pods)
+	for _, pod := range pods {
+		status, exists := cassTask.Status.PodStatuses[pod.Name]
+		if !exists {
+			continue
+		}
+
+		switch status.Status {
+		case api.PodWaiting:
+			continue
+		case api.PodCompleted:
+			completed++
+		case api.PodError:
+			failed++
+		case api.PodRunning:
+			if status.JobID != "" {
+				details, err := nodeMgmtClient.JobDetails(&pod, status.JobID)
+				if err != nil {
+					logger.Error(err, "Could not get JobDetails", "pod", pod.Name)
+					return remaining, failed, completed, running, err
+				}
+
+				if details.Id == "" {
+					// This should get requeued and restarted
+					delete(cassTask.Status.PodStatuses, pod.Name)
+				}
+
+				switch details.Status {
+				case "COMPLETED":
+					status.Status = api.PodCompleted
+					status.CompletionTime = ptr.To(metav1.Now())
+					cassTask.Status.PodStatuses[pod.Name] = status
+					completed++
+				case "ERROR":
+					maxRetries := 0
+
+					if taskConfig.RestartPolicy == corev1.RestartPolicyOnFailure {
+						maxRetries = 1
+						if taskConfig.Retries != nil {
+							maxRetries = *taskConfig.Retries
+						}
+					}
+
+					if status.Retries < maxRetries {
+						logger.V(1).Info("Retrying pod", "Pod", pod.Name, "Attempt", status.Retries+1, "MaxRetries", maxRetries)
+						status.Retries++
+						status.Status = api.PodWaiting
+						status.JobID = ""
+						status.Error = ""
+					} else {
+						status.Status = api.PodError
+						status.Error = details.Error
+						status.CompletionTime = ptr.To(metav1.Now())
+						failed++
+					}
+					cassTask.Status.PodStatuses[pod.Name] = status
+				default:
+					running++
+				}
+			} else {
+				// Sync jobs can only have one running at a time
+				if len(jobRunner) > 0 {
+					running++
+				} else {
+					// TODO Pod has crashed during sync task, need to retry or fail
+					logger.V(1).Info("Pod has crashed during sync task, need to retry or fail", "Pod", pod.Name)
+				}
+			}
+		default:
+			panic(fmt.Sprintf("This shouldn't happen, current status is %s", status.Status))
+		}
+	}
+
+	remaining = remaining - (completed + failed)
+
+	if remaining == 0 && running != 0 {
+		err := fmt.Errorf("inconsistent state: more pod states than pods, running=%d, completed=%d, failed=%d, totalPods=%d", running, completed, failed, len(pods))
+		logger.Error(err, "Pods marked running but all completed/failed")
+		return remaining, failed, completed, running, err
+	}
+
+	return remaining, failed, completed, running, nil
 }

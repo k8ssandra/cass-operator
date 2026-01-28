@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http/httptest"
+	"strings"
 	"time"
 
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
@@ -19,13 +20,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
-	mockServer  *httptest.Server
-	callDetails *httphelper.CallDetails
-	// testNamespaceName  = ""
+	mockServer         *httptest.Server
+	callDetails        *httphelper.CallDetails
 	testDatacenterName = "dc1"
 	testDc             *cassdcapi.CassandraDatacenter
 	clusterName        = ""
@@ -90,6 +91,11 @@ func createDatacenter(dcName, namespace string) func() {
 				createPod(namespace, clusterName, dcName, rack.Name, j)
 			}
 		}
+
+		Eventually(func(g Gomega) {
+			dc := &cassdcapi.CassandraDatacenter{}
+			g.Expect(k8sClient.Get(context.Background(), cassdcKey, dc)).To(Succeed())
+		}, 5*time.Second, 100*time.Millisecond)
 	}
 }
 
@@ -272,7 +278,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 					Expect(callDetails.URLCounts["/api/v1/ops/node/rebuild"]).To(Equal(nodeCount))
 					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
-					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", nodeCount))
 
 					// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 					Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount))
@@ -296,7 +302,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v1/ops/tables/sstables/upgrade"]).To(Equal(nodeCount))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", nodeCount))
 
 				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount))
 			})
@@ -318,7 +324,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v0/ops/node/move"]).To(Equal(3))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 3))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 3))
 
 				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", 3))
 			})
@@ -333,7 +339,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v1/ops/tables/flush"]).To(Equal(nodeCount))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", nodeCount))
 
 				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount))
 			})
@@ -349,7 +355,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v1/ops/tables/flush"]).To(Equal(1))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 1))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 1))
 
 				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", 1))
 			})
@@ -364,7 +370,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v1/ops/tables/garbagecollect"]).To(Equal(nodeCount))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", nodeCount))
 
 				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount))
 			})
@@ -380,7 +386,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v1/ops/tables/garbagecollect"]).To(Equal(nodeCount / rackCount))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount/rackCount))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount/rackCount))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", nodeCount/rackCount))
 
 				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount/rackCount))
 			})
@@ -398,7 +404,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v1/ops/tables/scrub"]).To(Equal(1))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 1))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 1))
 
 				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", 1))
 
@@ -424,7 +430,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v1/ops/tables/compact"]).To(Equal(1))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 1))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 1))
 
 				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", 1))
 
@@ -445,7 +451,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(nodeCount))
 					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
-					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", nodeCount))
 
 					// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 					Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
@@ -459,7 +465,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(nodeCount))
 					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
-					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", nodeCount))
 
 					// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 					Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
@@ -485,11 +491,11 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(nodeCount))
 					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
-					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", nodeCount))
 
 					Expect(completedTask.Status.Failed).To(BeNumerically("==", nodeCount))
 					Expect(completedTask.Status.Conditions[2].Type).To(Equal(string(api.JobFailed)))
-					Expect(completedTask.Status.Conditions[2].Message).To(Equal("any error"))
+					Expect(completedTask.Status.Conditions[2].Message).To(Equal("9 pods failed during processing"))
 				})
 				It("If retryPolicy is set, we should see a retry", func() {
 					By("Creating fake mgmt-api server")
@@ -511,11 +517,42 @@ var _ = Describe("CassandraTask controller tests", func() {
 					// Due to retry, we try twice and then bail out
 					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(2 * nodeCount))
 					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 2*nodeCount))
-					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 2*nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 2*nodeCount))
 
 					Expect(completedTask.Status.Failed).To(BeNumerically("==", nodeCount))
 					Expect(completedTask.Status.Conditions[2].Type).To(Equal(string(api.JobFailed)))
-					Expect(completedTask.Status.Conditions[2].Message).To(Equal("any error"))
+					Expect(completedTask.Status.Conditions[2].Message).To(Equal("9 pods failed during processing"))
+				})
+				It("If retryPolicy is set with retryCount, we should see a retry N times", func() {
+					By("Creating fake mgmt-api server with retry support")
+					callDetails := httphelper.NewCallDetails()
+					mockServer, err := httphelper.FakeExecutorServerWithRetry(callDetails, 2)
+					testRetryNamespaceName := fmt.Sprintf("test-retry-task-%d", rand.Int31())
+					Expect(err).ToNot(HaveOccurred())
+					mockServer.Start()
+					defer mockServer.Close()
+
+					By("create datacenter", createDatacenter("dc1", testRetryNamespaceName))
+					// defer deleteDatacenter(testRetryNamespaceName)
+
+					By("Creating a task for cleanup")
+					taskKey, task := buildTask(api.CommandCleanup, testRetryNamespaceName)
+					task.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+					task.Spec.Retries = ptr.To(2)
+					Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+					completedTask := waitForTaskCompletion(taskKey)
+
+					Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount))
+					Expect(len(completedTask.Status.PodStatuses)).To(BeNumerically(">=", nodeCount))
+
+					// Verify that retries were tracked
+					for _, status := range completedTask.Status.PodStatuses {
+						Expect(status.Retries).To(BeNumerically("==", 2))
+					}
+					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(3 * nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3*nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 3*nodeCount))
 				})
 				It("Replace a node in the datacenter without specifying the pod", func() {
 					testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())
@@ -544,6 +581,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				Expect(err).ToNot(HaveOccurred())
 				mockServer.Start()
 				By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
+				time.Sleep(1 * time.Second) // wait for datacenter to be ready
 			})
 
 			AfterEach(func() {
@@ -559,7 +597,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v0/ops/keyspace/cleanup"]).To(Equal(nodeCount))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 1))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
@@ -573,7 +611,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v0/ops/tables/sstables/upgrade"]).To(Equal(nodeCount))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 1))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
@@ -617,7 +655,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v0/ops/tables/flush"]).To(Equal(nodeCount))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 1))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
@@ -633,7 +671,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				Expect(callDetails.URLCounts["/api/v0/ops/tables/garbagecollect"]).To(Equal(nodeCount))
 				Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(Equal(0))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 1))
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 1))
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
@@ -678,7 +716,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				completedTask := waitForTaskCompletion(taskKey)
 
 				Expect(callDetails.URLCounts["/api/v0/ops/node/encryption/internode/truststore/reload"]).To(Equal(1))
-				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">", 0)) // This doesn't get called because the test of whether the feature exists doesn't pass.
+				Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 1)) // This doesn't get called because the test of whether the feature exists doesn't pass.
 
 				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
@@ -953,6 +991,151 @@ var _ = Describe("CassandraTask controller tests", func() {
 				taskKey, task := buildTask(api.CommandRefresh, testNamespaceName)
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 				_ = waitForTaskCompletion(taskKey)
+			})
+		})
+	})
+	Describe("CassandraTask controller parallel pod processing tests", func() {
+		Context("Parallel pod processing", func() {
+			var testNamespaceName string
+
+			BeforeEach(func() {
+				JobRunningRequeue = 1 * time.Millisecond
+				TaskRunningRequeue = 1 * time.Millisecond
+			})
+
+			Context("Concurrent processing within a rack", func() {
+				BeforeEach(func() {
+					By("Creating a fake mgmt-api server")
+					var err error
+					callDetails = httphelper.NewCallDetails()
+					mockServer, err = httphelper.FakeExecutorServerWithDetails(callDetails)
+					testNamespaceName = fmt.Sprintf("test-parallel-task-%d", rand.Int31())
+					Expect(err).ToNot(HaveOccurred())
+					mockServer.Start()
+					By("create datacenter", createDatacenter(testDatacenterName, testNamespaceName))
+				})
+
+				AfterEach(func() {
+					mockServer.Close()
+					deleteDatacenter(testNamespaceName)
+				})
+
+				It("should process multiple pods concurrently within a rack and process racks sequentially", func() {
+					By("Creating a task with maxConcurrentPods set to 2")
+					taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
+					task.Spec.MaxConcurrentPods = ptr.To(2)
+					Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+					Eventually(func(g Gomega) {
+						updatedTask := &api.CassandraTask{}
+						err := k8sClient.Get(context.TODO(), taskKey, updatedTask)
+						g.Expect(err).ToNot(HaveOccurred())
+
+						runningPodsByRack := make(map[string]int)
+						rackProcessingState := make(map[string]int)
+						for podName, status := range updatedTask.Status.PodStatuses {
+							if status.Status == api.PodRunning {
+								for _, rack := range testDc.Spec.Racks {
+									if strings.Contains(podName, rack.Name) {
+										runningPodsByRack[rack.Name]++
+										break
+									}
+								}
+							}
+							if status.Status == api.PodCompleted {
+								for _, rack := range testDc.Spec.Racks {
+									if strings.Contains(podName, rack.Name) {
+										rackProcessingState[rack.Name]++
+										break
+									}
+								}
+							}
+						}
+
+						totalRunning := 0
+						for _, count := range runningPodsByRack {
+							totalRunning += count
+						}
+						g.Expect(totalRunning).To(BeNumerically("<=", 2), "More than 2 pods are running concurrently")
+
+						racksWithRunningPods := 0
+						for _, count := range runningPodsByRack {
+							if count > 0 {
+								racksWithRunningPods++
+							}
+						}
+						Expect(racksWithRunningPods).To(BeNumerically("<=", 1), "Running pods are from multiple racks") // This is intentionally Expect and not g.Expect to make this test fail
+
+						// This is a small test to verify the processing order is correct
+						if rackProcessingState["r1"] > 0 {
+							Expect(rackProcessingState["r0"]).To(Equal(nodeCount/rackCount), "Rack1 has completed pods but rack0 is not fully done")
+						}
+						if rackProcessingState["r2"] > 0 {
+							Expect(rackProcessingState["r1"]).To(Equal(nodeCount/rackCount), "Rack2 has completed pods but rack1 is not fully done")
+						}
+
+						g.Expect(updatedTask.Status.CompletionTime).ToNot(BeNil())
+					}, 5*time.Second, 50*time.Millisecond).Should(Succeed())
+
+					completedTask := waitForTaskCompletion(taskKey)
+
+					Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount))
+					Expect(len(completedTask.Status.PodStatuses)).To(BeNumerically(">=", nodeCount))
+
+					for _, status := range completedTask.Status.PodStatuses {
+						Expect(status.Status).To(Equal(api.PodCompleted))
+					}
+				})
+				It("should handle maxConcurrentPods greater than rack size", func() {
+					By("Creating a task with maxConcurrentPods set to 10")
+					taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
+					task.Spec.MaxConcurrentPods = ptr.To(10)
+					Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+					Eventually(func(g Gomega) {
+						updatedTask := &api.CassandraTask{}
+						err := k8sClient.Get(context.TODO(), taskKey, updatedTask)
+						g.Expect(err).ToNot(HaveOccurred())
+
+						runningPodsByRack := make(map[string]int)
+						rackProcessingState := make(map[string]int)
+						for podName, status := range updatedTask.Status.PodStatuses {
+							if status.Status == api.PodRunning {
+								for _, rack := range testDc.Spec.Racks {
+									if strings.Contains(podName, rack.Name) {
+										runningPodsByRack[rack.Name]++
+										break
+									}
+								}
+							}
+							if status.Status == api.PodCompleted {
+								for _, rack := range testDc.Spec.Racks {
+									if strings.Contains(podName, rack.Name) {
+										rackProcessingState[rack.Name]++
+										break
+									}
+								}
+							}
+						}
+
+						totalRunning := 0
+						for _, count := range runningPodsByRack {
+							totalRunning += count
+						}
+						g.Expect(totalRunning).To(BeNumerically("<=", 2), "More than 2 pods are running concurrently")
+
+						racksWithRunningPods := 0
+						for _, count := range runningPodsByRack {
+							if count > 0 {
+								racksWithRunningPods++
+							}
+						}
+						Expect(racksWithRunningPods).To(BeNumerically("<=", 1), "Running pods are from multiple racks") // This is intentionally Expect and not g.Expect to make this test fail
+					}, 5*time.Second, 50*time.Millisecond).Should(Succeed())
+
+					completedTask := waitForTaskCompletion(taskKey)
+					Expect(completedTask.Status.Succeeded).To(BeNumerically("==", nodeCount))
+				})
 			})
 		})
 	})

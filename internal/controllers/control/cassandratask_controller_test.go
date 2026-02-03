@@ -95,7 +95,7 @@ func createDatacenter(dcName, namespace string) func() {
 		Eventually(func(g Gomega) {
 			dc := &cassdcapi.CassandraDatacenter{}
 			g.Expect(k8sClient.Get(context.Background(), cassdcKey, dc)).To(Succeed())
-		}, 5*time.Second, 100*time.Millisecond)
+		}, 5*time.Second, 100*time.Millisecond).Should(Succeed())
 	}
 }
 
@@ -576,7 +576,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				By("Creating fake synchronous mgmt-api server")
 				var err error
 				callDetails = httphelper.NewCallDetails()
-				mockServer, err = httphelper.FakeServerWithoutFeaturesEndpoint(callDetails)
+				mockServer, err = httphelper.FakeServerWithoutFeaturesEndpoint(callDetails, 0)
 				testNamespaceName = fmt.Sprintf("test-sync-task-%d", rand.Int31())
 				Expect(err).ToNot(HaveOccurred())
 				mockServer.Start()

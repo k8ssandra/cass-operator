@@ -669,25 +669,21 @@ func (r *CassandraTaskReconciler) processRack(
 ) (ctrl.Result, int, int, int, error) {
 	logger := log.FromContext(ctx)
 
-	cassTaskPatch := client.MergeFromWithOptions(cassTask.DeepCopy(), client.MergeFromWithOptimisticLock{})
-	// cassTaskPatch := client.MergeFrom(cassTask.DeepCopy())
+	cassTaskPatch := client.MergeFrom(cassTask.DeepCopy())
 
 	if cassTask.Status.PodStatuses == nil {
 		cassTask.Status.PodStatuses = make(map[string]api.PodProcessingStatus)
 	}
 
-	// Check completion status
 	rackRemaining, rackFailed, rackCompleted, runningCount, err := r.checkRackCompletion(ctx, cassTask, pods, taskConfig, nodeMgmtClient)
 	if err != nil {
 		return ctrl.Result{}, 0, 0, 0, err
 	}
 
-	// If at concurrency limit, wait
 	if runningCount >= maxConcurrent {
 		return ctrl.Result{RequeueAfter: JobRunningRequeue}, 0, 0, 0, nil
 	}
 
-	// If remaining is zero, but some are still running, we can't create more work yet
 	if rackRemaining > 0 && rackRemaining == runningCount {
 		return ctrl.Result{RequeueAfter: JobRunningRequeue}, 0, 0, 0, nil
 	}
@@ -703,26 +699,19 @@ func (r *CassandraTaskReconciler) processRack(
 
 		status, exists := cassTask.Status.PodStatuses[pod.Name]
 
-		// Skip if already completed or errored
 		if exists && (status.Status == api.PodCompleted || status.Status == api.PodError) {
 			continue
 		}
 
-		// Skip if already running
 		if exists && status.Status == api.PodRunning {
 			continue
 		}
 
-		// Start processing this pod
 		logger.V(1).Info("Starting pod task", "pod", pod.Name)
 		if err := r.startPodTask(ctx, cassTask, &pod, taskConfig, nodeMgmtClient); err != nil {
 			return ctrl.Result{}, 0, 0, 0, err
 		}
 		started++
-	}
-
-	if started > 0 {
-		logger.V(1).Info("Started pod tasks", "count", started)
 	}
 
 	// Update task status to persist all changes
@@ -793,6 +782,12 @@ func (r *CassandraTaskReconciler) startPodTask(
 			}
 		}
 
+		if len(jobRunner) >= cap(jobRunner) {
+			status.Status = api.PodWaiting
+			cassTask.Status.PodStatuses[pod.Name] = status
+			return nil
+		}
+
 		if status.Status == api.PodRunning {
 			go func() {
 				// Write value to the jobRunner to indicate we're running
@@ -805,7 +800,7 @@ func (r *CassandraTaskReconciler) startPodTask(
 				}()
 
 				if err = taskConfig.SyncFunc(nodeMgmtClient, pod, taskConfig); err != nil {
-					// We only log, nothing else to do - we won't even retry this pod
+					// We only log, nothing else to do - we won't even retry this pod.
 					logger.Error(err, "executing the sync task failed", "Pod", pod)
 					status.Error = err.Error()
 					status.Status = api.PodError
@@ -881,38 +876,18 @@ func (r *CassandraTaskReconciler) checkRackCompletion(
 					cassTask.Status.PodStatuses[pod.Name] = status
 					completed++
 				case "ERROR":
-					maxRetries := 0
-
-					if taskConfig.RestartPolicy == corev1.RestartPolicyOnFailure {
-						maxRetries = 1
-						if taskConfig.Retries != nil {
-							maxRetries = *taskConfig.Retries
-						}
-					}
-
-					if status.Retries < maxRetries {
-						logger.V(1).Info("Retrying pod", "Pod", pod.Name, "Attempt", status.Retries+1, "MaxRetries", maxRetries)
-						status.Retries++
-						status.Status = api.PodWaiting
-						status.JobID = ""
-						status.Error = ""
-					} else {
-						status.Status = api.PodError
-						status.Error = details.Error
-						status.CompletionTime = ptr.To(metav1.Now())
-						failed++
-					}
+					failed = failed + podFailedHandling(taskConfig, &status, details.Error)
 					cassTask.Status.PodStatuses[pod.Name] = status
 				default:
 					running++
 				}
 			} else {
-				// Sync jobs can only have one running at a time
 				if len(jobRunner) > 0 {
 					running++
 				} else {
-					// TODO Pod has crashed during sync task, need to retry or fail
-					logger.V(1).Info("Pod has crashed during sync task, need to retry or fail", "Pod", pod.Name)
+					logger.V(1).Info("Pod or controller has crashed during sync task, need to retry or fail", "Pod", pod.Name)
+					failed = failed + podFailedHandling(taskConfig, &status, "Pod or controller crashed during sync task")
+					cassTask.Status.PodStatuses[pod.Name] = status
 				}
 			}
 		default:
@@ -929,4 +904,29 @@ func (r *CassandraTaskReconciler) checkRackCompletion(
 	}
 
 	return remaining, failed, completed, running, nil
+}
+
+func podFailedHandling(taskConfig *TaskConfiguration, status *api.PodProcessingStatus, errMsg string) int {
+	maxRetries := 0
+
+	if taskConfig.RestartPolicy == corev1.RestartPolicyOnFailure {
+		maxRetries = 1
+		if taskConfig.Retries != nil {
+			maxRetries = *taskConfig.Retries
+		}
+	}
+
+	if status.Retries < maxRetries {
+		status.Retries++
+		status.Status = api.PodWaiting
+		status.JobID = ""
+		status.Error = ""
+	} else {
+		status.Status = api.PodError
+		status.Error = errMsg
+		status.CompletionTime = ptr.To(metav1.Now())
+		return 1
+	}
+
+	return 0
 }

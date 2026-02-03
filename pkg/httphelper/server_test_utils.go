@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 var featuresReply = `{
@@ -148,10 +149,19 @@ func FakeServerWithSyncFeaturesEndpoint(callDetails *CallDetails) (*httptest.Ser
 	}))
 }
 
-func FakeServerWithoutFeaturesEndpoint(callDetails *CallDetails) (*httptest.Server, error) {
+func FakeServerWithoutFeaturesEndpoint(callDetails *CallDetails, maxFailCount int) (*httptest.Server, error) {
+	currentFailCount := 0
+
 	return FakeMgmtApiServer(callDetails, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond) // Simulate some delay
 		if r.Method == http.MethodPost && (r.URL.Path == "/api/v0/ops/keyspace/cleanup" || r.URL.Path == "/api/v0/ops/tables/sstables/upgrade" || r.URL.Path == "/api/v0/ops/node/drain" || r.URL.Path == "/api/v0/ops/tables/flush" || r.URL.Path == "/api/v0/ops/tables/garbagecollect" || r.URL.Path == "/api/v0/ops/tables/compact") {
-			w.WriteHeader(http.StatusOK)
+			if currentFailCount < maxFailCount {
+				currentFailCount++
+				w.WriteHeader(http.StatusInternalServerError)
+			} else {
+				currentFailCount = 0
+				w.WriteHeader(http.StatusOK)
+			}
 		} else if r.Method == http.MethodPost && r.URL.Path == "/api/v0/ops/node/encryption/internode/truststore/reload" {
 			w.WriteHeader(http.StatusOK)
 		} else {

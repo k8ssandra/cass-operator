@@ -79,6 +79,7 @@ func FakeExecutorServerWithDetails(callDetails *CallDetails) (*httptest.Server, 
 				r.URL.Path == "/api/v1/ops/node/rebuild" ||
 				r.URL.Path == "/api/v1/ops/tables/sstables/upgrade" ||
 				r.URL.Path == "/api/v0/ops/node/move" ||
+				r.URL.Path == "/api/v0/ops/node/drain" ||
 				r.URL.Path == "/api/v1/ops/tables/compact" ||
 				r.URL.Path == "/api/v1/ops/tables/scrub" ||
 				r.URL.Path == "/api/v1/ops/tables/flush" ||

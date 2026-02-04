@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#865](https://github.com/k8ssandra/cass-operator/issues/865) Add VolumeMount for the management-api-server-certs-volume volume to all containers instead of only cassandra container
+* [ENHANCEMENT] [#841](https://github.com/k8ssandra/cass-operator/issues/841) Add the ability for the rolling restart to restart an entire rack at once. This speeds up the rolling restart process in a cluster that has large amount of nodes in a single rack.
 
 ## v1.28.1
 

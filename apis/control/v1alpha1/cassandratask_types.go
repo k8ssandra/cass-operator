@@ -63,6 +63,17 @@ type CassandraTaskTemplate struct {
 	// The "Allow" property is only valid if all the other active Tasks have "Allow" as well.
 	// +optional
 	ConcurrencyPolicy batchv1.ConcurrencyPolicy `json:"concurrencyPolicy,omitempty"`
+
+	// MaxConcurrentPods specifies the maximum number of pods to process concurrently in a rack.
+	// If not set or set to 0 defaults to 1.
+	// +optional
+	MaxConcurrentPods *int `json:"maxConcurrentPods,omitempty"`
+
+	// Retries specifies the maximum number of times a failed pod operation can be retried.
+	// This is only relevant if the RestartPolicy is set to OnFailure. If not set,
+	// the default value is 1.
+	// +optional
+	Retries *int `json:"retries,omitempty"`
 }
 
 type CassandraCommand string
@@ -163,6 +174,11 @@ type CassandraTaskStatus struct {
 	// The number of pods which reached phase Failed.
 	// +optional
 	Failed int `json:"failed,omitempty"`
+
+	// PodStatuses tracks the processing status of each pod for bookkeeping.
+	// Keys are pod names (not including pod UID to handle recreation scenarios).
+	// +optional
+	PodStatuses map[string]PodProcessingStatus `json:"podStatuses,omitempty"`
 }
 
 type JobConditionType string
@@ -177,6 +193,43 @@ const (
 	// DatacenterUpdated
 	DatacenterUpdated JobConditionType = "DatacenterUpdated"
 )
+
+// PodProcessingPhase represents the current phase of a pod being processed by a task.
+type PodProcessingPhase string
+
+const (
+	// PodWaiting means the pod is waiting to be processed.
+	PodWaiting PodProcessingPhase = "WAITING"
+	// PodRunning means the pod is currently being processed.
+	PodRunning PodProcessingPhase = "RUNNING"
+	// PodCompleted means the pod has been successfully processed.
+	PodCompleted PodProcessingPhase = "COMPLETED"
+	// PodError means the pod processing failed.
+	PodError PodProcessingPhase = "ERROR"
+)
+
+// PodProcessingStatus represents the status of a pod being processed by a CassandraTask.
+type PodProcessingStatus struct {
+	// Status of the pod processing.
+	Status PodProcessingPhase `json:"status"`
+
+	// JobID for async operations (mgmt-api).
+	JobID string `json:"jobId,omitempty"`
+
+	// Retry count
+	Retries int `json:"retries,omitempty"`
+
+	// Error message if failed.
+	Error string `json:"error,omitempty"`
+
+	// Represents time when the job controller started processing this pod.
+	// +optional
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+
+	// Represents time when the pod was completed (success or fail).
+	// +optional
+	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
+}
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status

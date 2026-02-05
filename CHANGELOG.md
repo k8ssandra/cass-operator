@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [FEATURE] [#885](https://github.com/k8ssandra/cass-operator/issues/885) Add the ability to define retryCount in CassandraTasks
+* [ENHANCEMENT] [#861](https://github.com/k8ssandra/cass-operator/issues/861) CassandraTasks have now configurable pod concurrency. maxConcurrentPods will determine how many pods in the same rack (never multiple racks) can be processed in parallel. Also, state of the processed pods is now moved to the CassandraTask status with some additional information.
 * [CHANGE] [#865](https://github.com/k8ssandra/cass-operator/issues/865) Add VolumeMount for the management-api-server-certs-volume volume to all containers instead of only cassandra container
 * [ENHANCEMENT] [#841](https://github.com/k8ssandra/cass-operator/issues/841) Add the ability for the rolling restart to restart an entire rack at once. This speeds up the rolling restart process in a cluster that has large amount of nodes in a single rack.
 

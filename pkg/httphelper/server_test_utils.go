@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 var featuresReply = `{
@@ -148,14 +149,70 @@ func FakeServerWithSyncFeaturesEndpoint(callDetails *CallDetails) (*httptest.Ser
 	}))
 }
 
-func FakeServerWithoutFeaturesEndpoint(callDetails *CallDetails) (*httptest.Server, error) {
+func FakeServerWithoutFeaturesEndpoint(callDetails *CallDetails, maxFailCount int) (*httptest.Server, error) {
+	currentFailCount := 0
+
 	return FakeMgmtApiServer(callDetails, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond) // Simulate some delay
 		if r.Method == http.MethodPost && (r.URL.Path == "/api/v0/ops/keyspace/cleanup" || r.URL.Path == "/api/v0/ops/tables/sstables/upgrade" || r.URL.Path == "/api/v0/ops/node/drain" || r.URL.Path == "/api/v0/ops/tables/flush" || r.URL.Path == "/api/v0/ops/tables/garbagecollect" || r.URL.Path == "/api/v0/ops/tables/compact") {
-			w.WriteHeader(http.StatusOK)
+			if currentFailCount < maxFailCount {
+				currentFailCount++
+				w.WriteHeader(http.StatusInternalServerError)
+			} else {
+				currentFailCount = 0
+				w.WriteHeader(http.StatusOK)
+			}
 		} else if r.Method == http.MethodPost && r.URL.Path == "/api/v0/ops/node/encryption/internode/truststore/reload" {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+// FakeExecutorServerWithRetry returns failCount for the first N calls, then success and then fails again for N times (repeating)
+func FakeExecutorServerWithRetry(callDetails *CallDetails, failCount int) (*httptest.Server, error) {
+	jobId := 0
+	currentFailCount := 0
+
+	return FakeMgmtApiServer(callDetails, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query, err := url.ParseQuery(r.URL.RawQuery)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+
+		if r.Method == http.MethodGet && r.RequestURI == "/api/v0/metadata/versions/features" {
+			w.WriteHeader(http.StatusOK)
+			_, err = w.Write([]byte(featuresReply))
+		} else if r.Method == http.MethodGet && r.URL.Path == "/api/v0/ops/executor/job" {
+			w.WriteHeader(http.StatusOK)
+			jobId := query.Get("job_id")
+			if currentFailCount < failCount {
+				currentFailCount++
+				_, err = fmt.Fprintf(w, jobDetailsFailed, jobId)
+			} else {
+				currentFailCount = 0
+				_, err = fmt.Fprintf(w, jobDetailsCompleted, jobId)
+			}
+		} else if r.Method == http.MethodPost &&
+			(r.URL.Path == "/api/v1/ops/keyspace/cleanup" ||
+				r.URL.Path == "/api/v1/ops/node/rebuild" ||
+				r.URL.Path == "/api/v1/ops/tables/sstables/upgrade" ||
+				r.URL.Path == "/api/v0/ops/node/move" ||
+				r.URL.Path == "/api/v1/ops/tables/compact" ||
+				r.URL.Path == "/api/v1/ops/tables/scrub" ||
+				r.URL.Path == "/api/v1/ops/tables/flush" ||
+				r.URL.Path == "/api/v1/ops/tables/garbagecollect") {
+			w.WriteHeader(http.StatusOK)
+			// Write jobId
+			jobId++
+			_, err = w.Write([]byte(strconv.Itoa(jobId)))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}))
 }

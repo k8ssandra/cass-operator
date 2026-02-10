@@ -592,7 +592,9 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 			It("Runs a cleanup task against the datacenter pods", func() {
 				By("Creating a task for cleanup")
-				taskKey := createTask(api.CommandCleanup, testNamespaceName)
+				taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
+				task.Spec.RestartPolicy = corev1.RestartPolicyNever
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				completedTask := waitForTaskCompletion(taskKey)
 
@@ -606,7 +608,9 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 			It("Runs a upgradesstables task against the datacenter pods", func() {
 				By("Creating a task for upgradesstables")
-				taskKey := createTask(api.CommandUpgradeSSTables, testNamespaceName)
+				taskKey, task := buildTask(api.CommandUpgradeSSTables, testNamespaceName)
+				task.Spec.RestartPolicy = corev1.RestartPolicyNever
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				completedTask := waitForTaskCompletion(taskKey)
 
@@ -650,6 +654,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				By("Creating a task for flush")
 				taskKey, task := buildTask(api.CommandFlush, testNamespaceName)
 				task.Spec.Jobs[0].Arguments.KeyspaceName = "ks1"
+				task.Spec.RestartPolicy = corev1.RestartPolicyNever
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				completedTask := waitForTaskCompletion(taskKey)
@@ -666,6 +671,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				By("Creating a task for garbagecollect")
 				taskKey, task := buildTask(api.CommandGarbageCollect, testNamespaceName)
 				task.Spec.Jobs[0].Arguments.KeyspaceName = "ks1"
+				task.Spec.RestartPolicy = corev1.RestartPolicyNever
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				completedTask := waitForTaskCompletion(taskKey)

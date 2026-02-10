@@ -371,7 +371,7 @@ func setDefaults(cassTask *api.CassandraTask) {
 	}
 
 	if cassTask.Spec.RestartPolicy == "" {
-		cassTask.Spec.RestartPolicy = corev1.RestartPolicyNever
+		cassTask.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
 	}
 
 	if cassTask.Spec.ConcurrencyPolicy == "" {

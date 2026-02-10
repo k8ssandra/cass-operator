@@ -11,6 +11,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
@@ -90,6 +91,12 @@ var _ = Describe(testName, func() {
 				WithLabel(dcLabel).
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, dcName, 60)
+
+			step = "verify CassandraTask has RestartPolicy OnFailure by default"
+			json = "jsonpath={.items[0].spec.restartPolicy}"
+			k = kubectl.Get("CassandraTask").FormatOutput(json)
+			restartPolicy := ns.OutputAndLog(step, k)
+			Expect(restartPolicy).To(BeEquivalentTo(string(corev1.RestartPolicyOnFailure)))
 
 			step = "verify LastExecution is updated after task completion"
 			json = "jsonpath={.status.lastExecution}"

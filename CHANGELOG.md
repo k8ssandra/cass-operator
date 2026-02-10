@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [FEATURE] [#850](https://github.com/k8ssandra/cass-operator/issues/850) Added EnableParallelCleanupWithinRack annotation which speeds up post-scale-out cleanup by processing nodes in parallel within a rack
+* [CHANGE] [#850](https://github.com/k8ssandra/cass-operator/issues/850) The default retry policy for CassandraTask has changed to OnFailure
 * [FEATURE] [#885](https://github.com/k8ssandra/cass-operator/issues/885) Add the ability to define retryCount in CassandraTasks
 * [ENHANCEMENT] [#861](https://github.com/k8ssandra/cass-operator/issues/861) CassandraTasks have now configurable pod concurrency. maxConcurrentPods will determine how many pods in the same rack (never multiple racks) can be processed in parallel. Also, state of the processed pods is now moved to the CassandraTask status with some additional information.
 * [CHANGE] [#865](https://github.com/k8ssandra/cass-operator/issues/865) Add VolumeMount for the management-api-server-certs-volume volume to all containers instead of only cassandra container

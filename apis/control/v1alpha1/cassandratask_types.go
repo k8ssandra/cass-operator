@@ -48,7 +48,7 @@ type CassandraTaskTemplate struct {
 	// Jobs defines the jobs this task will execute (and their order)
 	Jobs []CassandraJob `json:"jobs,omitempty"`
 
-	// RestartPolicy indicates the behavior n case of failure. Default is Never.
+	// RestartPolicy indicates the behavior n case of failure. Default is OnFailure.
 	// +optional
 	RestartPolicy corev1.RestartPolicy `json:"restartPolicy,omitempty"`
 

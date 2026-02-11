@@ -485,8 +485,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 					By("create datacenter", createDatacenter("dc1", testFailedNamespaceName))
 					By("Creating a task for cleanup")
-					taskKey, task := buildTask(api.CommandCleanup, testFailedNamespaceName)
-					Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+					taskKey := createTask(api.CommandCleanup, testFailedNamespaceName)
 
 					completedTask := waitForTaskCompletion(taskKey)
 

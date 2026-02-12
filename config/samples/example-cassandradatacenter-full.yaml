@@ -29,6 +29,8 @@ metadata:
     cassandra.datastax.com/delete-pvc: "true"
     # Disable PDB creation for this datacenter.
     cassandra.datastax.com/disable-pdb-creation: "false"
+    # Speeds up post-scale-out cleanup by processing nodes in parallel within a rack.
+    cassandra.datastax.com/enable-parallel-cleanup-within-rack: "false"
 spec:
   # Desired number of Cassandra nodes.
   size: 9

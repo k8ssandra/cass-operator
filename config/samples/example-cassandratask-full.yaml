@@ -14,7 +14,7 @@ spec:
   # Run the task no earlier than this time (omit to start immediately).
   scheduledTime: "2024-06-01T12:00:00Z"
   # Restart policy for the Job pods spawned by this task (Never | OnFailure).
-  restartPolicy: Never
+  restartPolicy: OnFailure
   # Cleanup TTL in seconds after task completion (0 disables auto-cleanup).
   ttlSecondsAfterFinished: 86400
   # Concurrency policy for tasks running against the same cluster (Allow | Forbid).

@@ -2506,17 +2506,8 @@ func (rc *ReconciliationContext) createCleanupTask() error {
 	return rc.Client.Status().Patch(rc.Ctx, dc, dcPatch)
 }
 
-//func (rc *ReconciliationContext) calculateMaxConcurrentPods() *int {
-//	return ptr.To(rc.desiredRackInformation[0].NodeCount) // we have validation above, not sure if we need to check length
-//}
-
 func (rc *ReconciliationContext) calculateMaxConcurrentPods() *int {
-	var maxConcurrentPods *int
-	rackInfos := rc.desiredRackInformation
-	if len(rackInfos) > 0 {
-		maxConcurrentPods = ptr.To(rackInfos[0].NodeCount)
-	}
-	return maxConcurrentPods
+	return ptr.To(rc.desiredRackInformation[0].NodeCount)
 }
 
 func (rc *ReconciliationContext) activeTaskCompleted(task *taskapi.CassandraTask) result.ReconcileResult {

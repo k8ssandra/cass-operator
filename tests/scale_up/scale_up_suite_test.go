@@ -122,7 +122,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 			ns.WaitForDatacenterReady(dcName)
 
-			step = fmt.Sprintf("checking that cassandratask has expected number of maxConcurrentPods")
+			step = "checking that cassandratask has expected number of maxConcurrentPods"
 			json = "jsonpath={.items[?(@.spec.maxConcurrentPods)].spec.maxConcurrentPods}"
 			k = kubectl.Get("cassandratask").
 				WithLabel(fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)).

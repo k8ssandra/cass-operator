@@ -183,7 +183,7 @@ spec:
                 type: integer
               restartPolicy:
                 description: RestartPolicy indicates the behavior n case of failure.
-                  Default is Never.
+                  Default is OnFailure.
                 type: string
               retries:
                 description: |-

@@ -474,30 +474,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 		})
 		Context("Failing jobs", func() {
 			When("In a datacenter", func() {
-				It("Should fail once when no retryPolicy is set", func() {
-					By("Creating fake mgmt-api server")
-					callDetails := httphelper.NewCallDetails()
-					mockServer, err := httphelper.FakeExecutorServerWithDetailsFails(callDetails)
-					testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())
-					Expect(err).ToNot(HaveOccurred())
-					mockServer.Start()
-					defer mockServer.Close()
-
-					By("create datacenter", createDatacenter("dc1", testFailedNamespaceName))
-					By("Create a task for cleanup")
-					taskKey := createTask(api.CommandCleanup, testFailedNamespaceName)
-
-					completedTask := waitForTaskCompletion(taskKey)
-
-					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(nodeCount))
-					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
-					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", nodeCount))
-
-					Expect(completedTask.Status.Failed).To(BeNumerically("==", nodeCount))
-					Expect(completedTask.Status.Conditions[2].Type).To(Equal(string(api.JobFailed)))
-					Expect(completedTask.Status.Conditions[2].Message).To(Equal("9 pods failed during processing"))
-				})
-				It("If retryPolicy is set, we should see a retry", func() {
+				It("If retryPolicy is not set, should use OnFailure by default", func() {
 					By("Creating fake mgmt-api server")
 					callDetails := httphelper.NewCallDetails()
 					mockServer, err := httphelper.FakeExecutorServerWithDetailsFails(callDetails)
@@ -508,9 +485,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 					By("create datacenter", createDatacenter("dc1", testFailedNamespaceName))
 					By("Creating a task for cleanup")
-					taskKey, task := buildTask(api.CommandCleanup, testFailedNamespaceName)
-					task.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
-					Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+					taskKey := createTask(api.CommandCleanup, testFailedNamespaceName)
 
 					completedTask := waitForTaskCompletion(taskKey)
 
@@ -518,6 +493,31 @@ var _ = Describe("CassandraTask controller tests", func() {
 					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(2 * nodeCount))
 					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 2*nodeCount))
 					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 2*nodeCount))
+
+					Expect(completedTask.Status.Failed).To(BeNumerically("==", nodeCount))
+					Expect(completedTask.Status.Conditions[2].Type).To(Equal(string(api.JobFailed)))
+					Expect(completedTask.Status.Conditions[2].Message).To(Equal("9 pods failed during processing"))
+				})
+				It("Should run once when retryPolicy is Never", func() {
+					By("Creating fake mgmt-api server")
+					callDetails := httphelper.NewCallDetails()
+					mockServer, err := httphelper.FakeExecutorServerWithDetailsFails(callDetails)
+					testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())
+					Expect(err).ToNot(HaveOccurred())
+					mockServer.Start()
+					defer mockServer.Close()
+
+					By("create datacenter", createDatacenter("dc1", testFailedNamespaceName))
+					By("Create a task for cleanup")
+					taskKey, task := buildTask(api.CommandCleanup, testFailedNamespaceName)
+					task.Spec.RestartPolicy = corev1.RestartPolicyNever
+					Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
+
+					completedTask := waitForTaskCompletion(taskKey)
+
+					Expect(callDetails.URLCounts["/api/v1/ops/keyspace/cleanup"]).To(Equal(nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", nodeCount))
+					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", nodeCount))
 
 					Expect(completedTask.Status.Failed).To(BeNumerically("==", nodeCount))
 					Expect(completedTask.Status.Conditions[2].Type).To(Equal(string(api.JobFailed)))
@@ -591,7 +591,9 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 			It("Runs a cleanup task against the datacenter pods", func() {
 				By("Creating a task for cleanup")
-				taskKey := createTask(api.CommandCleanup, testNamespaceName)
+				taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
+				task.Spec.RestartPolicy = corev1.RestartPolicyNever
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				completedTask := waitForTaskCompletion(taskKey)
 
@@ -605,7 +607,9 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 			It("Runs a upgradesstables task against the datacenter pods", func() {
 				By("Creating a task for upgradesstables")
-				taskKey := createTask(api.CommandUpgradeSSTables, testNamespaceName)
+				taskKey, task := buildTask(api.CommandUpgradeSSTables, testNamespaceName)
+				task.Spec.RestartPolicy = corev1.RestartPolicyNever
+				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				completedTask := waitForTaskCompletion(taskKey)
 
@@ -649,6 +653,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				By("Creating a task for flush")
 				taskKey, task := buildTask(api.CommandFlush, testNamespaceName)
 				task.Spec.Jobs[0].Arguments.KeyspaceName = "ks1"
+				task.Spec.RestartPolicy = corev1.RestartPolicyNever
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				completedTask := waitForTaskCompletion(taskKey)
@@ -665,6 +670,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				By("Creating a task for garbagecollect")
 				taskKey, task := buildTask(api.CommandGarbageCollect, testNamespaceName)
 				task.Spec.Jobs[0].Arguments.KeyspaceName = "ks1"
+				task.Spec.RestartPolicy = corev1.RestartPolicyNever
 				Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 				completedTask := waitForTaskCompletion(taskKey)

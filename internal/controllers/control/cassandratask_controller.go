@@ -531,6 +531,7 @@ JobDefinition:
 			Arguments:         job.Arguments,
 			MaxConcurrentPods: cassTask.Spec.MaxConcurrentPods,
 			Retries:           cassTask.Spec.Retries,
+			PodFilter:         genericPodFilter,
 		}
 
 		// Process all the reconcileEveryPodTasks

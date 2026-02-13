@@ -350,7 +350,6 @@ func callFlushAsync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, t
 
 func flush(taskConfig *TaskConfiguration) {
 	taskConfig.AsyncFeature = httphelper.AsyncFlush
-	taskConfig.PodFilter = genericPodFilter
 	taskConfig.SyncFunc = callFlushSync
 	taskConfig.AsyncFunc = callFlushAsync
 }
@@ -379,7 +378,6 @@ func callGarbageCollectSync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev
 
 func gc(taskConfig *TaskConfiguration) {
 	taskConfig.AsyncFeature = httphelper.AsyncGarbageCollect
-	taskConfig.PodFilter = genericPodFilter
 	taskConfig.AsyncFunc = callGarbageCollectAsync
 	taskConfig.SyncFunc = callGarbageCollectSync
 }
@@ -413,7 +411,6 @@ func scrubAsync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskC
 
 func scrub(taskConfig *TaskConfiguration) {
 	taskConfig.AsyncFeature = httphelper.AsyncScrubTask
-	taskConfig.PodFilter = genericPodFilter
 	taskConfig.SyncFunc = scrubSync
 	taskConfig.AsyncFunc = scrubAsync
 }
@@ -440,7 +437,6 @@ func compactAsync(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, tas
 
 func compact(taskConfig *TaskConfiguration) {
 	taskConfig.AsyncFeature = httphelper.AsyncCompactionTask
-	taskConfig.PodFilter = genericPodFilter
 	taskConfig.SyncFunc = compactSync
 	taskConfig.AsyncFunc = compactAsync
 }
@@ -487,7 +483,6 @@ func (r *CassandraTaskReconciler) refreshDatacenter(ctx context.Context, dc *cas
 // ts reload functionality
 
 func inodeTsReload(taskConfig *TaskConfiguration) {
-	taskConfig.PodFilter = genericPodFilter
 	taskConfig.SyncFunc = inodeTsReloadSync
 	taskConfig.SyncFeature = httphelper.ReloadInodeTruststore
 }

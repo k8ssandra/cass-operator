@@ -84,6 +84,9 @@ const (
 	// Allow disabling the creation of PodDisruptionBudget for the datacenter
 	DisablePodDisruptionBudgetAnnotation = "cassandra.datastax.com/disable-pdb-creation"
 
+	// EnableParallelCleanupWithinRackAnnotation speeds up post-scale-out cleanup by processing nodes in parallel within a rack.
+	EnableParallelCleanupWithinRackAnnotation = "cassandra.datastax.com/enable-parallel-cleanup-within-rack"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 

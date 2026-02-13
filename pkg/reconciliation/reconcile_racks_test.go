@@ -1849,6 +1849,7 @@ func TestCleanupAfterScaling(t *testing.T) {
 	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
 	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
 	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
+	assert.Nil(task.Spec.MaxConcurrentPods)
 }
 
 func TestCleanupAfterScalingWithTracker(t *testing.T) {
@@ -1891,6 +1892,33 @@ func TestCleanupAfterScalingWithTracker(t *testing.T) {
 	r = rc.cleanupAfterScaling()
 	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
 	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
+	assert.Nil(task.Spec.MaxConcurrentPods)
+}
+
+func TestCleanupAfterScalingWithParallelAnnotation(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	assert := assert.New(t)
+
+	mockClient := mocks.NewClient(t)
+	rc.Client = mockClient
+	_ = rc.CalculateRackInformation()
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.EnableParallelCleanupWithinRackAnnotation, "true")
+
+	var task *taskapi.CassandraTask
+	// 1. Create task - return ok
+	k8sMockClientCreate(rc.Client.(*mocks.Client), nil).
+		Run(func(args mock.Arguments) {
+			arg := args.Get(1).(*taskapi.CassandraTask)
+			task = arg
+		}).
+		Times(1)
+
+	r := rc.cleanupAfterScaling()
+	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
+	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
+	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
+	assert.Equal(*task.Spec.MaxConcurrentPods, rc.desiredRackInformation[0].NodeCount)
 }
 
 func TestStripPassword(t *testing.T) {

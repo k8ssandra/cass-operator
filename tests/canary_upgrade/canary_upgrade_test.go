@@ -5,6 +5,7 @@ package canary_upgrade
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -86,8 +87,10 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)
 
-			imageConfigFile := filepath.Join("..", "..", "config", "manager", "image_config.yaml")
-			registry, err := images.NewImageRegistry(imageConfigFile)
+			imageConfigFile := filepath.Join("..", "..", "config", "imageconfig", "image_config.yaml")
+			b, err := os.ReadFile(imageConfigFile)
+			Expect(err).ToNot(HaveOccurred())
+			registry, err := images.NewImageRegistryV2(b)
 			Expect(err).ToNot(HaveOccurred())
 
 			old, _ := registry.GetCassandraImage("cassandra", "4.0.1")

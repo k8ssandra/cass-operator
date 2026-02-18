@@ -11,16 +11,17 @@ metadata:
 spec:
   selector:
     matchLabels:
-      name: cass-operator
       control-plane: controller-manager
+      app.kubernetes.io/name: cass-operator
   replicas: 1
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
-        name: cass-operator
         control-plane: controller-manager
+        app.kubernetes.io/name: cass-operator
+        name: cass-operator
     spec:
       securityContext:
         runAsNonRoot: true
@@ -34,11 +35,9 @@ spec:
           - --health-probe-bind-address=:8081
         image: controller:latest
         name: manager
+        ports: []
         imagePullPolicy: IfNotPresent
         securityContext:
-          runAsNonRoot: true
-          runAsGroup: 65534
-          runAsUser: 65534
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
           capabilities:
@@ -68,5 +67,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        volumeMounts: []
+      volumes: []
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

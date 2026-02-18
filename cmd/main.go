@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -80,7 +78,6 @@ func main() {
 	var secureMetrics bool
 	var secureMetricsAuth bool
 	var enableHTTP2 bool
-	var configFile string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -103,9 +100,6 @@ func main() {
 
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.StringVar(&configFile, "config", "",
-		"The cass-operator will load its configuration from this file. "+
-			"Omit this flag to use the default configuration values. ")
 
 	opts := zap.Options{
 		Development: true,
@@ -193,7 +187,6 @@ func main() {
 		})
 	}
 
-	operConfig := &configv1beta1.OperatorConfig{}
 	options := ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -201,18 +194,6 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "b569adb7.cassandra.datastax.com",
-	}
-	if configFile != "" {
-		var err error
-		operConfig, err = readOperConfig(configFile)
-		if err != nil {
-			setupLog.Error(err, "unable to load the config file")
-			os.Exit(1)
-		}
-	}
-
-	if operConfig.ImageConfigFile == "" {
-		operConfig.ImageConfigFile = "/configs/image_config.yaml"
 	}
 
 	options.Cache = cache.Options{
@@ -254,7 +235,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	registry, err := setupImageRegistry(ctx, cfg, operConfig)
+	registry, err := setupImageRegistry(ctx, cfg)
 	if err != nil {
 		setupLog.Error(err, "unable to set up image registry")
 		os.Exit(1)
@@ -277,12 +258,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !operConfig.DisableWebhooks {
-		if err = apiwebhook.SetupCassandraDatacenterWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
-			os.Exit(1)
-		}
+	if err = apiwebhook.SetupCassandraDatacenterWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
+		os.Exit(1)
 	}
+
 	if err = (&controlcontrollers.CassandraTaskReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -377,7 +357,7 @@ func setupCacheIndexers(ctx context.Context, mgr ctrl.Manager) error {
 	return nil
 }
 
-func setupImageRegistry(ctx context.Context, cfg *rest.Config, operConfig *configv1beta1.OperatorConfig) (images.ImageRegistry, error) {
+func setupImageRegistry(ctx context.Context, cfg *rest.Config) (images.ImageRegistry, error) {
 	operatorNs, err := utils.GetOperatorNamespace()
 	if err != nil {
 		setupLog.Error(err, "unable to get operator namespace")
@@ -396,34 +376,5 @@ func setupImageRegistry(ctx context.Context, cfg *rest.Config, operConfig *confi
 		return nil, err
 	}
 
-	if registry == nil {
-		setupLog.Info("v1beta2 image config not found, falling back to v1beta1 from the disk")
-		registry, err = images.NewImageRegistry(operConfig.ImageConfigFile)
-		if err != nil {
-			setupLog.Error(err, "unable to load the image config file")
-			return nil, err
-		}
-	}
-
 	return registry, nil
-}
-
-func readOperConfig(configFile string) (*configv1beta1.OperatorConfig, error) {
-	operConfig := &configv1beta1.OperatorConfig{}
-	_, err := os.Stat(configFile)
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := os.ReadFile(configFile)
-	if err != nil {
-		return nil, err
-	}
-
-	codecs := serializer.NewCodecFactory(scheme)
-	if err := runtime.DecodeInto(codecs.UniversalDecoder(), content, operConfig); err != nil {
-		return nil, fmt.Errorf("could not decode file into runtime.Object: %v", err)
-	}
-
-	return operConfig, nil
 }

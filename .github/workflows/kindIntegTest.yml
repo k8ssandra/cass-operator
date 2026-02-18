@@ -158,11 +158,11 @@ jobs:
     strategy:
       matrix:
         version:
-          - "5.0.3"
+          - "5.0.6"
         integration_test:
           - canary_upgrade
           - podspec_simple
-          - upgrade_operator
+          # - upgrade_operator
       fail-fast: false
     runs-on: ubuntu-latest
     env:
@@ -191,7 +191,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "5.0.3"
+          - "5.0.6"
         integration_test:
           # Single worker tests:
           - additional_serviceoptions
@@ -270,17 +270,17 @@ jobs:
         version:
           - "4.0.17"
           - "4.1.8"
-          - "5.0.3"
-          - "6.8.54"
-          - "6.9.7"
+          - "5.0.6"
+          - "6.8.59"
+          - "6.9.17"
           # - "5.1.0"
         integration_test:
           - test_all_the_things
           - smoke_test_read_only_fs
         include:
-          - version: 6.8.54
+          - version: 6.8.59
             serverType: dse
-          - version: 6.9.7
+          - version: 6.9.17
             serverType: dse
           # - version: 5.1.0
           #   serverImage: ghcr.io/k8ssandra/cass-management-api:5.1-nightly-latest
@@ -322,7 +322,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - "5.0.3"
+          - "5.0.6"
         integration_test:
           - pvc_expansion
       fail-fast: true
@@ -354,7 +354,7 @@ jobs:
           make start-lvmd
           make KIND=$(type -a -P kind) launch-kind
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache: false

@@ -352,8 +352,8 @@ func (in *CassandraDatacenterSpec) DeepCopyInto(out *CassandraDatacenterSpec) {
 			(*out)[key] = val
 		}
 	}
-	if in.CDC != nil {
-		in, out := &in.CDC, &out.CDC
+	if in.DeprecatedCDC != nil {
+		in, out := &in.DeprecatedCDC, &out.DeprecatedCDC
 		*out = new(CDCConfiguration)
 		(*in).DeepCopyInto(*out)
 	}

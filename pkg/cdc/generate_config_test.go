@@ -63,7 +63,7 @@ func (c *testCase) run(t *testing.T) {
 // The main purpose here is to ensure that when marshalling and unmarshalling from the structs, we aren't losing fields.
 func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 	dc := GetCassandraDatacenter("test-dc", "test-ns")
-	dc.Spec.CDC = (*cassdcapi.CDCConfiguration)(nil)
+	dc.Spec.DeprecatedCDC = (*cassdcapi.CDCConfiguration)(nil)
 	test := testCase{
 		Description:   "When CDC not requested and a config json exists, UpdateConfig() does nothing.",
 		InitialConfig: existingConfig,
@@ -134,7 +134,7 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	dc := GetCassandraDatacenter("test-dc", "test-ns")
 	pulsarServiceUrl := "pulsar://pulsar:6650"
 	topicPrefix := "test-prefix-"
-	dc.Spec.CDC = &cassdcapi.CDCConfiguration{
+	dc.Spec.DeprecatedCDC = &cassdcapi.CDCConfiguration{
 		PulsarServiceUrl: &pulsarServiceUrl,
 		TopicPrefix:      &topicPrefix,
 	}
@@ -154,7 +154,7 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 	// Test case when the DC has CDC explicitly marked false.
 	dc := GetCassandraDatacenter("test-dc", "test-ns")
-	dc.Spec.CDC = (*cassdcapi.CDCConfiguration)(nil)
+	dc.Spec.DeprecatedCDC = (*cassdcapi.CDCConfiguration)(nil)
 	jvmAddtnlOptionsJson := `
 	{
 		"cassandra-env-sh": {

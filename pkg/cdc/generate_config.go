@@ -14,7 +14,7 @@ import (
 // UpdateConfig updates the json formatted Cassandra config which incorporates the JVM options (under key additional-jvm-opts) passed into the launch scripts
 // for Cassandra via the config builder.
 func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) (json.RawMessage, error) {
-	if cassDC.Spec.CDC == nil {
+	if cassDC.Spec.DeprecatedCDC == nil {
 		return config, nil
 	}
 
@@ -31,7 +31,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	}
 	updateCassandraYaml(&c) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
 	// Figure out what to do and reconcile config.CassEnvSh.AddtnlJVMOptions back to desired state per CDCConfig.
-	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, cassDC.Spec.CDC, cassDC, mcacEnabled(cassDC))
+	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, cassDC.Spec.DeprecatedCDC, cassDC, mcacEnabled(cassDC))
 	if err != nil {
 		return nil, err
 	}

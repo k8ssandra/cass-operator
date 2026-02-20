@@ -268,8 +268,8 @@ type CassandraDatacenterSpec struct {
 	// Additional Annotations allows to define additional labels that will be included in all objects created by the operator. Note, user can override values set by default from the cass-operator and doing so could break cass-operator functionality.
 	AdditionalAnnotations map[string]string `json:"additionalAnnotations,omitempty"`
 
-	// CDC allows configuration of the change data capture agent which can run within the Management API container. Use it to send data to Pulsar.
-	CDC *CDCConfiguration `json:"cdc,omitempty"`
+	// Deprecated this field is deprecated and will be removed in the future. DeprecatedCDC allows configuration of the change data capture agent which can run within the Management API container. Use it to send data to Pulsar.
+	DeprecatedCDC *CDCConfiguration `json:"cdc,omitempty"`
 
 	// DatacenterName allows to override the name of the Cassandra datacenter. In Cassandra the DC name will be overridden by this value.
 	// This setting can create conflicts if multiple DCs coexist in the same namespace if metadata.name for a DC with no override is set to the same value as the override name of another DC.

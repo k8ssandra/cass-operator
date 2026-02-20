@@ -152,9 +152,10 @@ spec:
                 format: int32
                 type: integer
               cdc:
-                description: CDC allows configuration of the change data capture agent
-                  which can run within the Management API container. Use it to send
-                  data to Pulsar.
+                description: Deprecated this field is deprecated and will be removed
+                  in the future. DeprecatedCDC allows configuration of the change
+                  data capture agent which can run within the Management API container.
+                  Use it to send data to Pulsar.
                 properties:
                   cdcConcurrentProcessors:
                     type: integer

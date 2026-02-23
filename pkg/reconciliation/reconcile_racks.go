@@ -765,7 +765,11 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	}
 	err = rc.refreshSeeds()
 	if err != nil {
-		return result.Error(err)
+		rc.ReqLogger.Error(err,
+			"failed to refresh seeds, but continuing reconciliation",
+			"seedCount", seedCount,
+			"totalPods", len(rc.dcPods),
+		)
 	}
 
 	// step 0 - fastpath
@@ -2139,6 +2143,13 @@ func (rc *ReconciliationContext) createStartSequence() []*corev1.Pod {
 		for podRankWithinRack := maxPodRankInThisRack; podRankWithinRack >= 0; podRankWithinRack-- {
 			podName := getStatefulSetPodNameForIdx(statefulSet, int32(podRankWithinRack))
 			pod := rc.getDCPodByName(podName)
+			if pod == nil {
+				rc.ReqLogger.Info("pod not found in datacenter pod list, skipping",
+					"podName", podName,
+					"rack", rackInfo.RackName,
+					"reason", "pod may be terminating or StatefulSet controller hasn't caught up")
+				continue
+			}
 			if !isServerReady(pod) {
 				if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
 					if utils.IndexOfString(rc.Datacenter.Status.FailedStarts, podName) > -1 {

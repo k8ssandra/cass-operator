@@ -28,6 +28,7 @@ var (
 	podNameToReplace = podNames[2]
 	dcYaml           = "../testdata/default-three-rack-three-node-dc-4x.yaml"
 	taskYaml         = "../testdata/tasks/replace_node_task.yaml"
+	taskYamlRack     = "../testdata/tasks/replace_node_task_rack.yaml"
 	dcResource       = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	ns               = ginkgo_util.NewWrapper(testName, namespace)
 )
@@ -257,6 +258,59 @@ var _ = Describe(testName, func() {
 			newPvName := ns.OutputAndLog(step, k)
 
 			Expect(pvName).ToNot(Equal(newPvName), "Expected PV volume to be different after node replace")
+		})
+		Specify("cassandratask can be used to replace a rack", func() {
+			rackPodNames := []string{"cluster1-dc1-r1-sts-0", "cluster1-dc1-r1-sts-1"}
+			oldPvByPod := make(map[string]string, len(rackPodNames))
+			newPvByPod := make(map[string]string, len(rackPodNames))
+
+			// This is to ensure we have enough nodes to see multiple replaces instead of just filtering change
+			step := "scale up to 6 nodes"
+			patch := `{"spec":{"size":6}}`
+			k := kubectl.PatchMerge(dcResource, patch)
+			ns.ExecAndLog(step, k)
+
+			ns.WaitForDatacenterCondition(dcName, "ScaleUp", string(corev1.ConditionFalse))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(6))
+
+			for _, podName := range rackPodNames {
+				step = fmt.Sprintf("retrieve the persistent volume claim for %s", podName)
+				json := "jsonpath={.spec.volumes[?(.name=='server-data')].persistentVolumeClaim.claimName}"
+				k = kubectl.Get("pod", podName).FormatOutput(json)
+				pvcName := ns.OutputAndLog(step, k)
+
+				step = fmt.Sprintf("find PVC volume for %s", podName)
+				json = "jsonpath={.spec.volumeName}"
+				k = kubectl.Get("pvc", pvcName).FormatOutput(json)
+				oldPvByPod[podName] = ns.OutputAndLog(step, k)
+			}
+
+			step = "creating a cassandra task to replace nodes in rack r1"
+			k = kubectl.ApplyFiles(taskYamlRack)
+			ns.ExecAndLog(step, k)
+
+			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionTrue))
+
+			ns.WaitForCompleteTask("replace-node-rack")
+			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionFalse))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(6))
+
+			for _, podName := range rackPodNames {
+				step = fmt.Sprintf("retrieve the persistent volume claim after replace for %s", podName)
+				json := "jsonpath={.spec.volumes[?(.name=='server-data')].persistentVolumeClaim.claimName}"
+				k = kubectl.Get("pod", podName).FormatOutput(json)
+				pvcName := ns.OutputAndLog(step, k)
+
+				step = fmt.Sprintf("find PVC volume after replace for %s", podName)
+				json = "jsonpath={.spec.volumeName}"
+				k = kubectl.Get("pvc", pvcName).FormatOutput(json)
+				newPvByPod[podName] = ns.OutputAndLog(step, k)
+			}
+
+			for _, podName := range rackPodNames {
+				Expect(oldPvByPod[podName]).ToNot(Equal(newPvByPod[podName]),
+					"Expected PV volume to be different after rack replace for pod %s", podName)
+			}
 		})
 	})
 })

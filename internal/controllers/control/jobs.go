@@ -183,46 +183,29 @@ func upgradesstables(taskConfig *TaskConfiguration) {
 func (r *CassandraTaskReconciler) replacePod(nodeMgmtClient httphelper.NodeMgmtClient, pod *corev1.Pod, taskConfig *TaskConfiguration) error {
 	logger := log.FromContext(taskConfig.Context)
 
-	// We check the podStartTime to prevent replacing the pod multiple times since annotations are removed when we delete the pod
-	podStartTime := pod.GetCreationTimestamp()
-	uid := pod.UID
-	podKey := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-	if podStartTime.Before(taskConfig.TaskStartTime) {
-		if isCassandraUp(pod) {
-			// Verify the cassandra pod is healthy before trying the drain
-			if err := nodeMgmtClient.CallDrainEndpoint(pod); err != nil {
-				logger.Error(err, "Failed to drain pod", "pod", pod.Name)
-			}
+	if isCassandraUp(pod) {
+		// Verify the cassandra pod is healthy before trying the drain
+		if err := nodeMgmtClient.CallDrainEndpoint(pod); err != nil {
+			logger.Error(err, "Failed to drain pod", "pod", pod.Name)
 		}
+	}
 
-		// Get all the PVCs that the pod is using?
-		pvcs, err := r.getPodPVCs(taskConfig.Context, taskConfig.Datacenter.Namespace, pod)
-		if err != nil {
-			return err
-		}
+	// Get all the PVCs that the pod is using?
+	pvcs, err := r.getPodPVCs(taskConfig.Context, taskConfig.Datacenter.Namespace, pod)
+	if err != nil {
+		return err
+	}
 
-		// Delete the PVCs .. without waiting (set status to terminating - finalizer will block)
-		for _, pvc := range pvcs {
-			if err := r.Delete(taskConfig.Context, pvc); err != nil {
-				return err
-			}
-		}
-
-		// Finally, delete the pod
-		if err := r.Delete(taskConfig.Context, pod); err != nil {
+	// Delete the PVCs .. without waiting (set status to terminating - finalizer will block)
+	for _, pvc := range pvcs {
+		if err := r.Delete(taskConfig.Context, pvc); err != nil {
 			return err
 		}
 	}
 
-	for i := 0; i < 10; i++ {
-		time.Sleep(1 * time.Second)
-		newPod := &corev1.Pod{}
-		if err := r.Get(taskConfig.Context, podKey, newPod); err != nil {
-			continue
-		}
-		if uid != newPod.UID {
-			break
-		}
+	// Finally, delete the pod
+	if err := r.Delete(taskConfig.Context, pod); err != nil {
+		return err
 	}
 
 	return nil
@@ -230,25 +213,55 @@ func (r *CassandraTaskReconciler) replacePod(nodeMgmtClient httphelper.NodeMgmtC
 
 func (r *CassandraTaskReconciler) replaceValidator(taskConfig *TaskConfiguration) (bool, error) {
 	// Check that arguments has replaceable pods and that those pods are actually existing pods
+
+	if taskConfig.Arguments.PodName == "" && taskConfig.Arguments.RackName == "" {
+		return false, fmt.Errorf("replace requires either rack_name or pod_name to be set as a filtering rule")
+	}
+
+	if taskConfig.Arguments.RackName != "" {
+		validRack := false
+		for _, rack := range taskConfig.Datacenter.Spec.Racks {
+			if rack.Name == taskConfig.Arguments.RackName {
+				validRack = true
+				break
+			}
+		}
+		if !validRack {
+			return false, fmt.Errorf("%s is not a valid rack name", taskConfig.Arguments.RackName)
+		}
+	}
+
 	if taskConfig.Arguments.PodName != "" {
 		pods, err := r.getDatacenterPods(taskConfig.Context, taskConfig.Datacenter)
 		if err != nil {
 			return true, err
 		}
+		validPod := false
 		for _, pod := range pods {
 			if pod.Name == taskConfig.Arguments.PodName {
-				return true, nil
+				validPod = true
+				break
 			}
+		}
+		if !validPod {
+			return false, fmt.Errorf("valid pod_name to replace is required")
 		}
 	}
 
-	return false, fmt.Errorf("valid pod_name to replace is required")
+	return true, nil
 }
 
 func requiredPodFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
-	// If pod isn't in the to be replaced pods, return false
+	rackName := taskConfig.Arguments.RackName
 	podName := taskConfig.Arguments.PodName
-	return pod.Name == podName
+
+	// If no filters are provided, reject everything
+	if rackName == "" && podName == "" {
+		return false
+	}
+
+	// Otherwise follow normal genericPodFilter
+	return genericPodFilter(pod, taskConfig)
 }
 
 func genericPodFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
@@ -268,13 +281,31 @@ func genericPodFilter(pod *corev1.Pod, taskConfig *TaskConfiguration) bool {
 // replacePreProcess adds enough information to CassandraDatacenter to ensure cass-operator knows this pod is being replaced
 func (r *CassandraTaskReconciler) replacePreProcess(taskConfig *TaskConfiguration) error {
 	dc := taskConfig.Datacenter
+	patch := client.MergeFrom(dc.DeepCopy())
+
+	podsToReplace := make([]string, 0, 1)
 	podName := taskConfig.Arguments.PodName
+	if podName != "" {
+		podsToReplace = append(podsToReplace, podName)
+	} else if taskConfig.Arguments.RackName != "" {
+		pods, err := r.getDatacenterPods(taskConfig.Context, taskConfig.Datacenter)
+		if err != nil {
+			return err
+		}
+
+		for _, pod := range pods {
+			if pod.Labels[cassapi.RackLabel] == taskConfig.Arguments.RackName {
+				podsToReplace = append(podsToReplace, pod.Name)
+			}
+		}
+	}
+
 	dc.Status.NodeReplacements = utils.AppendValuesToStringArrayIfNotPresent(
-		dc.Status.NodeReplacements, podName)
+		dc.Status.NodeReplacements, podsToReplace...)
 
 	r.setDatacenterCondition(dc, cassapi.NewDatacenterCondition(cassapi.DatacenterReplacingNodes, corev1.ConditionTrue))
 
-	return r.Client.Status().Update(taskConfig.Context, dc)
+	return r.Client.Status().Patch(taskConfig.Context, dc, patch)
 }
 
 func (r *CassandraTaskReconciler) setDatacenterCondition(dc *cassapi.CassandraDatacenter, condition *cassapi.DatacenterCondition) {

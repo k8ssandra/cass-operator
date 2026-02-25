@@ -704,18 +704,21 @@ func (rc *ReconciliationContext) CheckRackStoppedState() result.ReconcileResult 
 }
 
 // checkSeedLabels loops over all racks and makes sure that the proper pods are labelled as seeds.
-func (rc *ReconciliationContext) checkSeedLabels() (int, error) {
+func (rc *ReconciliationContext) checkSeedLabels() (seedCount int, didSeedsChange bool, err error) {
 	rc.ReqLogger.Info("reconcile_racks::CheckSeedLabels")
-	seedCount := 0
+	seedCount = 0
 	for idx := range rc.desiredRackInformation {
 		rackInfo := rc.desiredRackInformation[idx]
-		n, err := rc.labelSeedPods(rackInfo)
+		n, didRackSeedsChange, err := rc.labelSeedPods(rackInfo)
 		seedCount += n
 		if err != nil {
-			return 0, err
+			return 0, false, err
+		}
+		if didRackSeedsChange {
+			didSeedsChange = true
 		}
 	}
-	return seedCount, nil
+	return seedCount, didSeedsChange, nil
 }
 
 func shouldUseFastPath(dc *api.CassandraDatacenter, seedCount int) bool {
@@ -759,17 +762,15 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 
 	// get the nodes labelled as seeds before we start any nodes
 
-	seedCount, err := rc.checkSeedLabels()
+	seedCount, didSeedsChange, err := rc.checkSeedLabels()
 	if err != nil {
 		return result.Error(err)
 	}
-	err = rc.refreshSeeds()
-	if err != nil {
-		rc.ReqLogger.Error(err,
-			"failed to refresh seeds, but continuing reconciliation",
-			"seedCount", seedCount,
-			"totalPods", len(rc.dcPods),
-		)
+	if didSeedsChange {
+		err = rc.refreshSeeds()
+		if err != nil {
+			return result.Error(err)
+		}
 	}
 
 	// step 0 - fastpath
@@ -1480,8 +1481,8 @@ func (rc *ReconciliationContext) isClusterHealthy() bool {
 
 // labelSeedPods iterates over all pods for a statefulset and makes sure the right number of
 // ready pods are labelled as seeds, so that they are picked up by the headless seed service
-// Returns the number of ready seeds.
-func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (int, error) {
+// Returns the number of ready seeds and informs if rack seeds were updated.
+func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (count int, didSeedsChange bool, err error) {
 	logger := rc.ReqLogger.WithName("labelSeedPods")
 
 	rackPods := rc.rackPods(rackInfo.RackName)
@@ -1489,7 +1490,7 @@ func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (int, 
 	sort.SliceStable(rackPods, func(i, j int) bool {
 		return rackPods[i].Name < rackPods[j].Name
 	})
-	count := 0
+	count = 0
 	for _, pod := range rackPods {
 		patch := client.MergeFrom(pod.DeepCopy())
 
@@ -1528,16 +1529,17 @@ func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (int, 
 		}
 
 		if shouldUpdate {
+			didSeedsChange = true
 			pod.SetLabels(newLabels)
 			if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
 				logger.Error(
 					err, "Unable to update pod with seed label",
 					"pod", pod.Name)
-				return 0, err
+				return 0, false, err
 			}
 		}
 	}
-	return count, nil
+	return count, didSeedsChange, nil
 }
 
 // GetStatefulSetForRack returns the statefulset for the rack

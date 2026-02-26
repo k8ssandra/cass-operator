@@ -4155,3 +4155,141 @@ func TestCheckDcPodDisruptionBudget(t *testing.T) {
 	pdb = &policyv1.PodDisruptionBudget{}
 	require.NoError(rc.Client.Get(rc.Ctx, pdbName, pdb))
 }
+
+func TestRefreshSeeds(t *testing.T) {
+	assert := assert.New(t)
+	const (
+		initialSeedCount = 3
+		updatedSeedCount = 1 // Triggers seed list change detection
+	)
+	prepareReconciliationCtx := func() (*ReconciliationContext, httphelper.CassMetadataEndpoints, func()) {
+		rc, _, cleanupMockScr := setupTest()
+		desiredStatefulSet, _ := newStatefulSetForCassandraDatacenter(
+			nil,
+			"default",
+			rc.Datacenter,
+			initialSeedCount,
+			imageRegistry)
+		desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
+		trackObjects := []runtime.Object{
+			desiredStatefulSet,
+			rc.Datacenter,
+		}
+		mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
+		for idx := range mockPods {
+			mp := mockPods[idx]
+			metav1.SetMetaDataLabel(&mp.ObjectMeta, api.SeedNodeLabel, "true")
+			trackObjects = append(trackObjects, mp)
+		}
+		rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+		epData := httphelper.CassMetadataEndpoints{
+			Entity: []httphelper.EndpointState{},
+		}
+		for i := 0; i < int(*desiredStatefulSet.Spec.Replicas); i++ {
+			ep := httphelper.EndpointState{
+				RpcAddress: fmt.Sprintf("192.168.1.%d", i+1),
+				Status:     "UN",
+			}
+			epData.Entity = append(epData.Entity, ep)
+		}
+
+		nextRack := &RackInformation{}
+		nextRack.RackName = desiredStatefulSet.Labels[api.RackLabel]
+		nextRack.NodeCount = int(*desiredStatefulSet.Spec.Replicas)
+		nextRack.SeedCount = initialSeedCount
+
+		rackInfo := []*RackInformation{nextRack}
+		rc.desiredRackInformation = rackInfo
+		rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
+		rc.statefulSets[0] = desiredStatefulSet
+		rc.clusterPods = mockPods
+		rc.dcPods = mockPods
+		return rc, epData, cleanupMockScr
+	}
+
+	t.Run("Seeds have changed, refreshSeeds is executed", func(t *testing.T) {
+		rc, epData, cleanup := prepareReconciliationCtx()
+		defer cleanup()
+
+		rc.desiredRackInformation[0].SeedCount = updatedSeedCount
+
+		successResp := &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("OK")),
+		}
+		mockHttpClient := mocks.NewHttpClient(t)
+		mockHttpClient.On("Do",
+			mock.MatchedBy(func(req *http.Request) bool {
+				return req != nil && req.URL.Path == "/api/v0/ops/seeds/reload"
+			})).
+			Return(successResp, nil).
+			Times(initialSeedCount)
+		mockHttpClient.On("Do",
+			mock.MatchedBy(func(req *http.Request) bool {
+				return req != nil && req.URL.Path == "/api/v0/probes/cluster"
+			})).
+			Return(successResp, nil).
+			Times(initialSeedCount)
+		rc.NodeMgmtClient = httphelper.NodeMgmtClient{
+			Client:   mockHttpClient,
+			Log:      rc.ReqLogger,
+			Protocol: "http",
+		}
+
+		reconcileResult := rc.CheckPodsReady(epData)
+
+		assert.Equal(result.Continue(), reconcileResult)
+		mockHttpClient.AssertExpectations(t)
+	})
+
+	t.Run("Seeds haven't changed, refreshSeeds is not executed", func(t *testing.T) {
+		rc, epData, cleanup := prepareReconciliationCtx()
+		defer cleanup()
+		mockHttpClient := mocks.NewHttpClient(t)
+		successResp := &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("OK")),
+		}
+		// no calls with '/api/v0/ops/seeds/reload'
+		mockHttpClient.On("Do",
+			mock.MatchedBy(func(req *http.Request) bool {
+				return req != nil && req.URL.Path == "/api/v0/probes/cluster"
+			})).
+			Return(successResp, nil).
+			Times(initialSeedCount)
+		rc.NodeMgmtClient = httphelper.NodeMgmtClient{
+			Client:   mockHttpClient,
+			Log:      rc.ReqLogger,
+			Protocol: "http",
+		}
+
+		reconcileResult := rc.CheckPodsReady(epData)
+
+		assert.Equal(result.Continue(), reconcileResult)
+		mockHttpClient.AssertExpectations(t)
+	})
+
+	t.Run("Seeds have changed, but refreshSeeds fails", func(t *testing.T) {
+		rc, epData, cleanup := prepareReconciliationCtx()
+		defer cleanup()
+		rc.desiredRackInformation[0].SeedCount = updatedSeedCount
+		respError := errors.New("internal error")
+		mockHttpClient := mocks.NewHttpClient(t)
+		mockHttpClient.On("Do",
+			mock.MatchedBy(func(req *http.Request) bool {
+				return req != nil && req.URL.Path == "/api/v0/ops/seeds/reload"
+			})).
+			Return(&http.Response{}, respError).
+			Once()
+		rc.NodeMgmtClient = httphelper.NodeMgmtClient{
+			Client:   mockHttpClient,
+			Log:      rc.ReqLogger,
+			Protocol: "http",
+		}
+
+		reconcileResult := rc.CheckPodsReady(epData)
+
+		assert.Equal(result.Error(respError), reconcileResult)
+		mockHttpClient.AssertExpectations(t)
+	})
+}

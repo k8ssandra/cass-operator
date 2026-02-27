@@ -4159,8 +4159,8 @@ func TestCheckDcPodDisruptionBudget(t *testing.T) {
 func TestRefreshSeeds(t *testing.T) {
 	assert := assert.New(t)
 	const (
-		initialSeedCount = 3
-		updatedSeedCount = 1 // Triggers seed list change detection
+		initialSeedCount = 3 // all 3 pods labeled as seeds
+		reducedSeedCount = 1 // reducing to 1 triggers seed refresh across datacenter
 	)
 	prepareReconciliationCtx := func() (*ReconciliationContext, httphelper.CassMetadataEndpoints, func()) {
 		rc, _, cleanupMockScr := setupTest()
@@ -4210,9 +4210,7 @@ func TestRefreshSeeds(t *testing.T) {
 	t.Run("Seeds have changed, refreshSeeds is executed", func(t *testing.T) {
 		rc, epData, cleanup := prepareReconciliationCtx()
 		defer cleanup()
-
-		rc.desiredRackInformation[0].SeedCount = updatedSeedCount
-
+		rc.desiredRackInformation[0].SeedCount = reducedSeedCount
 		successResp := &http.Response{
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader("OK")),
@@ -4272,7 +4270,7 @@ func TestRefreshSeeds(t *testing.T) {
 	t.Run("Seeds have changed, but refreshSeeds fails", func(t *testing.T) {
 		rc, epData, cleanup := prepareReconciliationCtx()
 		defer cleanup()
-		rc.desiredRackInformation[0].SeedCount = updatedSeedCount
+		rc.desiredRackInformation[0].SeedCount = reducedSeedCount
 		respError := errors.New("internal error")
 		mockHttpClient := mocks.NewHttpClient(t)
 		mockHttpClient.On("Do",

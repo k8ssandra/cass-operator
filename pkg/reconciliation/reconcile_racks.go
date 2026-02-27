@@ -502,7 +502,7 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 			desiredSts.DeepCopyInto(statefulSet)
 
 			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.UpdatingRack,
-				"Updating rack %s", rackName, "force", force)
+				"Updating rack %s force=%t", rackName, force)
 
 			if err := rc.setConditionStatus(api.DatacenterUpdating, corev1.ConditionTrue); err != nil {
 				return result.Error(err)

@@ -696,12 +696,16 @@ func (ns *NsWrapper) WaitForCompletedCassandraTasks(dcName, command string, coun
 }
 
 func (ns *NsWrapper) WaitForCompleteTask(taskName string) {
+	ns.WaitForCompleteTaskTimeout(taskName, 360)
+}
+
+func (ns *NsWrapper) WaitForCompleteTaskTimeout(taskName string, seconds int) {
 	step := "checking that cassandratask status CompletionTime has a value"
 	json := "jsonpath={.status.completionTime}"
 	k := kubectl.Get("cassandratask", taskName).
 		FormatOutput(json)
 
-	ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, 360)
+	ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, seconds)
 }
 
 func (ns *NsWrapper) ExpectDatacenterNameStatusUpdated(dcName, dcNameOverride string) {

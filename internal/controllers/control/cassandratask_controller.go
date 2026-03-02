@@ -89,6 +89,7 @@ type TaskConfiguration struct {
 	TaskStartTime *metav1.Time
 	Datacenter    *cassapi.CassandraDatacenter
 	Context       context.Context
+	Job           api.CassandraCommand
 
 	// Input parameters
 	RestartPolicy     corev1.RestartPolicy
@@ -301,6 +302,18 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		nextRunTime := deletionTime.Sub(timeNow.Time)
 		res.RequeueAfter = nextRunTime
 		logger.V(1).Info("This task has completed, scheduling for deletion in " + nextRunTime.String())
+	}
+
+	podSucceeded := 0
+	for _, podStatus := range cassTask.Status.PodStatuses {
+		if podStatus.Status == api.PodCompleted {
+			podSucceeded++
+		}
+	}
+
+	if cassTask.Spec.Jobs[0].Command == api.CommandReplaceNode && podSucceeded > completed {
+		// This is to offset one-off error from cache timings with replace node's Pod deletion
+		completed = podSucceeded
 	}
 
 	cassTask.Status.Succeeded = completed
@@ -532,6 +545,7 @@ JobDefinition:
 			MaxConcurrentPods: cassTask.Spec.MaxConcurrentPods,
 			Retries:           cassTask.Spec.Retries,
 			PodFilter:         genericPodFilter,
+			Job:               job.Command,
 		}
 
 		// Process all the reconcileEveryPodTasks
@@ -609,29 +623,6 @@ JobDefinition:
 			if err = r.Status().Update(ctx, cassTask); err != nil {
 				return ctrl.Result{}, failed, completed, err
 			}
-		}
-
-		if job.Command == api.CommandReplaceNode {
-			// Special handling for replace process since it targets a single pod
-			if err := r.replacePreProcess(taskConfig); err != nil {
-				return ctrl.Result{}, failed, completed, err
-			}
-			nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc, nil)
-			if err != nil {
-				return ctrl.Result{}, failed, completed, err
-			}
-
-			pod := &corev1.Pod{}
-			if err := r.Get(taskConfig.Context, types.NamespacedName{Name: taskConfig.Arguments.PodName, Namespace: dc.Namespace}, pod); err != nil {
-				return ctrl.Result{}, failed, completed, err
-			}
-			if err := r.replacePod(nodeMgmtClient, pod, taskConfig); err != nil {
-				return ctrl.Result{}, failed, completed, err
-			}
-
-			completed++
-			res = ctrl.Result{}
-			break
 		}
 
 		var podTaskRes ctrl.Result
@@ -757,7 +748,7 @@ func (r *CassandraTaskReconciler) startPodTask(
 		status.StartTime = ptr.To(metav1.Now())
 	}
 
-	if features.Supports(taskConfig.AsyncFeature) {
+	if taskConfig.Job != api.CommandReplaceNode && features.Supports(taskConfig.AsyncFeature) {
 		jobId, err := taskConfig.AsyncFunc(nodeMgmtClient, pod, taskConfig)
 		if err != nil {
 			return err
@@ -774,7 +765,7 @@ func (r *CassandraTaskReconciler) startPodTask(
 			status.Status = api.PodError
 		}
 
-		if taskConfig.SyncFeature != "" {
+		if taskConfig.Job != api.CommandReplaceNode && taskConfig.SyncFeature != "" {
 			if !features.Supports(taskConfig.SyncFeature) {
 				err := fmt.Errorf("this job isn't supported by the target pod")
 				logger.Error(err, "Pod doesn't support this feature", "Pod", pod, "Feature", taskConfig.SyncFeature)
@@ -800,13 +791,24 @@ func (r *CassandraTaskReconciler) startPodTask(
 					<-jobRunner
 				}()
 
-				if err = taskConfig.SyncFunc(nodeMgmtClient, pod, taskConfig); err != nil {
-					// We only log, nothing else to do - we won't even retry this pod.
-					logger.Error(err, "executing the sync task failed", "Pod", pod)
-					status.Error = err.Error()
-					status.Status = api.PodError
-				} else {
-					status.Status = api.PodCompleted
+				if taskConfig.PreProcessFunc != nil {
+					if err := taskConfig.PreProcessFunc(taskConfig); err != nil {
+						logger.Error(err, "executing preprocessing functionality failed", "Pod", pod)
+						status.Error = err.Error()
+						status.Status = api.PodError
+					}
+				}
+
+				if status.Error == "" {
+					if err = taskConfig.SyncFunc(nodeMgmtClient, pod, taskConfig); err != nil {
+						// We only log, nothing else to do - we won't even retry this pod.
+						logger.Error(err, "executing the sync task failed", "Pod", pod)
+						status.Error = err.Error()
+						status.Status = api.PodError
+					} else {
+						status.Status = api.PodCompleted
+						status.CompletionTime = ptr.To(metav1.Now())
+					}
 				}
 
 				cassTask := &api.CassandraTask{}

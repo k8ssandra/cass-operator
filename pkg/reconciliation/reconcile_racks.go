@@ -1934,10 +1934,6 @@ func (rc *ReconciliationContext) startBootstrappedNodes(endpointData httphelper.
 
 	for _, pod := range rc.dcPods {
 		if _, ok := rc.Datacenter.Status.NodeStatuses[pod.Name]; ok {
-			// Verify pod is not going to be replaced
-			if utils.IndexOfString(rc.Datacenter.Status.NodeReplacements, pod.Name) > -1 {
-				continue
-			}
 			notReady, err := rc.startNode(pod, false, endpointData)
 			if err != nil {
 				return startingNodes, err

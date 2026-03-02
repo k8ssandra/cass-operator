@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#873](https://github.com/k8ssandra/cass-operator/issues/873) Allow replacing multiple previously bootstrapped nodes in parallel. Also, the CassandraTask to replace pod accepts RackName as alternative to PodName as filtering rule.
+
 ## v1.29.0
 
 * [CHANGE] [#875](https://github.com/k8ssandra/cass-operator/issues/875) Update to Go 1.25, Kubernetes 1.34 and UBI10 as the base image. Also, Vector to 0.53.0 and other smaller dependency updates. Deprecate CDC support.

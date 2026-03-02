@@ -26,3 +26,10 @@ spec:
     jvm-server-options:
       initial_heap_size: "512m"
       max_heap_size: "512m"
+      additional-jvm-opts:
+      - -Dcassandra.system_distributed_replication_dc_names=dc1
+      - -Dcassandra.system_distributed_replication_per_dc=3
+      - -Dcassandra.system_traces_replication_dc_names=dc1
+      - -Dcassandra.system_traces_replication_per_dc=3
+      - -Dcassandra.system_auth_replication_dc_names=dc1
+      - -Dcassandra.system_auth_replication_per_dc=3

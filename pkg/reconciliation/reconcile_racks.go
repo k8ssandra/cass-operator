@@ -41,6 +41,8 @@ var (
 	ResultShouldRequeueSoon reconcile.Result = reconcile.Result{RequeueAfter: 2 * time.Second}
 
 	QuietDurationFunc func(int) time.Duration = func(secs int) time.Duration { return time.Duration(secs) * time.Second }
+
+	errPodNotFound = fmt.Errorf("pod not found, most likely statefulset controller has not caught up yet")
 )
 
 const (
@@ -704,9 +706,11 @@ func (rc *ReconciliationContext) CheckRackStoppedState() result.ReconcileResult 
 }
 
 // checkSeedLabels loops over all racks and makes sure that the proper pods are labelled as seeds.
-func (rc *ReconciliationContext) checkSeedLabels() (seedCount int, didSeedsChange bool, err error) {
+// Returns the number of ready seeds across all racks and informs whether seed labels changed.
+func (rc *ReconciliationContext) checkSeedLabels() (int, bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::CheckSeedLabels")
-	seedCount = 0
+	didSeedsChange := false
+	seedCount := 0
 	for idx := range rc.desiredRackInformation {
 		rackInfo := rc.desiredRackInformation[idx]
 		n, didRackSeedsChange, err := rc.labelSeedPods(rackInfo)
@@ -1481,8 +1485,8 @@ func (rc *ReconciliationContext) isClusterHealthy() bool {
 
 // labelSeedPods iterates over all pods for a statefulset and makes sure the right number of
 // ready pods are labelled as seeds, so that they are picked up by the headless seed service
-// Returns the number of ready seeds and informs if rack seeds were updated.
-func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (count int, didSeedsChange bool, err error) {
+// Returns the number of ready seeds and informs whether rack seeds were changed.
+func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (int, bool, error) {
 	logger := rc.ReqLogger.WithName("labelSeedPods")
 
 	rackPods := rc.rackPods(rackInfo.RackName)
@@ -1490,7 +1494,8 @@ func (rc *ReconciliationContext) labelSeedPods(rackInfo *RackInformation) (count
 	sort.SliceStable(rackPods, func(i, j int) bool {
 		return rackPods[i].Name < rackPods[j].Name
 	})
-	count = 0
+	count := 0
+	didSeedsChange := false
 	for _, pod := range rackPods {
 		patch := client.MergeFrom(pod.DeepCopy())
 
@@ -2086,7 +2091,7 @@ RackLoop:
 			podName := getStatefulSetPodNameForIdx(statefulSet, int32(maxPodRankInThisRack))
 			pod := rc.getDCPodByName(podName)
 			if pod == nil {
-				return false, fmt.Errorf("pod %s not found, most likely statefulset controller has not caught up yet", podName)
+				return false, fmt.Errorf("pod %s: %w", podName, errPodNotFound)
 			}
 			if !isServerReady(pod) {
 				if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
@@ -2120,7 +2125,10 @@ RackLoop:
 func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetadataEndpoints) (bool, error) {
 	rc.ReqLogger.Info("reconcile_racks::startAllNodes")
 
-	podsToStart := rc.createStartSequence()
+	podsToStart, err := rc.createStartSequence()
+	if err != nil {
+		return false, fmt.Errorf("failed to create start sequence: %w", err)
+	}
 	for _, pod := range podsToStart {
 		notReady, err := rc.startNode(pod, false, endpointData)
 		if notReady || err != nil {
@@ -2131,7 +2139,7 @@ func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetad
 	return false, nil
 }
 
-func (rc *ReconciliationContext) createStartSequence() []*corev1.Pod {
+func (rc *ReconciliationContext) createStartSequence() ([]*corev1.Pod, error) {
 	rc.ReqLogger.Info("reconcile_racks::createStartSequence")
 
 	pods := make([]*corev1.Pod, 0)
@@ -2146,11 +2154,7 @@ func (rc *ReconciliationContext) createStartSequence() []*corev1.Pod {
 			podName := getStatefulSetPodNameForIdx(statefulSet, int32(podRankWithinRack))
 			pod := rc.getDCPodByName(podName)
 			if pod == nil {
-				rc.ReqLogger.Info("pod not found in datacenter pod list, skipping",
-					"podName", podName,
-					"rack", rackInfo.RackName,
-					"reason", "pod may be terminating or StatefulSet controller hasn't caught up")
-				continue
+				return nil, fmt.Errorf("pod %s: %w", podName, errPodNotFound)
 			}
 			if !isServerReady(pod) {
 				if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
@@ -2181,7 +2185,7 @@ func (rc *ReconciliationContext) createStartSequence() []*corev1.Pod {
 	sort.Slice(failedPods, podSortFunc)
 	pods = append(pods, failedPods...)
 
-	return pods
+	return pods, nil
 }
 
 // hasAdditionalSeeds returns true if the datacenter has at least one additional seed.

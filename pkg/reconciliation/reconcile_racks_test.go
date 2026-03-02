@@ -2369,6 +2369,7 @@ func TestStartingSequenceBuilder(t *testing.T) {
 	type podStart struct {
 		started      bool
 		failedStarts int
+		missing      bool
 	}
 
 	pod := func(started bool) podStart {
@@ -2379,12 +2380,17 @@ func TestStartingSequenceBuilder(t *testing.T) {
 		return podStart{started: started, failedStarts: failedStarts}
 	}
 
+	podMissing := func() podStart {
+		return podStart{missing: true}
+	}
+
 	type racks map[string][]podStart
 
 	tests := []struct {
 		name  string
 		racks racks
 		want  []string
+		err   error
 	}{
 		{
 			name: "balanced racks, all started",
@@ -2440,6 +2446,25 @@ func TestStartingSequenceBuilder(t *testing.T) {
 			},
 			want: []string{"rack3-1", "rack2-0"},
 		},
+		{
+			name: "unbalanced racks, some pods not started",
+			racks: racks{
+				"rack1": {pod(true), pod(true), pod(true)},
+				"rack2": {pod(false), pod(true)},
+				"rack3": {pod(true), pod(false), pod(true)},
+			},
+			want: []string{"rack3-1", "rack2-0"},
+		},
+		{
+			name: "balanced racks, some of the pods not found",
+			racks: racks{
+				"rack1": {pod(true), pod(true), podMissing()},
+				"rack2": {pod(true), pod(true), pod(true)},
+				"rack3": {pod(true), pod(true), pod(true)},
+			},
+			want: []string{},
+			err:  fmt.Errorf("pod %s: %w", "rack1-2", errPodNotFound),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2481,15 +2506,18 @@ func TestStartingSequenceBuilder(t *testing.T) {
 					if pod.failedStarts > 0 {
 						rc.Datacenter.Status.FailedStarts = append(rc.Datacenter.Status.FailedStarts, p.Name)
 					}
-					rc.dcPods = append(rc.dcPods, p)
+					if !pod.missing {
+						rc.dcPods = append(rc.dcPods, p)
+					}
 				}
 			}
-			podStartingSeq := rc.createStartSequence()
+			podStartingSeq, err := rc.createStartSequence()
 			got := []string{}
 			for _, pod := range podStartingSeq {
 				got = append(got, pod.Name)
 			}
 			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.err, err)
 		})
 	}
 }
@@ -4158,10 +4186,8 @@ func TestCheckDcPodDisruptionBudget(t *testing.T) {
 
 func TestRefreshSeeds(t *testing.T) {
 	assert := assert.New(t)
-	const (
-		initialSeedCount = 3 // all 3 pods labeled as seeds
-		reducedSeedCount = 1 // reducing to 1 triggers seed refresh across datacenter
-	)
+	initialSeedCount := 3 // all 3 pods labeled as seeds
+	reducedSeedCount := 1 // reducing to 1 triggers seed refresh across datacenter
 	prepareReconciliationCtx := func() (*ReconciliationContext, httphelper.CassMetadataEndpoints, func()) {
 		rc, _, cleanupMockScr := setupTest()
 		desiredStatefulSet, _ := newStatefulSetForCassandraDatacenter(

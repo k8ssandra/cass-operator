@@ -487,7 +487,7 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "3.11.14",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160, 9043},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
 		},
 		{
@@ -499,7 +499,7 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "4.0.7",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9043},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
 		},
 		{
@@ -511,7 +511,7 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "6.8.31",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160, 9043},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
 		},
 		{
@@ -539,7 +539,7 @@ func TestServicePorts(t *testing.T) {
 				},
 			},
 			// FIXME: 9004 should be in the list of open ports
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9043},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
 		},
 	}

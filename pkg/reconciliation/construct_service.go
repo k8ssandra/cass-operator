@@ -37,6 +37,7 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 		namedServicePort("mgmt-api", 8080, 8080),
 		namedServicePort("prometheus", 9103, 9103),
 		namedServicePort("metrics", 9000, 9000),
+		namedServicePort("sidecar", 9043, 9043),
 	}
 
 	if strings.HasPrefix(dc.Spec.ServerVersion, "3.") || dc.Spec.ServerType == "dse" {

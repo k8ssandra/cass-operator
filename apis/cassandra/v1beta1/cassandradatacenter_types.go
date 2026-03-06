@@ -790,6 +790,7 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 		namedPort("mgmt-api-http", 8080),
 		namedPort("prometheus", 9103),
 		namedPort("metrics", 9000),
+		namedPort("sidecar", 9043),
 	}
 
 	if strings.HasPrefix(dc.Spec.ServerVersion, "3.") || dc.Spec.ServerType == "dse" {

@@ -18,12 +18,35 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/prometheus/client_golang/prometheus"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
+
+const (
+	callDurationMetricName = "call_duration_seconds"
+	resultSuccessLabelName = "success"
+	resultErrorLabelName   = "error"
+)
+
+var nodeMgmtCallDurationMetric = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Namespace: "cass_operator",
+		Subsystem: "httphelper",
+		Name:      callDurationMetricName,
+		Help:      "Duration of management API calls.",
+		Buckets:   []float64{0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30},
+	},
+	[]string{"method", "route", "result"},
+)
+
+func init() {
+	metrics.Registry.MustRegister(nodeMgmtCallDurationMetric)
+}
 
 type NodeMgmtClient struct {
 	Client   HttpClient
@@ -1240,6 +1263,11 @@ func (client *NodeMgmtClient) CallMove(pod *corev1.Pod, newToken string) (string
 
 func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, contentType string) ([]byte, error) {
 	client.Log.Info("client::callNodeMgmtEndpoint")
+	callResult := resultErrorLabelName
+	startTime := time.Now()
+	defer func() {
+		nodeMgmtCallDurationMetric.WithLabelValues(request.method, urlForMetric(request.endpoint), callResult).Observe(time.Since(startTime).Seconds())
+	}()
 
 	port := 8080
 	if request.port > 0 {
@@ -1302,7 +1330,16 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 		return nil, reqErr
 	}
 
+	callResult = resultSuccessLabelName
 	return body, nil
+}
+
+func urlForMetric(endpoint string) string {
+	parsedEndpoint, err := url.Parse(endpoint)
+	if err != nil {
+		return ""
+	}
+	return parsedEndpoint.Path
 }
 
 type RequestError struct {

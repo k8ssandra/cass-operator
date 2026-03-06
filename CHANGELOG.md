@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [BUGFIX] [#887](https://github.com/k8ssandra/cass-operator/issues/887) Prevents infinite loop when seed refresh times out during node failures, allowing the operator to recover.
+
 ## v1.29.0
 
 * [CHANGE] [#875](https://github.com/k8ssandra/cass-operator/issues/875) Update to Go 1.25, Kubernetes 1.34 and UBI10 as the base image. Also, Vector to 0.53.0 and other smaller dependency updates. Deprecate CDC support.

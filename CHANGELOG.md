@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#888](https://github.com/k8ssandra/cass-operator/issues/888) Add new metrics around all calls to the mgmt-api. This allows to track if some calls are taking longer to execute than expected.
 * [BUGFIX] [#887](https://github.com/k8ssandra/cass-operator/issues/887) Prevents infinite loop when seed refresh times out during node failures, allowing the operator to recover.
 
 ## v1.29.0

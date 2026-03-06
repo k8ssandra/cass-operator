@@ -128,32 +128,16 @@ func main() {
 	// Create watchers for metrics and webhooks certificates
 	var metricsCertWatcher, webhookCertWatcher *certwatcher.CertWatcher
 
-	// Initial webhook TLS options
-	webhookTLSOpts := tlsOpts
-
-	if len(webhookCertPath) > 0 {
-		setupLog.Info("Initializing webhook certificate watcher using provided certificates",
-			"webhook-cert-path", webhookCertPath, "webhook-cert-name", webhookCertName, "webhook-cert-key", webhookCertKey)
-
-		var err error
-		webhookCertWatcher, err = certwatcher.New(
-			filepath.Join(webhookCertPath, webhookCertName),
-			filepath.Join(webhookCertPath, webhookCertKey),
-		)
-		if err != nil {
-			setupLog.Error(err, "Failed to initialize webhook certificate watcher")
-			os.Exit(1)
-		}
-
-		webhookTLSOpts = append(webhookTLSOpts, func(config *tls.Config) {
-			config.GetCertificate = webhookCertWatcher.GetCertificate
-		})
+	webhookServer, webhookCertWatcher, webhookEnabled, err := setupWebhookServer(
+		webhookCertPath,
+		webhookCertName,
+		webhookCertKey,
+		tlsOpts,
+	)
+	if err != nil {
+		setupLog.Error(err, "Failed to initialize webhook certificate watcher")
+		os.Exit(1)
 	}
-
-	webhookServer := webhook.NewServer(webhook.Options{
-		TLSOpts: webhookTLSOpts,
-	})
-
 	metricsServerOptions := metricsserver.Options{
 		BindAddress:   metricsAddr,
 		SecureServing: secureMetrics,
@@ -190,10 +174,15 @@ func main() {
 	options := ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
-		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "b569adb7.cassandra.datastax.com",
+	}
+
+	if webhookEnabled {
+		options.WebhookServer = webhookServer
+	} else {
+		setupLog.Info("webhooks disabled because --webhook-cert-path was not provided")
 	}
 
 	options.Cache = cache.Options{
@@ -258,9 +247,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = apiwebhook.SetupCassandraDatacenterWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
-		os.Exit(1)
+	if webhookEnabled {
+		if err = apiwebhook.SetupCassandraDatacenterWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
+			os.Exit(1)
+		}
 	}
 
 	if err = (&controlcontrollers.CassandraTaskReconciler{
@@ -324,6 +315,32 @@ func main() {
 	case <-ctx.Done():
 		// graceful shutdown
 	}
+}
+
+func setupWebhookServer(webhookCertPath, webhookCertName, webhookCertKey string, tlsOpts []func(*tls.Config)) (webhook.Server, *certwatcher.CertWatcher, bool, error) {
+	if len(webhookCertPath) == 0 {
+		return nil, nil, false, nil
+	}
+
+	setupLog.Info("Initializing webhook certificate watcher using provided certificates",
+		"webhook-cert-path", webhookCertPath, "webhook-cert-name", webhookCertName, "webhook-cert-key", webhookCertKey)
+
+	webhookCertWatcher, err := certwatcher.New(
+		filepath.Join(webhookCertPath, webhookCertName),
+		filepath.Join(webhookCertPath, webhookCertKey),
+	)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	webhookTLSOpts := append([]func(*tls.Config){}, tlsOpts...)
+	webhookTLSOpts = append(webhookTLSOpts, func(config *tls.Config) {
+		config.GetCertificate = webhookCertWatcher.GetCertificate
+	})
+
+	return webhook.NewServer(webhook.Options{
+		TLSOpts: webhookTLSOpts,
+	}), webhookCertWatcher, true, nil
 }
 
 func setupCacheIndexers(ctx context.Context, mgr ctrl.Manager) error {

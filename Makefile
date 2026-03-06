@@ -140,7 +140,7 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 .PHONY: test
 test: manifests generate fmt vet lint envtest ## Run tests.
 	# Old unit tests first - these use mocked client / fakeclient
-	go test ./pkg/... -coverprofile cover-pkg.out
+	go test -v ./cmd/... ./pkg/... -coverprofile cover-pkg.out
 	# Then the envtest ones
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./apis/... ./internal/... -coverprofile cover.out
 

@@ -9,4 +9,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: docker.io/k8ssandra/cass-operator
-  newTag: v1.29.0
+  newTag: v1.29.1

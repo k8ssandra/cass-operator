@@ -6,7 +6,7 @@ images:
   system-logger:
     repository: "k8ssandra"
     name: "system-logger"
-    tag: "v1.29.0"
+    tag: "v1.29.1"
   config-builder:
     repository: "datastax"
     name: "cass-config-builder"

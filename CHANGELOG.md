@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.29.1
 
 * [BUGFIX] [#899](https://github.com/k8ssandra/cass-operator/issues/899) Skip webhook startup when the manager is launched without `--webhook-cert-path` (Helm chart behavior).

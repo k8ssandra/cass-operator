@@ -4,11 +4,20 @@
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 
-VERSION ?= 1.28.0
+VERSION ?= 1.28.2
+BASE_VERSION := $(VERSION)
 
 COMMIT := $(shell git rev-parse --short HEAD)
 DATE := $(shell date +%Y%m%d)
-VERSION := $(VERSION)-dev.$(COMMIT)-$(DATE)
+BRANCH ?= $(or $(GITHUB_REF_NAME),$(shell git symbolic-ref --short -q HEAD 2>/dev/null))
+
+ifeq ($(BRANCH),master)
+VERSION := $(BASE_VERSION)-dev.$(COMMIT)-$(DATE)
+else ifneq ($(filter 1.%.x,$(BRANCH)),)
+VERSION := $(BASE_VERSION)-stable.$(COMMIT)-$(DATE)
+else
+VERSION := $(BASE_VERSION)-dev.$(COMMIT)-$(DATE)
+endif
 
 # TODO For daily pushes, create dev channel (k8ssandra bundle, not datastax) - or set these in the
 # .github

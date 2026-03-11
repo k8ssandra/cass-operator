@@ -138,7 +138,7 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForOperatorReady()
 
-			step := "creating a datacenter resource with 3 racks/3 nodes"
+			step := "creating a datacenter resource with 3 racks/6 nodes"
 			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -199,7 +199,7 @@ var _ = Describe(testName, func() {
 
 			// Ensure that all pods up and running when ReplacingNodes gets unset
 			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionFalse))
-			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(3))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(6))
 
 			step = "wait for the pod to return to life"
 			json = "jsonpath={.status.containerStatuses[?(.name=='cassandra')].ready}"
@@ -237,7 +237,7 @@ var _ = Describe(testName, func() {
 			// Wait for the task to be completed
 			ns.WaitForCompleteTask("replace-node")
 			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionFalse))
-			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(3))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(6))
 
 			step = "wait for the pod to return to life"
 			json = "jsonpath={.status.containerStatuses[?(.name=='cassandra')].ready}"
@@ -264,18 +264,9 @@ var _ = Describe(testName, func() {
 			oldPvByPod := make(map[string]string, len(rackPodNames))
 			newPvByPod := make(map[string]string, len(rackPodNames))
 
-			// This is to ensure we have enough nodes to see multiple replaces instead of just filtering change
-			step := "scale up to 6 nodes"
-			patch := `{"spec":{"size":6}}`
-			k := kubectl.PatchMerge(dcResource, patch)
-			ns.ExecAndLog(step, k)
-
-			ns.WaitForDatacenterCondition(dcName, "ScaleUp", string(corev1.ConditionFalse))
-			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(6))
-
 			for _, podName := range rackPodNames {
 				json := "jsonpath={.spec.volumes[?(.name=='server-data')].persistentVolumeClaim.claimName}"
-				k = kubectl.Get("pod", podName).FormatOutput(json)
+				k := kubectl.Get("pod", podName).FormatOutput(json)
 				pvcName, err := ns.Output(k)
 				Expect(err).ToNot(HaveOccurred(), "Failed to get PVC name for pod %s: %v", podName, err)
 
@@ -285,8 +276,8 @@ var _ = Describe(testName, func() {
 				Expect(err).ToNot(HaveOccurred(), "Failed to get PV name for PVC %s: %v", pvcName, err)
 			}
 
-			step = "creating a cassandra task to replace nodes in rack r1"
-			k = kubectl.ApplyFiles(taskYamlRack)
+			step := "creating a cassandra task to replace nodes in rack r1"
+			k := kubectl.ApplyFiles(taskYamlRack)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionTrue))

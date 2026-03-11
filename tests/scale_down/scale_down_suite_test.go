@@ -80,26 +80,43 @@ var _ = Describe(testName, func() {
 			k = kubectl.Delete("job", easyStressJobName)
 			ns.ExecAndLog(step, k)
 
-			step = "scale up to 4 nodes"
-			json := "{\"spec\": {\"size\": 4}}"
+			step = "enable tracked cleanup tasks"
+			json := "{\"metadata\": {\"annotations\": {\"cassandra.datastax.com/track-cleanup-tasks\": \"true\"}}}"
+			k = kubectl.PatchMerge(dcResource, json)
+			ns.ExecAndLog(step, k)
+
+			step = "scale up to 6 nodes"
+			json = "{\"spec\": {\"size\": 6}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionTrue))
 
-			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
-			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
-			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 360)
-
-			step = "scale down to 3 nodes"
+			step = "scale down to 3 nodes while cleanup task is still running"
 			json = "{\"spec\": {\"size\": 3}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
 
+			step = "wait for cleanup task to be running"
+			json = "jsonpath={.items[?(@.status.completionTime == \"\")].spec.jobs[0].command}"
+			k = kubectl.Get("CassandraTask").
+				WithLabel(dcLabel).
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "cleanup", 120)
+
+			step = "ensure scale down has not started before cleanup finishes"
+			json = "jsonpath={.items[*].metadata.name}"
+			k = kubectl.Get("pod").
+				WithLabel("cassandra.datastax.com/node-state=Decommissioning").
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "", 30)
+
+			ns.WaitForCompletedCassandraTasks(dcName, "cleanup", 1)
+			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
 			ns.WaitForDatacenterCondition(dcName, "ScalingDown", string(corev1.ConditionTrue))
 
 			podWithDecommissionedNode := "cluster1-dc1-r1-sts-1"
-			podPvcName := "server-data-cluster2-dc1-r1-sts-1"
+			podPvcName := "server-data-cluster1-dc1-r1-sts-1"
 
 			step = "check node status set to decommissioning"
 			json = "jsonpath={.items[*].metadata.name}"

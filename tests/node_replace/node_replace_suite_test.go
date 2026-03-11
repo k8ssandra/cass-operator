@@ -24,7 +24,7 @@ var (
 	testName         = "Node Replace"
 	namespace        = "test-node-replace"
 	dcName           = "dc1"
-	podNames         = []string{"cluster1-dc1-r1-sts-0", "cluster1-dc1-r2-sts-0", "cluster1-dc1-r3-sts-0"}
+	podNames         = []string{"cluster1-dc1-r1-sts-0", "cluster1-dc1-r1-sts-1", "cluster1-dc1-r2-sts-0", "cluster1-dc1-r2-sts-1", "cluster1-dc1-r3-sts-0", "cluster1-dc1-r3-sts-1"}
 	podNameToReplace = podNames[2]
 	dcYaml           = "../testdata/default-three-rack-three-node-dc-4x.yaml"
 	taskYaml         = "../testdata/tasks/replace_node_task.yaml"

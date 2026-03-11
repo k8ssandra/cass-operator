@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [BUGFIX] [#902](https://github.com/k8ssandra/cass-operator/issues/902) Cleanup tracking did not stop the process of requesting a scale down to happen before the task itself was finished. This could cause issues with the cleanup task finishing since nodes it was supposed to clean were deleted.
+
 ## v1.29.1
 
 * [BUGFIX] [#899](https://github.com/k8ssandra/cass-operator/issues/899) Skip webhook startup when the manager is launched without `--webhook-cert-path` (Helm chart behavior).

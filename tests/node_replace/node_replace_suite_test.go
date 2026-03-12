@@ -24,10 +24,11 @@ var (
 	testName         = "Node Replace"
 	namespace        = "test-node-replace"
 	dcName           = "dc1"
-	podNames         = []string{"cluster1-dc1-r1-sts-0", "cluster1-dc1-r2-sts-0", "cluster1-dc1-r3-sts-0"}
-	podNameToReplace = podNames[2]
+	podNames         = []string{"cluster1-dc1-r1-sts-0", "cluster1-dc1-r1-sts-1", "cluster1-dc1-r2-sts-0", "cluster1-dc1-r2-sts-1", "cluster1-dc1-r3-sts-0", "cluster1-dc1-r3-sts-1"}
+	podNameToReplace = "cluster1-dc1-r3-sts-0"
 	dcYaml           = "../testdata/default-three-rack-three-node-dc-4x.yaml"
 	taskYaml         = "../testdata/tasks/replace_node_task.yaml"
+	taskYamlRack     = "../testdata/tasks/replace_node_task_rack.yaml"
 	dcResource       = fmt.Sprintf("CassandraDatacenter/%s", dcName)
 	ns               = ginkgo_util.NewWrapper(testName, namespace)
 )
@@ -115,8 +116,9 @@ func verifyAllPodsAreCorrect() {
 
 			// Make sure that NodeStatus reflects the HostID for the replacement pod. Otherwise subsequent replaces will fail as the CassandraDatacenter has stale information
 			k := kubectl.Get("pod", podNameToReplace).FormatOutput("jsonpath={.status.podIP}")
-			step = "get podIP"
-			podIP := ns.OutputAndLog(step, k)
+			// step = "get podIP"
+			podIP, err := ns.Output(k)
+			Expect(err).ToNot(HaveOccurred(), "Failed to get pod IP for pod %s: %v", podNameToReplace, err)
 			if podName == podNameToReplace && podIP == nodeInfo.Address {
 				step = "verify nodeStatus HostID is up to date"
 				json := fmt.Sprintf("jsonpath={.status.nodeStatuses['%s'].hostID}", podNameToReplace)
@@ -136,7 +138,7 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForOperatorReady()
 
-			step := "creating a datacenter resource with 3 racks/3 nodes"
+			step := "creating a datacenter resource with 3 racks/6 nodes"
 			testFile, err := ginkgo_util.CreateTestFile(dcYaml)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -156,10 +158,10 @@ var _ = Describe(testName, func() {
 			k = kubectl.Get("pod", podNameToReplace).FormatOutput(json)
 			pvcName := ns.OutputAndLog(step, k)
 
-			step = "find PVC volume"
 			json = "jsonpath={.spec.volumeName}"
 			k = kubectl.Get("pvc", pvcName).FormatOutput(json)
-			pvName := ns.OutputAndLog(step, k)
+			pvName, err := ns.Output(k)
+			Expect(err).ToNot(HaveOccurred(), "Failed to get PV name")
 
 			ns.DisableGossipWaitNotReady(podNameToReplace)
 			ns.WaitForPodNotStarted(podNameToReplace)
@@ -193,11 +195,11 @@ var _ = Describe(testName, func() {
 			// Now we can delete the pod. The statefulset controller _should_
 			// create both a new pod and a new PVC for us.
 			k = kubectl.Delete("pod", podNameToReplace)
-			ns.ExecAndLog(step, k)
+			ns.ExecVPanic(k)
 
 			// Ensure that all pods up and running when ReplacingNodes gets unset
 			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionFalse))
-			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(3))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(6))
 
 			step = "wait for the pod to return to life"
 			json = "jsonpath={.status.containerStatuses[?(.name=='cassandra')].ready}"
@@ -212,21 +214,21 @@ var _ = Describe(testName, func() {
 		})
 		Specify("cassandratask can be used to replace a node", func() {
 			// Get PVC id
-			step := "retrieve the persistent volume claim"
 			json := "jsonpath={.spec.volumes[?(.name=='server-data')].persistentVolumeClaim.claimName}"
 			k := kubectl.Get("pod", podNameToReplace).FormatOutput(json)
-			pvcName := ns.OutputAndLog(step, k)
+			pvcName, err := ns.Output(k)
+			Expect(err).ToNot(HaveOccurred(), "Failed to get PVC name for pod %s: %v", podNameToReplace, err)
 
-			step = "find PVC volume"
 			json = "jsonpath={.spec.volumeName}"
 			k = kubectl.Get("pvc", pvcName).FormatOutput(json)
-			pvName := ns.OutputAndLog(step, k)
+			pvName, err := ns.Output(k)
+			Expect(err).ToNot(HaveOccurred(), "Failed to get PV name for PVC %s: %v", pvcName, err)
 
 			// Kill the Cassandra instance (emulate fsync failure or similar)
 			ns.KillCassandra(podNameToReplace)
 
 			// Create CassandraTask that should replace a node
-			step = "creating a cassandra task to replace a node"
+			step := "creating a cassandra task to replace a node"
 			k = kubectl.ApplyFiles(taskYaml)
 			ns.ExecAndLog(step, k)
 
@@ -235,7 +237,7 @@ var _ = Describe(testName, func() {
 			// Wait for the task to be completed
 			ns.WaitForCompleteTask("replace-node")
 			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionFalse))
-			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(3))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(6))
 
 			step = "wait for the pod to return to life"
 			json = "jsonpath={.status.containerStatuses[?(.name=='cassandra')].ready}"
@@ -246,17 +248,60 @@ var _ = Describe(testName, func() {
 			verifyAllPodsAreCorrect()
 
 			// Verify the PV id is different
-			step = "retrieve the persistent volume claim after pod replace"
 			json = "jsonpath={.spec.volumes[?(.name=='server-data')].persistentVolumeClaim.claimName}"
 			k = kubectl.Get("pod", podNameToReplace).FormatOutput(json)
-			pvcName = ns.OutputAndLog(step, k)
+			pvcName, err = ns.Output(k)
+			Expect(err).ToNot(HaveOccurred(), "Failed to get PVC name for pod %s: %v", podNameToReplace, err)
 
-			step = "find PVC volume"
 			json = "jsonpath={.spec.volumeName}"
 			k = kubectl.Get("pvc", pvcName).FormatOutput(json)
-			newPvName := ns.OutputAndLog(step, k)
-
+			newPvName, err := ns.Output(k)
+			Expect(err).ToNot(HaveOccurred(), "Failed to get PV name for PVC %s: %v", pvcName, err)
 			Expect(pvName).ToNot(Equal(newPvName), "Expected PV volume to be different after node replace")
+		})
+		Specify("cassandratask can be used to replace a rack", func() {
+			rackPodNames := []string{"cluster1-dc1-r1-sts-0", "cluster1-dc1-r1-sts-1"}
+			oldPvByPod := make(map[string]string, len(rackPodNames))
+			newPvByPod := make(map[string]string, len(rackPodNames))
+
+			for _, podName := range rackPodNames {
+				json := "jsonpath={.spec.volumes[?(.name=='server-data')].persistentVolumeClaim.claimName}"
+				k := kubectl.Get("pod", podName).FormatOutput(json)
+				pvcName, err := ns.Output(k)
+				Expect(err).ToNot(HaveOccurred(), "Failed to get PVC name for pod %s: %v", podName, err)
+
+				json = "jsonpath={.spec.volumeName}"
+				k = kubectl.Get("pvc", pvcName).FormatOutput(json)
+				oldPvByPod[podName], err = ns.Output(k)
+				Expect(err).ToNot(HaveOccurred(), "Failed to get PV name for PVC %s: %v", pvcName, err)
+			}
+
+			step := "creating a cassandra task to replace nodes in rack r1"
+			k := kubectl.ApplyFiles(taskYamlRack)
+			ns.ExecAndLog(step, k)
+
+			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionTrue))
+
+			ns.WaitForCompleteTaskTimeout("replace-node-rack", 720)
+			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionFalse))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(6))
+
+			for _, podName := range rackPodNames {
+				json := "jsonpath={.spec.volumes[?(.name=='server-data')].persistentVolumeClaim.claimName}"
+				k = kubectl.Get("pod", podName).FormatOutput(json)
+				pvcName, err := ns.Output(k)
+				Expect(err).ToNot(HaveOccurred(), "Failed to get PVC name for pod %s: %v", podName, err)
+
+				json = "jsonpath={.spec.volumeName}"
+				k = kubectl.Get("pvc", pvcName).FormatOutput(json)
+				newPvByPod[podName], err = ns.Output(k)
+				Expect(err).ToNot(HaveOccurred(), "Failed to get PV name for PVC %s: %v", pvcName, err)
+			}
+
+			for _, podName := range rackPodNames {
+				Expect(oldPvByPod[podName]).ToNot(Equal(newPvByPod[podName]),
+					"Expected PV volume to be different after rack replace for pod %s", podName)
+			}
 		})
 	})
 })

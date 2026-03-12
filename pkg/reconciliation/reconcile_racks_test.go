@@ -2083,7 +2083,6 @@ func TestStartBootstrappedNodes(t *testing.T) {
 		wantNotReady bool
 		nodeStatus   racks
 		wantEvents   []string
-		replacements []string
 	}{
 		// First check all the normal cases where we have no dead already bootstrapped nodes
 		{
@@ -2203,21 +2202,6 @@ func TestStartBootstrappedNodes(t *testing.T) {
 			wantEvents:   []string{"Normal StartingCassandra Starting Cassandra for pod rack1-1"},
 		},
 		{
-			name: "balanced racks, failed already bootstrapped to be replaced and a non-bootstrapped one",
-			racks: racks{
-				"rack1": {true, false, true},
-				"rack2": {true, true, true},
-				"rack3": {true, true, false},
-			},
-			nodeStatus: racks{
-				"rack1": {true, true, true},
-				"rack2": {true, true, true},
-				"rack3": {true, true, false},
-			},
-			wantNotReady: false,
-			replacements: []string{"rack1-1"},
-		},
-		{
 			name: "starting back from stopped state, all the nodes should be started at the same time",
 			racks: racks{
 				"rack1": {false, false},
@@ -2247,10 +2231,6 @@ func TestStartBootstrappedNodes(t *testing.T) {
 				}
 			}
 			rc.Datacenter.Status.NodeStatuses = nodeStatuses
-			if len(tt.replacements) > 0 {
-				rc.Datacenter.Status.NodeReplacements = tt.replacements
-			}
-
 			for _, rackName := range []string{"rack1", "rack2", "rack3"} {
 				rackPods := tt.racks[rackName]
 				sts := &appsv1.StatefulSet{

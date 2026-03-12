@@ -37,7 +37,7 @@ var (
 func createDatacenter(dcName, namespace string) func() {
 	return func() {
 		By("Create Datacenter, pods and set dc status to Ready")
-		clusterName = fmt.Sprintf("test-%s", dcName)
+		clusterName = "test"
 		testNamespace := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespace,
@@ -59,7 +59,7 @@ func createDatacenter(dcName, namespace string) func() {
 			Spec: cassdcapi.CassandraDatacenterSpec{
 				ClusterName:   clusterName,
 				ServerType:    "cassandra",
-				ServerVersion: "4.0.5",
+				ServerVersion: "5.0.6",
 				Size:          int32(nodeCount),
 			},
 			Status: cassdcapi.CassandraDatacenterStatus{},
@@ -569,7 +569,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 					Expect(callDetails.URLCounts["/api/v0/ops/executor/job"]).To(BeNumerically(">=", 3*nodeCount))
 					Expect(callDetails.URLCounts["/api/v0/metadata/versions/features"]).To(BeNumerically(">=", 3*nodeCount))
 				})
-				It("Replace a node in the datacenter without specifying the pod", func() {
+				It("Replace a node in the datacenter without specifying the pod or rack", func() {
 					testFailedNamespaceName := fmt.Sprintf("test-task-failed-%d", rand.Int31())
 					By("creating a datacenter", createDatacenter("dc1", testFailedNamespaceName))
 					By("Creating a task for replacenode")
@@ -581,7 +581,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 					Expect(completedTask.Status.Failed).To(BeNumerically(">=", 1))
 					Expect(completedTask.Status.Conditions[2].Type).To(Equal(string(api.JobFailed)))
-					Expect(completedTask.Status.Conditions[2].Message).To(Equal("terminal error: valid pod_name to replace is required"))
+					Expect(completedTask.Status.Conditions[2].Message).To(Equal("terminal error: replace requires either rack_name or pod_name to be set as a filtering rule"))
 				})
 			})
 		})
@@ -660,10 +660,33 @@ var _ = Describe("CassandraTask controller tests", func() {
 
 				completedTask := waitForTaskCompletion(taskKey)
 
-				// verifyPodsHaveAnnotations(testNamespaceName, string(task.UID))
 				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
 			})
+			It("Replaces a rack in the datacenter", func() {
+				By("Creating a task for replacenode")
+				taskKey, task := buildTask(api.CommandReplaceNode, testNamespaceName)
+				task.Spec.Jobs[0].Arguments.RackName = "r1"
+				Expect(k8sClient.Create(context.TODO(), task)).Should(Succeed())
 
+				for i := range 3 {
+					podKey := types.NamespacedName{
+						Name:      fmt.Sprintf("%s-%s-r1-sts-%d", clusterName, testDatacenterName, i),
+						Namespace: testNamespaceName,
+					}
+
+					Eventually(func() bool {
+						pod := &corev1.Pod{}
+						err := k8sClient.Get(context.TODO(), podKey, pod)
+						return err != nil && errors.IsNotFound(err)
+					}, 3*time.Second).Should(BeTrue())
+
+					createPod(testNamespaceName, clusterName, testDatacenterName, "r1", i)
+				}
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(completedTask.Status.Succeeded).To(BeNumerically("==", 3))
+			})
 			It("Runs a flush task against the datacenter pods", func() {
 				By("Creating a task for flush")
 				taskKey, task := buildTask(api.CommandFlush, testNamespaceName)

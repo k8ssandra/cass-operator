@@ -937,6 +937,10 @@ func (rc *ReconciliationContext) CheckRackScale() result.ReconcileResult {
 		maxReplicas := *statefulSet.Spec.Replicas
 
 		if maxReplicas < desiredNodeCount {
+			if _, res := rc.waitForTrackedCleanupTask(); res.Completed() {
+				return res
+			}
+
 			// Check to see if we are resuming from stopped and update conditions appropriately
 			if dc.GetConditionStatus(api.DatacenterStopped) == corev1.ConditionTrue {
 				if err := rc.setConditionStatus(api.DatacenterStopped, corev1.ConditionFalse); err != nil {
@@ -2444,16 +2448,8 @@ func (rc *ReconciliationContext) CheckCassandraNodeStatuses() result.ReconcileRe
 
 func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	if !metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.NoAutomatedCleanupAnnotation) {
-		if metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation) {
-			// Verify if the cleanup task has completed before moving on the with ScalingUp finished
-			task, err := rc.findActiveTask(taskapi.CommandCleanup)
-			if err != nil {
-				return result.Error(err)
-			}
-
-			if task != nil {
-				return rc.activeTaskCompleted(task)
-			}
+		if trackedTaskFound, res := rc.waitForTrackedCleanupTask(); res.Completed() || trackedTaskFound {
+			return res
 		}
 
 		// Create the cleanup task
@@ -2467,6 +2463,23 @@ func (rc *ReconciliationContext) cleanupAfterScaling() result.ReconcileResult {
 	}
 
 	return result.Continue()
+}
+
+func (rc *ReconciliationContext) waitForTrackedCleanupTask() (bool, result.ReconcileResult) {
+	if !metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation) {
+		return false, result.Continue()
+	}
+
+	task, err := rc.findActiveTask(taskapi.CommandCleanup)
+	if err != nil {
+		return true, result.Error(err)
+	}
+
+	if task != nil {
+		return true, rc.activeTaskCompleted(task)
+	}
+
+	return false, result.Continue()
 }
 
 func (rc *ReconciliationContext) createCleanupTask() error {
@@ -2556,6 +2569,24 @@ func (rc *ReconciliationContext) findActiveTask(command taskapi.CassandraCommand
 	return nil, nil
 }
 
+func (rc *ReconciliationContext) CheckCleanupAfterScaling() result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::CheckCleanupAfterScaling")
+
+	if rc.Datacenter.GetConditionStatus(api.DatacenterScalingUp) != corev1.ConditionTrue {
+		return result.Continue()
+	}
+
+	if res := rc.cleanupAfterScaling(); res.Completed() {
+		return res
+	}
+
+	if err := rc.setConditionStatus(api.DatacenterScalingUp, corev1.ConditionFalse); err != nil {
+		return result.Error(err)
+	}
+
+	return result.Continue()
+}
+
 func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckClearActionConditions")
 	dc := rc.Datacenter
@@ -2571,18 +2602,6 @@ func (rc *ReconciliationContext) CheckClearActionConditions() result.ReconcileRe
 	}
 	conditionsThatShouldBeTrue := []api.DatacenterConditionType{
 		api.DatacenterValid,
-	}
-
-	// Explicitly handle scaling up here because we want to run a cleanup afterwards
-	if dc.GetConditionStatus(api.DatacenterScalingUp) == corev1.ConditionTrue {
-		// Spawn a cleanup task before continuing
-		if res := rc.cleanupAfterScaling(); res.Completed() {
-			return res
-		}
-
-		if err := rc.setConditionStatus(api.DatacenterScalingUp, corev1.ConditionFalse); err != nil {
-			return result.Error(err)
-		}
 	}
 
 	// Make sure that the stopped condition matches the spec, because logically
@@ -2753,6 +2772,10 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	}
 
 	if recResult := rc.CheckCassandraNodeStatuses(); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.CheckCleanupAfterScaling(); recResult.Completed() {
 		return recResult.Output()
 	}
 

@@ -6,7 +6,6 @@ package images
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,9 +26,6 @@ type imageRegistry struct {
 }
 
 const (
-	ValidDseVersionRegexp      = "(6\\.[89]\\.\\d+)"
-	ValidHcdVersionRegexp      = "(1\\.\\d+\\.\\d+)"
-	ValidOssVersionRegexp      = "(3\\.11\\.\\d+)|(4\\.\\d+\\.\\d+)|(5\\.\\d+\\.\\d+)"
 	DefaultCassandraRepository = "k8ssandra/cass-management-api"
 	DefaultDSERepository       = "datastax/dse-mgmtapi-6_8"
 	DefaultHCDRepository       = "datastax/hcd"
@@ -71,21 +67,6 @@ func (i *imageRegistry) loadImageConfig(content []byte) (*configv1beta1.ImageCon
 	i.imageConfig = *parsedImageConfig
 
 	return parsedImageConfig, nil
-}
-
-func IsDseVersionSupported(version string) bool {
-	validVersions := regexp.MustCompile(ValidDseVersionRegexp)
-	return validVersions.MatchString(version)
-}
-
-func IsOssVersionSupported(version string) bool {
-	validVersions := regexp.MustCompile(ValidOssVersionRegexp)
-	return validVersions.MatchString(version)
-}
-
-func IsHCDVersionSupported(version string) bool {
-	validVersions := regexp.MustCompile(ValidHcdVersionRegexp)
-	return validVersions.MatchString(version)
 }
 
 func (i *imageRegistry) splitRegistry(image string) (registry string, imageNoRegistry string) {
@@ -230,17 +211,9 @@ func (i *imageRegistry) GetCassandraImage(serverType, version string) (string, e
 
 	switch serverType {
 	case "dse":
-		if !IsDseVersionSupported(version) {
-			return "", fmt.Errorf("server 'dse' and version '%s' do not work together", version)
-		}
 	case "cassandra":
-		if !IsOssVersionSupported(version) {
-			return "", fmt.Errorf("server 'cassandra' and version '%s' do not work together", version)
-		}
 	case "hcd":
-		if !IsHCDVersionSupported(version) {
-			return "", fmt.Errorf("server 'hcd' and version '%s' do not work together", version)
-		}
+		break
 	default:
 		return "", fmt.Errorf("server type '%s' is not supported", serverType)
 	}

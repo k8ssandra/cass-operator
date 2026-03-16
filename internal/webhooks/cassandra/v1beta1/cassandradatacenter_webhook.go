@@ -19,7 +19,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/k8ssandra/cass-operator/pkg/images"
 )
 
 // log is for logging in this package.
@@ -104,29 +103,9 @@ func (v *CassandraDatacenterCustomValidator) ValidateDelete(ctx context.Context,
 
 // ValidateSingleDatacenter checks that no values are improperly set on a CassandraDatacenter
 func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
-	// Ensure serverVersion and serverType are compatible
-
-	if dc.Spec.ServerType == "dse" {
-		if !images.IsDseVersionSupported(dc.Spec.ServerVersion) {
-			return attemptedTo("use unsupported DSE version '%s'", dc.Spec.ServerVersion)
-		}
-	}
-
-	if dc.Spec.ServerType == "hcd" {
-		if !images.IsHCDVersionSupported(dc.Spec.ServerVersion) {
-			return attemptedTo("use unsupported HCD version '%s'", dc.Spec.ServerVersion)
-		}
-	}
-
 	if dc.Spec.ServerType == "cassandra" && dc.Spec.DseWorkloads != nil {
 		if dc.Spec.DseWorkloads.AnalyticsEnabled || dc.Spec.DseWorkloads.GraphEnabled || dc.Spec.DseWorkloads.SearchEnabled {
 			return attemptedTo("enable DSE workloads if server type is Cassandra")
-		}
-	}
-
-	if dc.Spec.ServerType == "cassandra" {
-		if !images.IsOssVersionSupported(dc.Spec.ServerVersion) {
-			return attemptedTo("use unsupported Cassandra version '%s'", dc.Spec.ServerVersion)
 		}
 	}
 

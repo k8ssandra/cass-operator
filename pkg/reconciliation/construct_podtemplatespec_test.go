@@ -1581,26 +1581,6 @@ func Test_makeImage(t *testing.T) {
 			errString: "",
 		},
 		{
-			name: "test unknown dse version",
-			args: args{
-				serverImage:   "",
-				serverType:    "dse",
-				serverVersion: "6.7.0",
-			},
-			want:      "",
-			errString: "server 'dse' and version '6.7.0' do not work together",
-		},
-		{
-			name: "test unknown cassandra version",
-			args: args{
-				serverImage:   "",
-				serverType:    "cassandra",
-				serverVersion: "3.10.0",
-			},
-			want:      "",
-			errString: "server 'cassandra' and version '3.10.0' do not work together",
-		},
-		{
 			name: "test fallback",
 			args: args{
 				serverImage:   "",

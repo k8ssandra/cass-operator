@@ -1868,49 +1868,6 @@ func TestCleanupAfterScaling(t *testing.T) {
 	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
 }
 
-func TestCheckRackScale_WaitsForTrackedCleanupTask(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
-	defer cleanupMockScr()
-	assert := assert.New(t)
-
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation, "true")
-
-	statefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 1, imageRegistry)
-	require.NoError(t, err)
-	rc.statefulSets = []*appsv1.StatefulSet{statefulSet}
-	rc.desiredRackInformation = []*RackInformation{{
-		RackName:  "default",
-		NodeCount: 2,
-	}}
-
-	task := &taskapi.CassandraTask{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cleanup-task",
-			Namespace: rc.Datacenter.Namespace,
-		},
-		Spec: taskapi.CassandraTaskSpec{
-			CassandraTaskTemplate: taskapi.CassandraTaskTemplate{
-				Jobs: []taskapi.CassandraJob{{
-					Command: taskapi.CommandCleanup,
-				}},
-			},
-		},
-	}
-	rc.Datacenter.Status.AddTaskToTrack(task.ObjectMeta)
-
-	k8sMockClientGet(mockClient, nil).
-		Run(func(args mock.Arguments) {
-			task.DeepCopyInto(args.Get(2).(*taskapi.CassandraTask))
-		})
-
-	r := rc.CheckRackScale()
-	assert.Equal(result.RequeueSoon(10), r)
-	assert.Equal(int32(1), *statefulSet.Spec.Replicas)
-}
-
 func TestCheckCleanupAfterScaling_WaitsForTrackedCleanupTask(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()

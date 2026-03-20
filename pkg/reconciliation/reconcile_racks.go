@@ -937,10 +937,6 @@ func (rc *ReconciliationContext) CheckRackScale() result.ReconcileResult {
 		maxReplicas := *statefulSet.Spec.Replicas
 
 		if maxReplicas < desiredNodeCount {
-			if _, res := rc.waitForTrackedCleanupTask(); res.Completed() {
-				return res
-			}
-
 			// Check to see if we are resuming from stopped and update conditions appropriately
 			if dc.GetConditionStatus(api.DatacenterStopped) == corev1.ConditionTrue {
 				if err := rc.setConditionStatus(api.DatacenterStopped, corev1.ConditionFalse); err != nil {

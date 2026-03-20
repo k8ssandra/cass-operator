@@ -67,6 +67,10 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 		return result.Continue()
 	}
 
+	if _, res := rc.waitForTrackedCleanupTask(); res.Completed() {
+		return res
+	}
+
 	decommRackInfo, err := rc.CalculateRackInfoForDecomm(int(currentSize))
 	if err != nil {
 		logger.Error(err, "error calculating rack info for decommissioning nodes")

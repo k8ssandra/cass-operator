@@ -1836,50 +1836,23 @@ func TestCleanupAfterScaling(t *testing.T) {
 	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
 
-	var task *taskapi.CassandraTask
-	// 1. Create task - return ok
-	k8sMockClientCreate(rc.Client.(*mocks.Client), nil).
-		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*taskapi.CassandraTask)
-			task = arg
-		}).
-		Times(1)
-
-	r := rc.cleanupAfterScaling()
-	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
-	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
-	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
-	assert.Nil(task.Spec.MaxConcurrentPods)
-}
-
-func TestCleanupAfterScalingWithTracker(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
-	defer cleanupMockScr()
-	assert := assert.New(t)
-
-	// Setup annotation
-
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation, "true")
 
+	rc.Datacenter.SetCondition(*api.NewDatacenterCondition(api.DatacenterScalingUp, corev1.ConditionTrue))
 	var task *taskapi.CassandraTask
-	// 1. Create task - return ok
 	k8sMockClientCreate(rc.Client.(*mocks.Client), nil).
 		Run(func(args mock.Arguments) {
 			arg := args.Get(1).(*taskapi.CassandraTask)
 			task = arg
-		}).
-		Times(1)
+		}).Once()
 
 	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
 
-	r := rc.cleanupAfterScaling()
+	r := rc.CheckCleanupAfterScaling()
 	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
 	assert.Equal(result.RequeueSoon(10), r, "expected result of result.RequeueSoon(10)")
 	assert.Equal(1, len(rc.Datacenter.Status.TrackedTasks))
-	// 3. GET - return completed task
+
 	k8sMockClientGet(rc.Client.(*mocks.Client), nil).
 		Run(func(args mock.Arguments) {
 			arg := args.Get(2).(*taskapi.CassandraTask)
@@ -1887,38 +1860,95 @@ func TestCleanupAfterScalingWithTracker(t *testing.T) {
 			timeNow := metav1.Now()
 			arg.Status.CompletionTime = &timeNow
 		}).Once()
-	// 4. Patch to datacenter status
+
 	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
-	r = rc.cleanupAfterScaling()
+	k8sMockClientStatusUpdate(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
+	r = rc.CheckCleanupAfterScaling()
 	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
 	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
-	assert.Nil(task.Spec.MaxConcurrentPods)
 }
 
-func TestCleanupAfterScalingWithParallelAnnotation(t *testing.T) {
+func TestCheckCleanupAfterScaling_WaitsForTrackedCleanupTask(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 	assert := assert.New(t)
 
 	mockClient := mocks.NewClient(t)
 	rc.Client = mockClient
-	_ = rc.CalculateRackInformation()
-	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.EnableParallelCleanupWithinRackAnnotation, "true")
 
-	var task *taskapi.CassandraTask
-	// 1. Create task - return ok
-	k8sMockClientCreate(rc.Client.(*mocks.Client), nil).
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation, "true")
+	rc.Datacenter.SetCondition(api.DatacenterCondition{
+		Status: corev1.ConditionTrue,
+		Type:   api.DatacenterScalingUp,
+	})
+
+	task := &taskapi.CassandraTask{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cleanup-task",
+			Namespace: rc.Datacenter.Namespace,
+		},
+		Spec: taskapi.CassandraTaskSpec{
+			CassandraTaskTemplate: taskapi.CassandraTaskTemplate{
+				Jobs: []taskapi.CassandraJob{{
+					Command: taskapi.CommandCleanup,
+				}},
+			},
+		},
+	}
+	rc.Datacenter.Status.AddTaskToTrack(task.ObjectMeta)
+
+	k8sMockClientGet(mockClient, nil).
 		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*taskapi.CassandraTask)
-			task = arg
-		}).
-		Times(1)
+			task.DeepCopyInto(args.Get(2).(*taskapi.CassandraTask))
+		})
 
-	r := rc.cleanupAfterScaling()
-	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
-	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
+	r := rc.CheckCleanupAfterScaling()
+	assert.Equal(result.RequeueSoon(10), r)
+	assert.Equal(corev1.ConditionTrue, rc.Datacenter.GetConditionStatus(api.DatacenterScalingUp))
+}
+
+func TestCheckCleanupAfterScaling_ClearsScalingUpWhenTrackedCleanupCompletes(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	assert := assert.New(t)
+
+	mockClient := mocks.NewClient(t)
+	rc.Client = mockClient
+
+	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation, "true")
+	rc.Datacenter.SetCondition(api.DatacenterCondition{
+		Status: corev1.ConditionTrue,
+		Type:   api.DatacenterScalingUp,
+	})
+
+	task := &taskapi.CassandraTask{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cleanup-task",
+			Namespace: rc.Datacenter.Namespace,
+		},
+		Spec: taskapi.CassandraTaskSpec{
+			CassandraTaskTemplate: taskapi.CassandraTaskTemplate{
+				Jobs: []taskapi.CassandraJob{{
+					Command: taskapi.CommandCleanup,
+				}},
+			},
+		},
+	}
+	rc.Datacenter.Status.AddTaskToTrack(task.ObjectMeta)
+
+	k8sMockClientGet(mockClient, nil).
+		Run(func(args mock.Arguments) {
+			task.DeepCopyInto(args.Get(2).(*taskapi.CassandraTask))
+			timeNow := metav1.Now()
+			args.Get(2).(*taskapi.CassandraTask).Status.CompletionTime = &timeNow
+		})
+	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
+	k8sMockClientStatusUpdate(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
+
+	r := rc.CheckCleanupAfterScaling()
+	assert.Equal(result.Continue(), r)
+	assert.Equal(corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterScalingUp))
 	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
-	assert.Equal(*task.Spec.MaxConcurrentPods, rc.desiredRackInformation[0].NodeCount)
 }
 
 func TestStripPassword(t *testing.T) {

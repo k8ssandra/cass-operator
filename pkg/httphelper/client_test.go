@@ -519,14 +519,14 @@ func TestCallDurationMetricSuccess(t *testing.T) {
 		return req.URL.Path == "/api/v0/ops/node/drain" && req.Method == http.MethodPost
 	})).Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).Times(2)
 
-	before := getHttpHelperCallDurationCount(t, http.MethodPost, "/api/v0/ops/node/drain", resultSuccessLabelName)
+	before := getHttpHelperCallDurationCount(t, "/api/v0/ops/node/drain", resultSuccessLabelName)
 
 	mgmtClient := newMockMgmtClient(mockHttpClient)
 	require.NoError(mgmtClient.CallDrainEndpoint(goodPod))
 	require.NoError(mgmtClient.CallDrainEndpoint(goodPod))
 	require.True(mockHttpClient.AssertExpectations(t))
 
-	after := getHttpHelperCallDurationCount(t, http.MethodPost, "/api/v0/ops/node/drain", resultSuccessLabelName)
+	after := getHttpHelperCallDurationCount(t, "/api/v0/ops/node/drain", resultSuccessLabelName)
 	require.Equal(before+2, after)
 }
 
@@ -535,16 +535,16 @@ func TestCallDurationMetricError(t *testing.T) {
 
 	mockHttpClient := mocks.NewHttpClient(t)
 	mockHttpClient.On("Do", mock.MatchedBy(func(req *http.Request) bool {
-		return req.URL.Path == "/api/v0/ops/node/drain" && req.Method == http.MethodPost
+		return req.URL.Path == "/api/v0/ops/seeds/reload" && req.Method == http.MethodPost
 	})).Return(newHttpResponseMarshalled("this is an error", http.StatusInternalServerError), nil).Once()
 
-	before := getHttpHelperCallDurationCount(t, http.MethodPost, "/api/v0/ops/node/drain", resultErrorLabelName)
+	before := getHttpHelperCallDurationCount(t, "/api/v0/ops/seeds/reload", resultErrorLabelName)
 
 	mgmtClient := newMockMgmtClient(mockHttpClient)
-	require.Error(mgmtClient.CallDrainEndpoint(goodPod))
+	require.Error(mgmtClient.CallReloadSeedsEndpoint(goodPod))
 	require.True(mockHttpClient.AssertExpectations(t))
 
-	after := getHttpHelperCallDurationCount(t, http.MethodPost, "/api/v0/ops/node/drain", resultErrorLabelName)
+	after := getHttpHelperCallDurationCount(t, "/api/v0/ops/seeds/reload", resultErrorLabelName)
 	require.Equal(before+1, after)
 }
 
@@ -562,7 +562,7 @@ func newMockHttpClient(response *http.Response, err error) *mocks.HttpClient {
 	return httpClient
 }
 
-func getHttpHelperCallDurationCount(t *testing.T, method, route, result string) uint64 {
+func getHttpHelperCallDurationCount(t *testing.T, route, result string) uint64 {
 	t.Helper()
 
 	metricName := fmt.Sprintf("cass_operator_httphelper_%s", callDurationMetricName)
@@ -580,7 +580,7 @@ func getHttpHelperCallDurationCount(t *testing.T, method, route, result string) 
 				labels[label.GetName()] = label.GetValue()
 			}
 
-			if labels["method"] == method && labels["route"] == route && labels["result"] == result {
+			if labels["route"] == route && labels["result"] == result {
 				return metric.GetHistogram().GetSampleCount()
 			}
 		}

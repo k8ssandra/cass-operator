@@ -12,12 +12,13 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [BUGFIX] [#902](https://github.com/k8ssandra/cass-operator/issues/902) Cleanup tracking did not stop the process of requesting a scale down to happen before the task itself was finished. This could cause issues with the cleanup task finishing since nodes it was supposed to clean were deleted.
+* [ENHANCEMENT] [#888](https://github.com/k8ssandra/cass-operator/issues/888) Add new metrics around all calls to the mgmt-api. This allows to track if some calls are taking longer to execute than expected.
+* [ENHANCEMENT] [#873](https://github.com/k8ssandra/cass-operator/issues/873) Allow replacing multiple previously bootstrapped nodes in parallel. Also, the CassandraTask to replace pod accepts RackName as alternative to PodName as filtering rule.
 
 ## v1.29.1
 
 * [BUGFIX] [#899](https://github.com/k8ssandra/cass-operator/issues/899) Skip webhook startup when the manager is launched without `--webhook-cert-path` (Helm chart behavior).
 * [BUGFIX] [#887](https://github.com/k8ssandra/cass-operator/issues/887) Prevents infinite loop when seed refresh times out during node failures, allowing the operator to recover.
-* [ENHANCEMENT] [#873](https://github.com/k8ssandra/cass-operator/issues/873) Allow replacing multiple previously bootstrapped nodes in parallel. Also, the CassandraTask to replace pod accepts RackName as alternative to PodName as filtering rule.
 
 ## v1.29.0
 

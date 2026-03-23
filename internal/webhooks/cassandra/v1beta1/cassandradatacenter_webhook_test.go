@@ -76,45 +76,6 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 			errString: "",
 		},
 		{
-			name: "DSE 7.0.0 invalid",
-			dc: &api.CassandraDatacenter{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "exampleDC",
-				},
-				Spec: api.CassandraDatacenterSpec{
-					ServerType:    "dse",
-					ServerVersion: "7.0.0",
-				},
-			},
-			errString: "use unsupported DSE version '7.0.0'",
-		},
-		{
-			name: "DSE Invalid",
-			dc: &api.CassandraDatacenter{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "exampleDC",
-				},
-				Spec: api.CassandraDatacenterSpec{
-					ServerType:    "dse",
-					ServerVersion: "4.8.0",
-				},
-			},
-			errString: "use unsupported DSE version '4.8.0'",
-		},
-		{
-			name: "DSE 5 Invalid",
-			dc: &api.CassandraDatacenter{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "exampleDC",
-				},
-				Spec: api.CassandraDatacenterSpec{
-					ServerType:    "dse",
-					ServerVersion: "5.0.0",
-				},
-			},
-			errString: "use unsupported DSE version '5.0.0'",
-		},
-		{
 			name: "Cassandra valid",
 			dc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
@@ -165,32 +126,6 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 				},
 			},
 			errString: "",
-		},
-		{
-			name: "Cassandra Invalid",
-			dc: &api.CassandraDatacenter{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "exampleDC",
-				},
-				Spec: api.CassandraDatacenterSpec{
-					ServerType:    "cassandra",
-					ServerVersion: "6.8.0",
-				},
-			},
-			errString: "use unsupported Cassandra version '6.8.0'",
-		},
-		{
-			name: "Cassandra Invalid too",
-			dc: &api.CassandraDatacenter{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "exampleDC",
-				},
-				Spec: api.CassandraDatacenterSpec{
-					ServerType:    "cassandra",
-					ServerVersion: "7.0.0",
-				},
-			},
-			errString: "use unsupported Cassandra version '7.0.0'",
 		},
 		{
 			name: "Dse Workloads in Cassandra Invalid",

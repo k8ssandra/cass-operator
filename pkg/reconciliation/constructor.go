@@ -23,6 +23,25 @@ import (
 // newPodDisruptionBudgetForDatacenter creates a PodDisruptionBudget object for the Datacenter
 func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(int(dc.Spec.Size - 1))
+
+	if dc.Spec.MaxUnavailable != nil {
+		racks := dc.GetRacks()
+		rackNodeCounts := api.SplitRacks(int(dc.Spec.Size), len(racks))
+		maxRackNodeCount := 0
+		for _, rackNodeCount := range rackNodeCounts {
+			if rackNodeCount > maxRackNodeCount {
+				maxRackNodeCount = rackNodeCount
+			}
+		}
+
+		if maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(dc.Spec.MaxUnavailable, maxRackNodeCount, true); err == nil {
+			// Even if someone decides to set "200%" or something similarly silly here, it doesn't matter as we only process a single rack when it comes to MaxUnavailable changes
+			calculatedMinAvailable := int(dc.Spec.Size) - maxUnavailable
+			minAvailable = intstr.FromInt(calculatedMinAvailable)
+		}
+		// If err was not nil, we'll stick to the original minAvailable of size-1
+	}
+
 	labels := dc.GetDatacenterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
 	selectorLabels := dc.GetDatacenterLabels()

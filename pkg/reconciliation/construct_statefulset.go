@@ -158,21 +158,8 @@ func newStatefulSetForCassandraDatacenter(
 		result.Spec.ServiceName = sts.Spec.ServiceName
 	}
 
-	if dc.Spec.CanaryUpgrade {
-		var partition int32
-		if dc.Spec.CanaryUpgradeCount == 0 || dc.Spec.CanaryUpgradeCount > replicaCountInt32 {
-			partition = replicaCountInt32
-		} else {
-			partition = replicaCountInt32 - dc.Spec.CanaryUpgradeCount
-		}
-
-		strategy := appsv1.StatefulSetUpdateStrategy{
-			Type: appsv1.RollingUpdateStatefulSetStrategyType,
-			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-				Partition: &partition,
-			},
-		}
-		result.Spec.UpdateStrategy = strategy
+	if strategy := buildStatefulSetUpdateStrategy(dc, replicaCountInt32); strategy != nil {
+		result.Spec.UpdateStrategy = *strategy
 	}
 
 	if dc.Spec.MinReadySeconds != nil {
@@ -183,6 +170,31 @@ func newStatefulSetForCassandraDatacenter(
 	utils.AddHashAnnotation(result)
 
 	return result, nil
+}
+
+func buildStatefulSetUpdateStrategy(dc *api.CassandraDatacenter, replicaCount int32) *appsv1.StatefulSetUpdateStrategy {
+	if !dc.Spec.CanaryUpgrade && dc.Spec.MaxUnavailable == nil {
+		return nil
+	}
+
+	rollingUpdate := &appsv1.RollingUpdateStatefulSetStrategy{
+		MaxUnavailable: dc.Spec.MaxUnavailable,
+	}
+
+	if dc.Spec.CanaryUpgrade {
+		var partition int32
+		if dc.Spec.CanaryUpgradeCount == 0 || dc.Spec.CanaryUpgradeCount > replicaCount {
+			partition = replicaCount
+		} else {
+			partition = replicaCount - dc.Spec.CanaryUpgradeCount
+		}
+		rollingUpdate.Partition = &partition
+	}
+
+	return &appsv1.StatefulSetUpdateStrategy{
+		Type:          appsv1.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: rollingUpdate,
+	}
 }
 
 func legacyInternodeMount(dc *api.CassandraDatacenter, sts *appsv1.StatefulSet) bool {

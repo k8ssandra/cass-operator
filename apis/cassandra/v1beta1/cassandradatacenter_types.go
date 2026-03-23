@@ -282,7 +282,8 @@ type CassandraDatacenterSpec struct {
 	// Setting to 0 might cause multiple Cassandra pods to restart at the same time despite PodDisruptionBudget settings.
 	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
 
-	// MaxUnavailable sets the maximum number of pods that can be modified simultaneously during an update. This can at most target a single rack, so values higher than rack size will have no effect. Requires Kubernetes 1.35 or higher.
+	// MaxUnavailable sets the maximum number of rack pods that can be modified simultaneously during an update. This can at most target a single rack, so values higher than rack size will have no effect. Requires Kubernetes 1.35 or higher. Setting percentage will
+	// calculate against single rack's percentage of pods, not the entire datacenter.
 	// +kubebuilder:validation:XIntOrString
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 

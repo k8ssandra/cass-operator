@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -23,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
@@ -509,6 +511,43 @@ func TestDropRole(t *testing.T) {
 	require.True(mockHttpClient.AssertExpectations(t))
 }
 
+func TestCallDurationMetricSuccess(t *testing.T) {
+	require := require.New(t)
+
+	mockHttpClient := mocks.NewHttpClient(t)
+	mockHttpClient.On("Do", mock.MatchedBy(func(req *http.Request) bool {
+		return req.URL.Path == "/api/v0/ops/node/drain" && req.Method == http.MethodPost
+	})).Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).Times(2)
+
+	before := getHttpHelperCallDurationCount(t, "/api/v0/ops/node/drain", resultSuccessLabelName)
+
+	mgmtClient := newMockMgmtClient(mockHttpClient)
+	require.NoError(mgmtClient.CallDrainEndpoint(goodPod))
+	require.NoError(mgmtClient.CallDrainEndpoint(goodPod))
+	require.True(mockHttpClient.AssertExpectations(t))
+
+	after := getHttpHelperCallDurationCount(t, "/api/v0/ops/node/drain", resultSuccessLabelName)
+	require.Equal(before+2, after)
+}
+
+func TestCallDurationMetricError(t *testing.T) {
+	require := require.New(t)
+
+	mockHttpClient := mocks.NewHttpClient(t)
+	mockHttpClient.On("Do", mock.MatchedBy(func(req *http.Request) bool {
+		return req.URL.Path == "/api/v0/ops/seeds/reload" && req.Method == http.MethodPost
+	})).Return(newHttpResponseMarshalled("this is an error", http.StatusInternalServerError), nil).Once()
+
+	before := getHttpHelperCallDurationCount(t, "/api/v0/ops/seeds/reload", resultErrorLabelName)
+
+	mgmtClient := newMockMgmtClient(mockHttpClient)
+	require.Error(mgmtClient.CallReloadSeedsEndpoint(goodPod))
+	require.True(mockHttpClient.AssertExpectations(t))
+
+	after := getHttpHelperCallDurationCount(t, "/api/v0/ops/seeds/reload", resultErrorLabelName)
+	require.Equal(before+1, after)
+}
+
 func newMockMgmtClient(httpClient *mocks.HttpClient) *NodeMgmtClient {
 	return &NodeMgmtClient{
 		Client:   httpClient,
@@ -521,6 +560,32 @@ func newMockHttpClient(response *http.Response, err error) *mocks.HttpClient {
 	httpClient := new(mocks.HttpClient)
 	httpClient.On("Do", mock.Anything).Return(response, err)
 	return httpClient
+}
+
+func getHttpHelperCallDurationCount(t *testing.T, route, result string) uint64 {
+	t.Helper()
+
+	metricName := fmt.Sprintf("cass_operator_httphelper_%s", callDurationMetricName)
+	families, err := metrics.Registry.Gather()
+	require.NoError(t, err)
+
+	for _, family := range families {
+		if family.GetName() != metricName {
+			continue
+		}
+
+		for _, metric := range family.GetMetric() {
+			labels := make(map[string]string, len(metric.GetLabel()))
+			for _, label := range metric.GetLabel() {
+				labels[label.GetName()] = label.GetValue()
+			}
+
+			if labels["route"] == route && labels["result"] == result {
+				return metric.GetHistogram().GetSampleCount()
+			}
+		}
+	}
+	return 0
 }
 
 func newHttpResponse(responseBody []byte, status int) *http.Response {

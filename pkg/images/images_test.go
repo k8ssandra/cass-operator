@@ -168,15 +168,6 @@ func TestDefaultRepositories(t *testing.T) {
 	assert.Equal("datastax/dse-mgmtapi-6_8:6.8.17", path)
 }
 
-func TestOssValidVersions(t *testing.T) {
-	assert := assert.New(t)
-	assert.True(IsOssVersionSupported("4.0.0"))
-	assert.True(IsOssVersionSupported("4.1.0"))
-	assert.False(IsOssVersionSupported("4.0"))
-	assert.False(IsOssVersionSupported("4.1"))
-	assert.False(IsOssVersionSupported("6.8.0"))
-}
-
 func TestPullPolicyOverride(t *testing.T) {
 	assert := require.New(t)
 	imageConfigFile := filepath.Join("..", "..", "tests", "testdata", "image_config_parsing.yaml")

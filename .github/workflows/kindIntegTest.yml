@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Set version value
@@ -20,10 +20,10 @@ jobs:
         run: |
           echo "version=$(make version)" >> $GITHUB_OUTPUT
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Build and push
         id: docker_build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           file: Dockerfile
           context: .
@@ -34,7 +34,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           file: logger.Dockerfile
           push: false
@@ -44,12 +44,12 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Upload cass-operator image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cass-operator
           path: /tmp/k8ssandra-cass-operator.tar
       - name: Upload system-logger image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: system-logger
           path: /tmp/k8ssandra-system-logger.tar
@@ -69,18 +69,18 @@ jobs:
   #     M_SERVER_IMAGE: docker.io/k8ssandra/cass-management-api:3.11.17-ubi8
   #     SKIP_GATEKEEPER: true
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name == 'pull_request'
   #       with:
   #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name != 'pull_request'
   #     - uses: ./.github/actions/run-integ-test
   #       with:
   #         integration_test: ${{ matrix.integration_test }}
   #     - name: Archive k8s logs
   #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: k8s-logs-${{ matrix.integration_test }}
   #         path: ./build/kubectl_dump
@@ -100,18 +100,18 @@ jobs:
   #     M_INTEG_DIR: ${{ matrix.integration_test }}
   #     SKIP_GATEKEEPER: true
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name == 'pull_request'
   #       with:
   #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name != 'pull_request'
   #     - uses: ./.github/actions/run-integ-test
   #       with:
   #         integration_test: ${{ matrix.integration_test }}
   #     - name: Archive k8s logs
   #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: k8s-logs-${{ matrix.integration_test }}
   #         path: ./build/kubectl_dump
@@ -137,18 +137,18 @@ jobs:
   #     M_SERVER_TYPE: ${{ matrix.serverType }}
   #     SKIP_GATEKEEPER: true
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name == 'pull_request'
   #       with:
   #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name != 'pull_request'
   #     - uses: ./.github/actions/run-integ-test
   #       with:
   #         integration_test: ${{ matrix.integration_test }}
   #     - name: Archive k8s logs
   #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: k8s-logs-smoke_test-${{ matrix.version }}
   #         path: ./build/kubectl_dump
@@ -171,18 +171,18 @@ jobs:
   #     M_SERVER_VERSION: ${{ matrix.version }}
   #     SKIP_GATEKEEPER: true
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name == 'pull_request'
   #       with:
   #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name != 'pull_request'
   #     - uses: ./.github/actions/run-integ-test
   #       with:
   #         integration_test: ${{ matrix.integration_test }}
   #     - name: Archive k8s logs
   #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
   #         path: ./build/kubectl_dump
@@ -248,18 +248,18 @@ jobs:
   #     M_INTEG_DIR: ${{ matrix.integration_test }}
   #     M_SERVER_VERSION: ${{ matrix.version }}
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name == 'pull_request'
   #       with:
   #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name != 'pull_request'
   #     - uses: ./.github/actions/run-integ-test
   #       with:
   #         integration_test: ${{ matrix.integration_test }}
   #     - name: Archive k8s logs
   #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
   #         path: ./build/kubectl_dump
@@ -298,11 +298,11 @@ jobs:
   #     M_SERVER_IMAGE: ${{ matrix.serverImage }}
   #     M_SERVER_TYPE: ${{ matrix.serverType }}
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name == 'pull_request'
   #       with:
   #         ref: ${{ github.event.pull_request.head.sha }}
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       if: github.event_name != 'pull_request'
   #     - name: Set SKIP_GATEKEEPER
   #       if: ${{ matrix.skipGatekeeper }}
@@ -312,7 +312,7 @@ jobs:
   #         integration_test: ${{ matrix.integration_test }}
   #     - name: Archive k8s logs
   #       if: ${{ failure() }}
-  #       uses: actions/upload-artifact@v4
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: k8s-logs-smoke_test-${{ matrix.version }}
   #         path: ./build/kubectl_dump
@@ -337,11 +337,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lvm2 xfsprogs thin-provisioning-tools
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: topolvm/topolvm
           path: topolvm
@@ -376,12 +376,12 @@ jobs:
           mkdir bin
           ln -s /usr/local/bin/kustomize bin/kustomize
       - name: Download cass-operator image
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: cass-operator
           path: /tmp
       - name: Download system-logger image
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: system-logger
           path: /tmp
@@ -402,7 +402,7 @@ jobs:
           IMG=${{ steps.load.outputs.operator_img }} LOG_IMG=${{ steps.load.outputs.logger_img }} make integ-test
       - name: Archive k8s logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: k8s-logs-topolvm-test-${{ matrix.version }}
           path: ./build/kubectl_dump

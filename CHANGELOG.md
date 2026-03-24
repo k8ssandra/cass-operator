@@ -11,14 +11,15 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#905](https://github.com/k8ssandra/cass-operator/issues/905) Relax the ServerVersion checks to structure only without separating OSS/DSE/HCD.
 * [FEATURE] [#893](https://github.com/k8ssandra/cass-operator/issues/893) Add support for maxUnavailable (Kubernetes 1.35 and up). This allows to make changes to the Cassandra pods in parallel, thus speeding up changes in larger clusters. Allows integer or percentage setting, but will never target more than one rack at a time. 
 * [ENHANCEMENT] [#888](https://github.com/k8ssandra/cass-operator/issues/888) Add new metrics around all calls to the mgmt-api. This allows to track if some calls are taking longer to execute than expected.
+* [ENHANCEMENT] [#873](https://github.com/k8ssandra/cass-operator/issues/873) Allow replacing multiple previously bootstrapped nodes in parallel. Also, the CassandraTask to replace pod accepts RackName as alternative to PodName as filtering rule.
 
 ## v1.29.1
 
 * [BUGFIX] [#899](https://github.com/k8ssandra/cass-operator/issues/899) Skip webhook startup when the manager is launched without `--webhook-cert-path` (Helm chart behavior).
 * [BUGFIX] [#887](https://github.com/k8ssandra/cass-operator/issues/887) Prevents infinite loop when seed refresh times out during node failures, allowing the operator to recover.
-* [ENHANCEMENT] [#873](https://github.com/k8ssandra/cass-operator/issues/873) Allow replacing multiple previously bootstrapped nodes in parallel. Also, the CassandraTask to replace pod accepts RackName as alternative to PodName as filtering rule.
 
 ## v1.29.0
 

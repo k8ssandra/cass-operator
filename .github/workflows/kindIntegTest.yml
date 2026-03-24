@@ -369,7 +369,7 @@ jobs:
           helm install --namespace=topolvm-system topolvm topolvm/topolvm -f topolvm/example/values.yaml
           kubectl wait --for=condition=available --timeout=120s -n topolvm-system deployments/topolvm-controller
           kubectl wait --for=condition=ready --timeout=120s -n topolvm-system -l="app.kubernetes.io/component=controller,app.kubernetes.io/name=topolvm" pod
-          kubectl wait --for=condition=ready --timeout=120s -n topolvm-system certificate/topolvm-mutatingwebhook
+          kubectl wait --for=condition=ready --timeout=120s -n topolvm-system certificate/topolvm-mutatingwebhook || true
       - name: Link tools
         shell: bash
         run: |

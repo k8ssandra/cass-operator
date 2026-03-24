@@ -35,7 +35,9 @@ func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.
 		}
 
 		if maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(dc.Spec.MaxUnavailable, maxRackNodeCount, true); err == nil {
-			// Even if someone decides to set "200%" or something similarly silly here, it doesn't matter as we only process a single rack when it comes to MaxUnavailable changes
+			if maxUnavailable > maxRackNodeCount {
+				maxUnavailable = maxRackNodeCount
+			}
 			calculatedMinAvailable := int(dc.Spec.Size) - maxUnavailable
 			minAvailable = intstr.FromInt(calculatedMinAvailable)
 		}

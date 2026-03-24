@@ -43,12 +43,12 @@ runs:
       run: |
         hack/gatekeeper.sh
     - name: Download cass-operator image
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: cass-operator
         path: /tmp
     - name: Download system-logger image
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: system-logger
         path: /tmp

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -768,6 +769,95 @@ func TestMinReadySecondsChange(t *testing.T) {
 	assert.NoError(err, "failed to build statefulset")
 
 	assert.Equal(int32(10), sts.Spec.MinReadySeconds)
+}
+
+func TestMaxUnavailableChange(t *testing.T) {
+	tests := []struct {
+		name            string
+		maxUnavailable  intstr.IntOrString
+		expectedRolling *appsv1.RollingUpdateStatefulSetStrategy
+	}{
+		{
+			name:           "integer",
+			maxUnavailable: intstr.FromInt32(1),
+			expectedRolling: &appsv1.RollingUpdateStatefulSetStrategy{
+				MaxUnavailable: ptr.To(intstr.FromInt32(1)),
+			},
+		},
+		{
+			name:           "percentage",
+			maxUnavailable: intstr.Parse("25%"),
+			expectedRolling: &appsv1.RollingUpdateStatefulSetStrategy{
+				MaxUnavailable: ptr.To(intstr.Parse("25%")),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dc := &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "test",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+					},
+					Racks: []api.Rack{
+						{
+							Name: "r1",
+						},
+					},
+					PodTemplateSpec: &corev1.PodTemplateSpec{},
+					MaxUnavailable:  ptr.To(tt.maxUnavailable),
+				},
+			}
+
+			sts, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3, imageRegistry)
+			require.NoError(t, err, "failed to build statefulset")
+
+			expectedStrategy := appsv1.StatefulSetUpdateStrategy{
+				Type:          appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: tt.expectedRolling,
+			}
+			assert.Equal(t, expectedStrategy, sts.Spec.UpdateStrategy)
+		})
+	}
+}
+
+func TestMaxUnavailableMergedWithCanaryUpgrade(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:        "test",
+			ServerType:         "cassandra",
+			ServerVersion:      "4.0.7",
+			CanaryUpgrade:      true,
+			CanaryUpgradeCount: 1,
+			MaxUnavailable:     ptr.To(intstr.Parse("25%")),
+			StorageConfig: api.StorageConfig{
+				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+			},
+			Racks: []api.Rack{
+				{
+					Name: "r1",
+				},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{},
+		},
+	}
+
+	sts, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3, imageRegistry)
+	require.NoError(t, err, "failed to build statefulset")
+
+	expectedStrategy := appsv1.StatefulSetUpdateStrategy{
+		Type: appsv1.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+			Partition:      ptr.To(int32(2)),
+			MaxUnavailable: ptr.To(intstr.Parse("25%")),
+		},
+	}
+
+	assert.Equal(t, expectedStrategy, sts.Spec.UpdateStrategy)
 }
 
 func TestAddManagementApiServerSecurity(t *testing.T) {

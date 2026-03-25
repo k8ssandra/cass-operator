@@ -4,7 +4,7 @@
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 
-VERSION ?= 1.30.0
+VERSION ?= 1.31.0
 BASE_VERSION := $(VERSION)
 
 COMMIT := $(shell git rev-parse --short HEAD)

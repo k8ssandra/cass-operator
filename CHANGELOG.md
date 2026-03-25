@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.30.0
 
 * [CHANGE] [#905](https://github.com/k8ssandra/cass-operator/issues/905) Relax the ServerVersion checks to structure only without separating OSS/DSE/HCD.
 * [FEATURE] [#893](https://github.com/k8ssandra/cass-operator/issues/893) Add support for maxUnavailable (Kubernetes 1.35 and up). This allows to make changes to the Cassandra pods in parallel, thus speeding up changes in larger clusters. Allows integer or percentage setting, but will never target more than one rack at a time. 

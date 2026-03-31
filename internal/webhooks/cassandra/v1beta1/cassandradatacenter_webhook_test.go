@@ -11,6 +11,7 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -126,6 +127,36 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 				},
 			},
 			errString: "",
+		},
+		{
+			name: "Valid maxUnavailable percentage",
+			dc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					ServerType:     "cassandra",
+					ServerVersion:  "5.0.0",
+					Size:           3,
+					MaxUnavailable: ptr.To(intstr.Parse("50%")),
+				},
+			},
+			errString: "",
+		},
+		{
+			name: "Invalid maxUnavailable string",
+			dc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					ServerType:     "cassandra",
+					ServerVersion:  "5.0.0",
+					Size:           3,
+					MaxUnavailable: ptr.To(intstr.FromString("invalid")),
+				},
+			},
+			errString: "attempted to use invalid maxUnavailable value 'invalid'",
 		},
 		{
 			name: "Dse Workloads in Cassandra Invalid",
@@ -669,6 +700,84 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
 							Resources: corev1.VolumeResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("2Gi")},
+							},
+						},
+					},
+				},
+			},
+			errString: "",
+		},
+		{
+			name: "storage requests size shrink is rejected even when storage changes are allowed",
+			oldDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("2Gi")},
+							},
+						},
+					},
+				},
+			},
+			newDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+					Annotations: map[string]string{
+						api.AllowStorageChangesAnnotation: "true",
+					},
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+			},
+			errString: "shrink storageConfig.CassandraDataVolumeClaimSpec from 2Gi to 1Gi",
+		},
+		{
+			name: "storage requests have different unit but same size",
+			oldDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1024Mi")},
+							},
+						},
+					},
+				},
+			},
+			newDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+					Annotations: map[string]string{
+						api.AllowStorageChangesAnnotation: "true",
+					},
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1Gi")},
 							},
 						},
 					},

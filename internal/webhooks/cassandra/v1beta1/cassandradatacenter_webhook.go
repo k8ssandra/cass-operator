@@ -12,6 +12,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // log is for logging in this package.
@@ -134,6 +136,13 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 		return attemptedTo("define config dse-yaml with %s", serverStr)
 	}
 
+	if dc.Spec.MaxUnavailable != nil {
+		maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(dc.Spec.MaxUnavailable, int(dc.Spec.Size), true)
+		if err != nil || maxUnavailable < 0 {
+			return attemptedTo("use invalid maxUnavailable value '%s'", dc.Spec.MaxUnavailable.String())
+		}
+	}
+
 	// if using multiple nodes per worker, requests and limits should be set for both cpu and memory
 	if dc.Spec.AllowMultipleNodesPerWorker {
 		if dc.Spec.Resources.Requests.Cpu().IsZero() ||
@@ -180,6 +189,15 @@ func ValidateDatacenterFieldChanges(oldDc *api.CassandraDatacenter, newDc *api.C
 
 	oldClaimSpec := oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec.DeepCopy()
 	newClaimSpec := newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec.DeepCopy()
+	if oldClaimSpec != nil && newClaimSpec != nil {
+		oldStorageRequest := oldClaimSpec.Resources.Requests[corev1.ResourceStorage]
+		newStorageRequest := newClaimSpec.Resources.Requests[corev1.ResourceStorage]
+
+		if oldStorageRequest.Cmp(newStorageRequest) > 0 {
+			return attemptedTo(
+				"shrink storageConfig.CassandraDataVolumeClaimSpec from %s to %s", oldStorageRequest.String(), newStorageRequest.String())
+		}
+	}
 
 	// CassandraDataVolumeClaimSpec changes are disallowed
 	if metav1.HasAnnotation(newDc.ObjectMeta, api.AllowStorageChangesAnnotation) && newDc.Annotations[api.AllowStorageChangesAnnotation] == "true" {

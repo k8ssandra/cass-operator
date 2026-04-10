@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var fqlEnabledConfig string = `{"cassandra-yaml": { 
@@ -38,13 +39,14 @@ var (
 )
 
 func setupPodList(t *testing.T, rc *ReconciliationContext) {
+	t.Helper()
 	podIP := "192.168.101.11"
-
-	mockClient := mocks.NewClient(t)
 
 	pods := []corev1.Pod{{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-sts-0",
+			Name:      "test-sts-0",
+			Namespace: rc.Datacenter.Namespace,
+			Labels:    rc.Datacenter.GetClusterLabels(),
 		},
 		Status: corev1.PodStatus{
 			PodIP: podIP,
@@ -55,13 +57,12 @@ func setupPodList(t *testing.T, rc *ReconciliationContext) {
 		&pods[0],
 	}
 
-	k8sMockClientList(mockClient, nil).
-		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*corev1.PodList)
-			arg.Items = pods
-		})
-
-	rc.Client = mockClient
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme(nil)).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter, &pods[0]).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
 }
 
 func mockFeaturesEnabled(mockHttpClient *mocks.HttpClient) {

@@ -26,9 +26,6 @@ func TestRetryDecommissionNode(t *testing.T) {
 	state := "UP"
 	podIP := "192.168.101.11"
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
 	rc.Datacenter.SetCondition(api.DatacenterCondition{
 		Status: corev1.ConditionTrue,
 		Type:   api.DatacenterScalingDown,
@@ -109,14 +106,10 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 	podIP := "192.168.101.11"
 	state := "LEFT"
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
 	rc.Datacenter.SetCondition(api.DatacenterCondition{
 		Status: corev1.ConditionTrue,
 		Type:   api.DatacenterScalingDown,
 	})
-
-	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil)
 
 	labels := make(map[string]string)
 	labels[api.CassNodeState] = stateDecommissioning

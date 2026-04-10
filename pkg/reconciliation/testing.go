@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -34,11 +33,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
+
+const podPVCClaimNameField = "spec.volumes.persistentVolumeClaim.claimName"
 
 func newTestImageRegistry() images.ImageRegistry {
 	imageConfigFile := filepath.Join("..", "..", "tests", "testdata", "image_config_parsing.yaml")
@@ -121,11 +124,13 @@ func CreateMockReconciliationContext(
 		storageClass,
 	}
 
-	s := scheme.Scheme
-	setupScheme(s)
-	// s.AddKnownTypes(api.GroupVersion, cassandraDatacenter)
-
-	fakeClient := fake.NewClientBuilder().WithStatusSubresource(cassandraDatacenter).WithRuntimeObjects(trackObjects...).Build()
+	s := setupScheme(runtime.NewScheme())
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(s).
+		WithStatusSubresource(cassandraDatacenter).
+		WithRuntimeObjects(trackObjects...).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
 
 	request := &reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -174,158 +179,29 @@ func setupTest() (*ReconciliationContext, *corev1.Service, func()) {
 	return rc, service, cleanupMockScr
 }
 
-func k8sMockClientGet(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Get",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(key client.ObjectKey) bool {
-				return key != client.ObjectKey{}
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientUpdate(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Update",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientPatch(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Patch",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			}),
-		mock.MatchedBy(
-			func(patch client.Patch) bool {
-				return patch != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientStatusPatch(mockClient *mocks.SubResourceClient, returnArg interface{}) *mock.Call {
-	return mockClient.On("Patch",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			}),
-		mock.MatchedBy(
-			func(patch client.Patch) bool {
-				return patch != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientStatusUpdate(mockClient *mocks.SubResourceClient, returnArg interface{}) *mock.Call {
-	return mockClient.On("Update",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientCreate(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Create",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientDelete(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Delete",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientList(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("List",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			}),
-		mock.MatchedBy(matchListOptionsArg)).
-		Return(returnArg).
-		Once()
-}
-
-func matchListOptionsArg(arg interface{}) bool {
-	return listOptionsFromArg(arg) != nil
-}
-
-func listOptionsFromArg(arg interface{}) *client.ListOptions {
-	switch v := arg.(type) {
-	case *client.ListOptions:
-		return v
-	case []client.ListOption:
-		opts := &client.ListOptions{}
-		for _, opt := range v {
-			if opt != nil {
-				opt.ApplyToList(opts)
-			}
-		}
-		return opts
-	default:
-		return nil
-	}
-}
-
 func setupScheme(scheme *runtime.Scheme) *runtime.Scheme {
 	if scheme == nil {
 		scheme = runtime.NewScheme()
 	}
+	_ = clientgoscheme.AddToScheme(scheme)
 	_ = api.AddToScheme(scheme)
+	_ = taskapi.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 	_ = discoveryv1.AddToScheme(scheme)
 	return scheme
+}
+
+func podPVCClaimNames(obj client.Object) []string {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return nil
+	}
+
+	var claimNames []string
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName != "" {
+			claimNames = append(claimNames, volume.PersistentVolumeClaim.ClaimName)
+		}
+	}
+	return claimNames
 }

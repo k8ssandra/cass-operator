@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -240,7 +241,7 @@ func TestReconcileRacks_ReconcilePods(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = desiredStatefulSet.Labels[api.RackLabel]
@@ -511,36 +512,6 @@ func TestReconcilePods(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	k8sMockClientGet(mockClient, nil)
-
-	// this mock will only pass if the pod is updated with the correct labels
-	mockClient.On("Update",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj *corev1.Pod) bool {
-				dc := api.CassandraDatacenter{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cassandradatacenter-example",
-						Namespace: "default",
-					},
-					Spec: api.CassandraDatacenterSpec{
-						ClusterName: "cassandradatacenter-example-cluster",
-					},
-				}
-				expected := dc.GetRackLabels("default")
-				expected[oplabels.ManagedByLabel] = oplabels.ManagedByLabelValue
-
-				return reflect.DeepEqual(obj.GetLabels(), expected)
-			})).
-		Return(nil).
-		Once()
-
 	statefulSet, err := newStatefulSetForCassandraDatacenter(
 		nil,
 		"default",
@@ -550,10 +521,23 @@ func TestReconcilePods(t *testing.T) {
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 	statefulSet.Status.Replicas = int32(1)
 
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getStatefulSetPodNameForIdx(statefulSet, 0),
+			Namespace: rc.Datacenter.Namespace,
+			Labels:    map[string]string{},
+		},
+	}
+	require.NoError(t, rc.Client.Create(rc.Ctx, pod))
+
 	err = rc.ReconcilePods(statefulSet)
 	assert.NoErrorf(t, err, "Should not have returned an error")
 
-	mockClient.AssertExpectations(t)
+	reconciledPod := &corev1.Pod{}
+	require.NoError(t, rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(pod), reconciledPod))
+	expectedLabels := rc.Datacenter.GetRackLabels("default")
+	expectedLabels[oplabels.ManagedByLabel] = oplabels.ManagedByLabelValue
+	assert.Equal(t, expectedLabels, reconciledPod.GetLabels())
 }
 
 func TestReconcilePods_WithVolumes(t *testing.T) {
@@ -606,7 +590,7 @@ func TestReconcilePods_WithVolumes(t *testing.T) {
 		pvc,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(pod, pvc).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(pod, pvc).WithRuntimeObjects(trackObjects...).Build()
 	err = rc.ReconcilePods(statefulSet)
 	assert.NoErrorf(t, err, "Should not have returned an error")
 }
@@ -651,15 +635,22 @@ func TestReconcileNextRack_CreateError(t *testing.T) {
 		imageRegistry)
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	k8sMockClientCreate(mockClient, fmt.Errorf(""))
-	k8sMockClientUpdate(mockClient, nil).Times(1)
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme(nil)).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+				if _, ok := obj.(*appsv1.StatefulSet); ok {
+					return fmt.Errorf("")
+				}
+				return c.Create(ctx, obj, opts...)
+			},
+		}).
+		Build()
 
 	err = rc.ReconcileNextRack(statefulSet)
-
-	mockClient.AssertExpectations(t)
 
 	assert.Errorf(t, err, "Should have returned an error while calculating reconciliation actions")
 }
@@ -739,7 +730,7 @@ func TestReconcileRacks(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(desiredStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(desiredStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -763,10 +754,20 @@ func TestReconcileRacks_GetStatefulsetError(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	k8sMockClientGet(mockClient, fmt.Errorf(""))
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme(nil)).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if _, ok := obj.(*appsv1.StatefulSet); ok {
+					return fmt.Errorf("")
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		}).
+		Build()
 
 	var rackInfo []*RackInformation
 
@@ -779,8 +780,6 @@ func TestReconcileRacks_GetStatefulsetError(t *testing.T) {
 	rc.desiredRackInformation = rackInfo
 
 	result, err := rc.ReconcileAllRacks()
-
-	mockClient.AssertExpectations(t)
 
 	assert.Errorf(t, err, "Should have returned an error")
 
@@ -812,7 +811,7 @@ func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(desiredStatefulSet).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(desiredStatefulSet).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -849,7 +848,7 @@ func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
 		preExistingStatefulSet,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(preExistingStatefulSet).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(preExistingStatefulSet).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -891,7 +890,7 @@ func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(preExistingStatefulSet).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(preExistingStatefulSet).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -928,7 +927,7 @@ func TestReconcileRacks_NeedToPark(t *testing.T) {
 		rc.Datacenter,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(preExistingStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(preExistingStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -979,7 +978,7 @@ func TestReconcileRacks_AlreadyReconciled(t *testing.T) {
 		desiredPdb,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(desiredStatefulSet, rc.Datacenter, desiredPdb).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(desiredStatefulSet, rc.Datacenter, desiredPdb).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -1056,7 +1055,7 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 		rc.Datacenter,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(desiredStatefulSet, secondDesiredStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(desiredStatefulSet, secondDesiredStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -1126,7 +1125,7 @@ func TestReconcileRacks_UpdateRackNodeCount(t *testing.T) {
 				rc.Datacenter,
 			}
 
-			rc.Client = fake.NewClientBuilder().WithStatusSubresource(tt.args.statefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+			rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(tt.args.statefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 			if err := rc.UpdateRackNodeCount(tt.args.statefulSet, tt.args.newNodeCount); (err != nil) != tt.wantErr {
 				t.Errorf("updateRackNodeCount() error = %v, wantErr %v", err, tt.wantErr)
@@ -1168,7 +1167,7 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(desiredStatefulSet, rc.Datacenter, desiredPdb).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(desiredStatefulSet, rc.Datacenter, desiredPdb).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -1833,19 +1832,18 @@ func TestCleanupAfterScaling(t *testing.T) {
 	defer cleanupMockScr()
 	assert := assert.New(t)
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	var task *taskapi.CassandraTask
-	// 1. Create task - return ok
-	k8sMockClientCreate(rc.Client.(*mocks.Client), nil).
-		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*taskapi.CassandraTask)
-			task = arg
-		}).
-		Times(1)
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme(nil)).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
 
 	r := rc.cleanupAfterScaling()
+	taskList := &taskapi.CassandraTaskList{}
+	require.NoError(t, rc.Client.List(rc.Ctx, taskList))
+	require.Len(t, taskList.Items, 1)
+	task := taskList.Items[0]
 	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
 	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
 	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
@@ -1859,36 +1857,26 @@ func TestCleanupAfterScalingWithTracker(t *testing.T) {
 
 	// Setup annotation
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation, "true")
-
-	var task *taskapi.CassandraTask
-	// 1. Create task - return ok
-	k8sMockClientCreate(rc.Client.(*mocks.Client), nil).
-		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*taskapi.CassandraTask)
-			task = arg
-		}).
-		Times(1)
-
-	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme(nil)).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
 
 	r := rc.cleanupAfterScaling()
+	taskKey := types.NamespacedName{Name: rc.Datacenter.Status.TrackedTasks[0].Name, Namespace: rc.Datacenter.Status.TrackedTasks[0].Namespace}
+	task := &taskapi.CassandraTask{}
+	require.NoError(t, rc.Client.Get(rc.Ctx, taskKey, task))
 	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
 	assert.Equal(result.RequeueSoon(10), r, "expected result of result.RequeueSoon(10)")
 	assert.Equal(1, len(rc.Datacenter.Status.TrackedTasks))
-	// 3. GET - return completed task
-	k8sMockClientGet(rc.Client.(*mocks.Client), nil).
-		Run(func(args mock.Arguments) {
-			arg := args.Get(2).(*taskapi.CassandraTask)
-			task.DeepCopyInto(arg)
-			timeNow := metav1.Now()
-			arg.Status.CompletionTime = &timeNow
-		}).Once()
-	// 4. Patch to datacenter status
-	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
+
+	timeNow := metav1.Now()
+	task.Status.CompletionTime = &timeNow
+	require.NoError(t, rc.Client.Update(rc.Ctx, task))
+
 	r = rc.cleanupAfterScaling()
 	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
 	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
@@ -1900,21 +1888,20 @@ func TestCleanupAfterScalingWithParallelAnnotation(t *testing.T) {
 	defer cleanupMockScr()
 	assert := assert.New(t)
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
 	_ = rc.CalculateRackInformation()
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.EnableParallelCleanupWithinRackAnnotation, "true")
-
-	var task *taskapi.CassandraTask
-	// 1. Create task - return ok
-	k8sMockClientCreate(rc.Client.(*mocks.Client), nil).
-		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*taskapi.CassandraTask)
-			task = arg
-		}).
-		Times(1)
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme(nil)).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
 
 	r := rc.cleanupAfterScaling()
+	taskList := &taskapi.CassandraTaskList{}
+	require.NoError(t, rc.Client.List(rc.Ctx, taskList))
+	require.Len(t, taskList.Items, 1)
+	task := taskList.Items[0]
 	assert.Equal(result.Continue(), r, "expected result of result.Continue()")
 	assert.Equal(taskapi.CommandCleanup, task.Spec.Jobs[0].Command)
 	assert.Equal(0, len(rc.Datacenter.Status.TrackedTasks))
@@ -2010,16 +1997,6 @@ func TestFailedStart(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	done := make(chan struct{})
-	k8sMockClientDelete(mockClient, nil).Once().Run(func(mock.Arguments) { close(done) })
-
-	// Patch labelStarting, lastNodeStarted..
-	k8sMockClientPatch(mockClient, nil).Once()
-	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Twice()
-
 	res := &http.Response{
 		StatusCode: http.StatusInternalServerError,
 		Body:       io.NopCloser(strings.NewReader("OK")),
@@ -2034,19 +2011,25 @@ func TestFailedStart(t *testing.T) {
 		Return(res, nil).
 		Once()
 
-	client := httphelper.NodeMgmtClient{
+	nodeMgmtClient := httphelper.NodeMgmtClient{
 		Client:   mockHttpClient,
 		Log:      rc.ReqLogger,
 		Protocol: "http",
 	}
 
-	rc.NodeMgmtClient = client
+	rc.NodeMgmtClient = nodeMgmtClient
 
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{},
 	}
 
 	pod := makeReloadTestPod()
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme(nil)).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(runtimeObjectHelper(rc, nil, []*corev1.Pod{pod})...).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
 
 	fakeRecorder := record.NewFakeRecorder(5)
 	rc.Recorder = fakeRecorder
@@ -2055,19 +2038,18 @@ func TestFailedStart(t *testing.T) {
 	// The start is async method, so the error is not returned here
 	assert.Nil(t, err)
 
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		assert.Fail(t, "No pod delete occurred")
-	}
-
-	// mockClient.AssertExpectations(t)
-	// mockHttpClient.AssertExpectations(t)
+	require.Eventually(t, func() bool {
+		currentPod := &corev1.Pod{}
+		err := rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(pod), currentPod)
+		return apierrors.IsNotFound(err)
+	}, 2*time.Second, 20*time.Millisecond, "expected pod delete after failed start")
+	require.Eventually(t, func() bool {
+		return len(rc.Datacenter.Status.FailedStarts) == 1 && rc.Datacenter.Status.FailedStarts[0] == pod.Name
+	}, 2*time.Second, 20*time.Millisecond, "expected failed start status update")
 
 	close(fakeRecorder.Events)
 	// Should have 2 events, one to indicate Cassandra is starting, one to indicate it failed to start
 	assert.Equal(t, 2, len(fakeRecorder.Events))
-	assert.Equal(t, rc.Datacenter.Status.FailedStarts[0], pod.Name)
 }
 
 func TestStartBootstrappedNodes(t *testing.T) {
@@ -2263,8 +2245,25 @@ func TestStartBootstrappedNodes(t *testing.T) {
 				}
 			}
 
-			mockClient := mocks.NewClient(t)
-			rc.Client = mockClient
+			trackObjects := []runtime.Object{
+				rc.Datacenter,
+				// rc.statefulSets,
+				// rc.dcPods,
+			}
+
+			for _, sts := range rc.statefulSets {
+				trackObjects = append(trackObjects, sts)
+			}
+			for _, pod := range rc.dcPods {
+				trackObjects = append(trackObjects, pod)
+			}
+
+			rc.Client = fake.NewClientBuilder().
+				WithScheme(setupScheme(nil)).
+				WithStatusSubresource(rc.Datacenter).
+				WithRuntimeObjects(trackObjects...).
+				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+				Build()
 
 			expectedStartCount := 0
 			for i, rackPods := range tt.racks {
@@ -2284,12 +2283,6 @@ func TestStartBootstrappedNodes(t *testing.T) {
 			}()
 
 			if tt.wantNotReady {
-				// mock the calls in labelServerPodStarting:
-				// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
-				k8sMockClientPatch(mockClient, nil).Times(expectedStartCount)
-				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
-				k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Times(expectedStartCount)
-
 				res := &http.Response{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader("OK")),
@@ -2330,6 +2323,8 @@ func TestStartBootstrappedNodes(t *testing.T) {
 				}
 			}
 
+			assertStartingPodsAndStatusPatched(t, rc, expectedStartCount, false)
+
 			fakeRecorder := rc.Recorder.(*record.FakeRecorder)
 			close(fakeRecorder.Events)
 			if assert.Lenf(t, fakeRecorder.Events, len(tt.wantEvents), "expected %d events, got %d", len(tt.wantEvents), len(fakeRecorder.Events)) {
@@ -2339,8 +2334,6 @@ func TestStartBootstrappedNodes(t *testing.T) {
 				}
 				assert.ElementsMatch(t, tt.wantEvents, gotEvents)
 			}
-
-			mockClient.AssertExpectations(t)
 		})
 	}
 }
@@ -2603,17 +2596,15 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				}
 			}
 
-			mockClient := mocks.NewClient(t)
-			rc.Client = mockClient
+			rc.Client = fake.NewClientBuilder().
+				WithScheme(setupScheme(nil)).
+				WithStatusSubresource(rc.Datacenter).
+				WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.dcPods)...).
+				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+				Build()
 
 			done := make(chan struct{})
 			if tt.wantNotReady {
-				// mock the calls in labelServerPodStarting:
-				// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
-				k8sMockClientPatch(mockClient, nil)
-				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
-				k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil)
-
 				res := &http.Response{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader("OK")),
@@ -2654,6 +2645,8 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				}
 			}
 
+			assertStartingPodsAndStatusPatched(t, rc, len(tt.wantEvents), false)
+
 			fakeRecorder := rc.Recorder.(*record.FakeRecorder)
 			close(fakeRecorder.Events)
 			if assert.Lenf(t, fakeRecorder.Events, len(tt.wantEvents), "expected %d events, got %d", len(tt.wantEvents), len(fakeRecorder.Events)) {
@@ -2663,8 +2656,6 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				}
 				assert.Equal(t, tt.wantEvents, gotEvents)
 			}
-
-			mockClient.AssertExpectations(t)
 		})
 	}
 }
@@ -2754,18 +2745,15 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 					rc.dcPods = append(rc.dcPods, p)
 				}
 			}
-
-			mockClient := mocks.NewClient(t)
-			rc.Client = mockClient
+			rc.Client = fake.NewClientBuilder().
+				WithScheme(setupScheme(nil)).
+				WithStatusSubresource(rc.Datacenter).
+				WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.dcPods)...).
+				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+				Build()
 
 			done := make(chan struct{})
 			if tt.wantNotReady {
-				// mock the calls in labelServerPodStarting:
-				// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
-				k8sMockClientPatch(mockClient, nil)
-				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
-				k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil)
-
 				res := &http.Response{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader("OK")),
@@ -2781,14 +2769,13 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 					Once().
 					Run(func(mock.Arguments) { close(done) })
 
-				client := httphelper.NodeMgmtClient{
+				nodeMgmtClient := httphelper.NodeMgmtClient{
 					Client:   mockHttpClient,
 					Log:      rc.ReqLogger,
 					Protocol: "http",
 				}
-				rc.NodeMgmtClient = client
+				rc.NodeMgmtClient = nodeMgmtClient
 			}
-
 			epData := httphelper.CassMetadataEndpoints{
 				Entity: []httphelper.EndpointState{},
 			}
@@ -2797,7 +2784,6 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equalf(t, tt.wantNotReady, gotNotReady, "expected not ready to be %v", tt.wantNotReady)
-
 			if tt.wantNotReady {
 				select {
 				case <-done:
@@ -2805,6 +2791,8 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 					assert.Fail(t, "No pod start occurred")
 				}
 			}
+
+			assertStartingPodsAndStatusPatched(t, rc, len(tt.wantEvents), false)
 
 			fakeRecorder := rc.Recorder.(*record.FakeRecorder)
 			close(fakeRecorder.Events)
@@ -2815,8 +2803,6 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 				}
 				assert.Equal(t, tt.wantEvents, gotEvents)
 			}
-
-			mockClient.AssertExpectations(t)
 		})
 	}
 }
@@ -2935,8 +2921,12 @@ func TestStartOneNodePerRack(t *testing.T) {
 				}
 			}
 
-			mockClient := mocks.NewClient(t)
-			rc.Client = mockClient
+			rc.Client = fake.NewClientBuilder().
+				WithScheme(setupScheme(nil)).
+				WithStatusSubresource(rc.Datacenter).
+				WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.dcPods)...).
+				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+				Build()
 
 			done := make(chan struct{})
 
@@ -2962,23 +2952,6 @@ func TestStartOneNodePerRack(t *testing.T) {
 					Protocol: "http",
 				}
 				rc.NodeMgmtClient = client
-
-				// mock the calls in labelServerPodStarting:
-				// patch the pod: pod.Labels[api.CassNodeState] = stateStarting
-				k8sMockClientPatch(mockClient, nil)
-				// get the status client
-				// patch the dc status: dc.Status.LastServerNodeStarted = metav1.Now()
-				k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil)
-
-				// We need to mock the hasAdditionalSeeds call
-				// Mock the Get calls for EndpointSlices
-				// Three calls for the three potential slices (IPv4, IPv6, FQDN)
-
-				if tt.seedCount < 1 {
-					// There's additional checks here, for fetching the possible additional-seeds (the GET) and pre-adding a seed label
-					k8sMockClientGet(mockClient, nil).Times(3)
-					k8sMockClientPatch(mockClient, nil)
-				}
 			}
 
 			epData := httphelper.CassMetadataEndpoints{
@@ -2997,6 +2970,11 @@ func TestStartOneNodePerRack(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equalf(t, tt.wantNotReady, gotNotReady, "expected not ready to be %v", tt.wantNotReady)
+			expectedStartingCount := 0
+			if tt.wantNotReady {
+				expectedStartingCount = 1
+			}
+			assertStartingPodsAndStatusPatched(t, rc, expectedStartingCount, tt.wantNotReady && tt.seedCount < 1)
 		})
 	}
 }
@@ -3059,19 +3037,6 @@ func TestStartOneNodePerRackFailed(t *testing.T) {
 					rc.dcPods = append(rc.dcPods, p)
 				}
 			}
-
-			mockClient := mocks.NewClient(t)
-			rc.Client = mockClient
-
-			mockHttpClient := mocks.NewHttpClient(t)
-			k8sMockClientGet(mockClient, nil).Times(3)
-
-			client := httphelper.NodeMgmtClient{
-				Client:   mockHttpClient,
-				Log:      rc.ReqLogger,
-				Protocol: "http",
-			}
-			rc.NodeMgmtClient = client
 
 			epData := httphelper.CassMetadataEndpoints{
 				Entity: []httphelper.EndpointState{},
@@ -3453,18 +3418,19 @@ func TestSetConditionStatus(t *testing.T) {
 	defer cleanupMockScr()
 	assert := assert.New(t)
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	k8sMockClientStatusUpdate(mockClient.Status().(*mocks.SubResourceClient), nil).Times(2)
 	assert.NoError(rc.setConditionStatus(api.DatacenterHealthy, corev1.ConditionTrue))
 	assert.Equal(corev1.ConditionTrue, rc.Datacenter.GetConditionStatus(api.DatacenterHealthy))
+	dc := &api.CassandraDatacenter{}
+	assert.NoError(rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(rc.Datacenter), dc))
+	assert.Equal(corev1.ConditionTrue, dc.GetConditionStatus(api.DatacenterHealthy))
 	val, err := monitoring.GetMetricValue("cass_operator_datacenter_status", map[string]string{"datacenter": rc.Datacenter.DatacenterName(), "condition": string(api.DatacenterHealthy)})
 	assert.NoError(err)
 	assert.Equal(float64(1), val)
 
 	assert.NoError(rc.setConditionStatus(api.DatacenterHealthy, corev1.ConditionFalse))
 	assert.Equal(corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterHealthy))
+	assert.NoError(rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(rc.Datacenter), dc))
+	assert.Equal(corev1.ConditionFalse, dc.GetConditionStatus(api.DatacenterHealthy))
 	val, err = monitoring.GetMetricValue("cass_operator_datacenter_status", map[string]string{"datacenter": rc.Datacenter.DatacenterName(), "condition": string(api.DatacenterHealthy)})
 	assert.NoError(err)
 	assert.Equal(float64(0), val)
@@ -3475,11 +3441,6 @@ func TestDatacenterStatus(t *testing.T) {
 	defer cleanupMockScr()
 	assert := assert.New(t)
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	k8sMockClientStatusPatch(mockClient.Status().(*mocks.SubResourceClient), nil).Once()
-	k8sMockClientStatusUpdate(mockClient.Status().(*mocks.SubResourceClient), nil).Times(2)
 	assert.NoError(rc.setConditionStatus(api.DatacenterRequiresUpdate, corev1.ConditionTrue)) // This uses one StatusUpdate call
 	rc.Datacenter.Status.ObservedGeneration = 0
 	rc.Datacenter.Generation = 1
@@ -3517,7 +3478,7 @@ func TestDatacenterPods(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = "default"
@@ -3562,7 +3523,7 @@ func TestDatacenterPodsOldLabels(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = "default"
@@ -3616,7 +3577,7 @@ func TestDatacenterPodsNoDualFetch(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = "default"
@@ -3662,7 +3623,7 @@ func TestCheckRackLabels(t *testing.T) {
 		desiredStatefulSet,
 		rc.Datacenter,
 	}
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	rc.statefulSets = []*appsv1.StatefulSet{desiredStatefulSet}
 
@@ -3704,7 +3665,7 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = desiredStatefulSet.Labels[api.RackLabel]
@@ -4187,7 +4148,7 @@ func TestRefreshSeeds(t *testing.T) {
 			metav1.SetMetaDataLabel(&mp.ObjectMeta, api.SeedNodeLabel, "true")
 			trackObjects = append(trackObjects, mp)
 		}
-		rc.Client = fake.NewClientBuilder().WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+		rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 		epData := httphelper.CassMetadataEndpoints{
 			Entity: []httphelper.EndpointState{},
 		}
@@ -4296,4 +4257,54 @@ func TestRefreshSeeds(t *testing.T) {
 		assert.Equal(result.Error(respError), reconcileResult)
 		mockHttpClient.AssertExpectations(t)
 	})
+}
+
+func runtimeObjectHelper(rc *ReconciliationContext, statefulSets []*appsv1.StatefulSet, pods []*corev1.Pod) []runtime.Object {
+	trackObjects := []runtime.Object{rc.Datacenter}
+	for _, statefulSet := range statefulSets {
+		if statefulSet != nil {
+			trackObjects = append(trackObjects, statefulSet)
+		}
+	}
+	for _, pod := range pods {
+		if pod != nil {
+			trackObjects = append(trackObjects, pod)
+		}
+	}
+	return trackObjects
+}
+
+func assertStartingPodsAndStatusPatched(t *testing.T, rc *ReconciliationContext, expectedStartingCount int, requireSeedLabel bool) {
+	t.Helper()
+
+	require.Eventually(t, func() bool {
+		podList := &corev1.PodList{}
+		if err := rc.Client.List(rc.Ctx, podList); err != nil {
+			return false
+		}
+
+		startingCount := 0
+		for _, pod := range podList.Items {
+			if pod.Labels[api.CassNodeState] != stateStarting {
+				continue
+			}
+			startingCount++
+			if requireSeedLabel && pod.Labels[api.SeedNodeLabel] != "true" {
+				return false
+			}
+		}
+
+		dc := &api.CassandraDatacenter{}
+		if err := rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(rc.Datacenter), dc); err != nil {
+			return false
+		}
+
+		if startingCount != expectedStartingCount {
+			return false
+		}
+		if expectedStartingCount > 0 {
+			return !dc.Status.LastServerNodeStarted.IsZero()
+		}
+		return dc.Status.LastServerNodeStarted.IsZero()
+	}, 2*time.Second, 20*time.Millisecond, "expected persisted starting pod and datacenter status updates")
 }

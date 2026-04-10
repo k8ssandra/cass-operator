@@ -7,8 +7,6 @@ import (
 	"time"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	controllers "github.com/k8ssandra/cass-operator/internal/controllers/cassandra"
@@ -22,6 +20,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -222,25 +221,17 @@ func TestReconcile_Error(t *testing.T) {
 	s := scheme.Scheme
 	s.AddKnownTypes(api.GroupVersion, dc)
 
-	mockClient := &mocks.Client{}
-	mockClient.On("Get",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(key client.ObjectKey) bool {
-				return key != client.ObjectKey{}
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(fmt.Errorf("some cryptic error")).
-		Once()
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(s).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				return fmt.Errorf("some cryptic error")
+			},
+		}).
+		Build()
 
 	r := &controllers.CassandraDatacenterReconciler{
-		Client: mockClient,
+		Client: fakeClient,
 		Scheme: s,
 	}
 

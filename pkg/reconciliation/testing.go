@@ -11,13 +11,17 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-logr/logr"
-	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,12 +40,34 @@ import (
 	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/images"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 const podPVCClaimNameField = "spec.volumes.persistentVolumeClaim.claimName"
+
+type callDetails struct {
+	RequestPath string
+	RequestURI  string
+}
+
+type fakeMgmtApiServer struct {
+	server *httptest.Server
+
+	mu    sync.Mutex
+	calls []callDetails
+}
+
+var (
+	defaultMgmtApiServerOnce sync.Once
+	defaultMgmtApiServer     *fakeMgmtApiServer
+)
+
+type httpClientDoFunc func(*http.Request) (*http.Response, error)
+
+func (f httpClientDoFunc) Do(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 func newTestImageRegistry() images.ImageRegistry {
 	imageConfigFile := filepath.Join("..", "..", "tests", "testdata", "image_config_parsing.yaml")
@@ -149,20 +175,7 @@ func CreateMockReconciliationContext(
 	rc.Ctx = context.Background()
 	rc.ImageRegistry = newTestImageRegistry()
 
-	res := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader("OK")),
-	}
-
-	mockHttpClient := mocks.NewHttpClient(&testing.T{})
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req != nil
-			})).
-		Return(res, nil)
-
-	rc.NodeMgmtClient = httphelper.NodeMgmtClient{Client: mockHttpClient, Log: reqLogger, Protocol: "http"}
+	rc.NodeMgmtClient = defaultFakeMgmtApiServer().client(reqLogger)
 
 	return rc
 }
@@ -204,4 +217,127 @@ func podPVCClaimNames(obj client.Object) []string {
 		}
 	}
 	return claimNames
+}
+
+// Some of this code is shared with the stuff we had in the envtests and httphelper already. Separated for now due to packaging and to make it easier to review.
+func defaultFakeMgmtApiServer() *fakeMgmtApiServer {
+	defaultMgmtApiServerOnce.Do(func() {
+		defaultMgmtApiServer = startFakeMgmtApiTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/api/v0/metadata/versions/features":
+				http.NotFound(w, r)
+			case "/api/v0/ops/node/fullquerylogging":
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"entity": false}`)
+			case "/api/v0/metadata/endpoints":
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"entity": []}`)
+			case "/api/v0/ops/executor/job":
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"id":"1","status":"COMPLETED"}`)
+			default:
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, "OK")
+			}
+		}))
+	})
+	return defaultMgmtApiServer
+}
+
+func newFakeMgmtApiServer(t *testing.T, handler http.HandlerFunc) *fakeMgmtApiServer {
+	server := startFakeMgmtApiTestServer(handler)
+	t.Cleanup(server.Close)
+	return server
+}
+
+func startFakeMgmtApiTestServer(handler http.HandlerFunc) *fakeMgmtApiServer {
+	server := &fakeMgmtApiServer{}
+	server.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server.mu.Lock()
+		server.calls = append(server.calls, callDetails{
+			RequestPath: r.URL.Path,
+			RequestURI:  r.URL.RequestURI(),
+		})
+		server.mu.Unlock()
+
+		handler(w, r)
+	}))
+	return server
+}
+
+func (s *fakeMgmtApiServer) Close() {
+	if s != nil && s.server != nil {
+		s.server.Close()
+	}
+}
+
+func (s *fakeMgmtApiServer) client(log logr.Logger) httphelper.NodeMgmtClient {
+	protocol := "http"
+	if strings.HasPrefix(s.server.URL, "https://") {
+		protocol = "https"
+	}
+
+	return httphelper.NodeMgmtClient{
+		Client:   s.server.Client(),
+		Log:      log,
+		Protocol: protocol,
+	}
+}
+
+func (s *fakeMgmtApiServer) attachToPod(t *testing.T, pod *corev1.Pod) {
+	host, port := s.hostPort(t)
+	pod.Status.PodIP = host
+
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		if container.Name != "cassandra" {
+			continue
+		}
+		for j := range container.Ports {
+			if container.Ports[j].Name == "mgmt-api-http" {
+				container.Ports[j].ContainerPort = int32(port)
+				return
+			}
+		}
+		container.Ports = append(container.Ports, corev1.ContainerPort{Name: "mgmt-api-http", ContainerPort: int32(port)})
+		return
+	}
+}
+
+func (s *fakeMgmtApiServer) hostPort(t *testing.T) (string, int) {
+	t.Helper()
+
+	addr := strings.TrimPrefix(strings.TrimPrefix(s.server.URL, "http://"), "https://")
+	host, portStr, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+
+	port, err := strconv.Atoi(portStr)
+	require.NoError(t, err)
+
+	return host, port
+}
+
+func (s *fakeMgmtApiServer) callCount(requestURI string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	count := 0
+	for _, call := range s.calls {
+		if strings.Contains(requestURI, "?") {
+			if call.RequestURI == requestURI {
+				count++
+			}
+			continue
+		}
+		if call.RequestPath == requestURI {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (s *fakeMgmtApiServer) assertCallCount(t *testing.T, requestURI string, expected int) {
+	t.Helper() // To ensure the line number reported on failure is the caller of this method
+	require.Equal(t, expected, s.callCount(requestURI), "expected %d calls to %s", expected, requestURI)
 }

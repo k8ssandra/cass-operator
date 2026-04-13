@@ -4,17 +4,13 @@
 package reconciliation
 
 import (
-	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"testing"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
-	"github.com/stretchr/testify/mock"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,58 +20,43 @@ func TestRetryDecommissionNode(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 	state := "UP"
-	podIP := "192.168.101.11"
 
 	rc.Datacenter.SetCondition(api.DatacenterCondition{
 		Status: corev1.ConditionTrue,
 		Type:   api.DatacenterScalingDown,
 	})
-	res := &http.Response{
-		StatusCode: http.StatusBadRequest,
-		Body:       io.NopCloser(strings.NewReader("OK")),
-	}
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/ops/node/decommission"
-			})).
-		Return(res, nil).
-		Once().
-		Run(func(args mock.Arguments) { wg.Done() })
-
-	resFeatureSet := &http.Response{
-		StatusCode: http.StatusNotFound,
-		Body:       io.NopCloser(strings.NewReader("")),
-	}
-
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/metadata/versions/features"
-			})).
-		Return(resFeatureSet, nil).
-		Once()
-
-	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
-		Protocol: "http",
-	}
+	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.RequestURI() {
+		case "/api/v0/metadata/versions/features":
+			http.NotFound(w, r)
+		case "/api/v0/ops/node/decommission?force=true":
+			w.WriteHeader(http.StatusBadRequest)
+			wg.Done()
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	labels := make(map[string]string)
 	labels[api.CassNodeState] = stateDecommissioning
 
-	rc.dcPods = []*corev1.Pod{{
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "pod-1",
 			Labels: labels,
 		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "cassandra",
+				},
+			},
+		},
 		Status: corev1.PodStatus{
-			PodIP: podIP,
 			ContainerStatuses: []corev1.ContainerStatus{
 				{
 					Name:  "cassandra",
@@ -83,12 +64,14 @@ func TestRetryDecommissionNode(t *testing.T) {
 				},
 			},
 		},
-	}}
+	}
+	server.attachToPod(t, pod)
+	rc.dcPods = []*corev1.Pod{pod}
 
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
 			{
-				RpcAddress: podIP,
+				RpcAddress: pod.Status.PodIP,
 				Status:     state,
 			},
 		},
@@ -98,12 +81,13 @@ func TestRetryDecommissionNode(t *testing.T) {
 		t.Fatalf("expected result of result.RequeueSoon(5) but got %s", r)
 	}
 	wg.Wait()
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/decommission", 1)
 }
 
 func TestRemoveResourcesWhenDone(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
-	podIP := "192.168.101.11"
 	state := "LEFT"
 
 	rc.Datacenter.SetCondition(api.DatacenterCondition{
@@ -119,9 +103,7 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 			Name:   "pod-1",
 			Labels: labels,
 		},
-		Status: corev1.PodStatus{
-			PodIP: podIP,
-		},
+		Status: corev1.PodStatus{},
 	}}
 
 	makeInt := func(i int32) *int32 {
@@ -141,7 +123,7 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
 			{
-				RpcAddress: podIP,
+				RpcAddress: rc.dcPods[0].Status.PodIP,
 				Status:     state,
 			},
 		},

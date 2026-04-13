@@ -4,7 +4,6 @@
 package reconciliation
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -24,12 +23,10 @@ import (
 	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -236,12 +233,27 @@ func TestReconcileRacks_ReconcilePods(t *testing.T) {
 	}
 
 	mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
+	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v0/metadata/endpoints":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"entity":[]}`)
+		case "/api/v0/ops/seeds/reload", "/api/v0/probes/cluster":
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, "OK")
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, "OK")
+		}
+	}))
 	for idx := range mockPods {
 		mp := mockPods[idx]
+		server.attachToPod(t, mp)
 		trackObjects = append(trackObjects, mp)
 	}
 
 	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = desiredStatefulSet.Labels[api.RackLabel]
@@ -1234,6 +1246,9 @@ func mockReadyPodsForStatefulSet(sts *appsv1.StatefulSet, cluster, dc string) []
 			Name:  "cassandra",
 			Ready: true,
 		}}
+		pod.Spec.Containers = []corev1.Container{{
+			Name: "cassandra",
+		}}
 		pod.Status.PodIP = fmt.Sprintf("192.168.1.%d", i)
 		pods = append(pods, pod)
 	}
@@ -1732,6 +1747,13 @@ func makeReloadTestPod() *corev1.Pod {
 				api.DatacenterLabel: "mydc",
 			},
 		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "cassandra",
+				},
+			},
+		},
 		Status: corev1.PodStatus{
 			PodIP: "127.0.0.1",
 		},
@@ -1743,84 +1765,57 @@ func Test_callPodEndpoint(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	res := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader("OK")),
-	}
+	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RequestURI() != "/api/v0/ops/seeds/reload" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "OK")
+	}))
 
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req != nil
-			})).
-		Return(res, nil).
-		Once()
-
-	client := httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
-		Protocol: "http",
-	}
+	client := server.client(rc.ReqLogger)
 
 	pod := makeReloadTestPod()
-	pod.Status.PodIP = "1.2.3.4"
+	server.attachToPod(t, pod)
 
 	if err := client.CallReloadSeedsEndpoint(pod); err != nil {
 		assert.Fail(t, "Should not have returned error")
 	}
+	server.assertCallCount(t, "/api/v0/ops/seeds/reload", 1)
 }
 
 func Test_callPodEndpoint_BadStatus(t *testing.T) {
-	res := &http.Response{
-		StatusCode: http.StatusBadRequest,
-		Body:       io.NopCloser(strings.NewReader("OK")),
-	}
+	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RequestURI() != "/api/v0/ops/seeds/reload" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, "OK")
+	}))
 
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/ops/seeds/reload" && req.Method == "POST"
-			})).
-		Return(res, nil).
-		Once()
-
-	client := httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      zap.New(),
-		Protocol: "http",
-	}
+	client := server.client(zap.New())
 
 	pod := makeReloadTestPod()
+	server.attachToPod(t, pod)
 
 	if err := client.CallReloadSeedsEndpoint(pod); err == nil {
 		assert.Fail(t, "Should have returned error")
 	}
+	server.assertCallCount(t, "/api/v0/ops/seeds/reload", 1)
 }
 
 func Test_callPodEndpoint_RequestFail(t *testing.T) {
-	res := &http.Response{
-		StatusCode: http.StatusInternalServerError,
-		Body:       io.NopCloser(strings.NewReader("OK")),
-	}
+	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
 
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req != nil
-			})).
-		Return(res, fmt.Errorf("")).
-		Once()
-
-	client := httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      zap.New(),
-		Protocol: "http",
-	}
+	client := server.client(zap.New())
 
 	pod := makeReloadTestPod()
+	server.attachToPod(t, pod)
+	server.Close()
 
 	if err := client.CallReloadSeedsEndpoint(pod); err == nil {
 		assert.Fail(t, "Should have returned error")
@@ -1913,24 +1908,17 @@ func TestStripPassword(t *testing.T) {
 	defer cleanupMockScr()
 
 	password := "secretPassword"
-
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req != nil
-			})).
-		Return(nil, errors.New(password)).
-		Once()
-
+	requestURIs := make([]string, 0, 1)
 	client := httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
+		Client: httpClientDoFunc(func(req *http.Request) (*http.Response, error) {
+			requestURIs = append(requestURIs, req.URL.RequestURI())
+			return nil, errors.New(req.URL.RequestURI())
+		}),
 		Log:      rc.ReqLogger,
 		Protocol: "http",
 	}
 
 	pod := makeReloadTestPod()
-	pod.Status.PodIP = "1.2.3.4"
 
 	err := client.CallCreateRoleEndpoint(pod, "userNameA", password, true)
 	if err == nil {
@@ -1938,6 +1926,8 @@ func TestStripPassword(t *testing.T) {
 	}
 
 	assert.False(t, strings.Contains(err.Error(), password))
+	require.Len(t, requestURIs, 1)
+	assert.Contains(t, requestURIs[0], "/api/v0/ops/auth/role")
 }
 
 func TestNodereplacements(t *testing.T) {
@@ -1997,33 +1987,22 @@ func TestFailedStart(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	res := &http.Response{
-		StatusCode: http.StatusInternalServerError,
-		Body:       io.NopCloser(strings.NewReader("OK")),
-	}
-
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req != nil
-			})).
-		Return(res, nil).
-		Once()
-
-	nodeMgmtClient := httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
-		Protocol: "http",
-	}
-
-	rc.NodeMgmtClient = nodeMgmtClient
+	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RequestURI() != "/api/v0/lifecycle/start" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = io.WriteString(w, "OK")
+	}))
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{},
 	}
 
 	pod := makeReloadTestPod()
+	server.attachToPod(t, pod)
 	rc.Client = fake.NewClientBuilder().
 		WithScheme(setupScheme(nil)).
 		WithStatusSubresource(rc.Datacenter).
@@ -2050,6 +2029,7 @@ func TestFailedStart(t *testing.T) {
 	close(fakeRecorder.Events)
 	// Should have 2 events, one to indicate Cassandra is starting, one to indicate it failed to start
 	assert.Equal(t, 2, len(fakeRecorder.Events))
+	server.assertCallCount(t, "/api/v0/lifecycle/start", 1)
 }
 
 func TestStartBootstrappedNodes(t *testing.T) {
@@ -2224,6 +2204,11 @@ func TestStartBootstrappedNodes(t *testing.T) {
 					p := &corev1.Pod{}
 					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
 					p.Labels = map[string]string{}
+					p.Spec.Containers = []corev1.Container{
+						{
+							Name: "cassandra",
+						},
+					}
 					p.Status.ContainerStatuses = []corev1.ContainerStatus{
 						{
 							Name: "cassandra",
@@ -2258,13 +2243,6 @@ func TestStartBootstrappedNodes(t *testing.T) {
 				trackObjects = append(trackObjects, pod)
 			}
 
-			rc.Client = fake.NewClientBuilder().
-				WithScheme(setupScheme(nil)).
-				WithStatusSubresource(rc.Datacenter).
-				WithRuntimeObjects(trackObjects...).
-				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
-				Build()
-
 			expectedStartCount := 0
 			for i, rackPods := range tt.racks {
 				for j, started := range rackPods {
@@ -2283,28 +2261,28 @@ func TestStartBootstrappedNodes(t *testing.T) {
 			}()
 
 			if tt.wantNotReady {
-				res := &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader("OK")),
+				server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.RequestURI() != "/api/v0/lifecycle/start" || r.Method != http.MethodPost {
+						http.NotFound(w, r)
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, "OK")
+					wg.Done()
+				}))
+				for _, pod := range rc.dcPods {
+					server.attachToPod(t, pod)
 				}
-
-				mockHttpClient := mocks.NewHttpClient(t)
-				mockHttpClient.On("Do",
-					mock.MatchedBy(
-						func(req *http.Request) bool {
-							return req != nil
-						})).
-					Return(res, nil).
-					Times(expectedStartCount).
-					Run(func(mock.Arguments) { wg.Done() })
-
-				client := httphelper.NodeMgmtClient{
-					Client:   mockHttpClient,
-					Log:      rc.ReqLogger,
-					Protocol: "http",
-				}
-				rc.NodeMgmtClient = client
+				rc.NodeMgmtClient = server.client(rc.ReqLogger)
+				defer server.assertCallCount(t, "/api/v0/lifecycle/start", expectedStartCount)
 			}
+
+			rc.Client = fake.NewClientBuilder().
+				WithScheme(setupScheme(nil)).
+				WithStatusSubresource(rc.Datacenter).
+				WithRuntimeObjects(trackObjects...).
+				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+				Build()
 
 			epData := httphelper.CassMetadataEndpoints{
 				Entity: []httphelper.EndpointState{},
@@ -2575,6 +2553,11 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 					p := &corev1.Pod{}
 					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
 					p.Labels = map[string]string{}
+					p.Spec.Containers = []corev1.Container{
+						{
+							Name: "cassandra",
+						},
+					}
 					p.Status.ContainerStatuses = []corev1.ContainerStatus{
 						{
 							Name: "cassandra",
@@ -2596,37 +2579,29 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				}
 			}
 
+			done := make(chan struct{})
+			if tt.wantNotReady {
+				server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.RequestURI() != "/api/v0/lifecycle/start" || r.Method != http.MethodPost {
+						http.NotFound(w, r)
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, "OK")
+					close(done)
+				}))
+				for _, pod := range rc.dcPods {
+					server.attachToPod(t, pod)
+				}
+				rc.NodeMgmtClient = server.client(rc.ReqLogger)
+				defer server.assertCallCount(t, "/api/v0/lifecycle/start", 1)
+			}
 			rc.Client = fake.NewClientBuilder().
 				WithScheme(setupScheme(nil)).
 				WithStatusSubresource(rc.Datacenter).
 				WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.dcPods)...).
 				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
 				Build()
-
-			done := make(chan struct{})
-			if tt.wantNotReady {
-				res := &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader("OK")),
-				}
-
-				mockHttpClient := mocks.NewHttpClient(t)
-				mockHttpClient.On("Do",
-					mock.MatchedBy(
-						func(req *http.Request) bool {
-							return req != nil
-						})).
-					Return(res, nil).
-					Once().
-					Run(func(mock.Arguments) { close(done) })
-
-				client := httphelper.NodeMgmtClient{
-					Client:   mockHttpClient,
-					Log:      rc.ReqLogger,
-					Protocol: "http",
-				}
-				rc.NodeMgmtClient = client
-			}
 
 			epData := httphelper.CassMetadataEndpoints{
 				Entity: []httphelper.EndpointState{},
@@ -2754,27 +2729,20 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 
 			done := make(chan struct{})
 			if tt.wantNotReady {
-				res := &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader("OK")),
+				server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.RequestURI() != "/api/v0/lifecycle/start" || r.Method != http.MethodPost {
+						http.NotFound(w, r)
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, "OK")
+					close(done)
+				}))
+				for _, pod := range rc.dcPods {
+					server.attachToPod(t, pod)
 				}
-
-				mockHttpClient := mocks.NewHttpClient(t)
-				mockHttpClient.On("Do",
-					mock.MatchedBy(
-						func(req *http.Request) bool {
-							return req != nil
-						})).
-					Return(res, nil).
-					Once().
-					Run(func(mock.Arguments) { close(done) })
-
-				nodeMgmtClient := httphelper.NodeMgmtClient{
-					Client:   mockHttpClient,
-					Log:      rc.ReqLogger,
-					Protocol: "http",
-				}
-				rc.NodeMgmtClient = nodeMgmtClient
+				rc.NodeMgmtClient = server.client(rc.ReqLogger)
+				defer server.assertCallCount(t, "/api/v0/lifecycle/start", 1)
 			}
 			epData := httphelper.CassMetadataEndpoints{
 				Entity: []httphelper.EndpointState{},
@@ -2894,6 +2862,11 @@ func TestStartOneNodePerRack(t *testing.T) {
 					p := &corev1.Pod{}
 					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
 					p.Labels = map[string]string{}
+					p.Spec.Containers = []corev1.Container{
+						{
+							Name: "cassandra",
+						},
+					}
 					readyToStart := true
 					if tt.notReadyRacks[rackName] != nil && tt.notReadyRacks[rackName][i] {
 						readyToStart = false
@@ -2921,38 +2894,29 @@ func TestStartOneNodePerRack(t *testing.T) {
 				}
 			}
 
+			done := make(chan struct{})
+			var server *fakeMgmtApiServer
+			if tt.wantNotReady {
+				server = newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.RequestURI() != "/api/v0/lifecycle/start" || r.Method != http.MethodPost {
+						http.NotFound(w, r)
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, "OK")
+					close(done)
+				}))
+				for _, pod := range rc.dcPods {
+					server.attachToPod(t, pod)
+				}
+				rc.NodeMgmtClient = server.client(rc.ReqLogger)
+			}
 			rc.Client = fake.NewClientBuilder().
 				WithScheme(setupScheme(nil)).
 				WithStatusSubresource(rc.Datacenter).
 				WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.dcPods)...).
 				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
 				Build()
-
-			done := make(chan struct{})
-
-			if tt.wantNotReady {
-				res := &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader("OK")),
-				}
-
-				mockHttpClient := mocks.NewHttpClient(t)
-				mockHttpClient.On("Do",
-					mock.MatchedBy(
-						func(req *http.Request) bool {
-							return req != nil
-						})).
-					Return(res, nil).
-					Once().
-					Run(func(args mock.Arguments) { close(done) })
-
-				client := httphelper.NodeMgmtClient{
-					Client:   mockHttpClient,
-					Log:      rc.ReqLogger,
-					Protocol: "http",
-				}
-				rc.NodeMgmtClient = client
-			}
 
 			epData := httphelper.CassMetadataEndpoints{
 				Entity: []httphelper.EndpointState{},
@@ -3659,8 +3623,18 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 	}
 
 	mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
+	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v0/ops/seeds/reload", "/api/v0/probes/cluster":
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, "OK")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
 	for idx := range mockPods {
 		mp := mockPods[idx]
+		server.attachToPod(t, mp)
 		metav1.SetMetaDataLabel(&mp.ObjectMeta, api.SeedNodeLabel, "true")
 		trackObjects = append(trackObjects, mp)
 	}
@@ -3687,36 +3661,18 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 
 	for i := 0; i < int(*desiredStatefulSet.Spec.Replicas); i++ {
 		ep := httphelper.EndpointState{
-			RpcAddress: fmt.Sprintf("192.168.1.%d", i+1),
+			RpcAddress: mockPods[i].Status.PodIP,
 			Status:     "UN",
 		}
 		epData.Entity = append(epData.Entity, ep)
 	}
 
-	res := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader("OK")),
-	}
-
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req != nil
-			})).
-		Return(res, nil).
-		Times(len(epData.Entity) * 2) // reloadSeeds * pods + clusterHealthCheck * pods
-
-	client := httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
-		Protocol: "http",
-	}
-
-	rc.NodeMgmtClient = client
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	recRes := rc.CheckPodsReady(epData)
 	assert.Equal(result.Continue(), recRes) // All pods should be up, no need to call anything
+	server.assertCallCount(t, "/api/v0/ops/seeds/reload", len(epData.Entity))
+	server.assertCallCount(t, "/api/v0/probes/cluster", len(epData.Entity))
 }
 
 func TestShouldUseFastPath(t *testing.T) {
@@ -3746,6 +3702,13 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 				api.DatacenterLabel: "cassandradatacenter-example",         // Match the datacenter name from setupTest()
 				api.RackLabel:       "default",
 				api.CassNodeState:   stateStarted, // Need this to pass the isMgmtApiRunning check
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "cassandra",
+				},
 			},
 		},
 		Status: corev1.PodStatus{
@@ -3784,8 +3747,7 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockHttpClient := mocks.NewHttpClient(t)
-
+			pod := testPod.DeepCopy()
 			featuresJson := []byte(`{
 				"cassandra_version": "4.0.0",
 				"features": ["async_flush_task"]
@@ -3797,8 +3759,26 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 				}`)
 			}
 
-			// Current mgmt-api
-			modernEndpointsJson := []byte(`{
+			rc, _, cleanupMockScr := setupTest()
+			defer cleanupMockScr()
+
+			rc.Datacenter.Status.NodeStatuses = map[string]api.CassandraNodeStatus{}
+			var endpointsJson []byte
+
+			server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.RequestURI() {
+				case "/api/v0/metadata/versions/features":
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write(featuresJson)
+				case "/api/v0/metadata/endpoints":
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write(endpointsJson)
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			server.attachToPod(t, pod)
+			endpointsJson = []byte(`{
 				"entity": [
 					{
 						"ENDPOINT_IP": "255.244.0.1",
@@ -3810,48 +3790,29 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 					}
 				]
 			}`)
-
-			// <v0.1.69 mgmt-api
-			legacyEndpointsJson := []byte(`{
-				"entity": [
-					{
-						"ENDPOINT_IP": "10.244.0.1",
-						"HOST_ID": "test-host-id",
-						"RELEASE_VERSION": "4.0.0",
-						"STATUS": "NORMAL,4241053645453754050",
-						"RPC_ADDRESS": "10.244.0.1"
-					}
-				]
-			}`)
-
-			endpointsJson := modernEndpointsJson
 			if !tc.supportAsyncFlush {
-				endpointsJson = legacyEndpointsJson
+				endpointsJson = []byte(fmt.Sprintf(`{
+					"entity": [
+						{
+							"ENDPOINT_IP": %q,
+							"HOST_ID": "test-host-id",
+							"RELEASE_VERSION": "4.0.0",
+							"STATUS": "NORMAL,4241053645453754050",
+							"RPC_ADDRESS": %q
+						}
+					]
+				}`, pod.Status.PodIP, pod.Status.PodIP))
 			}
-
-			mockHttpClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(bytes.NewReader(featuresJson)),
-			}, nil).Once()
-
-			mockHttpClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(bytes.NewReader(endpointsJson)),
-			}, nil).Once()
-
-			rc, _, cleanupMockScr := setupTest()
-			defer cleanupMockScr()
-
-			rc.Datacenter.Status.NodeStatuses = map[string]api.CassandraNodeStatus{}
-
-			rc.NodeMgmtClient.Client = mockHttpClient
-			rc.dcPods = []*corev1.Pod{testPod}
+			rc.NodeMgmtClient = server.client(rc.ReqLogger)
+			rc.dcPods = []*corev1.Pod{pod}
 
 			err := rc.UpdateCassandraNodeStatus(false)
 
 			assert.NoError(t, err, "Unexpected error")
 			assert.Contains(t, rc.Datacenter.Status.NodeStatuses, podName, "Node status not added")
 			assert.Equal(t, tc.expectedHostID, rc.Datacenter.Status.NodeStatuses[podName].HostID, "Host ID not correctly set")
+			server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+			server.assertCallCount(t, "/api/v0/metadata/endpoints", 1)
 		})
 	}
 }
@@ -4148,7 +4109,6 @@ func TestRefreshSeeds(t *testing.T) {
 			metav1.SetMetaDataLabel(&mp.ObjectMeta, api.SeedNodeLabel, "true")
 			trackObjects = append(trackObjects, mp)
 		}
-		rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 		epData := httphelper.CassMetadataEndpoints{
 			Entity: []httphelper.EndpointState{},
 		}
@@ -4178,60 +4138,59 @@ func TestRefreshSeeds(t *testing.T) {
 		rc, epData, cleanup := prepareReconciliationCtx()
 		defer cleanup()
 		rc.desiredRackInformation[0].SeedCount = reducedSeedCount
-		successResp := &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader("OK")),
+		server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/api/v0/ops/seeds/reload", "/api/v0/probes/cluster":
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, "OK")
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		for i, pod := range rc.clusterPods {
+			server.attachToPod(t, pod)
+			epData.Entity[i].RpcAddress = pod.Status.PodIP
 		}
-		mockHttpClient := mocks.NewHttpClient(t)
-		mockHttpClient.On("Do",
-			mock.MatchedBy(func(req *http.Request) bool {
-				return req != nil && req.URL.Path == "/api/v0/ops/seeds/reload"
-			})).
-			Return(successResp, nil).
-			Times(initialSeedCount)
-		mockHttpClient.On("Do",
-			mock.MatchedBy(func(req *http.Request) bool {
-				return req != nil && req.URL.Path == "/api/v0/probes/cluster"
-			})).
-			Return(successResp, nil).
-			Times(initialSeedCount)
-		rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-			Client:   mockHttpClient,
-			Log:      rc.ReqLogger,
-			Protocol: "http",
-		}
+		rc.Client = fake.NewClientBuilder().
+			WithScheme(setupScheme(nil)).
+			WithStatusSubresource(rc.Datacenter).
+			WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.clusterPods)...).
+			Build()
+		rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 		reconcileResult := rc.CheckPodsReady(epData)
-
 		assert.Equal(result.Continue(), reconcileResult)
-		mockHttpClient.AssertExpectations(t)
+		server.assertCallCount(t, "/api/v0/ops/seeds/reload", initialSeedCount)
+		server.assertCallCount(t, "/api/v0/probes/cluster", initialSeedCount)
 	})
 
 	t.Run("Seeds haven't changed, refreshSeeds is not executed", func(t *testing.T) {
 		rc, epData, cleanup := prepareReconciliationCtx()
 		defer cleanup()
-		mockHttpClient := mocks.NewHttpClient(t)
-		successResp := &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader("OK")),
+		server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/api/v0/ops/seeds/reload", "/api/v0/probes/cluster":
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, "OK")
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		for i, pod := range rc.clusterPods {
+			server.attachToPod(t, pod)
+			epData.Entity[i].RpcAddress = pod.Status.PodIP
 		}
-		// no calls with '/api/v0/ops/seeds/reload'
-		mockHttpClient.On("Do",
-			mock.MatchedBy(func(req *http.Request) bool {
-				return req != nil && req.URL.Path == "/api/v0/probes/cluster"
-			})).
-			Return(successResp, nil).
-			Times(initialSeedCount)
-		rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-			Client:   mockHttpClient,
-			Log:      rc.ReqLogger,
-			Protocol: "http",
-		}
+		rc.Client = fake.NewClientBuilder().
+			WithScheme(setupScheme(nil)).
+			WithStatusSubresource(rc.Datacenter).
+			WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.clusterPods)...).
+			Build()
+		rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 		reconcileResult := rc.CheckPodsReady(epData)
 
 		assert.Equal(result.Continue(), reconcileResult)
-		mockHttpClient.AssertExpectations(t)
+		server.assertCallCount(t, "/api/v0/ops/seeds/reload", 0)
 	})
 
 	t.Run("Seeds have changed, but refreshSeeds fails", func(t *testing.T) {
@@ -4239,23 +4198,28 @@ func TestRefreshSeeds(t *testing.T) {
 		defer cleanup()
 		rc.desiredRackInformation[0].SeedCount = reducedSeedCount
 		respError := errors.New("internal error")
-		mockHttpClient := mocks.NewHttpClient(t)
-		mockHttpClient.On("Do",
-			mock.MatchedBy(func(req *http.Request) bool {
-				return req != nil && req.URL.Path == "/api/v0/ops/seeds/reload"
-			})).
-			Return(&http.Response{}, respError).
-			Once()
+		requestURIs := make([]string, 0, 1)
 		rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-			Client:   mockHttpClient,
+			Client: httpClientDoFunc(func(req *http.Request) (*http.Response, error) {
+				requestURIs = append(requestURIs, req.URL.Path)
+				return nil, respError
+			}),
 			Log:      rc.ReqLogger,
 			Protocol: "http",
 		}
+		for _, pod := range rc.clusterPods {
+			pod.Status.PodIP = "127.0.0.1"
+		}
+		rc.Client = fake.NewClientBuilder().
+			WithScheme(setupScheme(nil)).
+			WithStatusSubresource(rc.Datacenter).
+			WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.clusterPods)...).
+			Build()
 
 		reconcileResult := rc.CheckPodsReady(epData)
 
 		assert.Equal(result.Error(respError), reconcileResult)
-		mockHttpClient.AssertExpectations(t)
+		require.Equal(t, []string{"/api/v0/ops/seeds/reload"}, requestURIs)
 	})
 }
 

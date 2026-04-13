@@ -30,7 +30,7 @@ func TestDeletePVCs(t *testing.T) {
 
 	pvc := pvcProto(rc)
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter, pvc).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -48,7 +48,7 @@ func TestDeletePVCs_FailedToList(t *testing.T) {
 
 	listErr := fmt.Errorf("failed to list PVCs for CassandraDatacenter")
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -75,7 +75,7 @@ func TestDeletePVCs_PVCsNotFound(t *testing.T) {
 
 	notFoundErr := errors.NewNotFound(schema.GroupResource{}, "name")
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -99,7 +99,7 @@ func TestDeletePVCs_FailedToDelete(t *testing.T) {
 	pvc := pvcProto(rc)
 	deleteErr := fmt.Errorf("failed to delete")
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter, pvc).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -129,7 +129,7 @@ func TestDeletePVCs_FailedToDeleteBeingUsed(t *testing.T) {
 	pvc := pvcProto(rc)
 	pod := podWithPVC(rc, "pod-1", pvc.Name)
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter, pvc, pod).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).

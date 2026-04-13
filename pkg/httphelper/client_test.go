@@ -464,7 +464,7 @@ func TestListRoles(t *testing.T) {
 		require.Equal("/api/v0/ops/auth/role", req.URL.Path)
 	}, func() *http.Response {
 		return newHttpResponse(payload, http.StatusOK)
-	}, nil)
+	})
 
 	mgmtClient := newMockMgmtClient(httpClient)
 	roles, err = mgmtClient.CallListRolesEndpoint(goodPod)
@@ -482,7 +482,7 @@ func TestCreateRole(t *testing.T) {
 		require.Equal("true", req.URL.Query().Get("is_superuser"))
 	}, func() *http.Response {
 		return newHttpResponseMarshalled("OK", http.StatusOK)
-	}, nil)
+	})
 
 	mgmtClient := newMockMgmtClient(httpClient)
 	err := mgmtClient.CallCreateRoleEndpoint(goodPod, "role1", "password1", true)
@@ -496,7 +496,7 @@ func TestDropRole(t *testing.T) {
 		require.Equal("/api/v0/ops/auth/role", req.URL.Path)
 	}, func() *http.Response {
 		return newHttpResponseMarshalled("OK", http.StatusOK)
-	}, nil)
+	})
 
 	mgmtClient := newMockMgmtClient(httpClient)
 	err := mgmtClient.CallDropRoleEndpoint(goodPod, "role1")
@@ -512,7 +512,7 @@ func TestCallDurationMetricSuccess(t *testing.T) {
 		require.Equal("/api/v0/ops/node/drain", req.URL.Path)
 	}, func() *http.Response {
 		return newHttpResponseMarshalled("OK", http.StatusOK)
-	}, nil)
+	})
 
 	before := getHttpHelperCallDurationCount(t, "/api/v0/ops/node/drain", resultSuccessLabelName)
 
@@ -532,7 +532,7 @@ func TestCallDurationMetricError(t *testing.T) {
 		require.Equal("/api/v0/ops/seeds/reload", req.URL.Path)
 	}, func() *http.Response {
 		return newHttpResponseMarshalled("this is an error", http.StatusInternalServerError)
-	}, nil)
+	})
 
 	before := getHttpHelperCallDurationCount(t, "/api/v0/ops/seeds/reload", resultErrorLabelName)
 
@@ -563,20 +563,12 @@ func newMockHttpClient(response *http.Response, err error) HttpClient {
 	})
 }
 
-func newAssertingHttpClient(
-	t *testing.T,
-	assertRequest func(*http.Request),
-	response func() *http.Response,
-	err error,
-) HttpClient {
+func newAssertingHttpClient(t *testing.T, assertRequest func(*http.Request), response func() *http.Response) HttpClient {
 	t.Helper()
 
 	return httpClientDoFunc(func(req *http.Request) (*http.Response, error) {
 		assertRequest(req)
-		if response == nil {
-			return nil, err
-		}
-		return response(), err
+		return response(), nil
 	})
 }
 

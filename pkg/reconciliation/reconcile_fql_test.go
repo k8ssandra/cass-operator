@@ -61,7 +61,7 @@ func setupPodList(rc *ReconciliationContext) {
 	}
 
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter, &pods[0]).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -105,7 +105,7 @@ func attachPods(t *testing.T, rc *ReconciliationContext, server *fakeMgmtApiServ
 	server.attachToPod(t, rc.dcPods[0])
 	server.attachToPod(t, rc.clusterPods[0])
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter, rc.dcPods[0]).
 		WithRuntimeObjects(rc.Datacenter, rc.dcPods[0]).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).

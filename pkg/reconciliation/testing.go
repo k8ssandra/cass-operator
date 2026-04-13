@@ -150,7 +150,7 @@ func CreateMockReconciliationContext(
 		storageClass,
 	}
 
-	s := setupScheme(runtime.NewScheme())
+	s := setupScheme()
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(s).
 		WithStatusSubresource(cassandraDatacenter).
@@ -192,10 +192,8 @@ func setupTest() (*ReconciliationContext, *corev1.Service, func()) {
 	return rc, service, cleanupMockScr
 }
 
-func setupScheme(scheme *runtime.Scheme) *runtime.Scheme {
-	if scheme == nil {
-		scheme = runtime.NewScheme()
-	}
+func setupScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = api.AddToScheme(scheme)
 	_ = taskapi.AddToScheme(scheme)

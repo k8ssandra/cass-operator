@@ -56,7 +56,7 @@ func TestCalculateReconciliationActions(t *testing.T) {
 		pod,
 	}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter, service).WithRuntimeObjects(trackObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(rc.Datacenter, service).WithRuntimeObjects(trackObjects...).Build()
 	rc.Client = fakeClient
 
 	result, err := rc.CalculateReconciliationActions()
@@ -74,7 +74,7 @@ func TestCalculateReconciliationActions_GetServiceError(t *testing.T) {
 
 	getErr := fmt.Errorf("")
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -98,7 +98,7 @@ func TestCalculateReconciliationActions_FailedUpdate(t *testing.T) {
 
 	updateErr := fmt.Errorf("failed to update CassandraDatacenter with removed finalizers")
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -146,7 +146,7 @@ func TestProcessDeletion_FailedDelete(t *testing.T) {
 	pvc := pvcProto(rc)
 	deleteErr := fmt.Errorf("failed to delete pvc")
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter, sts, pvc).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -184,7 +184,7 @@ func TestProcessDeletion(t *testing.T) {
 	assert.NoError(err)
 	pvc := pvcProto(rc)
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter, sts, pvc).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).

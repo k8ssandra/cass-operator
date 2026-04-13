@@ -100,7 +100,7 @@ func TestCreateHeadlessService_ClientReturnsError(t *testing.T) {
 	defer cleanupMockScr()
 
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -127,7 +127,7 @@ func TestEndpointSliceControllerIntegration(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	fakeClient := fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithRuntimeObjects(rc.Datacenter).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(setupScheme()).WithRuntimeObjects(rc.Datacenter).Build()
 
 	rc.Client = fakeClient
 	rc.Datacenter.Spec.AdditionalSeeds = []string{

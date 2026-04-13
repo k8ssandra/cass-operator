@@ -252,7 +252,7 @@ func TestReconcileRacks_ReconcilePods(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	nextRack := &RackInformation{}
@@ -602,7 +602,7 @@ func TestReconcilePods_WithVolumes(t *testing.T) {
 		pvc,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(pod, pvc).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(pod, pvc).WithRuntimeObjects(trackObjects...).Build()
 	err = rc.ReconcilePods(statefulSet)
 	assert.NoErrorf(t, err, "Should not have returned an error")
 }
@@ -648,7 +648,7 @@ func TestReconcileNextRack_CreateError(t *testing.T) {
 	assert.NoErrorf(t, err, "error occurred creating statefulset")
 
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -742,7 +742,7 @@ func TestReconcileRacks(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(desiredStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(desiredStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -767,7 +767,7 @@ func TestReconcileRacks_GetStatefulsetError(t *testing.T) {
 	defer cleanupMockScr()
 
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -823,7 +823,7 @@ func TestReconcileRacks_WaitingForReplicas(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(desiredStatefulSet).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(desiredStatefulSet).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -860,7 +860,7 @@ func TestReconcileRacks_NeedMoreReplicas(t *testing.T) {
 		preExistingStatefulSet,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(preExistingStatefulSet).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(preExistingStatefulSet).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -902,7 +902,7 @@ func TestReconcileRacks_DoesntScaleDown(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(preExistingStatefulSet).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(preExistingStatefulSet).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -939,7 +939,7 @@ func TestReconcileRacks_NeedToPark(t *testing.T) {
 		rc.Datacenter,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(preExistingStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(preExistingStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -990,7 +990,7 @@ func TestReconcileRacks_AlreadyReconciled(t *testing.T) {
 		desiredPdb,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(desiredStatefulSet, rc.Datacenter, desiredPdb).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(desiredStatefulSet, rc.Datacenter, desiredPdb).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -1067,7 +1067,7 @@ func TestReconcileRacks_FirstRackAlreadyReconciled(t *testing.T) {
 		rc.Datacenter,
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(desiredStatefulSet, secondDesiredStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(desiredStatefulSet, secondDesiredStatefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -1137,7 +1137,7 @@ func TestReconcileRacks_UpdateRackNodeCount(t *testing.T) {
 				rc.Datacenter,
 			}
 
-			rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(tt.args.statefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+			rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(tt.args.statefulSet, rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 			if err := rc.UpdateRackNodeCount(tt.args.statefulSet, tt.args.newNodeCount); (err != nil) != tt.wantErr {
 				t.Errorf("updateRackNodeCount() error = %v, wantErr %v", err, tt.wantErr)
@@ -1179,7 +1179,7 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(desiredStatefulSet, rc.Datacenter, desiredPdb).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(desiredStatefulSet, rc.Datacenter, desiredPdb).WithRuntimeObjects(trackObjects...).Build()
 
 	var rackInfo []*RackInformation
 
@@ -1828,7 +1828,7 @@ func TestCleanupAfterScaling(t *testing.T) {
 	assert := assert.New(t)
 
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -1854,7 +1854,7 @@ func TestCleanupAfterScalingWithTracker(t *testing.T) {
 
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.TrackCleanupTasksAnnotation, "true")
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -1886,7 +1886,7 @@ func TestCleanupAfterScalingWithParallelAnnotation(t *testing.T) {
 	_ = rc.CalculateRackInformation()
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.EnableParallelCleanupWithinRackAnnotation, "true")
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -2004,7 +2004,7 @@ func TestFailedStart(t *testing.T) {
 	pod := makeReloadTestPod()
 	server.attachToPod(t, pod)
 	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme(nil)).
+		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(runtimeObjectHelper(rc, nil, []*corev1.Pod{pod})...).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -2278,7 +2278,7 @@ func TestStartBootstrappedNodes(t *testing.T) {
 			}
 
 			rc.Client = fake.NewClientBuilder().
-				WithScheme(setupScheme(nil)).
+				WithScheme(setupScheme()).
 				WithStatusSubresource(rc.Datacenter).
 				WithRuntimeObjects(trackObjects...).
 				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -2597,7 +2597,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				defer server.assertCallCount(t, "/api/v0/lifecycle/start", 1)
 			}
 			rc.Client = fake.NewClientBuilder().
-				WithScheme(setupScheme(nil)).
+				WithScheme(setupScheme()).
 				WithStatusSubresource(rc.Datacenter).
 				WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.dcPods)...).
 				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -2721,7 +2721,7 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 				}
 			}
 			rc.Client = fake.NewClientBuilder().
-				WithScheme(setupScheme(nil)).
+				WithScheme(setupScheme()).
 				WithStatusSubresource(rc.Datacenter).
 				WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.dcPods)...).
 				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -2912,7 +2912,7 @@ func TestStartOneNodePerRack(t *testing.T) {
 				rc.NodeMgmtClient = server.client(rc.ReqLogger)
 			}
 			rc.Client = fake.NewClientBuilder().
-				WithScheme(setupScheme(nil)).
+				WithScheme(setupScheme()).
 				WithStatusSubresource(rc.Datacenter).
 				WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.dcPods)...).
 				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
@@ -3442,7 +3442,7 @@ func TestDatacenterPods(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = "default"
@@ -3487,7 +3487,7 @@ func TestDatacenterPodsOldLabels(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = "default"
@@ -3541,7 +3541,7 @@ func TestDatacenterPodsNoDualFetch(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = "default"
@@ -3587,7 +3587,7 @@ func TestCheckRackLabels(t *testing.T) {
 		desiredStatefulSet,
 		rc.Datacenter,
 	}
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	rc.statefulSets = []*appsv1.StatefulSet{desiredStatefulSet}
 
@@ -3639,7 +3639,7 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 		trackObjects = append(trackObjects, mp)
 	}
 
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme(nil)).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	nextRack := &RackInformation{}
 	nextRack.RackName = desiredStatefulSet.Labels[api.RackLabel]
@@ -4152,7 +4152,7 @@ func TestRefreshSeeds(t *testing.T) {
 			epData.Entity[i].RpcAddress = pod.Status.PodIP
 		}
 		rc.Client = fake.NewClientBuilder().
-			WithScheme(setupScheme(nil)).
+			WithScheme(setupScheme()).
 			WithStatusSubresource(rc.Datacenter).
 			WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.clusterPods)...).
 			Build()
@@ -4181,7 +4181,7 @@ func TestRefreshSeeds(t *testing.T) {
 			epData.Entity[i].RpcAddress = pod.Status.PodIP
 		}
 		rc.Client = fake.NewClientBuilder().
-			WithScheme(setupScheme(nil)).
+			WithScheme(setupScheme()).
 			WithStatusSubresource(rc.Datacenter).
 			WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.clusterPods)...).
 			Build()
@@ -4211,7 +4211,7 @@ func TestRefreshSeeds(t *testing.T) {
 			pod.Status.PodIP = "127.0.0.1"
 		}
 		rc.Client = fake.NewClientBuilder().
-			WithScheme(setupScheme(nil)).
+			WithScheme(setupScheme()).
 			WithStatusSubresource(rc.Datacenter).
 			WithRuntimeObjects(runtimeObjectHelper(rc, rc.statefulSets, rc.clusterPods)...).
 			Build()

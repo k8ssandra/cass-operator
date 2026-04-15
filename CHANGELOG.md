@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [ENHANCEMENT] [#912](https://github.com/k8ssandra/cass-operator/issues/912) Add new webhook validations for maxUnavailable string format as well as PVC sizes
+* [ENHANCEMENT] [#902](https://github.com/k8ssandra/cass-operator/issues/902) If scaling down or scaling up process is still ongoing, the webhook will prevent changing the cluster size.
 
 ## v1.30.0
 

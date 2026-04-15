@@ -87,6 +87,13 @@ func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context,
 
 	log.Info("Validation for CassandraDatacenter upon update", "name", dc.GetName())
 
+	if metav1.HasAnnotation(dc.ObjectMeta, api.BypassWebhookValidationsAnnotation) &&
+		dc.Annotations[api.BypassWebhookValidationsAnnotation] == "true" {
+		log.Info("Webhook validations bypassed with annotation")
+
+		return nil, nil
+	}
+
 	if err := ValidateSingleDatacenter(dc); err != nil {
 		return nil, err
 	}
@@ -208,6 +215,17 @@ func ValidateDatacenterFieldChanges(oldDc *api.CassandraDatacenter, newDc *api.C
 	if !apiequality.Semantic.DeepEqual(oldClaimSpec, newClaimSpec) {
 		pvcSourceDiff := cmp.Diff(oldClaimSpec, newClaimSpec)
 		return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec, diff: %s", pvcSourceDiff)
+	}
+
+	if oldDc.Spec.Size != newDc.Spec.Size {
+		if oldDc.GetConditionStatus(api.DatacenterScalingUp) == corev1.ConditionTrue {
+			return attemptedTo("change size while datacenter is still scaling up")
+		}
+
+		if oldDc.GetConditionStatus(api.DatacenterScalingDown) == corev1.ConditionTrue {
+			// Here we don't want to allow any changes as scaling down is a lot heavier operation
+			return attemptedTo("change size while datacenter is still scaling down")
+		}
 	}
 
 	// Topology changes - Racks

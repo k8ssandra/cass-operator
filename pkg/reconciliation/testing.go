@@ -11,20 +11,23 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-logr/logr"
-	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -34,11 +37,37 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/images"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
+
+const podPVCClaimNameField = "spec.volumes.persistentVolumeClaim.claimName"
+
+type callDetails struct {
+	RequestPath string
+	RequestURI  string
+}
+
+type fakeMgmtApiServer struct {
+	server *httptest.Server
+
+	mu    sync.Mutex
+	calls []callDetails
+}
+
+var (
+	defaultMgmtApiServerOnce sync.Once
+	defaultMgmtApiServer     *fakeMgmtApiServer
+)
+
+type httpClientDoFunc func(*http.Request) (*http.Response, error)
+
+func (f httpClientDoFunc) Do(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 func newTestImageRegistry() images.ImageRegistry {
 	imageConfigFile := filepath.Join("..", "..", "tests", "testdata", "image_config_parsing.yaml")
@@ -121,11 +150,13 @@ func CreateMockReconciliationContext(
 		storageClass,
 	}
 
-	s := scheme.Scheme
-	setupScheme(s)
-	// s.AddKnownTypes(api.GroupVersion, cassandraDatacenter)
-
-	fakeClient := fake.NewClientBuilder().WithStatusSubresource(cassandraDatacenter).WithRuntimeObjects(trackObjects...).Build()
+	s := setupScheme()
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(s).
+		WithStatusSubresource(cassandraDatacenter).
+		WithRuntimeObjects(trackObjects...).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
 
 	request := &reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -144,20 +175,7 @@ func CreateMockReconciliationContext(
 	rc.Ctx = context.Background()
 	rc.ImageRegistry = newTestImageRegistry()
 
-	res := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader("OK")),
-	}
-
-	mockHttpClient := mocks.NewHttpClient(&testing.T{})
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req != nil
-			})).
-		Return(res, nil)
-
-	rc.NodeMgmtClient = httphelper.NodeMgmtClient{Client: mockHttpClient, Log: reqLogger, Protocol: "http"}
+	rc.NodeMgmtClient = defaultFakeMgmtApiServer().client(reqLogger)
 
 	return rc
 }
@@ -174,158 +192,150 @@ func setupTest() (*ReconciliationContext, *corev1.Service, func()) {
 	return rc, service, cleanupMockScr
 }
 
-func k8sMockClientGet(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Get",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(key client.ObjectKey) bool {
-				return key != client.ObjectKey{}
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientUpdate(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Update",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientPatch(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Patch",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			}),
-		mock.MatchedBy(
-			func(patch client.Patch) bool {
-				return patch != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientStatusPatch(mockClient *mocks.SubResourceClient, returnArg interface{}) *mock.Call {
-	return mockClient.On("Patch",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			}),
-		mock.MatchedBy(
-			func(patch client.Patch) bool {
-				return patch != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientStatusUpdate(mockClient *mocks.SubResourceClient, returnArg interface{}) *mock.Call {
-	return mockClient.On("Update",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientCreate(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Create",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientDelete(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("Delete",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(returnArg).
-		Once()
-}
-
-func k8sMockClientList(mockClient *mocks.Client, returnArg interface{}) *mock.Call {
-	return mockClient.On("List",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			}),
-		mock.MatchedBy(matchListOptionsArg)).
-		Return(returnArg).
-		Once()
-}
-
-func matchListOptionsArg(arg interface{}) bool {
-	return listOptionsFromArg(arg) != nil
-}
-
-func listOptionsFromArg(arg interface{}) *client.ListOptions {
-	switch v := arg.(type) {
-	case *client.ListOptions:
-		return v
-	case []client.ListOption:
-		opts := &client.ListOptions{}
-		for _, opt := range v {
-			if opt != nil {
-				opt.ApplyToList(opts)
-			}
-		}
-		return opts
-	default:
-		return nil
-	}
-}
-
-func setupScheme(scheme *runtime.Scheme) *runtime.Scheme {
-	if scheme == nil {
-		scheme = runtime.NewScheme()
-	}
+func setupScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	_ = clientgoscheme.AddToScheme(scheme)
 	_ = api.AddToScheme(scheme)
+	_ = taskapi.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 	_ = discoveryv1.AddToScheme(scheme)
 	return scheme
+}
+
+func podPVCClaimNames(obj client.Object) []string {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return nil
+	}
+
+	var claimNames []string
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName != "" {
+			claimNames = append(claimNames, volume.PersistentVolumeClaim.ClaimName)
+		}
+	}
+	return claimNames
+}
+
+// Some of this code is shared with the stuff we had in the envtests and httphelper already. Separated for now due to packaging and to make it easier to review.
+func defaultFakeMgmtApiServer() *fakeMgmtApiServer {
+	defaultMgmtApiServerOnce.Do(func() {
+		defaultMgmtApiServer = startFakeMgmtApiTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/api/v0/metadata/versions/features":
+				http.NotFound(w, r)
+			case "/api/v0/ops/node/fullquerylogging":
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"entity": false}`)
+			case "/api/v0/metadata/endpoints":
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"entity": []}`)
+			case "/api/v0/ops/executor/job":
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"id":"1","status":"COMPLETED"}`)
+			default:
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, "OK")
+			}
+		}))
+	})
+	return defaultMgmtApiServer
+}
+
+func newFakeMgmtApiServer(t *testing.T, handler http.HandlerFunc) *fakeMgmtApiServer {
+	server := startFakeMgmtApiTestServer(handler)
+	t.Cleanup(server.Close)
+	return server
+}
+
+func startFakeMgmtApiTestServer(handler http.HandlerFunc) *fakeMgmtApiServer {
+	server := &fakeMgmtApiServer{}
+	server.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server.mu.Lock()
+		server.calls = append(server.calls, callDetails{
+			RequestPath: r.URL.Path,
+			RequestURI:  r.URL.RequestURI(),
+		})
+		server.mu.Unlock()
+
+		handler(w, r)
+	}))
+	return server
+}
+
+func (s *fakeMgmtApiServer) Close() {
+	if s != nil && s.server != nil {
+		s.server.Close()
+	}
+}
+
+func (s *fakeMgmtApiServer) client(log logr.Logger) httphelper.NodeMgmtClient {
+	protocol := "http"
+	if strings.HasPrefix(s.server.URL, "https://") {
+		protocol = "https"
+	}
+
+	return httphelper.NodeMgmtClient{
+		Client:   s.server.Client(),
+		Log:      log,
+		Protocol: protocol,
+	}
+}
+
+func (s *fakeMgmtApiServer) attachToPod(t *testing.T, pod *corev1.Pod) {
+	host, port := s.hostPort(t)
+	pod.Status.PodIP = host
+
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		if container.Name != "cassandra" {
+			continue
+		}
+		for j := range container.Ports {
+			if container.Ports[j].Name == "mgmt-api-http" {
+				container.Ports[j].ContainerPort = int32(port)
+				return
+			}
+		}
+		container.Ports = append(container.Ports, corev1.ContainerPort{Name: "mgmt-api-http", ContainerPort: int32(port)})
+		return
+	}
+}
+
+func (s *fakeMgmtApiServer) hostPort(t *testing.T) (string, int) {
+	t.Helper()
+
+	addr := strings.TrimPrefix(strings.TrimPrefix(s.server.URL, "http://"), "https://")
+	host, portStr, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+
+	port, err := strconv.Atoi(portStr)
+	require.NoError(t, err)
+
+	return host, port
+}
+
+func (s *fakeMgmtApiServer) callCount(requestURI string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	count := 0
+	for _, call := range s.calls {
+		if strings.Contains(requestURI, "?") {
+			if call.RequestURI == requestURI {
+				count++
+			}
+			continue
+		}
+		if call.RequestPath == requestURI {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (s *fakeMgmtApiServer) assertCallCount(t *testing.T, requestURI string, expected int) {
+	t.Helper() // To ensure the line number reported on failure is the caller of this method
+	require.Equal(t, expected, s.callCount(requestURI), "expected %d calls to %s", expected, requestURI)
 }

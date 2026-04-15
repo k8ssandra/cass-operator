@@ -20,11 +20,7 @@ func (rc *ReconciliationContext) CheckFullQueryLogging() result.ReconcileResult 
 		return result.Error(err)
 	}
 
-	podList, err := rc.listPods(rc.Datacenter.GetClusterLabels())
-	if err != nil {
-		rc.ReqLogger.Error(err, "error listing all pods in the cluster to progress full query logging reconciliation")
-		return result.RequeueSoon(2)
-	}
+	podList := rc.clusterPods
 	for _, podPtr := range podList {
 		features, err := rc.NodeMgmtClient.FeatureSet(podPtr)
 		if err != nil {

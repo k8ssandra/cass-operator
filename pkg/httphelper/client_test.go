@@ -16,8 +16,6 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
@@ -226,7 +224,7 @@ func TestNodeMgmtClient_GetKeyspaceReplication(t *testing.T) {
 		name         string
 		pod          *corev1.Pod
 		keyspaceName string
-		httpClient   *mocks.HttpClient
+		httpClient   HttpClient
 		expected     map[string]string
 		err          error
 	}{
@@ -289,7 +287,7 @@ func TestNodeMgmtClient_ListTables(t *testing.T) {
 		name         string
 		pod          *corev1.Pod
 		keyspaceName string
-		httpClient   *mocks.HttpClient
+		httpClient   HttpClient
 		expected     []string
 		err          error
 	}{
@@ -359,7 +357,7 @@ func TestNodeMgmtClient_CreateTable(t *testing.T) {
 		name       string
 		pod        *corev1.Pod
 		table      *TableDefinition
-		httpClient *mocks.HttpClient
+		httpClient HttpClient
 		err        error
 	}{
 		{
@@ -461,16 +459,14 @@ func TestListRoles(t *testing.T) {
 	require.NoError(err)
 	require.Equal(3, len(roles))
 
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodGet
-			})).
-		Return(newHttpResponse(payload, http.StatusOK), nil).
-		Once()
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodGet, req.Method)
+		require.Equal("/api/v0/ops/auth/role", req.URL.Path)
+	}, func() *http.Response {
+		return newHttpResponse(payload, http.StatusOK)
+	})
 
-	mgmtClient := newMockMgmtClient(mockHttpClient)
+	mgmtClient := newMockMgmtClient(httpClient)
 	roles, err = mgmtClient.CallListRolesEndpoint(goodPod)
 	require.NoError(err)
 	require.Equal(3, len(roles))
@@ -478,53 +474,51 @@ func TestListRoles(t *testing.T) {
 
 func TestCreateRole(t *testing.T) {
 	require := require.New(t)
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodPost && req.URL.Query().Get("username") == "role1" && req.URL.Query().Get("password") == "password1" && req.URL.Query().Get("is_superuser") == "true"
-			})).
-		Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).
-		Once()
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodPost, req.Method)
+		require.Equal("/api/v0/ops/auth/role", req.URL.Path)
+		require.Equal("role1", req.URL.Query().Get("username"))
+		require.Equal("password1", req.URL.Query().Get("password"))
+		require.Equal("true", req.URL.Query().Get("is_superuser"))
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
 
-	mgmtClient := newMockMgmtClient(mockHttpClient)
+	mgmtClient := newMockMgmtClient(httpClient)
 	err := mgmtClient.CallCreateRoleEndpoint(goodPod, "role1", "password1", true)
 	require.NoError(err)
-	require.True(mockHttpClient.AssertExpectations(t))
 }
 
 func TestDropRole(t *testing.T) {
 	require := require.New(t)
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodDelete
-			})).
-		Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).
-		Once()
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodDelete, req.Method)
+		require.Equal("/api/v0/ops/auth/role", req.URL.Path)
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
 
-	mgmtClient := newMockMgmtClient(mockHttpClient)
+	mgmtClient := newMockMgmtClient(httpClient)
 	err := mgmtClient.CallDropRoleEndpoint(goodPod, "role1")
 
 	require.NoError(err)
-	require.True(mockHttpClient.AssertExpectations(t))
 }
 
 func TestCallDurationMetricSuccess(t *testing.T) {
 	require := require.New(t)
 
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do", mock.MatchedBy(func(req *http.Request) bool {
-		return req.URL.Path == "/api/v0/ops/node/drain" && req.Method == http.MethodPost
-	})).Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).Times(2)
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodPost, req.Method)
+		require.Equal("/api/v0/ops/node/drain", req.URL.Path)
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
 
 	before := getHttpHelperCallDurationCount(t, "/api/v0/ops/node/drain", resultSuccessLabelName)
 
-	mgmtClient := newMockMgmtClient(mockHttpClient)
+	mgmtClient := newMockMgmtClient(httpClient)
 	require.NoError(mgmtClient.CallDrainEndpoint(goodPod))
 	require.NoError(mgmtClient.CallDrainEndpoint(goodPod))
-	require.True(mockHttpClient.AssertExpectations(t))
 
 	after := getHttpHelperCallDurationCount(t, "/api/v0/ops/node/drain", resultSuccessLabelName)
 	require.Equal(before+2, after)
@@ -533,22 +527,29 @@ func TestCallDurationMetricSuccess(t *testing.T) {
 func TestCallDurationMetricError(t *testing.T) {
 	require := require.New(t)
 
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do", mock.MatchedBy(func(req *http.Request) bool {
-		return req.URL.Path == "/api/v0/ops/seeds/reload" && req.Method == http.MethodPost
-	})).Return(newHttpResponseMarshalled("this is an error", http.StatusInternalServerError), nil).Once()
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodPost, req.Method)
+		require.Equal("/api/v0/ops/seeds/reload", req.URL.Path)
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("this is an error", http.StatusInternalServerError)
+	})
 
 	before := getHttpHelperCallDurationCount(t, "/api/v0/ops/seeds/reload", resultErrorLabelName)
 
-	mgmtClient := newMockMgmtClient(mockHttpClient)
+	mgmtClient := newMockMgmtClient(httpClient)
 	require.Error(mgmtClient.CallReloadSeedsEndpoint(goodPod))
-	require.True(mockHttpClient.AssertExpectations(t))
 
 	after := getHttpHelperCallDurationCount(t, "/api/v0/ops/seeds/reload", resultErrorLabelName)
 	require.Equal(before+1, after)
 }
 
-func newMockMgmtClient(httpClient *mocks.HttpClient) *NodeMgmtClient {
+type httpClientDoFunc func(*http.Request) (*http.Response, error)
+
+func (f httpClientDoFunc) Do(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func newMockMgmtClient(httpClient HttpClient) *NodeMgmtClient {
 	return &NodeMgmtClient{
 		Client:   httpClient,
 		Log:      logr.Discard(),
@@ -556,10 +557,19 @@ func newMockMgmtClient(httpClient *mocks.HttpClient) *NodeMgmtClient {
 	}
 }
 
-func newMockHttpClient(response *http.Response, err error) *mocks.HttpClient {
-	httpClient := new(mocks.HttpClient)
-	httpClient.On("Do", mock.Anything).Return(response, err)
-	return httpClient
+func newMockHttpClient(response *http.Response, err error) HttpClient {
+	return httpClientDoFunc(func(*http.Request) (*http.Response, error) {
+		return response, err
+	})
+}
+
+func newAssertingHttpClient(t *testing.T, assertRequest func(*http.Request), response func() *http.Response) HttpClient {
+	t.Helper()
+
+	return httpClientDoFunc(func(req *http.Request) (*http.Response, error) {
+		assertRequest(req)
+		return response(), nil
+	})
 }
 
 func getHttpHelperCallDurationCount(t *testing.T, route, result string) uint64 {
@@ -652,9 +662,7 @@ func TestCustomTransport(t *testing.T) {
 		},
 	}
 
-	mockClient := mocks.NewClient(t)
-
-	mgmtClient, err := NewMgmtClient(t.Context(), mockClient, dc, customTransport)
+	mgmtClient, err := NewMgmtClient(t.Context(), nil, dc, customTransport)
 	mgmtClient.Log = logr.Discard()
 	require.NoError(err)
 

@@ -76,6 +76,8 @@ var _ = Describe(testName, func() {
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "true true true true", 1200)
 
+			ns.WaitForDatacenterReady(dcName)
+
 			step = "scale up to 5 nodes"
 			json = "{\"spec\": {\"size\": 5}}"
 			k = kubectl.PatchMerge(dcResource, json)
@@ -88,6 +90,8 @@ var _ = Describe(testName, func() {
 				WithFlag("field-selector", "status.phase=Running").
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "true true true true true", 1200)
+
+			ns.WaitForDatacenterReady(dcName)
 
 			step = "stopping the dc"
 			json = "{\"spec\": {\"stopped\": true}}"

@@ -4,6 +4,7 @@
 package v1beta1
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -126,6 +128,36 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 				},
 			},
 			errString: "",
+		},
+		{
+			name: "Valid maxUnavailable percentage",
+			dc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					ServerType:     "cassandra",
+					ServerVersion:  "5.0.0",
+					Size:           3,
+					MaxUnavailable: ptr.To(intstr.Parse("50%")),
+				},
+			},
+			errString: "",
+		},
+		{
+			name: "Invalid maxUnavailable string",
+			dc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					ServerType:     "cassandra",
+					ServerVersion:  "5.0.0",
+					Size:           3,
+					MaxUnavailable: ptr.To(intstr.FromString("invalid")),
+				},
+			},
+			errString: "attempted to use invalid maxUnavailable value 'invalid'",
 		},
 		{
 			name: "Dse Workloads in Cassandra Invalid",
@@ -677,6 +709,84 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 			errString: "",
 		},
 		{
+			name: "storage requests size shrink is rejected even when storage changes are allowed",
+			oldDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("2Gi")},
+							},
+						},
+					},
+				},
+			},
+			newDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+					Annotations: map[string]string{
+						api.AllowStorageChangesAnnotation: "true",
+					},
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+			},
+			errString: "shrink storageConfig.CassandraDataVolumeClaimSpec from 2Gi to 1Gi",
+		},
+		{
+			name: "storage requests have different unit but same size",
+			oldDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1024Mi")},
+							},
+						},
+					},
+				},
+			},
+			newDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+					Annotations: map[string]string{
+						api.AllowStorageChangesAnnotation: "true",
+					},
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName: storageName,
+							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+			},
+			errString: "",
+		},
+		{
 			name: "Removing a rack",
 			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{
@@ -731,6 +841,74 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				},
 			},
 			errString: "",
+		},
+		{
+			name: "Scaling is rejected while datacenter is still scaling up",
+			oldDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
+						Name: "rack0",
+					}},
+					Size: 3,
+				},
+				Status: api.CassandraDatacenterStatus{
+					Conditions: []api.DatacenterCondition{
+						{
+							Type:   api.DatacenterScalingUp,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
+						Name: "rack0",
+					}},
+					Size: 6,
+				},
+			},
+			errString: "change size while datacenter is still scaling up",
+		},
+		{
+			name: "Scaling is rejected while datacenter is still scaling down",
+			oldDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
+						Name: "rack0",
+					}},
+					Size: 6,
+				},
+				Status: api.CassandraDatacenterStatus{
+					Conditions: []api.DatacenterCondition{
+						{
+							Type:   api.DatacenterScalingDown,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
+						Name: "rack0",
+					}},
+					Size: 3,
+				},
+			},
+			errString: "change size while datacenter is still scaling down",
 		},
 		{
 			name: "Changed a rack name",
@@ -915,6 +1093,103 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				} else if !strings.Contains(err.Error(), tt.errString) {
 					t.Errorf("ValidateDatacenterFieldChanges() err = %v, want suffix %v", err, tt.errString)
 				}
+			}
+		})
+	}
+}
+
+func TestValidateUpdateBypassAnnotation(t *testing.T) {
+	validator := &CassandraDatacenterCustomValidator{}
+
+	tests := []struct {
+		name      string
+		oldDc     *api.CassandraDatacenter
+		newDc     *api.CassandraDatacenter
+		errString string
+	}{
+		{
+			name: "Scaling up even more is rejected while datacenter is still scaling up without bypass annotation",
+			oldDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
+						Name: "rack0",
+					}},
+					Size: 6,
+				},
+				Status: api.CassandraDatacenterStatus{
+					Conditions: []api.DatacenterCondition{
+						{
+							Type:   api.DatacenterScalingUp,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
+						Name: "rack0",
+					}},
+					Size: 9,
+				},
+			},
+			errString: "change size while datacenter is still scaling up",
+		},
+		{
+			name: "Scaling up even more is allowed if bypass is set while datacenter is still scaling up from previous operation",
+			oldDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
+						Name: "rack0",
+					}},
+					Size: 6,
+				},
+				Status: api.CassandraDatacenterStatus{
+					Conditions: []api.DatacenterCondition{
+						{
+							Type:   api.DatacenterScalingUp,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+					Annotations: map[string]string{
+						api.BypassWebhookValidationsAnnotation: "true",
+					},
+				},
+				Spec: api.CassandraDatacenterSpec{
+					Racks: []api.Rack{{
+						Name: "rack0",
+					}},
+					Size: 9,
+				},
+			},
+			errString: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings, err := validator.ValidateUpdate(context.Background(), tt.oldDc, tt.newDc)
+			assert.Empty(t, warnings)
+
+			if tt.errString == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errString)
 			}
 		})
 	}

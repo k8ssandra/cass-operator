@@ -88,6 +88,9 @@ const (
 	// EnableParallelCleanupWithinRackAnnotation speeds up post-scale-out cleanup by processing nodes in parallel within a rack.
 	EnableParallelCleanupWithinRackAnnotation = "cassandra.datastax.com/enable-parallel-cleanup-within-rack"
 
+	// BypassWebhookValidationsAnnotation allows bypassing CassandraDatacenter update webhook validations
+	BypassWebhookValidationsAnnotation = "cassandra.datastax.com/bypass-webhook-validations"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 

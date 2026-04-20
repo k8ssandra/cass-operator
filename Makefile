@@ -269,11 +269,11 @@ HELM ?= $(LOCALBIN)/helm
 OPM ?= $(LOCALBIN)/opm
 
 ## Tool Versions
-CERT_MANAGER_VERSION ?= v1.20.1
+CERT_MANAGER_VERSION ?= v1.20.2
 KUSTOMIZE_VERSION ?= v5.8.1
 CONTROLLER_TOOLS_VERSION ?= v0.20.1
 OPERATOR_SDK_VERSION ?= 1.42.2
-HELM_VERSION ?= 4.1.3
+HELM_VERSION ?= 4.1.4
 OPM_VERSION ?= 1.61.0
 GOLANGCI_LINT_VERSION ?= v2.11.4
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')

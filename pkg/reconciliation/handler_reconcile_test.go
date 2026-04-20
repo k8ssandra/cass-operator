@@ -7,6 +7,7 @@ import (
 	"time"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/stretchr/testify/require"
 
 	controllers "github.com/k8ssandra/cass-operator/internal/controllers/cassandra"
@@ -16,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
+	record "k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -164,11 +165,13 @@ func TestReconcile_NotFound(t *testing.T) {
 	s.AddKnownTypes(api.GroupVersion, dc)
 
 	fakeClient := fake.NewClientBuilder().WithStatusSubresource(dc).WithRuntimeObjects(trackObjects...).Build()
+	fakeRecorder := record.NewFakeRecorder(5)
 
 	r := &controllers.CassandraDatacenterReconciler{
 		Client: fakeClient,
 		Scheme: s,
 	}
+	r.Recorder = events.NewLoggingEventRecorder(fakeRecorder, r.Log.WithName("reconcile_tests"))
 
 	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -234,6 +237,8 @@ func TestReconcile_Error(t *testing.T) {
 		Client: fakeClient,
 		Scheme: s,
 	}
+	fakeRecorder := record.NewFakeRecorder(5)
+	r.Recorder = events.NewLoggingEventRecorder(fakeRecorder, r.Log.WithName("reconcile_tests"))
 
 	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{

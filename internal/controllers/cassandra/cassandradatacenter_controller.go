@@ -127,7 +127,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 	if err := rc.IsValid(rc.Datacenter); err != nil {
 		logger.Error(err, "CassandraDatacenter resource is invalid")
-		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ValidationFailed", err.Error())
+		rc.Recorder.Event(rc.Datacenter, "Warning", "ValidationFailed", err.Error())
 		return ctrl.Result{}, reconcile.TerminalError(err)
 	}
 
@@ -151,7 +151,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	res, err := rc.CalculateReconciliationActions()
 	if err != nil {
 		logger.Error(err, "calculateReconciliationActions returned an error")
-		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ReconcileFailed", err.Error())
+		rc.Recorder.Event(rc.Datacenter, "Warning", "ReconcileFailed", err.Error())
 	}
 
 	// Prevent immediate requeue

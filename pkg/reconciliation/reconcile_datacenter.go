@@ -45,7 +45,7 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 
 	if rc.Datacenter.Status.GetConditionStatus(api.DatacenterScalingDown) == corev1.ConditionTrue {
 		// ScalingDown is still happening
-		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.DecommissionDatacenter, "Datacenter is decommissioning")
+		rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DecommissionDatacenter, "Datacenter is decommissioning")
 		rc.ReqLogger.V(1).Info("Waiting for the decommission to complete first, before deleting")
 		return result.Continue()
 	}

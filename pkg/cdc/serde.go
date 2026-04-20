@@ -2,9 +2,10 @@
 // care about.
 package cdc
 
-import "maps"
-
-import "encoding/json"
+import (
+	"encoding/json"
+	"maps"
+)
 
 type configData struct {
 	CassEnvSh     *cassEnvSh `json:"cassandra-env-sh,omitempty"`

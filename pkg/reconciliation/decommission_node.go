@@ -138,8 +138,7 @@ func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData 
 
 			monitoring.UpdatePodStatusMetric(pod)
 
-			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsDecommissioning,
-				"Labeled node as decommissioning %s", pod.Name)
+			rc.Recorder.Eventf(rc.Datacenter, nil, corev1.EventTypeNormal, fmt.Sprintf("Labeled node as decommissioning %s", pod.Name), events.LabeledPodAsDecommissioning, "")
 
 			return nil
 		}
@@ -321,7 +320,7 @@ func (rc *ReconciliationContext) DeletePodPvcs(pod *corev1.Pod) error {
 		}
 
 		rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DeletedPvc,
-			"Claim Name: %s", pvcName)
+			fmt.Sprintf("Claim Name: %s", pvcName))
 	}
 	return nil
 }

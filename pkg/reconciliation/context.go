@@ -57,7 +57,7 @@ func CreateReconciliationContext(
 	req *reconcile.Request,
 	cli client.Client,
 	scheme *runtime.Scheme,
-	rec record.EventRecorderLogger,
+	rec record.EventRecorder,
 	secretWatches dynamicwatch.DynamicWatches,
 	imageRegistry images.ImageRegistry,
 	clusterScoped bool,
@@ -73,7 +73,7 @@ func CreateReconciliationContext(
 	rc.ImageRegistry = imageRegistry
 	rc.ClusterResources = clusterScoped
 	rc.ReqLogger = rc.ReqLogger.WithValues("namespace", req.Namespace)
-	rc.Recorder = &events.LoggingEventRecorder{EventRecorderLogger: rec, ReqLogger: reqLogger}
+	rc.Recorder = events.NewLoggingEventRecorder(rec, reqLogger)
 
 	rc.ReqLogger.Info("handler::CreateReconciliationContext")
 

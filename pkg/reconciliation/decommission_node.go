@@ -94,8 +94,7 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 				"desiredSize", desiredNodeCount,
 			)
 
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.ScalingDownRack,
-				"Scaling down rack %s", rackInfo.RackName)
+			rc.Recorder.Eventf(rc.Datacenter, nil, corev1.EventTypeNormal, fmt.Sprintf("Scaling down rack %s", rackInfo.RackName), events.ScalingDownRack, "")
 
 			if err := setOperatorProgressStatus(rc, api.ProgressUpdating); err != nil {
 				return result.Error(err)
@@ -139,7 +138,7 @@ func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData 
 
 			monitoring.UpdatePodStatusMetric(pod)
 
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsDecommissioning,
+			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsDecommissioning,
 				"Labeled node as decommissioning %s", pod.Name)
 
 			return nil
@@ -204,7 +203,7 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 					return res
 				}
 			}
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.DecommissioningNode, fmt.Sprintf("Decommissioning node %s", pod.Name))
+			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DecommissioningNode, fmt.Sprintf("Decommissioning node %s", pod.Name))
 			return result.RequeueSoon(5)
 		}
 	}
@@ -321,7 +320,7 @@ func (rc *ReconciliationContext) DeletePodPvcs(pod *corev1.Pod) error {
 			return err
 		}
 
-		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.DeletedPvc,
+		rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DeletedPvc,
 			"Claim Name: %s", pvcName)
 	}
 	return nil
@@ -397,7 +396,7 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 				pod.Name, free, int64(spaceUsedByDecommPod),
 			)
 			rc.ReqLogger.Error(errors.New(msg), msg)
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
+			rc.Recorder.Eventf(rc.Datacenter, nil, corev1.EventTypeWarning, "Not enough free space available to decommission", events.InvalidDatacenterSpec, msg)
 
 			if err := rc.setCondition(
 				api.NewDatacenterConditionWithReason(api.DatacenterValid,

@@ -239,7 +239,7 @@ func main() {
 		Client:           mgr.GetClient(),
 		Log:              ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
 		Scheme:           mgr.GetScheme(),
-		Recorder:         mgr.GetEventRecorderFor("cass-operator"),
+		Recorder:         mgr.GetEventRecorder("cass-operator"),
 		ImageRegistry:    registry,
 		ClusterResources: clusterScoped,
 	}).SetupWithManager(mgr); err != nil {

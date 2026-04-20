@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	record "k8s.io/client-go/tools/events"
 )
 
 const (
@@ -39,21 +39,20 @@ const (
 )
 
 type LoggingEventRecorder struct {
-	record.EventRecorder
+	record.EventRecorderLogger
 	ReqLogger logr.Logger
 }
 
-func (r *LoggingEventRecorder) Event(object runtime.Object, eventtype, reason, message string) {
-	r.ReqLogger.Info(message, "reason", reason, "eventType", eventtype)
-	r.EventRecorder.Event(object, eventtype, reason, message)
+// Eventf is just a wrapper to do WithLogger always.
+// Few notes for caller:
+// action is a constant from this file and is machine readable.
+// reason and note are human readable. Reason is short and note can include longer description with arguments
+func (r *LoggingEventRecorder) Eventf(object runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...any) {
+	r.EventRecorderLogger.WithLogger(r.ReqLogger).Eventf(object, related, eventtype, reason, action, note, args...)
 }
 
-func (r *LoggingEventRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...any) {
-	r.ReqLogger.Info(fmt.Sprintf(messageFmt, args...), "reason", reason, "eventType", eventtype)
-	r.EventRecorder.Eventf(object, eventtype, reason, messageFmt, args...)
-}
-
-func (r *LoggingEventRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...any) {
-	r.ReqLogger.Info(fmt.Sprintf(messageFmt, args...), "reason", reason, "eventType", eventtype)
-	r.EventRecorder.AnnotatedEventf(object, annotations, eventtype, reason, messageFmt, args...)
+// Event is a simplified version of Eventf with no support for related or note. Action is machine readable from this file
+// and reason has ability to use args. This is for backwards compatibility
+func (r *LoggingEventRecorder) Event(object runtime.Object, eventtype, action, reason string, args ...any) {
+	r.Eventf(object, nil, eventtype, fmt.Sprintf(reason, args...), action, "")
 }

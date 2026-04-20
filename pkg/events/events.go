@@ -37,23 +37,35 @@ const (
 )
 
 type LoggingEventRecorder struct {
+	record.EventRecorder
 	record.EventRecorderLogger
 	ReqLogger logr.Logger
 }
 
 func NewLoggingEventRecorder(recorder record.EventRecorder, reqLogger logr.Logger) *LoggingEventRecorder {
-	return &LoggingEventRecorder{
-		EventRecorderLogger: recorder.(record.EventRecorderLogger),
-		ReqLogger:           reqLogger,
+	loggingRecorder := &LoggingEventRecorder{
+		EventRecorder: recorder,
+		ReqLogger:     reqLogger,
 	}
+
+	if recorderWithLogger, ok := recorder.(record.EventRecorderLogger); ok {
+		loggingRecorder.EventRecorderLogger = recorderWithLogger
+	}
+
+	return loggingRecorder
 }
 
-// Eventf is just a wrapper to do WithLogger always.
+// Eventf wraps event recording with the request logger when the underlying recorder supports it.
 // Few notes for caller:
 // action is a constant from this file and is machine readable.
 // reason and note are human readable. Reason is short and note can include longer description with arguments
 func (r *LoggingEventRecorder) Eventf(object runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...any) {
-	r.EventRecorderLogger.WithLogger(r.ReqLogger).Eventf(object, related, eventtype, reason, action, note, args...)
+	if r.EventRecorderLogger != nil {
+		r.EventRecorderLogger.WithLogger(r.ReqLogger).Eventf(object, related, eventtype, reason, action, note, args...)
+		return
+	}
+
+	r.EventRecorder.Eventf(object, related, eventtype, reason, action, note, args...)
 }
 
 // Event is a simplified version of Eventf with no support for related or note. Action is machine readable from this file

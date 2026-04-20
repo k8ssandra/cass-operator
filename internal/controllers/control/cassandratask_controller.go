@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -745,7 +744,7 @@ func (r *CassandraTaskReconciler) startPodTask(
 	}
 
 	if status.StartTime == nil {
-		status.StartTime = ptr.To(metav1.Now())
+		status.StartTime = new(metav1.Now())
 	}
 
 	if taskConfig.Job != api.CommandReplaceNode && features.Supports(taskConfig.AsyncFeature) {
@@ -807,7 +806,7 @@ func (r *CassandraTaskReconciler) startPodTask(
 						status.Status = api.PodError
 					} else {
 						status.Status = api.PodCompleted
-						status.CompletionTime = ptr.To(metav1.Now())
+						status.CompletionTime = new(metav1.Now())
 					}
 				}
 
@@ -875,7 +874,7 @@ func (r *CassandraTaskReconciler) checkRackCompletion(
 				switch details.Status {
 				case "COMPLETED":
 					status.Status = api.PodCompleted
-					status.CompletionTime = ptr.To(metav1.Now())
+					status.CompletionTime = new(metav1.Now())
 					cassTask.Status.PodStatuses[pod.Name] = status
 					completed++
 				case "ERROR":
@@ -927,7 +926,7 @@ func podFailedHandling(taskConfig *TaskConfiguration, status *api.PodProcessingS
 	} else {
 		status.Status = api.PodError
 		status.Error = errMsg
-		status.CompletionTime = ptr.To(metav1.Now())
+		status.CompletionTime = new(metav1.Now())
 		return 1
 	}
 

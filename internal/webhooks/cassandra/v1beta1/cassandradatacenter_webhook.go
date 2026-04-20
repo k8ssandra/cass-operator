@@ -121,7 +121,7 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 	isDse := dc.Spec.ServerType == "dse"
 	isCassandra3 := dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "3.")
 
-	var c map[string]interface{}
+	var c map[string]any
 	if dc.Spec.Config != nil {
 		if err := json.Unmarshal(dc.Spec.Config, &c); err != nil {
 			return fmt.Errorf("unable to parse config json: %v", err)
@@ -377,7 +377,7 @@ func containsReservedPrefixes(config map[string]string) bool {
 	return false
 }
 
-func attemptedTo(action string, actionStrArgs ...interface{}) error {
+func attemptedTo(action string, actionStrArgs ...any) error {
 	var msg string
 	if actionStrArgs != nil {
 		msg = fmt.Sprintf(action, actionStrArgs...)

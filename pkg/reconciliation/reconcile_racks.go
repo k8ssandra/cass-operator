@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -2520,7 +2519,7 @@ func (rc *ReconciliationContext) createCleanupTask() error {
 }
 
 func (rc *ReconciliationContext) calculateMaxConcurrentPods() *int {
-	return ptr.To(rc.desiredRackInformation[0].NodeCount)
+	return new(rc.desiredRackInformation[0].NodeCount)
 }
 
 func (rc *ReconciliationContext) activeTaskCompleted(task *taskapi.CassandraTask) result.ReconcileResult {

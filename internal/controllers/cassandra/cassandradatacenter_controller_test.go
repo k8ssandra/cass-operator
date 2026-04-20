@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -36,7 +35,7 @@ func createDatacenter(ctx context.Context, dcName string, nodeCount, rackCount i
 	testDc := createStubCassDc(dcName, int32(nodeCount))
 
 	testDc.Spec.Racks = make([]cassdcapi.Rack, rackCount)
-	for i := 0; i < rackCount; i++ {
+	for i := range rackCount {
 		testDc.Spec.Racks[i] = cassdcapi.Rack{
 			Name: fmt.Sprintf("r%d", i),
 		}
@@ -58,7 +57,7 @@ func createStorageClass(ctx context.Context, storageClassName string) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: storageClassName,
 		},
-		AllowVolumeExpansion: ptr.To(true),
+		AllowVolumeExpansion: new(true),
 		Provisioner:          "kubernetes.io/no-provisioner",
 	}
 	Expect(k8sClient.Create(ctx, sc)).To(Succeed())
@@ -277,7 +276,7 @@ func createStubCassDc(dcName string, nodeCount int32) cassdcapi.CassandraDatacen
 			Size:          nodeCount,
 			StorageConfig: cassdcapi.StorageConfig{
 				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To[string]("default"),
+					StorageClassName: new("default"),
 					AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
 					Resources: corev1.VolumeResourceRequirements{
 						Requests: map[corev1.ResourceName]resource.Quantity{"storage": resource.MustParse("1Gi")},

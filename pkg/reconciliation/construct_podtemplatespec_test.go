@@ -6,10 +6,10 @@ package reconciliation
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 
@@ -1008,21 +1008,11 @@ func volumeMountNameMatcher(name string) VolumeMountMatcher {
 }
 
 func volumeMountsContains(volumeMounts []corev1.VolumeMount, matcher VolumeMountMatcher) bool {
-	for _, mount := range volumeMounts {
-		if matcher(mount) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(volumeMounts, matcher)
 }
 
 func volumesContains(volumes []corev1.Volume, matcher VolumeMatcher) bool {
-	for _, volume := range volumes {
-		if matcher(volume) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(volumes, matcher)
 }
 
 func envVarsMatch(expected, actual []corev1.EnvVar) bool {
@@ -1257,7 +1247,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 					Name: "default",
 				},
 			},
-			ReadOnlyRootFilesystem: ptr.To(false),
+			ReadOnlyRootFilesystem: new(false),
 		},
 	}
 
@@ -1271,7 +1261,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 					Name: "default",
 				},
 			},
-			ReadOnlyRootFilesystem: ptr.To(false),
+			ReadOnlyRootFilesystem: new(false),
 		},
 	}
 
@@ -1337,7 +1327,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage_withContainerOverr
 					Name: "default",
 				},
 			},
-			ReadOnlyRootFilesystem: ptr.To(false),
+			ReadOnlyRootFilesystem: new(false),
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
@@ -1957,7 +1947,7 @@ func TestReadOnlyRootFilesystemVolumeChanges(t *testing.T) {
 			ClusterName:            "bob",
 			ServerType:             "cassandra",
 			ServerVersion:          "4.1.5",
-			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2005,7 +1995,7 @@ func TestReadOnlyRootFilesystemVolumeChanges(t *testing.T) {
 
 	assert.Len(containers, 2, "Unexpected number of containers containers returned")
 	assert.Equal("cassandra", containers[0].Name)
-	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+	assert.Equal(new(true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
 
 	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
 		[]corev1.VolumeMount{
@@ -2043,7 +2033,7 @@ func TestReadOnlyRootFilesystemVolumeChangesHCD(t *testing.T) {
 			ClusterName:            "bob",
 			ServerType:             "hcd",
 			ServerVersion:          "1.0.0",
-			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2091,7 +2081,7 @@ func TestReadOnlyRootFilesystemVolumeChangesHCD(t *testing.T) {
 
 	assert.Len(containers, 2, "Unexpected number of containers containers returned")
 	assert.Equal("cassandra", containers[0].Name)
-	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+	assert.Equal(new(true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
 
 	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
 		[]corev1.VolumeMount{
@@ -2128,7 +2118,7 @@ func TestReadOnlyRootFilesystemVolumeChangesDSE(t *testing.T) {
 			ClusterName:            "bob",
 			ServerType:             "dse",
 			ServerVersion:          "6.9.2",
-			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2170,7 +2160,7 @@ func TestReadOnlyRootFilesystemVolumeChangesDSE(t *testing.T) {
 
 	assert.Len(containers, 2, "Unexpected number of containers containers returned")
 	assert.Equal("cassandra", containers[0].Name)
-	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+	assert.Equal(new(true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
 
 	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
 		[]corev1.VolumeMount{
@@ -2226,7 +2216,7 @@ func TestReadOnlyRootFilesystemVolumeChangesDSEWithClient(t *testing.T) {
 			ClusterName:            "bob",
 			ServerType:             "dse",
 			ServerVersion:          "6.9.2",
-			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2274,7 +2264,7 @@ func TestReadOnlyRootFilesystemVolumeChangesDSEWithClient(t *testing.T) {
 
 	assert.Len(containers, 2, "Unexpected number of containers containers returned")
 	assert.Equal("cassandra", containers[0].Name)
-	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+	assert.Equal(new(true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
 
 	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
 		[]corev1.VolumeMount{
@@ -2354,7 +2344,7 @@ func TestReadOnlyRootFilesystemWithSecurityContext(t *testing.T) {
 					},
 				},
 			},
-			ReadOnlyRootFilesystem: ptr.To(true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2376,30 +2366,30 @@ func TestReadOnlyRootFilesystemWithSecurityContext(t *testing.T) {
 	// capabilities from the podTemplateSpec.
 	assert.Equal(CassandraContainerName, containers[0].Name)
 	assert.Equal(containers[0].SecurityContext, &corev1.SecurityContext{
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   new(true),
+		AllowPrivilegeEscalation: new(false),
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 	})
 
 	// Other containers should just get the podTemplateSpec contents.
 	assert.Equal(ServerBaseConfigContainerName, initContainers[0].Name)
 	assert.Equal(initContainers[0].SecurityContext, &corev1.SecurityContext{
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   new(true),
+		AllowPrivilegeEscalation: new(false),
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 	})
 
 	assert.Equal(ServerConfigContainerName, initContainers[1].Name)
 	assert.Equal(initContainers[1].SecurityContext, &corev1.SecurityContext{
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   new(true),
+		AllowPrivilegeEscalation: new(false),
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 	})
 
 	assert.Equal(SystemLoggerContainerName, containers[1].Name)
 	assert.Equal(containers[1].SecurityContext, &corev1.SecurityContext{
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   new(true),
+		AllowPrivilegeEscalation: new(false),
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 	})
 }
@@ -2445,7 +2435,7 @@ func TestPodTemplateSpecAdditionalVolumeMount(t *testing.T) {
 					},
 				},
 			},
-			ReadOnlyRootFilesystem: ptr.To(true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",

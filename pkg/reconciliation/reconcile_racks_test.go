@@ -479,7 +479,7 @@ func TestCheckRackPodTemplate_TemplateLabels(t *testing.T) {
 	require.NoErrorf(err, "error occurred creating statefulset")
 
 	desiredStatefulSet.Generation = 1
-	desiredStatefulSet.Spec.Replicas = ptr.To(int32(1))
+	desiredStatefulSet.Spec.Replicas = new(int32(1))
 	desiredStatefulSet.Status.Replicas = int32(1)
 	desiredStatefulSet.Status.UpdatedReplicas = int32(1)
 	desiredStatefulSet.Status.ObservedGeneration = 1
@@ -1233,7 +1233,7 @@ func TestReconcileRacks_UpdateConfig(t *testing.T) {
 func mockReadyPodsForStatefulSet(sts *appsv1.StatefulSet, cluster, dc string) []*corev1.Pod {
 	var pods []*corev1.Pod
 	sz := int(*sts.Spec.Replicas)
-	for i := 0; i < sz; i++ {
+	for i := range sz {
 		pod := &corev1.Pod{}
 		pod.Namespace = sts.Namespace
 		pod.Name = fmt.Sprintf("%s-%d", sts.Name, i)
@@ -2197,7 +2197,7 @@ func TestStartBootstrappedNodes(t *testing.T) {
 				rackPods := tt.racks[rackName]
 				sts := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{Name: rackName},
-					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
+					Spec:       appsv1.StatefulSetSpec{Replicas: new(int32(len(rackPods)))},
 				}
 				rc.statefulSets = append(rc.statefulSets, sts)
 				for i, started := range rackPods {
@@ -2425,7 +2425,7 @@ func TestStartingSequenceBuilder(t *testing.T) {
 				rackPods := tt.racks[rackName]
 				sts := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{Name: rackName},
-					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
+					Spec:       appsv1.StatefulSetSpec{Replicas: new(int32(len(rackPods)))},
 				}
 				rc.statefulSets = append(rc.statefulSets, sts)
 				podCount := len(rackPods)
@@ -2542,7 +2542,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				rackPods := tt.racks[rackName]
 				sts := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{Name: rackName},
-					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
+					Spec:       appsv1.StatefulSetSpec{Replicas: new(int32(len(rackPods)))},
 				}
 				rc.statefulSets = append(rc.statefulSets, sts)
 				rc.desiredRackInformation = append(rc.desiredRackInformation, &RackInformation{
@@ -2684,7 +2684,7 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 				rackPods := tt.racks[rackName]
 				sts := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{Name: rackName},
-					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
+					Spec:       appsv1.StatefulSetSpec{Replicas: new(int32(len(rackPods)))},
 				}
 				rc.statefulSets = append(rc.statefulSets, sts)
 				podCount := len(rackPods)
@@ -2851,7 +2851,7 @@ func TestStartOneNodePerRack(t *testing.T) {
 			for rackName, rackPods := range tt.racks {
 				sts := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{Name: rackName},
-					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
+					Spec:       appsv1.StatefulSetSpec{Replicas: new(int32(len(rackPods)))},
 				}
 				rc.statefulSets = append(rc.statefulSets, sts)
 				rc.desiredRackInformation = append(rc.desiredRackInformation, &RackInformation{
@@ -2981,7 +2981,7 @@ func TestStartOneNodePerRackFailed(t *testing.T) {
 			for rackName, rackPods := range tt.racks {
 				sts := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{Name: rackName},
-					Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(len(rackPods)))},
+					Spec:       appsv1.StatefulSetSpec{Replicas: new(int32(len(rackPods)))},
 				}
 				rc.statefulSets = append(rc.statefulSets, sts)
 				rc.desiredRackInformation = append(rc.desiredRackInformation, &RackInformation{
@@ -3134,7 +3134,7 @@ func TestCheckVolumeClaimSizesValidation(t *testing.T) {
 			MountPath: "/var/log/cassandra",
 			Name:      "server-logs",
 			PVCSpec: &corev1.PersistentVolumeClaimSpec{
-				StorageClassName: ptr.To[string]("standard"),
+				StorageClassName: new("standard"),
 				Resources: corev1.VolumeResourceRequirements{
 					Requests: map[corev1.ResourceName]resource.Quantity{corev1.ResourceStorage: resource.MustParse("384Mi")},
 				},
@@ -3194,7 +3194,7 @@ func TestVolumeClaimSizesExpansion(t *testing.T) {
 	// Mark the StorageClass as allowing expansion and Datacenter to allow expansion
 	storageClass := &storagev1.StorageClass{}
 	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: "standard"}, storageClass))
-	storageClass.AllowVolumeExpansion = ptr.To[bool](true)
+	storageClass.AllowVolumeExpansion = new(true)
 	require.NoError(rc.Client.Update(rc.Ctx, storageClass))
 	metav1.SetMetaDataAnnotation(&rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation, "true")
 	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
@@ -3234,7 +3234,7 @@ func TestCheckPVCResizing(t *testing.T) {
 			Labels:    rc.Datacenter.GetRackLabels("rack1"),
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			StorageClassName: ptr.To[string]("standard"),
+			StorageClassName: new("standard"),
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: map[corev1.ResourceName]resource.Quantity{
@@ -3284,7 +3284,7 @@ func TestCheckPVCResizing(t *testing.T) {
 			Labels:    rc.Datacenter.GetRackLabels("rack1"),
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			StorageClassName: ptr.To[string]("standard"),
+			StorageClassName: new("standard"),
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: map[corev1.ResourceName]resource.Quantity{
@@ -3356,7 +3356,7 @@ func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
 	// Mark the StorageClass as allowing expansion
 	storageClass := &storagev1.StorageClass{}
 	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: "standard"}, storageClass))
-	storageClass.AllowVolumeExpansion = ptr.To[bool](true)
+	storageClass.AllowVolumeExpansion = new(true)
 	require.NoError(rc.Client.Update(rc.Ctx, storageClass))
 
 	res = rc.CheckRackPodTemplate()
@@ -3504,7 +3504,7 @@ func TestDatacenterPodsOldLabels(t *testing.T) {
 	// Lets modify the Datacenter names and set the status like it used to be in some older versions
 	rc.Datacenter.Spec.DatacenterName = "overrideMe"
 	rc.Datacenter.Name = "dc1"
-	rc.Datacenter.Status.DatacenterName = ptr.To("overrideMe")
+	rc.Datacenter.Status.DatacenterName = new("overrideMe")
 	rc.Datacenter.Status.MetadataVersion = 0
 	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
 
@@ -3558,7 +3558,7 @@ func TestDatacenterPodsNoDualFetch(t *testing.T) {
 	// Lets modify the Datacenter names and set the status like it used to be in some older versions
 	rc.Datacenter.Spec.DatacenterName = "overrideMe"
 	rc.Datacenter.Name = "overrideMe" // Setting all these values to the same triggers in 1.27.0 a race condition that returns 6 pods instead of 3
-	rc.Datacenter.Status.DatacenterName = ptr.To("overrideMe")
+	rc.Datacenter.Status.DatacenterName = new("overrideMe")
 	rc.Datacenter.Status.MetadataVersion = 0
 	rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
 
@@ -3791,7 +3791,7 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 				]
 			}`)
 			if !tc.supportAsyncFlush {
-				endpointsJson = []byte(fmt.Sprintf(`{
+				endpointsJson = fmt.Appendf(nil, `{
 					"entity": [
 						{
 							"ENDPOINT_IP": %q,
@@ -3801,7 +3801,7 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 							"RPC_ADDRESS": %q
 						}
 					]
-				}`, pod.Status.PodIP, pod.Status.PodIP))
+				}`, pod.Status.PodIP, pod.Status.PodIP)
 			}
 			rc.NodeMgmtClient = server.client(rc.ReqLogger)
 			rc.dcPods = []*corev1.Pod{pod}

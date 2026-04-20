@@ -16,7 +16,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/utils/ptr"
 
 	configv1beta1 "github.com/k8ssandra/cass-operator/apis/config/v1beta1"
 )
@@ -195,7 +194,7 @@ func TestRepositoryAndNamespaceOverride(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal("ghcr.io/datastax/dse-mgmtapi-6_8:6.8.44", path)
 
-	imageConfig.ImageNamespace = ptr.To[string]("enterprise")
+	imageConfig.ImageNamespace = new("enterprise")
 	path, err = registry.GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
 	assert.Equal("ghcr.io/enterprise/dse-mgmtapi-6_8:6.8.44", path)
@@ -204,7 +203,7 @@ func TestRepositoryAndNamespaceOverride(t *testing.T) {
 	imageConfig = &registry.(*imageRegistry).imageConfig
 	imageConfig.Images = &configv1beta1.Images{}
 	imageConfig.DefaultImages = &configv1beta1.DefaultImages{}
-	imageConfig.ImageNamespace = ptr.To[string]("enterprise")
+	imageConfig.ImageNamespace = new("enterprise")
 	path, err = registry.GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
 	assert.Equal("enterprise/dse-mgmtapi-6_8:6.8.44", path)
@@ -223,12 +222,12 @@ func TestRepositoryAndNamespaceOverride(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal("docker.io/datastax/dse-mgmtapi-6_8:6.8.44", path)
 
-	imageConfig.ImageNamespace = ptr.To("internal")
+	imageConfig.ImageNamespace = new("internal")
 	path, err = registry.GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
 	assert.Equal("docker.io/internal/dse-mgmtapi-6_8:6.8.44", path)
 
-	imageConfig.ImageNamespace = ptr.To("")
+	imageConfig.ImageNamespace = new("")
 	path, err = registry.GetCassandraImage("dse", "6.8.44")
 	assert.NoError(err)
 	assert.Equal("docker.io/dse-mgmtapi-6_8:6.8.44", path)

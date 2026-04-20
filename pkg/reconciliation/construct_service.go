@@ -6,6 +6,7 @@ package reconciliation
 // This file defines constructors for k8s service-related objects
 import (
 	"fmt"
+	"maps"
 	"net"
 	"strings"
 
@@ -86,18 +87,14 @@ func addAdditionalOptions(service *corev1.Service, serviceConfig *api.ServiceCon
 		if service.Labels == nil {
 			service.Labels = make(map[string]string, len(serviceConfig.Labels))
 		}
-		for k, v := range serviceConfig.Labels {
-			service.Labels[k] = v
-		}
+		maps.Copy(service.Labels, serviceConfig.Labels)
 	}
 
 	if len(serviceConfig.Annotations) > 0 {
 		if service.Annotations == nil {
 			service.Annotations = make(map[string]string, len(serviceConfig.Annotations))
 		}
-		for k, v := range serviceConfig.Annotations {
-			service.Annotations[k] = v
-		}
+		maps.Copy(service.Annotations, serviceConfig.Annotations)
 	}
 }
 

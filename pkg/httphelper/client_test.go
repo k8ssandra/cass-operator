@@ -608,7 +608,7 @@ func newHttpResponse(responseBody []byte, status int) *http.Response {
 	}
 }
 
-func newHttpResponseMarshalled(responseBody interface{}, status int) *http.Response {
+func newHttpResponseMarshalled(responseBody any, status int) *http.Response {
 	marshalled, _ := json.Marshal(responseBody)
 	body := io.NopCloser(bytes.NewReader(marshalled))
 	bodyLength := int64(len(marshalled))

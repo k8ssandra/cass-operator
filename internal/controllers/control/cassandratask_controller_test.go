@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -66,7 +65,7 @@ func createDatacenter(dcName, namespace string) func() {
 		}
 
 		testDc.Spec.Racks = make([]cassdcapi.Rack, 3)
-		for i := 0; i < rackCount; i++ {
+		for i := range rackCount {
 			testDc.Spec.Racks[i] = cassdcapi.Rack{
 				Name: fmt.Sprintf("r%d", i),
 			}
@@ -87,7 +86,7 @@ func createDatacenter(dcName, namespace string) func() {
 		createStatefulSets(cassdcKey.Namespace)
 		podsPerRack := nodeCount / rackCount
 		for _, rack := range testDc.Spec.Racks {
-			for j := 0; j < podsPerRack; j++ {
+			for j := range podsPerRack {
 				createPod(namespace, clusterName, dcName, rack.Name, j)
 			}
 		}
@@ -553,7 +552,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 					By("Creating a task for cleanup")
 					taskKey, task := buildTask(api.CommandCleanup, testRetryNamespaceName)
 					task.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
-					task.Spec.Retries = ptr.To(2)
+					task.Spec.Retries = new(2)
 					Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 					completedTask := waitForTaskCompletion(taskKey)
@@ -1067,7 +1066,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				It("should process multiple pods concurrently within a rack and process racks sequentially", func() {
 					By("Creating a task with maxConcurrentPods set to 2")
 					taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
-					task.Spec.MaxConcurrentPods = ptr.To(2)
+					task.Spec.MaxConcurrentPods = new(2)
 					Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 					Eventually(func(g Gomega) {
@@ -1133,7 +1132,7 @@ var _ = Describe("CassandraTask controller tests", func() {
 				It("should handle maxConcurrentPods greater than rack size", func() {
 					By("Creating a task with maxConcurrentPods set to 10")
 					taskKey, task := buildTask(api.CommandCleanup, testNamespaceName)
-					task.Spec.MaxConcurrentPods = ptr.To(10)
+					task.Spec.MaxConcurrentPods = new(10)
 					Expect(k8sClient.Create(context.Background(), task)).Should(Succeed())
 
 					Eventually(func(g Gomega) {

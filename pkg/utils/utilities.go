@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"maps"
 	"math"
 	"reflect"
 )
@@ -11,19 +12,19 @@ import (
 func RangeInt(min, max, step int) []int {
 	size := int(math.Ceil(float64((max - min)) / float64(step)))
 	l := make([]int, size)
-	for i := 0; i < size; i++ {
+	for i := range size {
 		l[i] = min + i*step
 	}
 	return l
 }
 
-func isArrayOrSlice(a interface{}) bool {
+func isArrayOrSlice(a any) bool {
 	t := reflect.TypeOf(a)
 	k := t.Kind()
 	return k == reflect.Slice || k == reflect.Array
 }
 
-func ElementsMatch(a interface{}, b interface{}) bool {
+func ElementsMatch(a any, b any) bool {
 	if !isArrayOrSlice(a) || !isArrayOrSlice(b) {
 		return false
 	}
@@ -61,23 +62,21 @@ func ElementsMatch(a interface{}, b interface{}) bool {
 // then destination's value for that key will be overwritten with what's in source.
 func MergeMap(destination map[string]string, sources ...map[string]string) map[string]string {
 	for _, source := range sources {
-		for k, v := range source {
-			destination[k] = v
-		}
+		maps.Copy(destination, source)
 	}
 
 	return destination
 }
 
 // SearchMap will recursively search a map looking for a key with a value of another map
-func SearchMap(mapToSearch map[string]interface{}, key string) map[string]interface{} {
+func SearchMap(mapToSearch map[string]any, key string) map[string]any {
 	if v, ok := mapToSearch[key]; ok {
-		return v.(map[string]interface{})
+		return v.(map[string]any)
 	}
 
 	for _, v := range mapToSearch {
 		switch v := v.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 
 			if foundMap := SearchMap(v, key); len(foundMap) != 0 {
 				return foundMap
@@ -85,7 +84,7 @@ func SearchMap(mapToSearch map[string]interface{}, key string) map[string]interf
 		}
 	}
 
-	return make(map[string]interface{})
+	return make(map[string]any)
 }
 
 func IndexOfString(a []string, v string) int {

@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -139,7 +138,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 					ServerType:     "cassandra",
 					ServerVersion:  "5.0.0",
 					Size:           3,
-					MaxUnavailable: ptr.To(intstr.Parse("50%")),
+					MaxUnavailable: new(intstr.Parse("50%")),
 				},
 			},
 			errString: "",
@@ -154,7 +153,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 					ServerType:     "cassandra",
 					ServerVersion:  "5.0.0",
 					Size:           3,
-					MaxUnavailable: ptr.To(intstr.FromString("invalid")),
+					MaxUnavailable: new(intstr.FromString("invalid")),
 				},
 			},
 			errString: "attempted to use invalid maxUnavailable value 'invalid'",
@@ -428,7 +427,7 @@ func Test_ValidateSingleDatacenter(t *testing.T) {
 
 func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 	storageSize := resource.MustParse("1Gi")
-	storageName := ptr.To[string]("server-data")
+	storageName := new("server-data")
 
 	tests := []struct {
 		name      string
@@ -658,7 +657,7 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 				Spec: api.CassandraDatacenterSpec{
 					StorageConfig: api.StorageConfig{
 						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
-							StorageClassName: ptr.To[string]("new-server-data"),
+							StorageClassName: new("new-server-data"),
 							AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
 							Resources: corev1.VolumeResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},

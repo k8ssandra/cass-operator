@@ -13,7 +13,7 @@ import (
 )
 
 // This needs to be outside of the apis package or else code-gen fails
-type NodeConfig map[string]interface{}
+type NodeConfig map[string]any
 
 // GetModelValues will gather the cluster model values for cluster and datacenter
 func GetModelValues(

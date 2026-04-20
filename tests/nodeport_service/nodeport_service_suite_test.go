@@ -52,20 +52,20 @@ func checkNodePortService() {
 
 	k := kubectl.Get(nodePortServiceResource).FormatOutput("json")
 	output := ns.OutputPanic(k)
-	data := map[string]interface{}{}
+	data := map[string]any{}
 	err := json.Unmarshal([]byte(output), &data)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = json.Unmarshal([]byte(output), &data)
 	Expect(err).ToNot(HaveOccurred())
 
-	spec := data["spec"].(map[string]interface{})
+	spec := data["spec"].(map[string]any)
 	policy := spec["externalTrafficPolicy"].(string)
 	Expect(policy).To(Equal("Local"), "Expected externalTrafficPolicy %s to be Local", policy)
 
-	portData := spec["ports"].([]interface{})
-	port0 := portData[0].(map[string]interface{})
-	port1 := portData[1].(map[string]interface{})
+	portData := spec["ports"].([]any)
+	port0 := portData[0].(map[string]any)
+	port1 := portData[1].(map[string]any)
 
 	// for some reason, k8s is giving the port numbers back as floats
 	ns.ExpectKeyValues(port0, map[string]string{

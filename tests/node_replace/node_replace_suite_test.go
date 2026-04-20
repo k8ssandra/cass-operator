@@ -64,7 +64,7 @@ func quotedList(stringArray []string) string {
 
 func duplicate(value string, count int) string {
 	result := []string{}
-	for i := 0; i < count; i++ {
+	for range count {
 		result = append(result, value)
 	}
 
@@ -74,15 +74,12 @@ func duplicate(value string, count int) string {
 func DeleteIgnoreFinalizersAndLog(description string, resourceName string) {
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-
 	// Delete might hang due to a finalizer such as kubernetes.io/pvc-protection
 	// so we run it asynchronously and then remove any finalizers to unblock it.
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		k := kubectl.Delete(resourceName)
 		ns.ExecAndLog(description, k)
-	}()
+	})
 
 	// Give the resource a second to get to a terminating state. Note that this
 	// may not be reflected in the resource's status... hence the sleep here as

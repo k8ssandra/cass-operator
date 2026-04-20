@@ -13,7 +13,7 @@ import (
 
 func TestMetricAdder(t *testing.T) {
 	pods := make([]*corev1.Pod, 6)
-	for i := 0; i < len(pods); i++ {
+	for i := range pods {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod%d", i),
@@ -81,7 +81,7 @@ func TestMetricAdder(t *testing.T) {
 func TestNamespaceSeparation(t *testing.T) {
 	require := require.New(t)
 	pods := make([]*corev1.Pod, 2)
-	for i := 0; i < len(pods); i++ {
+	for i := range pods {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod%d", i),

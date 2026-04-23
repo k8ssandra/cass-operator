@@ -204,12 +204,15 @@ func ValidateDatacenterFieldChanges(oldDc *api.CassandraDatacenter, newDc *api.C
 			return attemptedTo(
 				"shrink storageConfig.CassandraDataVolumeClaimSpec from %s to %s", oldStorageRequest.String(), newStorageRequest.String())
 		}
-	}
 
-	// CassandraDataVolumeClaimSpec changes are disallowed
-	if metav1.HasAnnotation(newDc.ObjectMeta, api.AllowStorageChangesAnnotation) && newDc.Annotations[api.AllowStorageChangesAnnotation] == "true" {
-		// If the AllowStorageChangesAnnotation is set, we allow changes to the CassandraDataVolumeClaimSpec sizes, but not other fields
-		oldClaimSpec.Resources.Requests = newClaimSpec.Resources.Requests
+		if metav1.HasAnnotation(newDc.ObjectMeta, api.AllowStorageChangesAnnotation) && newDc.Annotations[api.AllowStorageChangesAnnotation] == "true" {
+			// If the AllowStorageChangesAnnotation is set, we allow changes to the CassandraDataVolumeClaimSpec sizes, but not other fields
+			oldClaimSpec.Resources.Requests = newClaimSpec.Resources.Requests
+		}
+
+		// VolumeAttributesClassName changes are always allowed as they represent in-place volume
+		// performance class changes (e.g. AWS EBS VolumeAttributesClass) and do not replace the PVC.
+		oldClaimSpec.VolumeAttributesClassName = newClaimSpec.VolumeAttributesClassName
 	}
 
 	if !apiequality.Semantic.DeepEqual(oldClaimSpec, newClaimSpec) {

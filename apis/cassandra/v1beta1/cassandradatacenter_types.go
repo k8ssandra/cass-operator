@@ -72,6 +72,10 @@ const (
 	// AllowStorageChangesAnnotation indicates the CassandraDatacenter StorageConfig can be modified for existing datacenters
 	AllowStorageChangesAnnotation = "cassandra.datastax.com/allow-storage-changes"
 
+	// AllowVolumeAttributesChangesAnnotation allows changing VolumeAttributesClassName for existing PVCs.
+	// Requires Kubernetes 1.34+ and a CSI driver that supports the VolumeAttributesClass API.
+	AllowVolumeAttributesChangesAnnotation = "cassandra.datastax.com/allow-volume-attributes-changes"
+
 	// UseClientBuilderAnnotation enforces the usage of new config builder from k8ssandra-client for versions that would otherwise use the cass-config-builder
 	UseClientBuilderAnnotation = "cassandra.datastax.com/use-new-config-builder"
 
@@ -426,6 +430,8 @@ const (
 	DatacenterDecommission    DatacenterConditionType = "Decommission"
 	DatacenterRequiresUpdate  DatacenterConditionType = "RequiresUpdate"
 	DatacenterResizingVolumes DatacenterConditionType = "ResizingVolumes"
+
+	DatacenterModifyingVolumeAttributes DatacenterConditionType = "ModifyingVolumeAttributes"
 
 	// DatacenterHealthy indicates if QUORUM can be reached from all deployed nodes.
 	// If this check fails, certain operations such as scaling up will not proceed.

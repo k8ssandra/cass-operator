@@ -212,6 +212,11 @@ func ValidateDatacenterFieldChanges(oldDc *api.CassandraDatacenter, newDc *api.C
 		oldClaimSpec.Resources.Requests = newClaimSpec.Resources.Requests
 	}
 
+	// VolumeAttributesClassName changes are always allowed. Annotation check during reconciliation will determine if the change should be applied to existing PVCs or not.
+	if oldClaimSpec != nil && newClaimSpec != nil {
+		oldClaimSpec.VolumeAttributesClassName = newClaimSpec.VolumeAttributesClassName
+	}
+
 	if !apiequality.Semantic.DeepEqual(oldClaimSpec, newClaimSpec) {
 		pvcSourceDiff := cmp.Diff(oldClaimSpec, newClaimSpec)
 		return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec, diff: %s", pvcSourceDiff)

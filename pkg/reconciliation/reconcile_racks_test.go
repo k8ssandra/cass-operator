@@ -3221,6 +3221,319 @@ func TestVolumeClaimSizesExpansion(t *testing.T) {
 	}
 }
 
+func TestCheckVolumeAttributesClass(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	originalStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
+	require.NoErrorf(err, "error occurred creating statefulset")
+
+	res := rc.CheckVolumeAttributesClass(originalStatefulSet, originalStatefulSet)
+	require.Equal(result.Continue(), res, "no VAC change, should continue")
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.VolumeAttributesClassName = ptr.To[string]("gp3-cassandra")
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
+	require.NoErrorf(err, "error occurred creating statefulset")
+
+	res = rc.CheckVolumeAttributesClass(originalStatefulSet, desiredStatefulSet)
+	require.Equal(result.Continue(), res, "VAC change should continue")
+	require.Equal(ptr.To[string]("gp3-cassandra"), originalStatefulSet.Spec.VolumeClaimTemplates[0].Spec.VolumeAttributesClassName,
+		"statefulSet VolumeClaimTemplate should reflect new VAC in-memory")
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.VolumeAttributesClassName = nil
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+	clearedStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
+	require.NoErrorf(err, "error occurred creating statefulset")
+
+	res = rc.CheckVolumeAttributesClass(desiredStatefulSet, clearedStatefulSet)
+	require.Equal(result.Continue(), res, "clearing VAC should succeed")
+	require.Nil(desiredStatefulSet.Spec.VolumeClaimTemplates[0].Spec.VolumeAttributesClassName,
+		"statefulSet VolumeClaimTemplate should be nil after clear")
+}
+
+func TestReconcileVolumeAttributesClass(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	dcLabels := rc.Datacenter.GetDatacenterLabels()
+
+	for i := 0; i < 2; i++ {
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("server-data-dc1-%d", i),
+				Namespace: "default",
+				Labels:    dcLabels,
+			},
+		}
+		require.NoError(rc.Client.Create(rc.Ctx, pvc))
+	}
+
+	res := rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.Continue(), res, "no VAC change, should continue")
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.VolumeAttributesClassName = ptr.To[string]("gp3-cassandra")
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.True(res.Completed())
+	_, resErr := res.Output()
+	require.Error(resErr, "VAC change without annotation should error")
+
+	if rc.Datacenter.Annotations == nil {
+		rc.Datacenter.Annotations = map[string]string{}
+	}
+	rc.Datacenter.Annotations[api.AllowVolumeAttributesChangesAnnotation] = "true"
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.RequeueSoon(10), res, "VAC change with annotation should requeue after patching")
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.Continue(), res, "second reconcile after patch should continue")
+
+	pvcs, err := rc.listPVCs(dcLabels)
+	require.NoError(err)
+	for _, pvc := range pvcs {
+		require.Equal(ptr.To[string]("gp3-cassandra"), pvc.Spec.VolumeAttributesClassName,
+			"PVC %s should be patched to desired VAC", pvc.Name)
+	}
+
+	pvcs, err = rc.listPVCs(dcLabels)
+	require.NoError(err)
+	for _, pvc := range pvcs {
+		pvc.Status.ModifyVolumeStatus = &corev1.ModifyVolumeStatus{
+			TargetVolumeAttributesClassName: "gp3-cassandra",
+			Status:                          corev1.PersistentVolumeClaimModifyVolumeInProgress,
+		}
+		require.NoError(rc.Client.Status().Update(rc.Ctx, &pvc))
+		// Reset spec to trigger mismatch
+		patch := client.MergeFrom(pvc.DeepCopy())
+		pvc.Spec.VolumeAttributesClassName = ptr.To[string]("gp3-old")
+		require.NoError(rc.Client.Patch(rc.Ctx, &pvc, patch))
+	}
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.RequeueSoon(10), res, "InProgress to same target should requeue")
+
+	// PVC InProgress to different (old/invalid) target — should patch through
+	pvcs, err = rc.listPVCs(dcLabels)
+	require.NoError(err)
+	for _, pvc := range pvcs {
+		pvc.Status.ModifyVolumeStatus = &corev1.ModifyVolumeStatus{
+			TargetVolumeAttributesClassName: "gp3-old-invalid",
+			Status:                          corev1.PersistentVolumeClaimModifyVolumeInProgress,
+		}
+		require.NoError(rc.Client.Status().Update(rc.Ctx, &pvc))
+	}
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.RequeueSoon(10), res, "InProgress to different target should patch and requeue")
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.Continue(), res, "second reconcile after patching through should continue")
+	pvcs, err = rc.listPVCs(dcLabels)
+	require.NoError(err)
+	for _, pvc := range pvcs {
+		require.Equal(ptr.To[string]("gp3-cassandra"), pvc.Spec.VolumeAttributesClassName,
+			"PVC %s should be patched even when InProgress to different target", pvc.Name)
+	}
+
+	pvcs, err = rc.listPVCs(dcLabels)
+	require.NoError(err)
+	for _, pvc := range pvcs {
+		patch := client.MergeFrom(pvc.DeepCopy())
+		pvc.Spec.VolumeAttributesClassName = ptr.To[string]("gp3-old")
+		require.NoError(rc.Client.Patch(rc.Ctx, &pvc, patch))
+	}
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.RequeueSoon(10), res, "stale PVC should be patched and requeue")
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.Continue(), res, "second reconcile after stale PVC patch should continue")
+	pvcs, err = rc.listPVCs(dcLabels)
+	require.NoError(err)
+	for _, pvc := range pvcs {
+		require.Equal(ptr.To[string]("gp3-cassandra"), pvc.Spec.VolumeAttributesClassName,
+			"PVC %s should be patched to desired VAC", pvc.Name)
+	}
+
+	pvcs, err = rc.listPVCs(dcLabels)
+	require.NoError(err)
+	for _, pvc := range pvcs {
+		pvc.Status.ModifyVolumeStatus = &corev1.ModifyVolumeStatus{
+			TargetVolumeAttributesClassName: "gp3-cassandra",
+			Status:                          corev1.PersistentVolumeClaimModifyVolumeInfeasible,
+		}
+		require.NoError(rc.Client.Status().Update(rc.Ctx, &pvc))
+	}
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.True(res.Completed(), "Infeasible modification should stop reconciliation")
+	_, resErr = res.Output()
+	require.Error(resErr, "Infeasible modification should return error")
+	require.Equal(corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterValid))
+
+	pvcs, err = rc.listPVCs(dcLabels)
+	require.NoError(err)
+	for _, pvc := range pvcs {
+		pvc.Status.ModifyVolumeStatus = &corev1.ModifyVolumeStatus{
+			TargetVolumeAttributesClassName: "gp3-old",
+			Status:                          corev1.PersistentVolumeClaimModifyVolumeInfeasible,
+		}
+		require.NoError(rc.Client.Status().Update(rc.Ctx, &pvc))
+	}
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.Continue(), res, "stale Infeasible for different target should not block")
+}
+
+func TestReconcileVolumeAttributesClassStatus(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	dcLabels := rc.Datacenter.GetDatacenterLabels()
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.VolumeAttributesClassName = ptr.To[string]("gp3-cassandra")
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+
+	res := rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.Continue(), res, "no PVCs, should continue")
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "server-data-dc1-0",
+			Namespace: "default",
+			Labels:    dcLabels,
+		},
+	}
+	pvc.Spec.VolumeAttributesClassName = ptr.To[string]("gp3-cassandra")
+	require.NoError(rc.Client.Create(rc.Ctx, pvc))
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.Continue(), res, "PVC with no ModifyVolumeStatus should continue")
+
+	pvc.Status.ModifyVolumeStatus = &corev1.ModifyVolumeStatus{
+		TargetVolumeAttributesClassName: "gp3-cassandra",
+		Status:                          corev1.PersistentVolumeClaimModifyVolumePending,
+	}
+	require.NoError(rc.Client.Status().Update(rc.Ctx, pvc))
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.RequeueSoon(10), res, "Pending ModifyVolumeStatus should requeue")
+
+	pvc.Status.ModifyVolumeStatus.Status = corev1.PersistentVolumeClaimModifyVolumeInProgress
+	require.NoError(rc.Client.Status().Update(rc.Ctx, pvc))
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.RequeueSoon(10), res, "InProgress ModifyVolumeStatus should requeue")
+
+	// ModifyVolumeStatus = Infeasible targeting desired VAC — should surface error and mark Valid=False
+	pvc.Status.ModifyVolumeStatus.Status = corev1.PersistentVolumeClaimModifyVolumeInfeasible
+	pvc.Status.ModifyVolumeStatus.TargetVolumeAttributesClassName = "gp3-cassandra"
+	require.NoError(rc.Client.Status().Update(rc.Ctx, pvc))
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.True(res.Completed(), "Infeasible should stop reconciliation")
+	_, resErr := res.Output()
+	require.Error(resErr)
+	require.Equal(corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterValid))
+
+	pvc.Status.ModifyVolumeStatus.TargetVolumeAttributesClassName = "gp3-old"
+	require.NoError(rc.Client.Status().Update(rc.Ctx, pvc))
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.Continue(), res, "stale Infeasible for different target should not block")
+
+	pvc.Status.ModifyVolumeStatus.Status = corev1.PersistentVolumeClaimModifyVolumeInProgress
+	pvc.Status.ModifyVolumeStatus.TargetVolumeAttributesClassName = "gp3-cassandra"
+	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{
+		{
+			Type:    corev1.PersistentVolumeClaimVolumeModifyVolumeError,
+			Status:  corev1.ConditionTrue,
+			Message: "invalid argument: throughput/iops ratio too high",
+		},
+	}
+	require.NoError(rc.Client.Status().Update(rc.Ctx, pvc))
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.True(res.Completed(), "ModifyVolumeError should stop reconciliation")
+	_, resErr = res.Output()
+	require.Error(resErr)
+	require.Equal(corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterValid))
+
+	pvc.Status.ModifyVolumeStatus.TargetVolumeAttributesClassName = "gp3-old"
+	require.NoError(rc.Client.Status().Update(rc.Ctx, pvc))
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.Continue(), res, "stale ModifyVolumeError for different target should not block")
+}
+
+func TestVolumeAttributesClassEndToEnd(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	originalStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
+	require.NoErrorf(err, "error occurred creating statefulset")
+	require.NoError(rc.Client.Create(rc.Ctx, originalStatefulSet))
+
+	for i := 0; i < int(*originalStatefulSet.Spec.Replicas); i++ {
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("server-data-%s-%d", originalStatefulSet.Name, i),
+				Namespace: "default",
+			},
+		}
+		pvc.Spec = originalStatefulSet.Spec.VolumeClaimTemplates[0].Spec
+		pvc.Labels = originalStatefulSet.Spec.VolumeClaimTemplates[0].Labels
+		require.NoError(rc.Client.Create(rc.Ctx, pvc))
+	}
+
+	rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.VolumeAttributesClassName = ptr.To[string]("gp3-cassandra")
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+
+	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
+	require.NoErrorf(err, "error occurred creating statefulset")
+
+	res := rc.CheckVolumeAttributesClass(originalStatefulSet, desiredStatefulSet)
+	require.Equal(result.Continue(), res)
+	require.Equal("gp3-cassandra", *originalStatefulSet.Spec.VolumeClaimTemplates[0].Spec.VolumeAttributesClassName,
+		"STS VolumeClaimTemplate should be updated in-memory")
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.True(res.Completed(), "without annotation the PVC change should be blocked")
+	_, resErr := res.Output()
+	require.Error(resErr)
+
+	if rc.Datacenter.Annotations == nil {
+		rc.Datacenter.Annotations = map[string]string{}
+	}
+	rc.Datacenter.Annotations[api.AllowVolumeAttributesChangesAnnotation] = "true"
+	require.NoError(rc.Client.Update(rc.Ctx, rc.Datacenter))
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.RequeueSoon(10), res, "should requeue after patching PVCs")
+
+	res = rc.ReconcileVolumeAttributesClass()
+	require.Equal(result.Continue(), res)
+
+	pvcs, err := rc.listPVCs(originalStatefulSet.Spec.VolumeClaimTemplates[0].Labels)
+	require.NoError(err)
+	require.Len(pvcs, int(*originalStatefulSet.Spec.Replicas))
+	for _, pvc := range pvcs {
+		require.Equal("gp3-cassandra", *pvc.Spec.VolumeAttributesClassName,
+			"PVC %s should reflect the new VAC", pvc.Name)
+	}
+
+	_, hasStorageAnnotation := rc.Datacenter.Annotations[api.AllowStorageChangesAnnotation]
+	require.False(hasStorageAnnotation, "VAC changes must not require AllowStorageChangesAnnotation")
+}
+
 func TestCheckPVCResizing(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()

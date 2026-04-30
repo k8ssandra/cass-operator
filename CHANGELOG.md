@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [FEATURE] [#922](https://github.com/k8ssandra/cass-operator/issues/922) Allow modifying VolumeAttributesClassName on existing PVCs to support in-place volume performance class updates. Requires Kubernetes 1.34+ and a CSI driver that supports the VolumeAttributesClass API. This feature is behind an opt-in annotation `cassandra.datastax.com/allow-volume-attributes-changes: "true"` on the CassandraDatacenter.
 * [ENHANCEMENT] [#912](https://github.com/k8ssandra/cass-operator/issues/912) Add new webhook validations for maxUnavailable string format as well as PVC sizes
 * [ENHANCEMENT] [#902](https://github.com/k8ssandra/cass-operator/issues/902) If scaling down or scaling up process is still ongoing, the webhook will prevent changing the cluster size.
 

@@ -787,6 +787,82 @@ func Test_ValidateDatacenterFieldChanges(t *testing.T) {
 			errString: "",
 		},
 		{
+			name: "VolumeAttributesClassName change is allowed",
+			oldDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName:          storageName,
+							AccessModes:               []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							VolumeAttributesClassName: ptr.To[string]("gp3-cassandra-general"),
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
+							},
+						},
+					},
+				},
+			},
+			newDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName:          storageName,
+							AccessModes:               []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							VolumeAttributesClassName: ptr.To[string]("gp3-cassandra"),
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
+							},
+						},
+					},
+				},
+			},
+			errString: "",
+		},
+		{
+			name: "VolumeAttributesClassName change with other field change is rejected",
+			oldDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName:          storageName,
+							AccessModes:               []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+							VolumeAttributesClassName: ptr.To[string]("gp3-cassandra-general"),
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
+							},
+						},
+					},
+				},
+			},
+			newDc: &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "exampleDC",
+				},
+				Spec: api.CassandraDatacenterSpec{
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+							StorageClassName:          storageName,
+							AccessModes:               []corev1.PersistentVolumeAccessMode{"ReadWriteMany"},
+							VolumeAttributesClassName: ptr.To[string]("gp3-cassandra"),
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{"storage": storageSize},
+							},
+						},
+					},
+				},
+			},
+			errString: "change storageConfig.CassandraDataVolumeClaimSpec",
+		},
+		{
 			name: "Removing a rack",
 			oldDc: &api.CassandraDatacenter{
 				ObjectMeta: metav1.ObjectMeta{

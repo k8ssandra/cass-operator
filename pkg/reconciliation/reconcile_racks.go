@@ -303,6 +303,49 @@ func isPVCStatusConditionTrue(pvc *corev1.PersistentVolumeClaim, conditionType c
 	return false
 }
 
+func (rc *ReconciliationContext) recordVACModificationFailed(pvcName string) error {
+	msg := fmt.Sprintf("VolumeAttributesClass modification failed for %s", pvcName)
+	return rc.setCondition(api.NewDatacenterConditionWithReason(api.DatacenterValid, corev1.ConditionFalse, "pvcModifyVolumeAttributesFailed", msg))
+}
+
+func pvcModifyVolumeAttributesFailed(pvc *corev1.PersistentVolumeClaim) bool {
+	if pvc.Status.ModifyVolumeStatus == nil {
+		return false
+	}
+	return pvc.Status.ModifyVolumeStatus.Status == corev1.PersistentVolumeClaimModifyVolumeInfeasible ||
+		isPVCStatusConditionTrue(pvc, corev1.PersistentVolumeClaimVolumeModifyVolumeError)
+}
+
+// pvcModifyVolumeAttributesFailedFor returns true only when the PVC failure targets the given VAC.
+// This filters out stale ModifyVolumeError conditions left over from a previous attempt
+// (e.g. ebs-csi sets ModifyVolumeError during OPTIMIZING cooldown, then clears it once the
+// next modification succeeds — we should not surface that as an active failure).
+func pvcModifyVolumeAttributesFailedFor(pvc *corev1.PersistentVolumeClaim, target *string) bool {
+	if !pvcModifyVolumeAttributesFailed(pvc) {
+		return false
+	}
+	return pvc.Status.ModifyVolumeStatus.TargetVolumeAttributesClassName == ptr.Deref(target, "")
+}
+
+func pvcModifyingVolumeAttributes(pvc *corev1.PersistentVolumeClaim) bool {
+	if pvc.Status.ModifyVolumeStatus == nil {
+		return false
+	}
+	s := pvc.Status.ModifyVolumeStatus.Status
+	return s == corev1.PersistentVolumeClaimModifyVolumePending ||
+		s == corev1.PersistentVolumeClaimModifyVolumeInProgress
+}
+
+// pvcModifyingVolumeAttributesTo returns true only if the PVC is being modified to the given target.
+// ebs-csi keeps ModifyVolumeStatus=InProgress while retrying even on InvalidParameterValue errors,
+// so we must check the target rather than just InProgress to avoid blocking a corrective patch.
+func pvcModifyingVolumeAttributesTo(pvc *corev1.PersistentVolumeClaim, target *string) bool {
+	if !pvcModifyingVolumeAttributes(pvc) {
+		return false
+	}
+	return pvc.Status.ModifyVolumeStatus.TargetVolumeAttributesClassName == ptr.Deref(target, "")
+}
+
 func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *appsv1.StatefulSet) result.ReconcileResult {
 	rc.ReqLogger.Info("reconcile_racks::CheckVolumeClaims")
 
@@ -331,7 +374,7 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 
 		if currentSize.Cmp(createdSize) < 0 {
 			rc.ReqLogger.Info("PVC resize request detected", "pvc", claim.Name, "currentSize", currentSize.String(), "createdSize", createdSize.String())
-			if !metav1.HasAnnotation(rc.Datacenter.ObjectMeta, api.AllowStorageChangesAnnotation) || rc.Datacenter.Annotations[api.AllowStorageChangesAnnotation] != "true" {
+			if rc.Datacenter.Annotations[api.AllowStorageChangesAnnotation] != "true" {
 				msg := fmt.Sprintf("PVC resize requested, but %s annotation is not set to 'true'", api.AllowStorageChangesAnnotation)
 				rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
 				return result.Error(pkgerrors.New(msg))
@@ -394,6 +437,124 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 
 			return result.Continue()
 		}
+	}
+
+	return result.Continue()
+}
+
+func (rc *ReconciliationContext) ReconcileVolumeAttributesClass() result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::ReconcileVolumeAttributesClass")
+
+	desiredVAC := rc.Datacenter.Spec.StorageConfig.CassandraDataVolumeClaimSpec.VolumeAttributesClassName
+
+	pvcList, err := rc.listPVCs(rc.Datacenter.GetDatacenterLabels())
+	if err != nil {
+		return result.Error(err)
+	}
+
+	// First pass: check for failures and in-progress modifications on PVCs that already have the desired spec.
+	var failedPVCs []string
+	var inProgressPVC string
+	for _, pvc := range pvcList {
+		if !ptr.Equal(pvc.Spec.VolumeAttributesClassName, desiredVAC) {
+			continue
+		}
+		if pvcModifyVolumeAttributesFailedFor(&pvc, desiredVAC) {
+			if err := rc.recordVACModificationFailed(pvc.Name); err != nil {
+				return result.Error(err)
+			}
+			failedPVCs = append(failedPVCs, pvc.Name)
+		} else if inProgressPVC == "" && pvcModifyingVolumeAttributesTo(&pvc, desiredVAC) {
+			inProgressPVC = pvc.Name
+		}
+	}
+
+	if len(failedPVCs) > 0 {
+		return result.Error(pkgerrors.Errorf("VolumeAttributesClass modification failed for PVCs: %s", strings.Join(failedPVCs, ", ")))
+	}
+
+	if inProgressPVC != "" {
+		// Keep condition True while CSI driver is working
+		if err := rc.setConditionStatus(api.DatacenterModifyingVolumeAttributes, corev1.ConditionTrue); err != nil {
+			return result.Error(err)
+		}
+		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.ModifyVolumeAttributesInProgress,
+			"VolumeAttributesClass modification in progress for %s, waiting for CSI driver", inProgressPVC)
+		return result.RequeueSoon(10)
+	}
+
+	// Second pass: patch PVCs that don't yet have the desired spec.
+	patched := false
+	for _, pvc := range pvcList {
+		if ptr.Equal(pvc.Spec.VolumeAttributesClassName, desiredVAC) {
+			continue
+		}
+
+		if rc.Datacenter.Annotations[api.AllowVolumeAttributesChangesAnnotation] != "true" {
+			msg := fmt.Sprintf("VolumeAttributesClassName change requested, but %s annotation is not set to 'true'", api.AllowVolumeAttributesChangesAnnotation)
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
+			return result.Error(pkgerrors.New(msg))
+		}
+
+		if err := rc.setConditionStatus(api.DatacenterModifyingVolumeAttributes, corev1.ConditionTrue); err != nil {
+			return result.Error(err)
+		}
+
+		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.UpdatingVolumeAttributesClass,
+			"Updating VolumeAttributesClassName for %s", pvc.Name)
+
+		if pvcModifyingVolumeAttributesTo(&pvc, desiredVAC) {
+			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.ModifyVolumeAttributesInProgress,
+				"VolumeAttributesClass modification in progress for %s, waiting for CSI driver", pvc.Name)
+			return result.RequeueSoon(10)
+		}
+
+		patch := client.MergeFrom(pvc.DeepCopy())
+		pvc.Spec.VolumeAttributesClassName = desiredVAC
+		if err := rc.Client.Patch(rc.Ctx, &pvc, patch); err != nil {
+			return result.Error(err)
+		}
+		patched = true
+	}
+
+	// If we just patched PVCs, requeue to let the CSI driver process before declaring success.
+	if patched {
+		return result.RequeueSoon(10)
+	}
+
+	// All PVCs match desired spec, no failures, no in-progress — emit success if we were modifying.
+	if rc.Datacenter.GetConditionStatus(api.DatacenterModifyingVolumeAttributes) == corev1.ConditionTrue {
+		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.VolumeAttributesClassUpdated,
+			"VolumeAttributesClass successfully updated to %s", ptr.Deref(desiredVAC, "<none>"))
+	}
+
+	if err := rc.setConditionStatus(api.DatacenterModifyingVolumeAttributes, corev1.ConditionFalse); err != nil {
+		return result.Error(err)
+	}
+
+	return result.Continue()
+}
+
+func (rc *ReconciliationContext) CheckVolumeAttributesClass(statefulSet, desiredSts *appsv1.StatefulSet) result.ReconcileResult {
+	rc.ReqLogger.Info("reconcile_racks::CheckVolumeAttributesClass")
+
+	if len(statefulSet.Spec.VolumeClaimTemplates) != len(desiredSts.Spec.VolumeClaimTemplates) {
+		return result.Error(fmt.Errorf("statefulSet and desiredSts have different volume claim template counts"))
+	}
+
+	for i, claim := range statefulSet.Spec.VolumeClaimTemplates {
+		desiredClaim := desiredSts.Spec.VolumeClaimTemplates[i]
+		if claim.Name != desiredClaim.Name {
+			return result.Error(fmt.Errorf("statefulSet and desiredSts have different volume claim templates"))
+		}
+
+		if ptr.Equal(claim.Spec.VolumeAttributesClassName, desiredClaim.Spec.VolumeAttributesClassName) {
+			continue
+		}
+
+		// Update in-memory so desiredSts carries the new VAC when the STS is recreated.
+		claim.Spec.VolumeAttributesClassName = desiredClaim.Spec.VolumeAttributesClassName
+		statefulSet.Spec.VolumeClaimTemplates[i] = claim
 	}
 
 	return result.Continue()
@@ -488,6 +649,9 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 
 			// copy the stuff that can't be updated
 			if res := rc.CheckVolumeClaimSizes(statefulSet, desiredSts); res.Completed() {
+				return res
+			}
+			if res := rc.CheckVolumeAttributesClass(statefulSet, desiredSts); res.Completed() {
 				return res
 			}
 			desiredSts.Spec.VolumeClaimTemplates = statefulSet.Spec.VolumeClaimTemplates
@@ -2769,6 +2933,10 @@ func (rc *ReconciliationContext) ReconcileAllRacks() (reconcile.Result, error) {
 	}
 
 	if recResult := rc.CheckPVCResizing(); recResult.Completed() {
+		return recResult.Output()
+	}
+
+	if recResult := rc.ReconcileVolumeAttributesClass(); recResult.Completed() {
 		return recResult.Output()
 	}
 

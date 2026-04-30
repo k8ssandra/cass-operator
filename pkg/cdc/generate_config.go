@@ -60,16 +60,16 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 	for i := 0; i < reflectedCDCConfig.NumField(); i++ {
 		// This logic depends on the json tags from the CR mapping to the CDC agent's parameter names.
 		fieldName := t.Field(i).Name
-		t := reflect.TypeOf(*CDCConfig)
+		t := reflect.TypeFor[cassdcapi.CDCConfiguration]()
 		reflectedField, ok := t.FieldByName(fieldName)
 		if !ok {
 			return nil, errors.New(fmt.Sprint("could not get CDC field", fieldName))
 		}
 		nameTag := strings.Split(reflectedField.Tag.Get("json"), ",")[0]
-		reflectedValue := interface{}(nil)
+		reflectedValue := any(nil)
 		// We need to get value types back from pointer types here and handle nil pointers.
 		switch reflectedField.Type.Kind() {
-		case reflect.Ptr:
+		case reflect.Pointer:
 			if !reflectedCDCConfig.Field(i).IsNil() { // We only want to append the value if it is non-nil
 				reflectedValue = reflectedCDCConfig.Field(i).Elem().Interface()
 				optsSlice = append(optsSlice, nameTag+"="+fmt.Sprintf("%s", reflectedValue))
@@ -131,7 +131,7 @@ func mcacEnabled(cassDC cassdcapi.CassandraDatacenter) bool {
 
 func updateCassandraYaml(cassConfig *configData) {
 	if cassConfig.CassandraYaml == nil {
-		cassConfig.CassandraYaml = make(map[string]interface{})
+		cassConfig.CassandraYaml = make(map[string]any)
 	}
 	cassConfig.CassandraYaml["cdc_enabled"] = true
 }

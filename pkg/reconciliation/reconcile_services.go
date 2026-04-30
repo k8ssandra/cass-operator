@@ -4,6 +4,8 @@
 package reconciliation
 
 import (
+	"fmt"
+
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/internal/result"
 	corev1 "k8s.io/api/core/v1"
@@ -11,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
@@ -37,7 +40,7 @@ func (rc *ReconciliationContext) CreateHeadlessServices() result.ReconcileResult
 			return result.Error(err)
 		}
 
-		rc.Recorder.Eventf(rc.Datacenter, "Normal", "CreatedResource", "Created service %s", service.Name)
+		rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.CreatedResource, fmt.Sprintf("Created service %s", service.Name))
 	}
 
 	// at this point we had previously been saying this reconcile call was over, we're done

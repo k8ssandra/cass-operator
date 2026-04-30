@@ -175,7 +175,7 @@ const (
 )
 
 func (f *FeatureSet) UnmarshalJSON(b []byte) error {
-	var input map[string]interface{}
+	var input map[string]any
 	if err := json.Unmarshal(b, &input); err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (f *FeatureSet) UnmarshalJSON(b []byte) error {
 	f.CassandraVersion = input["cassandra_version"].(string)
 	var empty struct{}
 	f.Features = make(map[string]struct{})
-	if fList, ok := input["features"].([]interface{}); ok {
+	if fList, ok := input["features"].([]any); ok {
 		for _, feature := range fList {
 			f.Features[feature.(string)] = empty
 		}
@@ -496,7 +496,7 @@ func (client *NodeMgmtClient) CallKeyspaceCleanupEndpoint(pod *corev1.Pod, jobs 
 }
 
 func createKeySpaceRequest(pod *corev1.Pod, jobs int, keyspaceName string, tables []string, endpoint string) (*nodeMgmtRequest, error) {
-	postData := make(map[string]interface{})
+	postData := make(map[string]any)
 	if jobs > -1 {
 		postData["jobs"] = strconv.Itoa(jobs)
 	}
@@ -806,7 +806,7 @@ func (client *NodeMgmtClient) AlterKeyspace(pod *corev1.Pod, keyspaceName string
 }
 
 func (client *NodeMgmtClient) modifyKeyspace(endpoint string, pod *corev1.Pod, keyspaceName string, replicationSettings []map[string]string) error {
-	postData := make(map[string]interface{})
+	postData := make(map[string]any)
 
 	if keyspaceName == "" || replicationSettings == nil {
 		return fmt.Errorf("keyspacename and replication settings are required")
@@ -937,10 +937,10 @@ func (client *NodeMgmtClient) ListTables(pod *corev1.Pod, keyspaceName string) (
 }
 
 type TableDefinition struct {
-	KeyspaceName string                 `json:"keyspace_name"`
-	TableName    string                 `json:"table_name"`
-	Columns      []*ColumnDefinition    `json:"columns"`
-	Options      map[string]interface{} `json:"options,omitempty"`
+	KeyspaceName string              `json:"keyspace_name"`
+	TableName    string              `json:"table_name"`
+	Columns      []*ColumnDefinition `json:"columns"`
+	Options      map[string]any      `json:"options,omitempty"`
 }
 
 func NewTableDefinition(keyspaceName string, tableName string, columns ...*ColumnDefinition) *TableDefinition {
@@ -1377,7 +1377,7 @@ func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod)
 		client.Log.Error(err, "failed to call endpoint /api/v0/ops/node/fullquerylogging")
 		return false, err
 	}
-	var parsedResponse map[string]interface{}
+	var parsedResponse map[string]any
 	err = json.Unmarshal(apiResponse, &parsedResponse)
 	if err != nil {
 		client.Log.Error(err, "failed to unmarshall JSON response from /api/v0/ops/node/fullquerylogging", "response", string(apiResponse))

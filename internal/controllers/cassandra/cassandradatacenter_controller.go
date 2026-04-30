@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -74,7 +74,7 @@ type CassandraDatacenterReconciler struct {
 	client.Client
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 
 	// SecretWatches is used in the controller when setting up the watches and
 	// during reconciliation where we update the mappings for the watches.
@@ -130,7 +130,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 	if err := rc.IsValid(rc.Datacenter); err != nil {
 		logger.Error(err, "CassandraDatacenter resource is invalid")
-		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ValidationFailed", err.Error())
+		rc.Recorder.Event(rc.Datacenter, "Warning", "ValidationFailed", err.Error())
 		return ctrl.Result{}, reconcile.TerminalError(err)
 	}
 
@@ -154,7 +154,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	res, err := rc.CalculateReconciliationActions()
 	if err != nil {
 		logger.Error(err, "calculateReconciliationActions returned an error")
-		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ReconcileFailed", err.Error())
+		rc.Recorder.Event(rc.Datacenter, "Warning", "ReconcileFailed", err.Error())
 	}
 
 	// Prevent immediate requeue

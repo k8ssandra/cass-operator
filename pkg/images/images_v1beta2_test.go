@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	api "github.com/k8ssandra/cass-operator/apis/config/v1beta2"
@@ -126,9 +125,9 @@ func TestExtendedImageConfigParsingV2(t *testing.T) {
 	assert.NotNil(imageConfig.Images)
 	assert.NotNil(imageConfig.Types)
 	imageConfig.Overrides = &api.ImagePolicy{
-		Repository: ptr.To("enterprise"),
+		Repository: new("enterprise"),
 	}
-	imageConfig.Defaults.Registry = ptr.To("localhost:5005")
+	imageConfig.Defaults.Registry = new("localhost:5005")
 
 	medusaImage := registry.GetImage("medusa")
 	assert.Equal("localhost:5005/enterprise/cassandra-medusa:latest", medusaImage)

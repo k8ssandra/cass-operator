@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	record "k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -38,6 +38,7 @@ import (
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
+	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -171,7 +172,10 @@ func CreateMockReconciliationContext(
 	rc.Scheme = s
 	rc.ReqLogger = reqLogger
 	rc.Datacenter = cassandraDatacenter
-	rc.Recorder = record.NewFakeRecorder(100)
+	rc.Recorder = &events.LoggingEventRecorder{
+		EventRecorderLogger: record.NewFakeRecorder(100),
+		ReqLogger:           reqLogger,
+	}
 	rc.Ctx = context.Background()
 	rc.ImageRegistry = newTestImageRegistry()
 

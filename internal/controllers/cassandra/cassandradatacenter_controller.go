@@ -58,7 +58,10 @@ var (
 
 // Kubernetes core
 // +kubebuilder:rbac:groups=apps,namespace=cass-operator,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods;endpoints;endpoints/restricted;services;configmaps;secrets;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=services;secrets;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=endpoints;endpoints/restricted,verbs=list;watch;delete
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods,verbs=get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=events,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=namespaces,verbs=get
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch

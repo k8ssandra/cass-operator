@@ -11,11 +11,9 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/google/go-cmp/cmp"
@@ -32,7 +30,7 @@ var log = logf.Log.WithName("api")
 
 // SetupCassandraDatacenterWebhookWithManager registers the webhook for CassandraDatacenter in the manager.
 func SetupCassandraDatacenterWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&api.CassandraDatacenter{}).
+	return ctrl.NewWebhookManagedBy(mgr, &api.CassandraDatacenter{}).
 		WithValidator(&CassandraDatacenterCustomValidator{}).
 		WithDefaulter(&CassandraDatacenterCustomDefaulter{}).
 		Complete()
@@ -45,10 +43,8 @@ func SetupCassandraDatacenterWebhookWithManager(mgr ctrl.Manager) error {
 // Kind CassandraDatacenter when those are created or updated.
 type CassandraDatacenterCustomDefaulter struct{}
 
-var _ webhook.CustomDefaulter = &CassandraDatacenterCustomDefaulter{}
-
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind CassandraDatacenter.
-func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
+func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, obj *api.CassandraDatacenter) error {
 	return nil
 }
 
@@ -56,15 +52,10 @@ func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, obj ru
 // when it is created, updated, or deleted.
 type CassandraDatacenterCustomValidator struct{}
 
-var _ webhook.CustomValidator = &CassandraDatacenterCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
-func (v *CassandraDatacenterCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	dc, ok := obj.(*api.CassandraDatacenter)
-	if !ok {
-		return nil, fmt.Errorf("expected a CassandraDatacenter object but got %T", obj)
-	}
-	log.Info("Validation for CassandraDatacenter upon creation", "name", dc.GetName())
+func (v *CassandraDatacenterCustomValidator) ValidateCreate(ctx context.Context, obj *api.CassandraDatacenter) (admission.Warnings, error) {
+	log.Info("Validation for CassandraDatacenter upon creation", "name", obj.GetName())
+	dc := obj
 
 	if err := ValidateSingleDatacenter(dc); err != nil {
 		return admission.Warnings{}, err
@@ -74,16 +65,9 @@ func (v *CassandraDatacenterCustomValidator) ValidateCreate(ctx context.Context,
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
-func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	dc, ok := newObj.(*api.CassandraDatacenter)
-	if !ok {
-		return nil, fmt.Errorf("expected a CassandraDatacenter object for the newObj but got %T", newObj)
-	}
-
-	oldDc, ok := oldObj.(*api.CassandraDatacenter)
-	if !ok {
-		return nil, fmt.Errorf("expected a CassandraDatacenter object for the oldObj but got %T", oldObj)
-	}
+func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *api.CassandraDatacenter) (admission.Warnings, error) {
+	dc := newObj
+	oldDc := oldObj
 
 	log.Info("Validation for CassandraDatacenter upon update", "name", dc.GetName())
 
@@ -106,7 +90,7 @@ func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context,
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
-func (v *CassandraDatacenterCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *CassandraDatacenterCustomValidator) ValidateDelete(ctx context.Context, obj *api.CassandraDatacenter) (admission.Warnings, error) {
 	return nil, nil
 }
 

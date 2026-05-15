@@ -16,7 +16,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -165,7 +164,7 @@ func TestStorageExpansionNils(t *testing.T) {
 
 	storageClass := &storagev1.StorageClass{}
 	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: "standard"}, storageClass))
-	storageClass.AllowVolumeExpansion = ptr.To[bool](true)
+	storageClass.AllowVolumeExpansion = new(true)
 	require.NoError(rc.Client.Update(rc.Ctx, storageClass))
 
 	supports, err = rc.storageExpansion()

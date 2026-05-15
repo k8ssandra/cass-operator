@@ -193,7 +193,7 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 			ServerType:             "cassandra",
 			ServerVersion:          "4.1.0",
 			ClusterName:            "cluster1",
-			ReadOnlyRootFilesystem: ptr.To(false),
+			ReadOnlyRootFilesystem: new(false),
 			StorageConfig: api.StorageConfig{
 				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 					StorageClassName: &storageClassName,
@@ -443,10 +443,10 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 	}
 
 	defaultSecurityContext := &corev1.PodSecurityContext{
-		RunAsUser:    ptr.To(int64(999)),
-		RunAsGroup:   ptr.To(int64(999)),
-		FSGroup:      ptr.To(int64(999)),
-		RunAsNonRoot: ptr.To[bool](true),
+		RunAsUser:    new(int64(999)),
+		RunAsGroup:   new(int64(999)),
+		FSGroup:      new(int64(999)),
+		RunAsNonRoot: new(true),
 	}
 
 	tests := []struct {
@@ -490,18 +490,18 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 					PodTemplateSpec: &corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							SecurityContext: &corev1.PodSecurityContext{
-								RunAsUser:  ptr.To(int64(12345)),
-								RunAsGroup: ptr.To(int64(54321)),
-								FSGroup:    ptr.To(int64(11111)),
+								RunAsUser:  new(int64(12345)),
+								RunAsGroup: new(int64(54321)),
+								FSGroup:    new(int64(11111)),
 							},
 						},
 					},
 				},
 			},
 			expected: &corev1.PodSecurityContext{
-				RunAsUser:  ptr.To(int64(12345)),
-				RunAsGroup: ptr.To(int64(54321)),
-				FSGroup:    ptr.To(int64(11111)),
+				RunAsUser:  new(int64(12345)),
+				RunAsGroup: new(int64(54321)),
+				FSGroup:    new(int64(11111)),
 			},
 		},
 		{
@@ -515,18 +515,18 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 					PodTemplateSpec: &corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							SecurityContext: &corev1.PodSecurityContext{
-								RunAsUser:  ptr.To(int64(12345)),
-								RunAsGroup: ptr.To(int64(54321)),
-								FSGroup:    ptr.To(int64(11111)),
+								RunAsUser:  new(int64(12345)),
+								RunAsGroup: new(int64(54321)),
+								FSGroup:    new(int64(11111)),
 							},
 						},
 					},
 				},
 			},
 			expected: &corev1.PodSecurityContext{
-				RunAsUser:  ptr.To(int64(12345)),
-				RunAsGroup: ptr.To(int64(54321)),
-				FSGroup:    ptr.To(int64(11111)),
+				RunAsUser:  new(int64(12345)),
+				RunAsGroup: new(int64(54321)),
+				FSGroup:    new(int64(11111)),
 			},
 		},
 		{
@@ -629,7 +629,7 @@ func TestEmptyDatacenterStatusName(t *testing.T) {
 			ClusterName: "cluster1",
 		},
 		Status: api.CassandraDatacenterStatus{
-			DatacenterName: ptr.To[string](""),
+			DatacenterName: new(""),
 		},
 	}
 
@@ -781,14 +781,14 @@ func TestMaxUnavailableChange(t *testing.T) {
 			name:           "integer",
 			maxUnavailable: intstr.FromInt32(1),
 			expectedRolling: &appsv1.RollingUpdateStatefulSetStrategy{
-				MaxUnavailable: ptr.To(intstr.FromInt32(1)),
+				MaxUnavailable: new(intstr.FromInt32(1)),
 			},
 		},
 		{
 			name:           "percentage",
 			maxUnavailable: intstr.Parse("25%"),
 			expectedRolling: &appsv1.RollingUpdateStatefulSetStrategy{
-				MaxUnavailable: ptr.To(intstr.Parse("25%")),
+				MaxUnavailable: new(intstr.Parse("25%")),
 			},
 		},
 	}
@@ -809,7 +809,7 @@ func TestMaxUnavailableChange(t *testing.T) {
 						},
 					},
 					PodTemplateSpec: &corev1.PodTemplateSpec{},
-					MaxUnavailable:  ptr.To(tt.maxUnavailable),
+					MaxUnavailable:  new(tt.maxUnavailable),
 				},
 			}
 
@@ -833,7 +833,7 @@ func TestMaxUnavailableMergedWithCanaryUpgrade(t *testing.T) {
 			ServerVersion:      "4.0.7",
 			CanaryUpgrade:      true,
 			CanaryUpgradeCount: 1,
-			MaxUnavailable:     ptr.To(intstr.Parse("25%")),
+			MaxUnavailable:     new(intstr.Parse("25%")),
 			StorageConfig: api.StorageConfig{
 				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
 			},
@@ -852,8 +852,8 @@ func TestMaxUnavailableMergedWithCanaryUpgrade(t *testing.T) {
 	expectedStrategy := appsv1.StatefulSetUpdateStrategy{
 		Type: appsv1.RollingUpdateStatefulSetStrategyType,
 		RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-			Partition:      ptr.To(int32(2)),
-			MaxUnavailable: ptr.To(intstr.Parse("25%")),
+			Partition:      new(int32(2)),
+			MaxUnavailable: new(intstr.Parse("25%")),
 		},
 	}
 

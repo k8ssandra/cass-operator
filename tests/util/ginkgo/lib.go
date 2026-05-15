@@ -30,7 +30,7 @@ const (
 
 func duplicate(value string, count int) string {
 	result := []string{}
-	for i := 0; i < count; i++ {
+	for range count {
 		result = append(result, value)
 	}
 
@@ -75,7 +75,7 @@ func CreateTestFile(dcYaml string) (string, error) {
 	}
 
 	if spec["config"] != nil {
-		config := spec["config"].(map[string]interface{})
+		config := spec["config"].(map[string]any)
 
 		// jvm-options <-> jvm-server-options
 		if strings.HasPrefix(cassandraVersion, "3.") {
@@ -554,7 +554,7 @@ func (ns *NsWrapper) WaitForOperatorReady() {
 }
 
 // Note that the actual value will be cast to a string before the comparison with the expectedValue
-func (ns NsWrapper) ExpectKeyValue(m map[string]interface{}, key string, expectedValue string) {
+func (ns NsWrapper) ExpectKeyValue(m map[string]any, key string, expectedValue string) {
 	actualValue, ok := m[key].(string)
 	if !ok {
 		// Note: floats will end up as strings with six decimal points
@@ -571,7 +571,7 @@ func (ns NsWrapper) ExpectKeyValue(m map[string]interface{}, key string, expecte
 }
 
 // Compare all key/values from an expected map to an actual map
-func (ns NsWrapper) ExpectKeyValues(actual map[string]interface{}, expected map[string]string) {
+func (ns NsWrapper) ExpectKeyValues(actual map[string]any, expected map[string]string) {
 	for key := range expected {
 		ns.ExpectKeyValue(actual, key, expected[key])
 	}

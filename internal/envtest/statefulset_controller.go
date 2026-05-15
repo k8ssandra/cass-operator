@@ -44,7 +44,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if sts.GetDeletionTimestamp() != nil {
 		logger.Info("StatefulSet has been marked for deletion")
 		// Delete the pods
-		for i := 0; i < intendedReplicas; i++ {
+		for i := range intendedReplicas {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-%d", sts.Name, i),
@@ -103,7 +103,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	for i := 0; i < intendedReplicas; i++ {
+	for i := range intendedReplicas {
 		podKey := types.NamespacedName{
 			Name:      fmt.Sprintf("%s-%d", sts.Name, i),
 			Namespace: sts.Namespace,

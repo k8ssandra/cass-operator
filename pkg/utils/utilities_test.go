@@ -213,99 +213,99 @@ func Test_mergeMap(t *testing.T) {
 
 func TestSearchMap(t *testing.T) {
 	type args struct {
-		mapToSearch map[string]interface{}
+		mapToSearch map[string]any
 		key         string
 	}
 	tests := []struct {
 		name string
 		args args
-		want map[string]interface{}
+		want map[string]any
 	}{
 		{
 			name: "Happy Path",
 			args: args{
-				mapToSearch: map[string]interface{}{
-					"key": map[string]interface{}{
+				mapToSearch: map[string]any{
+					"key": map[string]any{
 						"foo": "bar",
 					},
 				},
 				key: "key",
 			},
-			want: map[string]interface{}{
+			want: map[string]any{
 				"foo": "bar",
 			},
 		}, {
 			name: "Deeply nested",
 			args: args{
-				mapToSearch: map[string]interface{}{
+				mapToSearch: map[string]any{
 					"foo": "bar",
-					"a": map[string]interface{}{
-						"alpha": map[string]interface{}{
+					"a": map[string]any{
+						"alpha": map[string]any{
 							"foo": "bar",
 						},
-						"alpha1": map[string]interface{}{
+						"alpha1": map[string]any{
 							"foo1": "bar1",
 						},
 					},
-					"b": map[string]interface{}{
+					"b": map[string]any{
 						"bravo": "bar",
-						"bravo1": map[string]interface{}{
-							"bravo111": map[string]interface{}{
-								"key": map[string]interface{}{
+						"bravo1": map[string]any{
+							"bravo111": map[string]any{
+								"key": map[string]any{
 									"foo": "bar",
 								},
 							},
 						},
 					},
-					"c": map[string]interface{}{
-						"charlie": map[string]interface{}{
+					"c": map[string]any{
+						"charlie": map[string]any{
 							"foo": "bar",
 						},
-						"charlie1": map[string]interface{}{
+						"charlie1": map[string]any{
 							"foo1": "bar1",
 						},
 					},
 				},
 				key: "key",
 			},
-			want: map[string]interface{}{
+			want: map[string]any{
 				"foo": "bar",
 			},
 		}, {
 			name: "Key Not Found",
 			args: args{
-				mapToSearch: map[string]interface{}{
+				mapToSearch: map[string]any{
 					"foo": "bar",
-					"a": map[string]interface{}{
-						"alpha": map[string]interface{}{
+					"a": map[string]any{
+						"alpha": map[string]any{
 							"foo": "bar",
 						},
-						"alpha1": map[string]interface{}{
+						"alpha1": map[string]any{
 							"foo1": "bar1",
 						},
 					},
-					"b": map[string]interface{}{
+					"b": map[string]any{
 						"bravo": "bar",
-						"bravo1": map[string]interface{}{
-							"bravo111": map[string]interface{}{
-								"wrong-key": map[string]interface{}{
+						"bravo1": map[string]any{
+							"bravo111": map[string]any{
+								"wrong-key": map[string]any{
 									"foo": "bar",
 								},
 							},
 						},
 					},
-					"c": map[string]interface{}{
-						"charlie": map[string]interface{}{
+					"c": map[string]any{
+						"charlie": map[string]any{
 							"foo": "bar",
 						},
-						"charlie1": map[string]interface{}{
+						"charlie1": map[string]any{
 							"foo1": "bar1",
 						},
 					},
 				},
 				key: "key",
 			},
-			want: map[string]interface{}{},
+			want: map[string]any{},
 		},
 	}
 	for _, tt := range tests {

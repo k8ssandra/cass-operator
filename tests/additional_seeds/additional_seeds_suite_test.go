@@ -99,14 +99,14 @@ func retrieveDatacenterInfo() DatacenterInfo {
 	k := kubectl.Get(dcResource).
 		FormatOutput("json")
 	output := ns.OutputPanic(k)
-	data := map[string]interface{}{}
+	data := map[string]any{}
 	err := json.Unmarshal([]byte(output), &data)
 	Expect(err).ToNot(HaveOccurred())
 
-	spec := data["spec"].(map[string]interface{})
+	spec := data["spec"].(map[string]any)
 	rackNames := []string{}
-	for _, rackData := range spec["racks"].([]interface{}) {
-		name := rackData.(map[string]interface{})["name"]
+	for _, rackData := range spec["racks"].([]any) {
+		name := rackData.(map[string]any)["name"]
 		if name != nil {
 			rackNames = append(rackNames, name.(string))
 		}
@@ -189,7 +189,7 @@ func checkSeedConstraints() {
 	// checkCassandraSeedListsAlignWithSeedLabels(info)
 }
 
-func getAdditionalSeedEndpointResourceAddresses(suffix string) ([]interface{}, error) {
+func getAdditionalSeedEndpointResourceAddresses(suffix string) ([]any, error) {
 	// Should be addresses and then go through them in the later check
 	jsonpath := "jsonpath={.endpoints[].addresses}"
 	k := kubectl.Get(fmt.Sprintf("%s-%s", additionalSeedEndpointResource, suffix)).FormatOutput(jsonpath)
@@ -197,16 +197,16 @@ func getAdditionalSeedEndpointResourceAddresses(suffix string) ([]interface{}, e
 	if err != nil {
 		return nil, err
 	}
-	ips := []interface{}{}
+	ips := []any{}
 	err = json.Unmarshal([]byte(output), &ips)
 	return ips, err
 }
 
-func getAdditionalSeedServiceData() (map[string]interface{}, error) {
+func getAdditionalSeedServiceData() (map[string]any, error) {
 	// Check the service
 	k := kubectl.Get(additionalSeedServiceResource).FormatOutput("json")
 	output := ns.OutputPanic(k)
-	data := map[string]interface{}{}
+	data := map[string]any{}
 	err := json.Unmarshal([]byte(output), &data)
 	return data, err
 }
@@ -216,7 +216,7 @@ func checkAdditionalSeedService() {
 	data, err := getAdditionalSeedServiceData()
 	Expect(err).ToNot(HaveOccurred())
 
-	spec := data["spec"].(map[string]interface{})
+	spec := data["spec"].(map[string]any)
 	actualType := spec["type"].(string)
 	Expect(actualType).To(Equal("ClusterIP"), "Expected additional seed service type %s to be ClusterIP", actualType)
 

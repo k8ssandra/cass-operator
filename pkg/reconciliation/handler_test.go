@@ -14,7 +14,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -248,7 +247,7 @@ func TestConflictingDcNameOverride(t *testing.T) {
 			DatacenterName: "CassandraDatacenter_example",
 		},
 		Status: api.CassandraDatacenterStatus{
-			DatacenterName: ptr.To[string]("CassandraDatacenter_example"),
+			DatacenterName: new("CassandraDatacenter_example"),
 		},
 	})
 	assert.NoError(err)
@@ -263,7 +262,7 @@ func TestChangeDcNameFailure1(t *testing.T) {
 	defer cleanupMockScr()
 
 	rc.Datacenter.Status = api.CassandraDatacenterStatus{
-		DatacenterName: ptr.To("test"),
+		DatacenterName: new("test"),
 	}
 
 	errs := rc.validateDatacenterNameOverride()
@@ -277,7 +276,7 @@ func TestChangeDcNameFailure2(t *testing.T) {
 
 	rc.Datacenter.Spec.DatacenterName = "test"
 	rc.Datacenter.Status = api.CassandraDatacenterStatus{
-		DatacenterName: ptr.To(""),
+		DatacenterName: new(""),
 	}
 
 	errs := rc.validateDatacenterNameOverride()
@@ -290,7 +289,7 @@ func TestChangeDcNameNotModified1(t *testing.T) {
 	defer cleanupMockScr()
 	rc.Datacenter.Spec.DatacenterName = "test"
 	rc.Datacenter.Status = api.CassandraDatacenterStatus{
-		DatacenterName: ptr.To("test"),
+		DatacenterName: new("test"),
 	}
 
 	errs := rc.validateDatacenterNameOverride()

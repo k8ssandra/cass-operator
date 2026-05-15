@@ -862,7 +862,7 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 func (dc *CassandraDatacenter) FullQueryEnabled() (bool, error) {
 	// TODO Cleanup to more common processing after ModelValues is moved to apis
 	if dc.Spec.Config != nil {
-		var dcConfig map[string]interface{}
+		var dcConfig map[string]any
 		if err := json.Unmarshal(dc.Spec.Config, &dcConfig); err != nil {
 			return false, err
 		}
@@ -870,7 +870,7 @@ func (dc *CassandraDatacenter) FullQueryEnabled() (bool, error) {
 		if !found {
 			return false, nil
 		}
-		casYamlMap, ok := casYaml.(map[string]interface{})
+		casYamlMap, ok := casYaml.(map[string]any)
 		if !ok {
 			err := fmt.Errorf("failed to parse cassandra-yaml")
 			return false, err
@@ -901,7 +901,7 @@ func SplitRacks(nodeCount, rackCount int) []int {
 
 	var topology []int
 
-	for rackIdx := 0; rackIdx < rackCount; rackIdx++ {
+	for rackIdx := range rackCount {
 		nodesForThisRack := nodesPerRack
 		if rackIdx < extraNodes {
 			nodesForThisRack++

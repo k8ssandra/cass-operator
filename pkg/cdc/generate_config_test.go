@@ -41,19 +41,19 @@ type testCase struct {
 	InitialConfig  string
 	DC             cassdcapi.CassandraDatacenter
 	Expected       string
-	ParsedExpected map[string]interface{}
-	Actual         map[string]interface{}
+	ParsedExpected map[string]any
+	Actual         map[string]any
 }
 
 // run runs the testCase and populates the actual and ParsedExpected maps.
 func (c *testCase) run(t *testing.T) {
 	newConfig, err := UpdateConfig(json.RawMessage(c.InitialConfig), c.DC)
 	assert.NoError(t, err, err)
-	c.Actual = make(map[string]interface{})
+	c.Actual = make(map[string]any)
 	err = json.Unmarshal(newConfig, &c.Actual)
 	assert.NoError(t, err, err)
 	if c.Expected != "" {
-		c.ParsedExpected = make(map[string]interface{})
+		c.ParsedExpected = make(map[string]any)
 		err = json.Unmarshal([]byte(c.Expected), &c.ParsedExpected)
 		assert.NoError(t, err, err)
 	}
@@ -145,7 +145,7 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	}
 	test.run(t)
 	assert.Contains(t,
-		test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"],
+		test.Actual["cassandra-env-sh"].(map[string]any)["additional-jvm-opts"],
 		"-javaagent:/opt/cdc_agent/cdc-agent.jar=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-",
 	)
 }
@@ -171,6 +171,6 @@ func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 		Expected:      jvmAddtnlOptionsJson,
 	}
 	test.run(t)
-	assert.NotContains(t, test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"], "-javaagent:/opt/cdc_agent/cdc-agent.jar=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-")
-	assert.Contains(t, test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"], "additional-option2")
+	assert.NotContains(t, test.Actual["cassandra-env-sh"].(map[string]any)["additional-jvm-opts"], "-javaagent:/opt/cdc_agent/cdc-agent.jar=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-")
+	assert.Contains(t, test.Actual["cassandra-env-sh"].(map[string]any)["additional-jvm-opts"], "additional-option2")
 }

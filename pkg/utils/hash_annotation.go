@@ -37,7 +37,7 @@ func AddHashAnnotation(r Annotated) {
 	r.SetAnnotations(m)
 }
 
-func deepHashString(obj interface{}) string {
+func deepHashString(obj any) string {
 	hasher := sha256.New()
 	DeepHashObject(hasher, obj)
 	hashBytes := hasher.Sum([]byte{})
@@ -48,7 +48,7 @@ func deepHashString(obj interface{}) string {
 // DeepHashObject writes specified object to hash using the spew library
 // which follows pointers and prints actual values of the nested objects
 // ensuring the hash does not change when a pointer changes.
-func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
+func DeepHashObject(hasher hash.Hash, objectToWrite any) {
 	hasher.Reset()
 	printer := spew.ConfigState{
 		Indent:         " ",

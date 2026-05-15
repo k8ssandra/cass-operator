@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -663,8 +662,8 @@ func securityContext(dc *api.CassandraDatacenter, container *corev1.Container) {
 	}
 
 	if dc.ReadOnlyFs() {
-		container.SecurityContext.ReadOnlyRootFilesystem = ptr.To(true)
-		container.SecurityContext.AllowPrivilegeEscalation = ptr.To(false)
+		container.SecurityContext.ReadOnlyRootFilesystem = new(true)
+		container.SecurityContext.AllowPrivilegeEscalation = new(false)
 	}
 }
 
@@ -947,7 +946,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 			RunAsUser:    &userID,
 			RunAsGroup:   &userID,
 			FSGroup:      &userID,
-			RunAsNonRoot: ptr.To(true),
+			RunAsNonRoot: new(true),
 		}
 	}
 

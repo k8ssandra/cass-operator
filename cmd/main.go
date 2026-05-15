@@ -195,8 +195,8 @@ func main() {
 	if strings.Contains(ns, ",") {
 		setupLog.Info("manager set up with multiple namespaces", "namespaces", ns)
 		// configure cluster-scoped with MultiNamespacedCacheBuilder
-		namespaces := strings.Split(ns, ",")
-		for _, namespace := range namespaces {
+		namespaces := strings.SplitSeq(ns, ",")
+		for namespace := range namespaces {
 			options.Cache.DefaultNamespaces[namespace] = cache.Config{}
 		}
 	} else if ns != "" {
@@ -239,7 +239,7 @@ func main() {
 		Client:           mgr.GetClient(),
 		Log:              ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
 		Scheme:           mgr.GetScheme(),
-		Recorder:         mgr.GetEventRecorderFor("cass-operator"),
+		Recorder:         mgr.GetEventRecorder("cass-operator"),
 		ImageRegistry:    registry,
 		ClusterResources: clusterScoped,
 	}).SetupWithManager(mgr); err != nil {

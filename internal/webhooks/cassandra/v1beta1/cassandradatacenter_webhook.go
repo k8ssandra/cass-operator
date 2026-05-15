@@ -11,11 +11,9 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/google/go-cmp/cmp"
@@ -32,7 +30,7 @@ var log = logf.Log.WithName("api")
 
 // SetupCassandraDatacenterWebhookWithManager registers the webhook for CassandraDatacenter in the manager.
 func SetupCassandraDatacenterWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&api.CassandraDatacenter{}).
+	return ctrl.NewWebhookManagedBy(mgr, &api.CassandraDatacenter{}).
 		WithValidator(&CassandraDatacenterCustomValidator{}).
 		WithDefaulter(&CassandraDatacenterCustomDefaulter{}).
 		Complete()
@@ -45,10 +43,8 @@ func SetupCassandraDatacenterWebhookWithManager(mgr ctrl.Manager) error {
 // Kind CassandraDatacenter when those are created or updated.
 type CassandraDatacenterCustomDefaulter struct{}
 
-var _ webhook.CustomDefaulter = &CassandraDatacenterCustomDefaulter{}
-
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind CassandraDatacenter.
-func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
+func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, dc *api.CassandraDatacenter) error {
 	return nil
 }
 
@@ -56,14 +52,8 @@ func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, obj ru
 // when it is created, updated, or deleted.
 type CassandraDatacenterCustomValidator struct{}
 
-var _ webhook.CustomValidator = &CassandraDatacenterCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
-func (v *CassandraDatacenterCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	dc, ok := obj.(*api.CassandraDatacenter)
-	if !ok {
-		return nil, fmt.Errorf("expected a CassandraDatacenter object but got %T", obj)
-	}
+func (v *CassandraDatacenterCustomValidator) ValidateCreate(ctx context.Context, dc *api.CassandraDatacenter) (admission.Warnings, error) {
 	log.Info("Validation for CassandraDatacenter upon creation", "name", dc.GetName())
 
 	if err := ValidateSingleDatacenter(dc); err != nil {
@@ -74,17 +64,7 @@ func (v *CassandraDatacenterCustomValidator) ValidateCreate(ctx context.Context,
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
-func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	dc, ok := newObj.(*api.CassandraDatacenter)
-	if !ok {
-		return nil, fmt.Errorf("expected a CassandraDatacenter object for the newObj but got %T", newObj)
-	}
-
-	oldDc, ok := oldObj.(*api.CassandraDatacenter)
-	if !ok {
-		return nil, fmt.Errorf("expected a CassandraDatacenter object for the oldObj but got %T", oldObj)
-	}
-
+func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context, oldDc, dc *api.CassandraDatacenter) (admission.Warnings, error) {
 	log.Info("Validation for CassandraDatacenter upon update", "name", dc.GetName())
 
 	if metav1.HasAnnotation(dc.ObjectMeta, api.BypassWebhookValidationsAnnotation) &&
@@ -106,7 +86,7 @@ func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context,
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
-func (v *CassandraDatacenterCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *CassandraDatacenterCustomValidator) ValidateDelete(ctx context.Context, dc *api.CassandraDatacenter) (admission.Warnings, error) {
 	return nil, nil
 }
 
@@ -121,7 +101,7 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 	isDse := dc.Spec.ServerType == "dse"
 	isCassandra3 := dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "3.")
 
-	var c map[string]interface{}
+	var c map[string]any
 	if dc.Spec.Config != nil {
 		if err := json.Unmarshal(dc.Spec.Config, &c); err != nil {
 			return fmt.Errorf("unable to parse config json: %v", err)
@@ -377,7 +357,7 @@ func containsReservedPrefixes(config map[string]string) bool {
 	return false
 }
 
-func attemptedTo(action string, actionStrArgs ...interface{}) error {
+func attemptedTo(action string, actionStrArgs ...any) error {
 	var msg string
 	if actionStrArgs != nil {
 		msg = fmt.Sprintf(action, actionStrArgs...)

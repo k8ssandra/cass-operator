@@ -2,12 +2,15 @@
 // care about.
 package cdc
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"maps"
+)
 
 type configData struct {
 	CassEnvSh     *cassEnvSh `json:"cassandra-env-sh,omitempty"`
-	CassandraYaml map[string]interface{}
-	UnknownFields map[string]interface{}
+	CassandraYaml map[string]any
+	UnknownFields map[string]any
 }
 
 func (c *configData) UnmarshalJSON(data []byte) error {
@@ -26,7 +29,7 @@ func (c *configData) UnmarshalJSON(data []byte) error {
 	}
 	// If cassandra-yaml key exists, parse, add to c.CassEnvSh field, delete from intermediate map.
 	if cassYamlUnparsed, exists := intermediate["cassandra-yaml"]; exists {
-		parsedCassYaml := make(map[string]interface{}) // First parse the known field "jvm-options" into the known struct cassEnvSh{}
+		parsedCassYaml := make(map[string]any) // First parse the known field "jvm-options" into the known struct cassEnvSh{}
 		if err := json.Unmarshal(cassYamlUnparsed, &parsedCassYaml); err != nil {
 			return err
 		}
@@ -34,9 +37,9 @@ func (c *configData) UnmarshalJSON(data []byte) error {
 		delete(intermediate, "cassandra-yaml")
 	}
 	// Now parse the remaining fields as a map[string]interface{}.
-	unknownFields := make(map[string]interface{})
+	unknownFields := make(map[string]any)
 	for k, v := range intermediate {
-		var tmp interface{}
+		var tmp any
 		if err := json.Unmarshal(v, &tmp); err != nil {
 			return err
 		}
@@ -47,10 +50,8 @@ func (c *configData) UnmarshalJSON(data []byte) error {
 }
 
 func (c configData) MarshalJSON() ([]byte, error) {
-	intermediate := make(map[string]interface{})
-	for k, v := range c.UnknownFields {
-		intermediate[k] = v
-	}
+	intermediate := make(map[string]any)
+	maps.Copy(intermediate, c.UnknownFields)
 	if c.CassEnvSh != nil {
 		intermediate["cassandra-env-sh"] = c.CassEnvSh
 	}
@@ -62,7 +63,7 @@ func (c configData) MarshalJSON() ([]byte, error) {
 
 type cassEnvSh struct {
 	AddtnlJVMOptions *[]string `json:"additional-jvm-opts,omitempty"`
-	UnknownFields    map[string]interface{}
+	UnknownFields    map[string]any
 }
 
 func (j *cassEnvSh) UnmarshalJSON(data []byte) error {
@@ -81,9 +82,9 @@ func (j *cassEnvSh) UnmarshalJSON(data []byte) error {
 		delete(intermediate, "additional-jvm-opts")
 	}
 	// Now parse the remaining fields as a map[string]interface{}.
-	unknownFields := make(map[string]interface{})
+	unknownFields := make(map[string]any)
 	for k, v := range intermediate {
-		var tmp interface{}
+		var tmp any
 		if err := json.Unmarshal(v, &tmp); err != nil {
 			return err
 		}
@@ -95,10 +96,8 @@ func (j *cassEnvSh) UnmarshalJSON(data []byte) error {
 
 // We just need this for flattening everything back down.
 func (c cassEnvSh) MarshalJSON() ([]byte, error) {
-	intermediate := make(map[string]interface{})
-	for k, v := range c.UnknownFields {
-		intermediate[k] = v
-	}
+	intermediate := make(map[string]any)
+	maps.Copy(intermediate, c.UnknownFields)
 	if c.AddtnlJVMOptions != nil && len(*c.AddtnlJVMOptions) > 0 {
 		intermediate["additional-jvm-opts"] = c.AddtnlJVMOptions
 	}

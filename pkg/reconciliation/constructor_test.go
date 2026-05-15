@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 )
 
 func TestPodDisruptionBudget(t *testing.T) {
@@ -42,7 +41,7 @@ func TestPodDisruptionBudgetIntMaxUnavailable(t *testing.T) {
 		},
 		Spec: api.CassandraDatacenterSpec{
 			Size:           6,
-			MaxUnavailable: ptr.To(intstr.FromInt(2)),
+			MaxUnavailable: new(intstr.FromInt(2)),
 		},
 	}
 
@@ -64,14 +63,14 @@ func TestPodDisruptionBudgetPercentageMaxUnavailable(t *testing.T) {
 				{Name: "rack1"},
 				{Name: "rack2"},
 			},
-			MaxUnavailable: ptr.To(intstr.Parse("50%")),
+			MaxUnavailable: new(intstr.Parse("50%")),
 		},
 	}
 
 	pdb := newPodDisruptionBudgetForDatacenter(dc)
 	assert.Equal(int32(4), pdb.Spec.MinAvailable.IntVal) // This was roundup
 
-	dc.Spec.MaxUnavailable = ptr.To(intstr.Parse("100%"))
+	dc.Spec.MaxUnavailable = new(intstr.Parse("100%"))
 	pdb = newPodDisruptionBudgetForDatacenter(dc)
 	assert.Equal(int32(3), pdb.Spec.MinAvailable.IntVal)
 }

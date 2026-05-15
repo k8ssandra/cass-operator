@@ -5,6 +5,7 @@ package oplabels
 
 import (
 	"fmt"
+	"maps"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,9 +56,7 @@ func AddOperatorAnnotations(m map[string]string, dc *api.CassandraDatacenter) {
 		m = make(map[string]string)
 	}
 	if len(dc.Spec.AdditionalAnnotations) != 0 {
-		for key, value := range dc.Spec.AdditionalAnnotations {
-			m[key] = value
-		}
+		maps.Copy(m, dc.Spec.AdditionalAnnotations)
 	}
 }
 

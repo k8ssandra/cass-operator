@@ -57,7 +57,7 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 	reflectedCDCConfig := reflect.ValueOf(*CDCConfig)
 	t := reflectedCDCConfig.Type()
 	optsSlice = []string{}
-	for i := 0; i < reflectedCDCConfig.NumField(); i++ {
+	for i := range reflectedCDCConfig.NumField() {
 		// This logic depends on the json tags from the CR mapping to the CDC agent's parameter names.
 		fieldName := t.Field(i).Name
 		t := reflect.TypeFor[cassdcapi.CDCConfiguration]()

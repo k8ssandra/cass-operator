@@ -11,7 +11,7 @@ if docker inspect "${reg_name}" >/dev/null 2>&1; then
 else
   docker run \
     -d --restart=always -p "127.0.0.1:${reg_port}:5000" --network bridge --name "${reg_name}" \
-    registry:2
+    registry:3
 fi
 
 # 2. Create kind cluster with containerd registry config dir enabled

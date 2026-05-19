@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.31.0
 
 * [CHANGE] [#919](https://github.com/k8ssandra/cass-operator/issues/919) Update to Kubernetes 1.35 and Go 1.26, update events usage.

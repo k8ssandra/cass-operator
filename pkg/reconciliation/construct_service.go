@@ -261,6 +261,9 @@ func newNodePortServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *core
 	}
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.NodePortService)
+
+	utils.AddHashAnnotation(service)
+
 	return service
 }
 

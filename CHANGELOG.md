@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [BUGFIX] [#930](https://github.com/k8ssandra/cass-operator/issues/930) Add the resource-hash annotation to the NodePort service so the operator reconciles updates to it; previously the NodePort service was only created and never updated, so changes to additionalServiceConfig.nodePortService were ignored.
+
 ## v1.31.0
 
 * [CHANGE] [#919](https://github.com/k8ssandra/cass-operator/issues/919) Update to Kubernetes 1.35 and Go 1.26, update events usage.

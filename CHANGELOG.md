@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.30.0
 
 * [CHANGE] [#905](https://github.com/k8ssandra/cass-operator/issues/905) Relax the ServerVersion checks to structure only without separating OSS/DSE/HCD.

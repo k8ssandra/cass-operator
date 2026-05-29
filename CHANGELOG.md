@@ -16,7 +16,6 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#919](https://github.com/k8ssandra/cass-operator/issues/919) Update to Kubernetes 1.35 and Go 1.26, update events usage.
 * [ENHANCEMENT] [#912](https://github.com/k8ssandra/cass-operator/issues/912) Add new webhook validations for maxUnavailable string format as well as PVC sizes
 * [ENHANCEMENT] [#902](https://github.com/k8ssandra/cass-operator/issues/902) If scaling down or scaling up process is still ongoing, the webhook will prevent changing the cluster size.
-* [ENHANCEMENT] Bump ginkgo to v2.29.0 and gomega to v1.41.0
 
 ## v1.30.0
 

@@ -727,8 +727,9 @@ func (r *CassandraTaskReconciler) startPodTask(
 	nodeMgmtClient httphelper.NodeMgmtClient,
 ) error {
 	logger := log.FromContext(ctx)
+	// TODO If the pod is dead, this will throw 500 and replace process will fail. This is a regression.
 	features, err := nodeMgmtClient.FeatureSet(pod)
-	if err != nil {
+	if err != nil && taskConfig.Job != api.CommandReplaceNode {
 		return err
 	}
 

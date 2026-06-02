@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net"
+	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"time"
 
@@ -175,6 +178,58 @@ func createPod(namespace, clusterName, dcName, rackName string, ordinal int) {
 		},
 	}
 	Expect(k8sClient.Status().Patch(context.Background(), pod, patchPod)).Should(Succeed())
+}
+
+func linkPodToTestServer(podKey types.NamespacedName, server *httptest.Server) {
+	host, portString, err := net.SplitHostPort(server.Listener.Addr().String())
+	Expect(err).ToNot(HaveOccurred())
+
+	port, err := strconv.Atoi(portString)
+	Expect(err).ToNot(HaveOccurred())
+
+	pod := &corev1.Pod{}
+	Expect(k8sClient.Get(context.Background(), podKey, pod)).Should(Succeed())
+	podLabels := pod.Labels
+
+	Expect(k8sClient.Delete(context.Background(), pod)).Should(Succeed())
+	Eventually(func() bool {
+		err := k8sClient.Get(context.Background(), podKey, &corev1.Pod{})
+		return err != nil && errors.IsNotFound(err)
+	}, 3*time.Second).Should(BeTrue())
+
+	pod = &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podKey.Name,
+			Namespace: podKey.Namespace,
+			Labels:    podLabels,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "cassandra",
+					Image: "k8ssandra/cassandra-nothere:latest",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "mgmt-api-http",
+							ContainerPort: int32(port),
+						},
+					},
+				},
+			},
+		},
+	}
+	Expect(k8sClient.Create(context.Background(), pod)).Should(Succeed())
+
+	patchPodStatus := client.MergeFrom(pod.DeepCopy())
+	pod.Status = corev1.PodStatus{
+		PodIP: host,
+		PodIPs: []corev1.PodIP{
+			{
+				IP: host,
+			},
+		},
+	}
+	Expect(k8sClient.Status().Patch(context.Background(), pod, patchPodStatus)).Should(Succeed())
 }
 
 func deleteDatacenter(namespace string) {
@@ -649,6 +704,40 @@ var _ = Describe("CassandraTask controller tests", func() {
 				Expect(k8sClient.Create(context.TODO(), task)).Should(Succeed())
 
 				// Verify the pod2 was deleted
+				Eventually(func() bool {
+					pod := &corev1.Pod{}
+					err := k8sClient.Get(context.TODO(), podKey, pod)
+					return err != nil && errors.IsNotFound(err)
+				}, 3*time.Second).Should(BeTrue())
+
+				// Recreate it so the process "finishes"
+				createPod(testNamespaceName, clusterName, testDatacenterName, "r1", 2)
+
+				completedTask := waitForTaskCompletion(taskKey)
+
+				Expect(completedTask.Status.Succeeded).To(BeNumerically(">=", 1))
+			})
+			It("Replaces a node when the target pod management API is unavailable", func() {
+				By("Creating a management API server that fails all requests")
+				failingMgmtAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusInternalServerError)
+				}))
+				defer failingMgmtAPI.Close()
+
+				By("Creating a task for replacenode")
+				taskKey, task := buildTask(api.CommandReplaceNode, testNamespaceName)
+
+				podKey := types.NamespacedName{
+					Name:      fmt.Sprintf("%s-%s-r1-sts-%d", clusterName, testDatacenterName, 2),
+					Namespace: testNamespaceName,
+				}
+
+				linkPodToTestServer(podKey, failingMgmtAPI)
+
+				task.Spec.Jobs[0].Arguments.PodName = podKey.Name
+				Expect(k8sClient.Create(context.TODO(), task)).Should(Succeed())
+
+				By("Verifying the pod was deleted even though management API calls fail")
 				Eventually(func() bool {
 					pod := &corev1.Pod{}
 					err := k8sClient.Get(context.TODO(), podKey, pod)

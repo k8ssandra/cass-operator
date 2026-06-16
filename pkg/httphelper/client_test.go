@@ -51,6 +51,103 @@ func Test_BuildPodHostFromPod(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func Test_GetMgmtApiPortFromContainer(t *testing.T) {
+	tests := []struct {
+		name      string
+		container *corev1.Container
+		expected  int
+	}{
+		{
+			name: "default port when no mgmt-api-http port defined",
+			container: &corev1.Container{
+				Name: "cassandra",
+				Ports: []corev1.ContainerPort{
+					{Name: "native", ContainerPort: 9042},
+					{Name: "internode", ContainerPort: 7000},
+				},
+			},
+			expected: 8080,
+		},
+		{
+			name: "custom port when mgmt-api-http port defined",
+			container: &corev1.Container{
+				Name: "cassandra",
+				Ports: []corev1.ContainerPort{
+					{Name: "native", ContainerPort: 9042},
+					{Name: "mgmt-api-http", ContainerPort: 8081},
+					{Name: "internode", ContainerPort: 7000},
+				},
+			},
+			expected: 8081,
+		},
+		{
+			name: "default port when container has no ports",
+			container: &corev1.Container{
+				Name:  "cassandra",
+				Ports: []corev1.ContainerPort{},
+			},
+			expected: 8080,
+		},
+		{
+			name: "default port when container ports is nil",
+			container: &corev1.Container{
+				Name:  "cassandra",
+				Ports: nil,
+			},
+			expected: 8080,
+		},
+		{
+			name: "finds mgmt-api-http among many ports",
+			container: &corev1.Container{
+				Name: "cassandra",
+				Ports: []corev1.ContainerPort{
+					{Name: "native", ContainerPort: 9042},
+					{Name: "internode", ContainerPort: 7000},
+					{Name: "jmx", ContainerPort: 7199},
+					{Name: "mgmt-api-http", ContainerPort: 9999},
+					{Name: "metrics", ContainerPort: 9103},
+				},
+			},
+			expected: 9999,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GetMgmtApiPortFromContainer(tt.container)
+			assert.Equal(t, tt.expected, result, "GetMgmtApiPortFromContainer() returned unexpected port")
+		})
+	}
+}
+
+func Test_BuildPodHostFromPod_WithCustomPort(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-custom-port",
+			Namespace: "somenamespace",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "cassandra",
+					Ports: []corev1.ContainerPort{
+						{Name: "mgmt-api-http", ContainerPort: 8081},
+						{Name: "native", ContainerPort: 9042},
+					},
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			PodIP: "1.2.3.4",
+		},
+	}
+
+	result, podPort, err := BuildPodHostFromPod(pod)
+	assert.NoError(t, err)
+	assert.Equal(t, "1.2.3.4", result)
+	assert.Equal(t, 8081, podPort, "Expected custom port 8081 to be returned")
+}
+
 func Test_parseMetadataEndpointsResponseBody(t *testing.T) {
 	endpoints, err := parseMetadataEndpointsResponseBody([]byte(`{
 		"entity": [

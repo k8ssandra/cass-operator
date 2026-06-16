@@ -219,6 +219,15 @@ func NewMgmtClient(ctx context.Context, client client.Client, dc *cassdcapi.Cass
 	}, nil
 }
 
+func GetMgmtApiPortFromContainer(container *corev1.Container) int {
+	for _, port := range container.Ports {
+		if port.Name == "mgmt-api-http" {
+			return int(port.ContainerPort)
+		}
+	}
+	return MgmtApiTargetPort
+}
+
 func BuildPodHostFromPod(pod *corev1.Pod) (string, int, error) {
 	// This function previously returned the dns hostname which includes the StatefulSet's headless service,
 	// which is the datacenter service. There are times though that we want to make a mgmt api call to the pod
@@ -228,16 +237,12 @@ func BuildPodHostFromPod(pod *corev1.Pod) (string, int, error) {
 		return "", 0, newNoPodIPError(pod)
 	}
 
-	mgmtApiPort := 8080
+	mgmtApiPort := MgmtApiTargetPort
 
 	// Check for port override
 	for _, container := range pod.Spec.Containers {
 		if container.Name == "cassandra" {
-			for _, port := range container.Ports {
-				if port.Name == "mgmt-api-http" {
-					mgmtApiPort = int(port.ContainerPort)
-				}
-			}
+			mgmtApiPort = GetMgmtApiPortFromContainer(&container)
 		}
 	}
 

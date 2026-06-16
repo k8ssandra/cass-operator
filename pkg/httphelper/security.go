@@ -21,11 +21,12 @@ import (
 )
 
 const (
-	NodeDrainEndpoint        = "/api/v0/ops/node/drain"
-	MgmtApiTargetHostAndPort = "localhost:8080"
-	LivenessEndpoint         = "/api/v0/probes/liveness"
-	ReadinessEndpoint        = "/api/v0/probes/readiness"
-	DefaultTimeout           = 10
+	MgmtApiTargetHost = "localhost"
+	MgmtApiTargetPort = 8080
+	NodeDrainEndpoint = "/api/v0/ops/node/drain"
+	LivenessEndpoint  = "/api/v0/probes/liveness"
+	ReadinessEndpoint = "/api/v0/probes/readiness"
+	DefaultTimeout    = 10
 
 	caCertPath = "/management-api-certs/ca.crt"
 	tlsCrt     = "/management-api-certs/tls.crt"
@@ -97,8 +98,8 @@ func ValidateManagementApiConfig(dc *api.CassandraDatacenter, client client.Clie
 // SPI for adding new mechanisms for securing the management API
 type ManagementApiSecurityProvider interface {
 	BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error)
-	BuildMgmtApiGetAction(endpoint string, timeout int) *corev1.ExecAction
-	BuildMgmtApiPostAction(endpoint string, timeout int) *corev1.ExecAction
+	BuildMgmtApiGetAction(hostname string, port int, endpoint string, timeout int) *corev1.ExecAction
+	BuildMgmtApiPostAction(hostname string, port int, endpoint string, timeout int) *corev1.ExecAction
 	AddServerSecurity(pod *corev1.PodTemplateSpec) error
 	GetProtocol() string
 	ValidateConfig(ctx context.Context, client client.Client) []error
@@ -155,15 +156,15 @@ func (provider *ManualManagementApiSecurityProvider) GetProtocol() string {
 	return "https"
 }
 
-func GetMgmtApiPostAction(dc *api.CassandraDatacenter, endpoint string, timeout int) (*corev1.ExecAction, error) {
+func GetMgmtApiPostAction(dc *api.CassandraDatacenter, hostname string, port int, endpoint string, timeout int) (*corev1.ExecAction, error) {
 	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
-	return provider.BuildMgmtApiPostAction(endpoint, timeout), nil
+	return provider.BuildMgmtApiPostAction(hostname, port, endpoint, timeout), nil
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiGetAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiGetAction(hostname string, port int, endpoint string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -175,12 +176,12 @@ func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiGetAction(end
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("http://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("http://%s:%d%s", hostname, port, endpoint),
 		},
 	}
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiGetAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiGetAction(hostname string, port int, endpoint string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -196,12 +197,12 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiGetAction(endpo
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("https://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("https://%s:%d%s", hostname, port, endpoint),
 		},
 	}
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiPostAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiPostAction(hostname string, port int, endpoint string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -213,12 +214,12 @@ func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiPostAction(en
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("http://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("http://%s:%d%s", hostname, port, endpoint),
 		},
 	}
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(hostname string, port int, endpoint string, timeout int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -234,7 +235,7 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(endp
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("https://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("https://%s:%d%s", hostname, port, endpoint),
 		},
 	}
 }
@@ -303,38 +304,78 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 
 	cassContainer.Env = append(envVars, cassContainer.Env...)
 
-	// Update Liveness probe to account for mutual auth (can't just use HTTP probe now)
-	if cassContainer.LivenessProbe == nil {
-		cassContainer.LivenessProbe = &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{},
+	// Only HTTPGet probes need conversion to Exec for mTLS support.
+	// Other probe types (TCPSocket, GRPC, Exec) are preserved as-is.
+	if cassContainer.LivenessProbe != nil {
+		existingProbe := cassContainer.LivenessProbe.DeepCopy()
+
+		livenessTimeout := int(existingProbe.TimeoutSeconds)
+		if livenessTimeout < 1 {
+			livenessTimeout = DefaultTimeout
+		}
+
+		livenessHostname := MgmtApiTargetHost
+		livenessPort := GetMgmtApiPortFromContainer(cassContainer)
+		livenessEndpoint := LivenessEndpoint
+
+		// Check which probe mechanism is currently configured. If HTTPGet
+		// ProbeHandler is configured, extract its settings so it can be
+		// converted to an Exec ProbeHandler.
+		if existingProbe.HTTPGet != nil {
+			if existingProbe.HTTPGet.Host != "" {
+				livenessHostname = existingProbe.HTTPGet.Host
+			}
+			if existingProbe.HTTPGet.Port.IntVal != 0 {
+				livenessPort = existingProbe.HTTPGet.Port.IntValue()
+			}
+			if existingProbe.HTTPGet.Path != "" {
+				livenessEndpoint = existingProbe.HTTPGet.Path
+			}
+
+			cassContainer.LivenessProbe.ProbeHandler = corev1.ProbeHandler{
+				Exec: provider.BuildMgmtApiGetAction(
+					livenessHostname,
+					livenessPort,
+					livenessEndpoint,
+					livenessTimeout,
+				),
+			}
 		}
 	}
 
-	livenessTimeout := int(cassContainer.LivenessProbe.TimeoutSeconds)
-	if livenessTimeout < 1 {
-		livenessTimeout = DefaultTimeout
-	}
+	if cassContainer.ReadinessProbe != nil {
+		existingProbe := cassContainer.ReadinessProbe.DeepCopy()
 
-	cassContainer.LivenessProbe.HTTPGet = nil
-	cassContainer.LivenessProbe.TCPSocket = nil
-	cassContainer.LivenessProbe.Exec = provider.BuildMgmtApiGetAction(LivenessEndpoint, livenessTimeout)
+		readinessTimeout := int(existingProbe.TimeoutSeconds)
+		if readinessTimeout < 1 {
+			readinessTimeout = DefaultTimeout
+		}
 
-	// Update Readiness probe to account for mutual auth (can't just use HTTP probe now)
-	// TODO: Get endpoint from configured HTTPGet probe
-	if cassContainer.ReadinessProbe == nil {
-		cassContainer.ReadinessProbe = &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{},
+		readinessHostname := MgmtApiTargetHost
+		readinessPort := GetMgmtApiPortFromContainer(cassContainer)
+		readinessEndpoint := ReadinessEndpoint
+
+		if existingProbe.HTTPGet != nil {
+			if existingProbe.HTTPGet.Host != "" {
+				readinessHostname = existingProbe.HTTPGet.Host
+			}
+			if existingProbe.HTTPGet.Port.IntVal != 0 {
+				readinessPort = existingProbe.HTTPGet.Port.IntValue()
+			}
+			if existingProbe.HTTPGet.Path != "" {
+				readinessEndpoint = existingProbe.HTTPGet.Path
+			}
+
+			cassContainer.ReadinessProbe.ProbeHandler = corev1.ProbeHandler{
+				Exec: provider.BuildMgmtApiGetAction(
+					readinessHostname,
+					readinessPort,
+					readinessEndpoint,
+					readinessTimeout,
+				),
+			}
 		}
 	}
-
-	readinessTimeout := int(cassContainer.ReadinessProbe.TimeoutSeconds)
-	if readinessTimeout < 1 {
-		readinessTimeout = DefaultTimeout
-	}
-
-	cassContainer.ReadinessProbe.HTTPGet = nil
-	cassContainer.ReadinessProbe.TCPSocket = nil
-	cassContainer.ReadinessProbe.Exec = provider.BuildMgmtApiGetAction(ReadinessEndpoint, readinessTimeout)
 
 	return nil
 }

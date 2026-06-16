@@ -180,17 +180,18 @@ func selectorFromFieldPath(fieldPath string) *corev1.EnvVarSource {
 	}
 }
 
-func httpGetAction(port int, path string) *corev1.HTTPGetAction {
+func httpGetAction(host string, port int, path string) *corev1.HTTPGetAction {
 	return &corev1.HTTPGetAction{
 		Port: intstr.FromInt(port),
 		Path: path,
+		Host: host,
 	}
 }
 
-func probe(port int, path string, initDelay int, period int, timeout int) *corev1.Probe {
+func probe(host string, port int, path string, initDelay int, period int, timeout int) *corev1.Probe {
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
-			HTTPGet: httpGetAction(port, path),
+			HTTPGet: httpGetAction(host, port, path),
 		},
 		InitialDelaySeconds: int32(initDelay),
 		PeriodSeconds:       int32(period),
@@ -708,12 +709,36 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		cassContainer.Resources = dc.Spec.Resources
 	}
 
+	// Combine ports
+
+	portDefaults, err := dc.GetContainerPorts()
+	if err != nil {
+		return err
+	}
+
+	cassContainer.Ports = combinePortSlices(portDefaults, cassContainer.Ports)
+
+	// Only set default probes when probe is nil; i.e. no probe configuration supplied
 	if cassContainer.LivenessProbe == nil {
-		cassContainer.LivenessProbe = probe(8080, httphelper.LivenessEndpoint, 15, 15, 10)
+		cassContainer.LivenessProbe = probe(
+			httphelper.MgmtApiTargetHost,
+			httphelper.GetMgmtApiPortFromContainer(cassContainer),
+			httphelper.LivenessEndpoint,
+			15,
+			15,
+			10,
+		)
 	}
 
 	if cassContainer.ReadinessProbe == nil {
-		cassContainer.ReadinessProbe = probe(8080, httphelper.ReadinessEndpoint, 20, 10, 10)
+		cassContainer.ReadinessProbe = probe(
+			httphelper.MgmtApiTargetHost,
+			httphelper.GetMgmtApiPortFromContainer(cassContainer),
+			httphelper.ReadinessEndpoint,
+			15,
+			15,
+			10,
+		)
 	}
 
 	if cassContainer.Lifecycle == nil {
@@ -721,7 +746,13 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	if cassContainer.Lifecycle.PreStop == nil {
-		action, err := httphelper.GetMgmtApiPostAction(dc, httphelper.NodeDrainEndpoint, 0)
+		action, err := httphelper.GetMgmtApiPostAction(
+			dc,
+			httphelper.MgmtApiTargetHost,
+			httphelper.GetMgmtApiPortFromContainer(cassContainer),
+			httphelper.NodeDrainEndpoint,
+			0,
+		)
 		if err != nil {
 			return err
 		}
@@ -762,15 +793,6 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	cassContainer.Env = combineEnvSlices(envDefaults, cassContainer.Env)
-
-	// Combine ports
-
-	portDefaults, err := dc.GetContainerPorts()
-	if err != nil {
-		return err
-	}
-
-	cassContainer.Ports = combinePortSlices(portDefaults, cassContainer.Ports)
 
 	// Combine volumeMounts
 

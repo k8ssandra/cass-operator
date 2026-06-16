@@ -16,6 +16,7 @@ import (
 	"github.com/k8ssandra/cass-operator/internal/result"
 	apiwebhook "github.com/k8ssandra/cass-operator/internal/webhooks/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
+	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 )
 
 // Use a var so we can mock this function
@@ -50,6 +51,9 @@ func (rc *ReconciliationContext) CalculateReconciliationActions() (reconcile.Res
 	if result := rc.ProcessDeletion(); result.Completed() {
 		return result.Output()
 	}
+
+	// Keep the progress/condition metrics populated across restarts and leader changes.
+	monitoring.UpdateDatacenterMetricsFromStatus(rc.Datacenter)
 
 	if err := rc.addFinalizer(); err != nil {
 		return result.Error(err).Output()

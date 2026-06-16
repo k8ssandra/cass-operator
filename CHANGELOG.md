@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [BUGFIX] [#936](https://github.com/k8ssandra/cass-operator/issues/936) Re-assert datacenter progress and condition metrics from status on every reconcile so they are not lost on operator restart or leader change.
 * [BUGFIX] [#933](https://github.com/k8ssandra/cass-operator/issues/933) Fix regression introduced in the CassandraTask replacement process introduced in the full rack replacement feature.
 
 ## v1.31.0

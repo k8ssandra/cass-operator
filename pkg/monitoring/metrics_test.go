@@ -78,6 +78,46 @@ func TestMetricAdder(t *testing.T) {
 	require.Error(err)
 }
 
+func TestUpdateDatacenterMetricsFromStatus(t *testing.T) {
+	require := require.New(t)
+
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{Name: "datacenter1", Namespace: "ns"},
+		Spec:       api.CassandraDatacenterSpec{ClusterName: "cluster1"},
+		Status: api.CassandraDatacenterStatus{
+			CassandraOperatorProgress: api.ProgressReady,
+			Conditions: []api.DatacenterCondition{
+				{Type: api.DatacenterReady, Status: corev1.ConditionTrue},
+				{Type: api.DatacenterScalingUp, Status: corev1.ConditionFalse},
+			},
+		},
+	}
+
+	UpdateDatacenterMetricsFromStatus(dc)
+
+	labels := map[string]string{"namespace": "ns", "cluster": "cluster1", "datacenter": "datacenter1"}
+
+	progress, err := GetMetricValue("cass_operator_datacenter_progress", mergeLabels(labels, "progress", string(api.ProgressReady)))
+	require.NoError(err)
+	require.Equal(float64(1), progress)
+
+	ready, err := GetMetricValue("cass_operator_datacenter_status", mergeLabels(labels, "condition", string(api.DatacenterReady)))
+	require.NoError(err)
+	require.Equal(float64(1), ready)
+
+	scalingUp, err := GetMetricValue("cass_operator_datacenter_status", mergeLabels(labels, "condition", string(api.DatacenterScalingUp)))
+	require.NoError(err)
+	require.Equal(float64(0), scalingUp)
+}
+
+func mergeLabels(base map[string]string, key, value string) map[string]string {
+	out := map[string]string{key: value}
+	for k, v := range base {
+		out[k] = v
+	}
+	return out
+}
+
 func TestNamespaceSeparation(t *testing.T) {
 	require := require.New(t)
 	pods := make([]*corev1.Pod, 2)

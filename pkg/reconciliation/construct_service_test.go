@@ -214,26 +214,6 @@ func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T) {
 			"Add": "annotation",
 		})
 	}
-}
-
-// TestNewNodePortServiceForCassandraDatacenterHasResourceHash guards against a
-// regression where the NodePort service was built without a resource-hash
-// annotation. CheckHeadlessServices only updates an existing service when
-// ResourcesHaveSameHash reports a difference; without the hash annotation the
-// comparison always matched ("" == ""), so the NodePort service was created
-// once and never updated (changes to additionalServiceConfig were ignored).
-func TestNewNodePortServiceForCassandraDatacenterHasResourceHash(t *testing.T) {
-	dc := &api.CassandraDatacenter{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "dc1",
-		},
-		Spec: api.CassandraDatacenterSpec{
-			ClusterName:   "piclem",
-			ServerVersion: "4.0.1",
-		},
-	}
-
-	service := newNodePortServiceForCassandraDatacenter(dc)
 
 	assert.Contains(t, service.Annotations, utils.ResourceHashAnnotationKey,
 		"NodePort service must carry the resource-hash annotation so the operator reconciles updates to it")

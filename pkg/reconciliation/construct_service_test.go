@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/pkg/utils"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -213,6 +214,9 @@ func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T) {
 			"Add": "annotation",
 		})
 	}
+
+	assert.Contains(t, service.Annotations, utils.ResourceHashAnnotationKey,
+		"NodePort service must carry the resource-hash annotation so the operator reconciles updates to it")
 }
 
 func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T) {

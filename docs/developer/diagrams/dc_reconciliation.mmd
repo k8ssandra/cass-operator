@@ -1,0 +1,62 @@
+flowchart TD
+    A["Watch event<br/>CR spec or annotation change<br/>owned Service / StatefulSet / PDB change<br/>config Secret change<br/>dynamic watched Secret change"]
+    B["Reconcile(ctx, request)"]
+    C["Create request-scoped logger<br/>attach loopID<br/>start duration timer"]
+    D["CreateReconciliationContext"]
+    E["IsValid(datacenter)"]
+    F{"Cooldown or quiet period active?"}
+    G["CalculateReconciliationActions"]
+    Z1["Stop<br/>ignore deleted / missing resource"]
+    Z2["Stop<br/>return error"]
+    Z3["Stop<br/>terminal validation error"]
+    Z4["Stop<br/>RequeueAfter cooldown"]
+    A --> B --> C --> D
+    D -->|NotFound| Z1
+    D -->|Other error| Z2
+    D --> E
+    E -->|Invalid| Z3
+    E --> F
+    F -->|Yes| Z4
+    F -->|No| G
+    NOTE["Rule for the stages below:<br/>any stage that returns Done / RequeueSoon / Error<br/>exits the current reconcile pass immediately"]
+    G -.-> NOTE
+
+    subgraph P0["Planner entry"]
+        G --> P1{"DeletionTimestamp set?"}
+        P1 -->|Yes| P2["ProcessDeletion"]
+        P1 -->|No| P3["addFinalizer"]
+        P3 --> P4["CheckHeadlessServices<br/>and additional-seed EndpointSlices"]
+        P4 --> P5["CalculateRackInformation"]
+        P5 --> P6["ReconcileAllRacks"]
+    end
+
+    subgraph P1R["ReconcileAllRacks staged pipeline"]
+        P6 --> R0["List cluster pods<br/>derive datacenter pods<br/>fetch Cassandra metadata endpoints"]
+        R0 --> R1["CheckStatefulSetControllerCaughtUp"]
+        R1 --> R2["UpdateStatus"]
+        R2 --> R3["CheckConfigSecret"]
+        R3 --> R4["CheckRackCreation"]
+        R4 --> R5["CheckRackLabels"]
+        R5 --> R6["CheckDecommissioningNodes"]
+        R6 --> R7["CheckSuperuserSecretCreation"]
+        R7 --> R8["CheckInternodeCredentialCreation"]
+        R8 --> R9["CheckRackStoppedState"]
+        R9 --> R10["CheckRackForceUpgrade"]
+        R10 --> R11["CheckRackScale"]
+        R11 --> R12["CheckPodsReady"]
+        R12 --> R13["CheckCassandraNodeStatuses"]
+        R13 --> R14["DecommissionNodes"]
+        R14 --> R15["CheckRollingRestart"]
+        R15 --> R16["CheckDcPodDisruptionBudget"]
+        R16 --> R17["CheckPVCResizing"]
+        R17 --> R18["CheckRackPodTemplate"]
+        R18 --> R19["CheckRackPodLabels"]
+        R19 --> R20["CreateUsers"]
+        R20 --> R21["CheckClearActionConditions"]
+        R21 --> R22["CheckConditionInitializedAndReady"]
+        R22 --> R23["CheckFullQueryLogging"]
+        R23 --> R24["setOperatorProgressStatus(Ready)"]
+        R24 --> R25["setDatacenterStatus"]
+        R25 --> R26["enableQuietPeriod(5s)"]
+        R26 --> R27["Done"]
+    end

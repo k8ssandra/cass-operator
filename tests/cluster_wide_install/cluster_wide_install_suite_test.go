@@ -37,7 +37,7 @@ var (
 func TestLifecycle(t *testing.T) {
 	ginkgo_util.RunTestLifecycleWithCleanup(t, testName, ns, func() error {
 		return kustomize.UndeployDir(opNamespace, "cluster_wide_install")
-	})
+	}, dcNamespace1, dcNamespace2)
 }
 
 var _ = Describe(testName, func() {

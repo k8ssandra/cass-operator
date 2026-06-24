@@ -141,7 +141,3 @@ type ImageComponent struct {
 	Suffix     string `json:"suffix,omitempty"`
 	ImagePolicy
 }
-
-func init() {
-	SchemeBuilder.Register(&ImageConfig{}, &Images{})
-}

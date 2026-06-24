@@ -552,10 +552,6 @@ type CassandraDatacenterList struct {
 	Items           []CassandraDatacenter `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&CassandraDatacenter{}, &CassandraDatacenterList{})
-}
-
 func (dc *CassandraDatacenter) GetConfigBuilderImage() string {
 	return dc.Spec.ConfigBuilderImage
 }

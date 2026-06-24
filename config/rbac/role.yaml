@@ -23,6 +23,7 @@ rules:
   - ""
   resources:
   - configmaps
+  - events
   verbs:
   - get
   - list
@@ -34,15 +35,6 @@ rules:
   - endpoints/restricted
   verbs:
   - delete
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - get
   - list
   - watch
 - apiGroups:
@@ -157,6 +149,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
 - apiGroups:
   - policy
   resources:

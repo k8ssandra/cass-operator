@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/pkg/errors"
@@ -21,12 +22,53 @@ import (
 	. "github.com/onsi/gomega"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
 )
 
 const (
 	EnvNoCleanup = "M_NO_CLEANUP"
 )
+
+type LifecycleCleanup func() error
+
+func RunTestLifecycle(t *testing.T, testName string, ns NsWrapper) {
+	RunTestLifecycleWithCleanup(t, testName, ns, func() error {
+		return kustomize.Undeploy(ns.Namespace)
+	})
+}
+
+func RunTestLifecycleWithCleanup(t *testing.T, testName string, ns NsWrapper, cleanup LifecycleCleanup) {
+	ginkgo.AfterSuite(func() {
+		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
+		err := kubectl.DumpAllLogs(logPath).ExecV()
+		if err != nil {
+			t.Logf("Failed to dump all the logs: %v", err)
+		}
+
+		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
+		if ShouldSkipCleanup() {
+			fmt.Printf("Skipping cleanup and deletion because %s is set.\n", EnvNoCleanup)
+			return
+		}
+
+		ns.Terminate()
+		if cleanup != nil {
+			err = cleanup()
+			if err != nil {
+				t.Logf("Failed to cleanup test suite: %v", err)
+			}
+		}
+	})
+
+	RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecs(t, testName)
+}
+
+func ShouldSkipCleanup() bool {
+	value := os.Getenv(EnvNoCleanup)
+	return value != "" && value != "false"
+}
 
 func duplicate(value string, count int) string {
 	result := []string{}
@@ -261,8 +303,7 @@ func (k *NsWrapper) countStep() int {
 }
 
 func (ns NsWrapper) Terminate() {
-	noCleanup := os.Getenv(EnvNoCleanup)
-	if strings.ToLower(noCleanup) == "true" {
+	if ShouldSkipCleanup() {
 		fmt.Println("Skipping namespace cleanup and deletion.")
 		return
 	}

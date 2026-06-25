@@ -256,7 +256,3 @@ type CassandraTaskList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CassandraTask `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&CassandraTask{}, &CassandraTaskList{})
-}

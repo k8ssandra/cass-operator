@@ -62,7 +62,8 @@ var (
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=endpoints;endpoints/restricted,verbs=list;watch;delete
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods,verbs=get;list;watch;update;patch;delete
-// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=events,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=events,verbs=get;list;watch
+// +kubebuilder:rbac:groups=events.k8s.io,namespace=cass-operator,resources=events,verbs=create
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=namespaces,verbs=get
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=policy,namespace=cass-operator,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete

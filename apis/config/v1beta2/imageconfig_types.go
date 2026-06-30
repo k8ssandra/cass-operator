@@ -180,7 +180,3 @@ type ImageComponent struct {
 	// We ignore Tag from the Image, but other fields are preserved.
 	Image
 }
-
-func init() {
-	SchemeBuilder.Register(&ImageConfig{})
-}

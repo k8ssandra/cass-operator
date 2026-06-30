@@ -36,7 +36,3 @@ type OperatorConfig struct {
 	// +optional
 	ImageConfigFile string `json:"imageConfigFile,omitempty"`
 }
-
-func init() {
-	SchemeBuilder.Register(&OperatorConfig{})
-}

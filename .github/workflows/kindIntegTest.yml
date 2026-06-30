@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Set version value
@@ -69,11 +69,11 @@ jobs:
       M_SERVER_IMAGE: docker.io/k8ssandra/cass-management-api:3.11.17-ubi8
       SKIP_GATEKEEPER: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
@@ -107,11 +107,11 @@ jobs:
       M_INTEG_DIR: ${{ matrix.integration_test }}
       SKIP_GATEKEEPER: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
@@ -147,11 +147,11 @@ jobs:
       M_SERVER_VERSION: ${{ matrix.version }}
       SKIP_GATEKEEPER: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
@@ -231,11 +231,11 @@ jobs:
       M_INTEG_DIR: ${{ matrix.integration_test }}
       M_SERVER_VERSION: ${{ matrix.version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name != 'pull_request'
       - uses: ./.github/actions/run-integ-test
         with:
@@ -288,11 +288,11 @@ jobs:
       M_SERVER_IMAGE: ${{ matrix.serverImage }}
       M_SERVER_TYPE: ${{ matrix.serverType }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name != 'pull_request'
       - name: Set SKIP_GATEKEEPER
         if: ${{ matrix.skipGatekeeper }}
@@ -334,11 +334,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lvm2 xfsprogs thin-provisioning-tools
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: topolvm/topolvm
           path: topolvm

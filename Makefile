@@ -154,12 +154,12 @@ test: manifests generate fmt vet lint envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./apis/... ./internal/... -coverprofile cover.out
 
 .PHONY: integ-test
-integ-test: kustomize cert-manager helm ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
+integ-test: kustomize cert-manager helm support-bundle ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
 ifeq ($(M_INTEG_DIR), all)
 	# Run all the tests (exclude kustomize & testdata directories)
-	cd tests && go test -v ./... -timeout 60m --ginkgo.show-node-events --ginkgo.v
+	cd tests && PATH="$(abspath $(LOCALBIN)):$$PATH" go test -v ./... -timeout 60m --ginkgo.show-node-events --ginkgo.v
 else
-	cd tests/${M_INTEG_DIR} && go test -v ./... -timeout 60m --ginkgo.show-node-events --ginkgo.v
+	cd tests/${M_INTEG_DIR} && PATH="$(abspath $(LOCALBIN)):$$PATH" go test -v ./... -timeout 60m --ginkgo.show-node-events --ginkgo.v
 endif
 
 .PHONY: version
@@ -267,6 +267,7 @@ GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
 HELM ?= $(LOCALBIN)/helm
 OPM ?= $(LOCALBIN)/opm
+SUPPORT_BUNDLE ?= $(LOCALBIN)/kubectl-support_bundle
 
 ## Tool Versions
 CERT_MANAGER_VERSION ?= v1.20.2
@@ -275,6 +276,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.21.0
 OPERATOR_SDK_VERSION ?= 1.42.2
 HELM_VERSION ?= 4.2.2
 OPM_VERSION ?= 1.61.0
+TROUBLESHOOT_VERSION ?= v0.130.0
 GOLANGCI_LINT_VERSION ?= v2.12.2
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
@@ -318,6 +320,31 @@ golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
+OS=$(shell go env GOOS)
+ARCH=$(shell go env GOARCH)
+
+.PHONY: support-bundle
+support-bundle: $(SUPPORT_BUNDLE) ## Download the troubleshoot.sh kubectl support-bundle plugin locally if necessary.
+
+TROUBLESHOOT_ARCH ?= $(ARCH)
+ifeq ($(OS),darwin)
+TROUBLESHOOT_ARCH = all
+endif
+TROUBLESHOOT_TARNAME = support-bundle_${OS}_${TROUBLESHOOT_ARCH}.tar.gz
+SUPPORT_BUNDLE_VERSIONED = $(SUPPORT_BUNDLE)-$(TROUBLESHOOT_VERSION)
+$(SUPPORT_BUNDLE): $(SUPPORT_BUNDLE_VERSIONED)
+	ln -sf $(SUPPORT_BUNDLE_VERSIONED) $(SUPPORT_BUNDLE)
+
+$(SUPPORT_BUNDLE_VERSIONED): $(LOCALBIN)
+	@{ \
+	set -e ;\
+	curl -sSLo $(LOCALBIN)/$(TROUBLESHOOT_TARNAME) https://github.com/replicatedhq/troubleshoot/releases/download/$(TROUBLESHOOT_VERSION)/$(TROUBLESHOOT_TARNAME) ;\
+	tar -zxf $(LOCALBIN)/$(TROUBLESHOOT_TARNAME) -C $(LOCALBIN)/ ;\
+	mv $(LOCALBIN)/support-bundle $(SUPPORT_BUNDLE_VERSIONED) ;\
+	rm -f $(LOCALBIN)/$(TROUBLESHOOT_TARNAME) ;\
+	chmod +x $(SUPPORT_BUNDLE_VERSIONED) ;\
+	}
+
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
 # $2 - package url which can be installed
@@ -333,10 +360,6 @@ mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $(1)-$(3) $(1)
 endef
-
-
-OS=$(shell go env GOOS)
-ARCH=$(shell go env GOARCH)
 
 HELMTARNAME = helm-v$(HELM_VERSION)-${OS}-${ARCH}.tar.gz
 .PHONY: helm

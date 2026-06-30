@@ -89,6 +89,13 @@ jobs:
         with:
           name: k8s-logs-${{ matrix.integration_test }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-${{ matrix.integration_test }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore
 
   kind_40_tests:
     if: ${{ inputs.version == '4.0' || inputs.version == 'ALL' }}
@@ -124,6 +131,13 @@ jobs:
         with:
           name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-${{ matrix.integration_test }}-${{ matrix.version }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore
 
   kind_dse_tests:
     if: ${{ inputs.version == '6.8' || inputs.version == 'ALL' }}
@@ -161,6 +175,13 @@ jobs:
         with:
           name: k8s-logs-${{ matrix.integration_test }}-dse-${{ matrix.version }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-${{ matrix.integration_test }}-dse-${{ matrix.version }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore
 
   kind_int_tests:
     needs: build_docker_images
@@ -259,6 +280,13 @@ jobs:
         with:
           name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-${{ matrix.integration_test }}-${{ matrix.version }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore
   kind_smoke_tests:
     needs: build_docker_images
     strategy:
@@ -309,3 +337,10 @@ jobs:
         with:
           name: k8s-logs-smoke_test-${{ matrix.version }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-smoke_test-${{ matrix.version }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore

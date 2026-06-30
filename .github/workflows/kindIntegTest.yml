@@ -84,6 +84,13 @@ jobs:
         with:
           name: k8s-logs-${{ matrix.integration_test }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-${{ matrix.integration_test }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore
   # This job is only for tests that don't run or don't pass against 4.1 yet
   kind_40_tests:
     needs: build_docker_images
@@ -115,6 +122,13 @@ jobs:
         with:
           name: k8s-logs-${{ matrix.integration_test }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-${{ matrix.integration_test }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore
   kind_int_no_gatekeeper_tests:
     needs: build_docker_images
     strategy:
@@ -148,6 +162,13 @@ jobs:
         with:
           name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-${{ matrix.integration_test }}-${{ matrix.version }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore
   kind_int_tests:
     needs: build_docker_images
     strategy:
@@ -225,6 +246,13 @@ jobs:
         with:
           name: k8s-logs-${{ matrix.integration_test }}-${{ matrix.version }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-${{ matrix.integration_test }}-${{ matrix.version }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore
   kind_smoke_tests:
     needs: build_docker_images
     strategy:
@@ -278,6 +306,13 @@ jobs:
         with:
           name: k8s-logs-smoke_test-${{ matrix.version }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-smoke_test-${{ matrix.version }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore
   kind_topolvm_tests:
     name: TopoLVM kind installation with volumeExpansion
     needs: build_docker_images
@@ -368,3 +403,10 @@ jobs:
         with:
           name: k8s-logs-topolvm-test-${{ matrix.version }}
           path: ./build/kubectl_dump
+      - name: Archive support bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: support-bundle-topolvm-test-${{ matrix.version }}
+          path: ./build/kubectl_dump/**/support-bundle/**
+          if-no-files-found: ignore

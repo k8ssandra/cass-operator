@@ -35,21 +35,9 @@ var (
 )
 
 func TestLifecycle(t *testing.T) {
-	AfterSuite(func() {
-		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		err := kubectl.DumpAllLogs(logPath).ExecV()
-		if err != nil {
-			fmt.Printf("\n\tError during dumping logs: %s\n\n", err.Error())
-		}
-		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
-		ns.Terminate()
-		err = kustomize.UndeployDir(opNamespace, "cluster_wide_install")
-		if err != nil {
-			t.Logf("Failed to undeploy cass-operator: %v", err)
-		}
-	})
-	RegisterFailHandler(Fail)
-	RunSpecs(t, testName)
+	ginkgo_util.RunTestLifecycleWithCleanup(t, testName, ns, func() error {
+		return kustomize.UndeployDir(opNamespace, "cluster_wide_install")
+	}, dcNamespace1, dcNamespace2)
 }
 
 var _ = Describe(testName, func() {

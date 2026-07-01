@@ -107,7 +107,7 @@ func RemoveDatacenterPods(namespace, cluster, datacenter string) {
 	PodStatusVec.DeletePartialMatch(prometheus.Labels{"namespace": namespace, "cluster": cluster, "datacenter": datacenter})
 }
 
-func SetDatacenterConditionMetric(dc *api.CassandraDatacenter, conditionType api.DatacenterConditionType, status corev1.ConditionStatus) {
+func setDatacenterConditionMetric(dc *api.CassandraDatacenter, conditionType api.DatacenterConditionType, status corev1.ConditionStatus) {
 	cond := float64(0)
 	if status == corev1.ConditionTrue {
 		cond = 1
@@ -116,12 +116,20 @@ func SetDatacenterConditionMetric(dc *api.CassandraDatacenter, conditionType api
 	DatacenterStatusVec.WithLabelValues(dc.Namespace, dc.Spec.ClusterName, dc.DatacenterName(), string(conditionType)).Set(cond)
 }
 
-func UpdateOperatorDatacenterProgressStatusMetric(dc *api.CassandraDatacenter, state api.ProgressState) {
+func updateOperatorDatacenterProgressStatusMetric(dc *api.CassandraDatacenter, state api.ProgressState) {
 	// Delete other statuses
 	DatacenterOperatorStatusVec.DeletePartialMatch(prometheus.Labels{"namespace": dc.Namespace, "cluster": dc.Spec.ClusterName, "datacenter": dc.DatacenterName()})
 
 	// Set this one only
 	DatacenterOperatorStatusVec.WithLabelValues(dc.Namespace, dc.Spec.ClusterName, dc.DatacenterName(), string(state)).Set(1)
+}
+
+func RefreshDatacenterMetrics(dc *api.CassandraDatacenter) {
+	for _, cond := range dc.Status.Conditions {
+		setDatacenterConditionMetric(dc, cond.Type, cond.Status)
+	}
+
+	updateOperatorDatacenterProgressStatusMetric(dc, dc.Status.CassandraOperatorProgress)
 }
 
 // Add CassandraTask status also (how many pods done etc) per task

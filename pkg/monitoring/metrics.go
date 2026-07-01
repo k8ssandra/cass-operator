@@ -124,6 +124,18 @@ func UpdateOperatorDatacenterProgressStatusMetric(dc *api.CassandraDatacenter, s
 	DatacenterOperatorStatusVec.WithLabelValues(dc.Namespace, dc.Spec.ClusterName, dc.DatacenterName(), string(state)).Set(1)
 }
 
+// UpdateDatacenterMetricsFromStatus re-asserts the progress and condition gauges from the
+// datacenter's persisted status. These are otherwise only written on a transition, so they are
+// lost on operator restart or leader change until the datacenter changes state again.
+func UpdateDatacenterMetricsFromStatus(dc *api.CassandraDatacenter) {
+	if dc.Status.CassandraOperatorProgress != "" {
+		UpdateOperatorDatacenterProgressStatusMetric(dc, dc.Status.CassandraOperatorProgress)
+	}
+	for _, condition := range dc.Status.Conditions {
+		SetDatacenterConditionMetric(dc, condition.Type, condition.Status)
+	}
+}
+
 // Add CassandraTask status also (how many pods done etc) per task
 // Add podnames to the CassandraTask status that are done? Or waiting?
 

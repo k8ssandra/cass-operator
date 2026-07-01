@@ -80,7 +80,7 @@ func TestMetricAdder(t *testing.T) {
 	require.NoError(err)
 	require.Equal("terminating", status)
 
-	// Decommissioning should be prefered to Terminating if we are decommissioning the pod
+	// Decommissioning should be preferred to Terminating if we are decommissioning the pod
 	pods[5].SetDeletionTimestamp(&now)
 	UpdatePodStatusMetric(pods[1])
 	status, err = getCurrentPodStatus("pod5")

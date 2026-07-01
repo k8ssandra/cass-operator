@@ -1953,6 +1953,29 @@ func TestStripPassword(t *testing.T) {
 	assert.False(t, strings.Contains(err.Error(), password))
 }
 
+func TestStripPasswordWithUrlEncodedPassword(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	password := "secret+Password"
+	encodedPassword := "secret%2BPassword"
+	client := httphelper.NodeMgmtClient{
+		Client: httpClientDoFunc(func(req *http.Request) (*http.Response, error) {
+			return nil, fmt.Errorf("Post %q: EOF", req.URL.String())
+		}),
+		Log:      rc.ReqLogger,
+		Protocol: "http",
+	}
+
+	pod := makeReloadTestPod()
+
+	err := client.CallCreateRoleEndpoint(pod, "userNameA", password, true)
+	require.Error(t, err)
+
+	assert.NotContains(t, err.Error(), password)
+	assert.NotContains(t, err.Error(), encodedPassword)
+}
+
 func TestNodereplacements(t *testing.T) {
 	assert := assert.New(t)
 	rc, _, cleanupMockScr := setupTest()

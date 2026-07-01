@@ -1959,15 +1959,24 @@ func TestStripPasswordWithUrlEncodedPassword(t *testing.T) {
 
 	password := "secret+Password"
 	encodedPassword := "secret%2BPassword"
+
+	mockHttpClient := mocks.NewHttpClient(t)
+	mockHttpClient.On("Do",
+		mock.MatchedBy(
+			func(req *http.Request) bool {
+				return req != nil
+			})).
+		Return(nil, errors.New(encodedPassword)).
+		Once()
+
 	client := httphelper.NodeMgmtClient{
-		Client: httpClientDoFunc(func(req *http.Request) (*http.Response, error) {
-			return nil, fmt.Errorf("Post %q: EOF", req.URL.String())
-		}),
+		Client:   mockHttpClient,
 		Log:      rc.ReqLogger,
 		Protocol: "http",
 	}
 
 	pod := makeReloadTestPod()
+	pod.Status.PodIP = "1.2.3.4"
 
 	err := client.CallCreateRoleEndpoint(pod, "userNameA", password, true)
 	require.Error(t, err)

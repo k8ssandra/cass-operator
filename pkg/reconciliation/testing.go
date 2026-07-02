@@ -123,8 +123,8 @@ func CreateMockReconciliationContext(
 
 	storageClass := &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   storageClassName,
-			Labels: map[string]string{"storageclass.kubernetes.io/is-default-class": "true"},
+			Name:        storageClassName,
+			Annotations: map[string]string{"storageclass.kubernetes.io/is-default-class": "true"},
 		},
 	}
 

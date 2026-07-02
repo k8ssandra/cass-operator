@@ -9,7 +9,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
-## unreleased
+## v1.30.3
 
 * [BUGFIX] [#938](https://github.com/k8ssandra/cass-operator/issues/938) Stripping of passwords from logs was failing if the password included characters that caused URLEncode to happen
 

@@ -182,7 +182,12 @@ func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
 					// Pod has been over 5 minutes in Pending state. This can be normal, but lets see
 					// if we have some detected failures events like FailedScheduling
 					events := &corev1.EventList{}
-					if err := rc.Client.List(rc.Ctx, events, &client.ListOptions{Namespace: pod.Namespace, FieldSelector: fields.SelectorFromSet(fields.Set{"involvedObject.name": pod.Name})}); err != nil {
+					// Read Events through the uncached APIReader: only this one Pod's
+					// events are needed, and a cached read would instantiate a
+					// cluster-wide informer for Events — the highest-cardinality,
+					// highest-churn resource — which is prohibitively expensive in
+					// memory when the operator runs cluster-scoped.
+					if err := rc.APIReader.List(rc.Ctx, events, &client.ListOptions{Namespace: pod.Namespace, FieldSelector: fields.SelectorFromSet(fields.Set{"involvedObject.name": pod.Name})}); err != nil {
 						rc.ReqLogger.Error(err, "error getting events for pod", "pod", pod.Name)
 						return false, ""
 					}

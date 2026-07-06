@@ -11,6 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#947](https://github.com/k8ssandra/cass-operator/issues/947) Bound the informer cache in cluster-scoped mode: label-scope Pod/StatefulSet/PodDisruptionBudget/Service informers to operator-managed objects, read Secrets/PVCs/ConfigMaps/Endpoints/EndpointSlices/StorageClasses through live API calls with metadata-only Secret watches, and strip managedFields/last-applied from cached objects. Operator memory no longer scales with cluster size.
 * [BUGFIX] [#933](https://github.com/k8ssandra/cass-operator/issues/933) Fix regression introduced in the CassandraTask replacement process introduced in the full rack replacement feature.
 * [BUGFIX] [#930](https://github.com/k8ssandra/cass-operator/issues/930) Add the missing resource-hash annotation to the NodePort service so changes to it are detected and reconciled.
 * [BUGFIX] [#938](https://github.com/k8ssandra/cass-operator/issues/938) Stripping of passwords from logs was failing if the password included characters that caused URLEncode to happen

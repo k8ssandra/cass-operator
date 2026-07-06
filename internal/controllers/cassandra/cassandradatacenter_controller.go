@@ -73,9 +73,12 @@ var (
 // CassandraDatacenterReconciler reconciles a cassandraDatacenter object
 type CassandraDatacenterReconciler struct {
 	client.Client
-	Log      logr.Logger
-	Scheme   *runtime.Scheme
-	Recorder events.EventRecorder
+	// APIReader is an uncached reader (mgr.GetAPIReader) used for high-cardinality
+	// reads deliberately kept out of the informer cache, such as Events.
+	APIReader client.Reader
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	Recorder  events.EventRecorder
 
 	// SecretWatches is used in the controller when setting up the watches and
 	// during reconciliation where we update the mappings for the watches.
@@ -114,7 +117,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 	logger.Info("======== handler::Reconcile has been called")
 
-	rc, err := reconciliation.CreateReconciliationContext(ctx, &request, r.Client, r.Scheme, r.Recorder, r.SecretWatches, r.ImageRegistry, r.ClusterResources)
+	rc, err := reconciliation.CreateReconciliationContext(ctx, &request, r.Client, r.APIReader, r.Scheme, r.Recorder, r.SecretWatches, r.ImageRegistry, r.ClusterResources)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.

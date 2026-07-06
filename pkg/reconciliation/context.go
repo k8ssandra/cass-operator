@@ -27,8 +27,11 @@ import (
 
 // ReconciliationContext contains all of the input necessary to calculate a list of ReconciliationActions
 type ReconciliationContext struct {
-	Request          *reconcile.Request
-	Client           client.Client
+	Request *reconcile.Request
+	Client  client.Client
+	// APIReader is an uncached reader (mgr.GetAPIReader) used for high-cardinality
+	// reads deliberately kept out of the informer cache, such as Events.
+	APIReader        client.Reader
 	Scheme           *runtime.Scheme
 	Datacenter       *api.CassandraDatacenter
 	NodeMgmtClient   httphelper.NodeMgmtClient
@@ -56,6 +59,7 @@ func CreateReconciliationContext(
 	ctx context.Context,
 	req *reconcile.Request,
 	cli client.Client,
+	apiReader client.Reader,
 	scheme *runtime.Scheme,
 	rec record.EventRecorder,
 	secretWatches dynamicwatch.DynamicWatches,
@@ -66,6 +70,7 @@ func CreateReconciliationContext(
 	rc := &ReconciliationContext{}
 	rc.Request = req
 	rc.Client = cli
+	rc.APIReader = apiReader
 	rc.Scheme = scheme
 	rc.SecretWatches = secretWatches
 	rc.ReqLogger = reqLogger

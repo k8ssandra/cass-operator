@@ -155,7 +155,7 @@ func OutputWithEnvWithInput(env map[string]string, cmd string, in string, args .
 }
 
 // Copied from mage
-func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, err error) {
+func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (bool, error) {
 	expand := func(s string) string {
 		s2, ok := env[s]
 		if ok {
@@ -177,7 +177,7 @@ func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...s
 	return ran, fmt.Errorf(`failed to run "%s %s: %v"`, cmd, strings.Join(args, " "), err)
 }
 
-func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
+func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (bool, int, error) {
 	c := exec.Command(cmd, args...)
 	c.Env = os.Environ()
 	for k, v := range env {
@@ -187,7 +187,7 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	c.Stdout = stdout
 	c.Stdin = os.Stdin
 	log.Println("exec:", cmd, strings.Join(args, " "))
-	err = c.Run()
+	err := c.Run()
 	return CmdRan(err), ExitStatus(err), err
 }
 

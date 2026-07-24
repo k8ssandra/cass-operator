@@ -172,6 +172,16 @@ func TestStorageExpansionNils(t *testing.T) {
 	require.True(supports)
 }
 
+func TestStorageClassDefaultOne(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	storageClass, err := storageClass(rc.Ctx, rc.Client, nil)
+	require.NoError(err)
+	require.Equal("standard", storageClass.Name)
+}
+
 func podWithPVC(rc *ReconciliationContext, podName string, pvcName string) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

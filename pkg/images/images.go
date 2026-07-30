@@ -69,7 +69,7 @@ func (i *imageRegistry) loadImageConfig(content []byte) (*configv1beta1.ImageCon
 	return parsedImageConfig, nil
 }
 
-func (i *imageRegistry) splitRegistry(image string) (registry string, imageNoRegistry string) {
+func (i *imageRegistry) splitRegistry(image string) (string, string) {
 	comps := strings.Split(image, "/")
 
 	if len(comps) > 1 && (strings.Contains(comps[0], ".") || strings.Contains(comps[0], ":")) {

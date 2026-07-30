@@ -191,13 +191,14 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		Owns(&policyv1.PodDisruptionBudget{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
 		Owns(&corev1.Service{}, builder.WithPredicates(managedByCassandraOperatorPredicate))
 
+	// Uses only object metadata (no *corev1.Secret assertion) so it works with the
+	// metadata-only projected watch below.
 	configSecretMapFn := func(ctx context.Context, mapObj client.Object) []reconcile.Request {
 		requests := make([]reconcile.Request, 0)
-		secret := mapObj.(*corev1.Secret)
-		if v, ok := secret.Annotations[api.DatacenterAnnotation]; ok {
+		if v, ok := mapObj.GetAnnotations()[api.DatacenterAnnotation]; ok {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Namespace: secret.Namespace,
+					Namespace: mapObj.GetNamespace(),
 					Name:      v,
 				},
 			})
@@ -229,7 +230,10 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		},
 	}
 
-	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(configSecretMapFn), builder.WithPredicates(configSecretPredicate))
+	// builder.OnlyMetadata: the map fn and predicate above only need annotations, so
+	// cache Secret metadata instead of full objects (Secret data reads go through the
+	// live client — see Client.Cache.DisableFor in cmd/main.go).
+	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(configSecretMapFn), builder.WithPredicates(configSecretPredicate), builder.OnlyMetadata)
 
 	// Setup watches for Secrets. These secrets are often not owned by or created by
 	// the operator, so we must create a mapping back to the appropriate datacenters.
@@ -245,7 +249,8 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		return requests
 	}
 
-	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(toRequests))
+	// builder.OnlyMetadata: FindWatchers only inspects metadata (name/annotations).
+	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(toRequests), builder.OnlyMetadata)
 
 	return c.Complete(r)
 }

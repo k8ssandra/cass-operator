@@ -29,8 +29,14 @@ import (
 	"go.uber.org/zap/zapcore"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -53,6 +59,7 @@ import (
 	controlcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/control"
 	apiwebhook "github.com/k8ssandra/cass-operator/internal/webhooks/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
@@ -185,8 +192,46 @@ func main() {
 		setupLog.Info("webhooks disabled because --webhook-cert-path was not provided")
 	}
 
+	// Bound the informer cache so cluster-scoped mode (empty WATCH_NAMESPACE) does not
+	// cache every object of every watched type across all namespaces:
+	//
+	//   * Pod/StatefulSet/PodDisruptionBudget/Service informers are label-scoped to
+	//     managed-by=cass-operator: the operator only ever reads objects it created,
+	//     and it labels all of them. These are the hot read paths (every reconcile),
+	//     so they stay cached.
+	//   * Secrets are read through live API calls (Client.Cache.DisableFor) because
+	//     the operator also reads user-provided secrets (SuperuserSecretName,
+	//     Spec.Users, ConfigSecret, management API TLS) that carry no operator label;
+	//     the two Secret watches use metadata-only projection (builder.OnlyMetadata),
+	//     so no full-object Secret informer ever exists. PVC/StorageClass/
+	//     EndpointSlice/Endpoints/ConfigMap reads are cold paths and also go live,
+	//     avoiding lazily-created cluster-wide informers for those types.
+	//   * All cached objects are stripped of managedFields and the kubectl
+	//     last-applied-configuration annotation, which often dominate object size.
+	managedByOperator := labels.SelectorFromSet(labels.Set{
+		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+	})
 	options.Cache = cache.Options{
 		DefaultNamespaces: map[string]cache.Config{},
+		DefaultTransform:  stripHeavyMetadata(),
+		ByObject: map[client.Object]cache.ByObject{
+			&corev1.Pod{}:                   {Label: managedByOperator},
+			&appsv1.StatefulSet{}:           {Label: managedByOperator},
+			&policyv1.PodDisruptionBudget{}: {Label: managedByOperator},
+			&corev1.Service{}:               {Label: managedByOperator},
+		},
+	}
+	options.Client = client.Options{
+		Cache: &client.CacheOptions{
+			DisableFor: []client.Object{
+				&corev1.Secret{},
+				&corev1.PersistentVolumeClaim{},
+				&corev1.ConfigMap{},
+				&corev1.Endpoints{},
+				&discoveryv1.EndpointSlice{},
+				&storagev1.StorageClass{},
+			},
+		},
 	}
 
 	clusterScoped := len(ns) == 0
@@ -341,6 +386,30 @@ func setupWebhookServer(webhookCertPath, webhookCertName, webhookCertKey string,
 	return webhook.NewServer(webhook.Options{
 		TLSOpts: webhookTLSOpts,
 	}), webhookCertWatcher, true, nil
+}
+
+// stripHeavyMetadata extends cache.TransformStripManagedFields by also dropping the
+// kubectl last-applied-configuration annotation from every cached object: for a
+// kubectl-applied object that annotation embeds the full object (including Secret
+// data), so it dominates cached-object size — and even survives metadata-only
+// projection, since annotations are part of PartialObjectMetadata. Nothing in the
+// operator reads it.
+func stripHeavyMetadata() toolscache.TransformFunc {
+	stripManagedFields := cache.TransformStripManagedFields()
+	return func(obj interface{}) (interface{}, error) {
+		obj, err := stripManagedFields(obj)
+		if err != nil {
+			return obj, err
+		}
+		if m, ok := obj.(metav1.Object); ok {
+			annotations := m.GetAnnotations()
+			if _, found := annotations[corev1.LastAppliedConfigAnnotation]; found {
+				delete(annotations, corev1.LastAppliedConfigAnnotation)
+				m.SetAnnotations(annotations)
+			}
+		}
+		return obj, nil
+	}
 }
 
 func setupCacheIndexers(ctx context.Context, mgr ctrl.Manager) error {

@@ -24,6 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/reconciliation"
 	appsv1 "k8s.io/api/apps/v1"
@@ -162,6 +163,9 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	if res.RequeueAfter > 0 && res.RequeueAfter < minimumRequeueTime {
 		res.RequeueAfter = minimumRequeueTime
 	}
+
+	monitoring.RefreshDatacenterMetrics(rc.Datacenter)
+
 	return res, err
 }
 

@@ -561,6 +561,59 @@ func TestDropRole(t *testing.T) {
 	require.NoError(err)
 }
 
+func TestInsertIdentityToRole(t *testing.T) {
+	require := require.New(t)
+	identity := "spiffe://sidecar.prod.example.com/user/u_12345/credential/credential-id"
+
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodPost, req.Method)
+		require.Equal("/api/v1/ops/auth/identity_to_role", req.URL.Path)
+		require.Equal("application/json", req.Header.Get("Content-Type"))
+
+		var payload map[string]string
+		require.NoError(json.NewDecoder(req.Body).Decode(&payload))
+		require.Equal(map[string]string{
+			"identity": identity,
+			"role":     "schema_reader",
+		}, payload)
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
+
+	mgmtClient := newMockMgmtClient(httpClient)
+	require.NoError(mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, identity, "schema_reader"))
+}
+
+func TestDeleteIdentityToRole(t *testing.T) {
+	require := require.New(t)
+	identity := "spiffe://sidecar.prod.example.com/user/u_12345/credential/credential-id"
+
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodDelete, req.Method)
+		require.Equal("/api/v1/ops/auth/identity_to_role", req.URL.Path)
+		require.Equal("application/json", req.Header.Get("Content-Type"))
+
+		var payload map[string]string
+		require.NoError(json.NewDecoder(req.Body).Decode(&payload))
+		require.Equal(map[string]string{
+			"identity": identity,
+		}, payload)
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
+
+	mgmtClient := newMockMgmtClient(httpClient)
+	require.NoError(mgmtClient.CallDeleteIdentityToRoleEndpoint(goodPod, identity))
+}
+
+func TestIdentityToRoleValidation(t *testing.T) {
+	mgmtClient := newMockMgmtClient(nil)
+
+	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "", "schema_reader"), "identity cannot be empty")
+	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "spiffe://example.com/user/1", ""), "role cannot be empty")
+	assert.EqualError(t, mgmtClient.CallDeleteIdentityToRoleEndpoint(goodPod, ""), "identity cannot be empty")
+}
+
 func TestCallDurationMetricSuccess(t *testing.T) {
 	require := require.New(t)
 

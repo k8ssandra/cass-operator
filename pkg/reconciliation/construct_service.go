@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
@@ -31,11 +32,12 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 	if dc.IsNodePortEnabled() {
 		nativePort = dc.GetNodePortNativePort()
 	}
+	mgmtApiPort := managementApiPortForDatacenter(dc)
 
 	ports := []corev1.ServicePort{
 		namedServicePort("native", nativePort, nativePort),
 		namedServicePort("tls-native", 9142, 9142),
-		namedServicePort("mgmt-api", 8080, 8080),
+		namedServicePort("mgmt-api", mgmtApiPort, mgmtApiPort),
 		namedServicePort("prometheus", 9103, 9103),
 		namedServicePort("metrics", 9000, 9000),
 	}
@@ -100,6 +102,13 @@ func addAdditionalOptions(service *corev1.Service, serviceConfig *api.ServiceCon
 
 func namedServicePort(name string, port int, targetPort int) corev1.ServicePort {
 	return corev1.ServicePort{Name: name, Port: int32(port), TargetPort: intstr.FromInt(targetPort)}
+}
+
+func managementApiPortForDatacenter(dc *api.CassandraDatacenter) int {
+	if dc.Spec.PodTemplateSpec == nil {
+		return httphelper.GetMgmtApiPort(nil)
+	}
+	return httphelper.GetMgmtApiPort(dc.Spec.PodTemplateSpec.Spec.Containers)
 }
 
 func buildLabelSelectorForSeedService(dc *api.CassandraDatacenter) map[string]string {
@@ -279,13 +288,14 @@ func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev
 	if dc.IsNodePortEnabled() {
 		nativePort = dc.GetNodePortNativePort()
 	}
+	mgmtApiPort := managementApiPortForDatacenter(dc)
 
 	service.Spec.Ports = []corev1.ServicePort{
 		{
 			Name: "native", Port: int32(nativePort), TargetPort: intstr.FromInt(nativePort),
 		},
 		{
-			Name: "mgmt-api", Port: 8080, TargetPort: intstr.FromInt(8080),
+			Name: "mgmt-api", Port: int32(mgmtApiPort), TargetPort: intstr.FromInt(mgmtApiPort),
 		},
 		{
 			Name: "prometheus", Port: 9103, TargetPort: intstr.FromInt(9103),

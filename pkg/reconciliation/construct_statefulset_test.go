@@ -870,6 +870,24 @@ func TestAddManagementApiServerSecurity(t *testing.T) {
 			ClusterName:   "pleasenobob",
 			ServerType:    "cassandra",
 			ServerVersion: "5.0.6",
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: CassandraContainerName,
+							Ports: []corev1.ContainerPort{
+								{Name: "mgmt-api-http", ContainerPort: 8081},
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{GRPC: &corev1.GRPCAction{Port: 8081}},
+							},
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{GRPC: &corev1.GRPCAction{Port: 8081}},
+							},
+						},
+					},
+				},
+			},
 			ManagementApiAuth: api.ManagementApiAuthConfig{
 				Manual: &api.ManagementApiAuthManualConfig{
 					ClientSecretName: "mgmt-api-client-credentials",
@@ -911,4 +929,17 @@ func TestAddManagementApiServerSecurity(t *testing.T) {
 		}
 		require.True(foundServerCertsMount, "did not find management api server certs volume mount in container %s", c.Name)
 	}
+
+	cassContainer := findContainer(podTemplateSpec.Spec.Containers, CassandraContainerName)
+	require.NotNil(cassContainer)
+	require.NotNil(cassContainer.LivenessProbe)
+	require.Nil(cassContainer.LivenessProbe.GRPC)
+	require.NotNil(cassContainer.LivenessProbe.Exec)
+	require.Contains(cassContainer.LivenessProbe.Exec.Command,
+		"https://localhost:8081/api/v0/probes/liveness")
+	require.NotNil(cassContainer.ReadinessProbe)
+	require.Nil(cassContainer.ReadinessProbe.GRPC)
+	require.NotNil(cassContainer.ReadinessProbe.Exec)
+	require.Contains(cassContainer.ReadinessProbe.Exec.Command,
+		"https://localhost:8081/api/v0/probes/readiness")
 }

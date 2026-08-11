@@ -16,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
@@ -481,6 +482,7 @@ func TestServicePorts(t *testing.T) {
 		dc                  *api.CassandraDatacenter
 		dcServicePorts      []int32
 		allPodsServicePorts []int32
+		mgmtApiPort         int32
 	}{
 		{
 			name: "Cassandra 3.11.14",
@@ -505,6 +507,31 @@ func TestServicePorts(t *testing.T) {
 			},
 			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "Cassandra 4.0.7 with custom management API port",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{Name: "mgmt-api-http", ContainerPort: 8081},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			dcServicePorts:      []int32{8081, 9000, 9042, 9103, 9142},
+			allPodsServicePorts: []int32{8081, 9000, 9042, 9103},
+			mgmtApiPort:         8081,
 		},
 		{
 			name: "DSE 6.8.31",
@@ -557,15 +584,30 @@ func TestServicePorts(t *testing.T) {
 				}
 				return servicePorts
 			}
+			assertMgmtApiPort := func(svc *corev1.Service) {
+				if test.mgmtApiPort == 0 {
+					return
+				}
+				for _, port := range svc.Spec.Ports {
+					if port.Name == "mgmt-api" {
+						assert.Equal(t, test.mgmtApiPort, port.Port)
+						assert.Equal(t, intstr.FromInt(int(test.mgmtApiPort)), port.TargetPort)
+						return
+					}
+				}
+				assert.Fail(t, "mgmt-api service port not found")
+			}
 			t.Run("dc service", func(t *testing.T) {
 				svc := newServiceForCassandraDatacenter(test.dc)
 				servicePorts := getServicePorts(svc)
 				assert.ElementsMatch(t, servicePorts, test.dcServicePorts)
+				assertMgmtApiPort(svc)
 			})
 			t.Run("all pods service", func(t *testing.T) {
 				svc := newAllPodsServiceForCassandraDatacenter(test.dc)
 				servicePorts := getServicePorts(svc)
 				assert.ElementsMatch(t, servicePorts, test.allPodsServicePorts)
+				assertMgmtApiPort(svc)
 			})
 		})
 	}

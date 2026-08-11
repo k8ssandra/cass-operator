@@ -228,20 +228,22 @@ func BuildPodHostFromPod(pod *corev1.Pod) (string, int, error) {
 		return "", 0, newNoPodIPError(pod)
 	}
 
-	mgmtApiPort := 8080
+	return pod.Status.PodIP, GetMgmtApiPort(pod.Spec.Containers), nil
+}
 
-	// Check for port override
-	for _, container := range pod.Spec.Containers {
+// GetMgmtApiPort returns the named mgmt-api port from the cassandra container.
+func GetMgmtApiPort(containers []corev1.Container) int {
+	for _, container := range containers {
 		if container.Name == "cassandra" {
 			for _, port := range container.Ports {
 				if port.Name == "mgmt-api-http" {
-					mgmtApiPort = int(port.ContainerPort)
+					return int(port.ContainerPort)
 				}
 			}
 		}
 	}
 
-	return pod.Status.PodIP, mgmtApiPort, nil
+	return cassdcapi.DefaultMgmtApiPort
 }
 
 func GetPodHost(podName, clusterName, dcName, namespace string) string {
@@ -1274,7 +1276,7 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 		nodeMgmtCallDurationMetric.WithLabelValues(request.method, urlForMetric(request.endpoint), callResult).Observe(time.Since(startTime).Seconds())
 	}()
 
-	port := 8080
+	port := cassdcapi.DefaultMgmtApiPort
 	if request.port > 0 {
 		port = request.port
 	}

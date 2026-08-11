@@ -51,6 +51,63 @@ func Test_BuildPodHostFromPod(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestGetMgmtApiPort(t *testing.T) {
+	tests := []struct {
+		name       string
+		containers []corev1.Container
+		expected   int
+	}{
+		{
+			name:     "default without containers",
+			expected: api.DefaultMgmtApiPort,
+		},
+		{
+			name: "ignore management API port on another container",
+			containers: []corev1.Container{
+				{
+					Name:  "sidecar",
+					Ports: []corev1.ContainerPort{{Name: "mgmt-api-http", ContainerPort: 8081}},
+				},
+			},
+			expected: api.DefaultMgmtApiPort,
+		},
+		{
+			name: "ignore other Cassandra ports",
+			containers: []corev1.Container{
+				{
+					Name: "cassandra",
+					Ports: []corev1.ContainerPort{
+						{Name: "native", ContainerPort: 9042},
+						{Name: "metrics", ContainerPort: 9000},
+					},
+				},
+			},
+			expected: api.DefaultMgmtApiPort,
+		},
+		{
+			name: "custom management API port among other Cassandra ports",
+			containers: []corev1.Container{
+				{Name: "sidecar", Ports: []corev1.ContainerPort{{Name: "http", ContainerPort: 8082}}},
+				{
+					Name: "cassandra",
+					Ports: []corev1.ContainerPort{
+						{Name: "native", ContainerPort: 9042},
+						{Name: "mgmt-api-http", ContainerPort: 8081},
+						{Name: "metrics", ContainerPort: 9000},
+					},
+				},
+			},
+			expected: 8081,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, GetMgmtApiPort(test.containers))
+		})
+	}
+}
+
 func Test_parseMetadataEndpointsResponseBody(t *testing.T) {
 	endpoints, err := parseMetadataEndpointsResponseBody([]byte(`{
 		"entity": [

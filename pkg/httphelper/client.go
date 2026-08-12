@@ -396,6 +396,73 @@ func (client *NodeMgmtClient) CallDropRoleEndpoint(pod *corev1.Pod, username str
 	return err
 }
 
+type identityToRoleRequest struct {
+	Identity string  `json:"identity"`
+	Role     string  `json:"role,omitempty"`
+	TTL      float64 `json:"ttl,omitempty"`
+}
+
+// CallInsertIdentityToRoleEndpoint inserts a SPIFFE identity to Cassandra role mapping.
+func (client *NodeMgmtClient) CallInsertIdentityToRoleEndpoint(pod *corev1.Pod, identity, role string, ttl time.Duration) error {
+	client.Log.Info(
+		"calling Management API insert identity to role - POST /api/v1/ops/auth/identity_to_role",
+		"pod", pod.Name,
+	)
+
+	if identity == "" || role == "" {
+		return errors.New("identity and role must be set")
+	}
+	if ttl != 0 && ttl < time.Second {
+		return errors.New("ttl must be at least one second")
+	}
+
+	return client.callIdentityToRoleEndpoint(pod, http.MethodPost, identityToRoleRequest{
+		Identity: identity,
+		Role:     role,
+		TTL:      ttl.Seconds(),
+	})
+}
+
+// CallDeleteIdentityToRoleEndpoint removes a SPIFFE identity to Cassandra role mapping.
+func (client *NodeMgmtClient) CallDeleteIdentityToRoleEndpoint(pod *corev1.Pod, identity string) error {
+	client.Log.Info(
+		"calling Management API delete identity to role - DELETE /api/v1/ops/auth/identity_to_role",
+		"pod", pod.Name,
+	)
+
+	if identity == "" {
+		return errors.New("identity cannot be empty")
+	}
+
+	return client.callIdentityToRoleEndpoint(pod, http.MethodDelete, identityToRoleRequest{
+		Identity: identity,
+	})
+}
+
+func (client *NodeMgmtClient) callIdentityToRoleEndpoint(pod *corev1.Pod, method string, payload identityToRoleRequest) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	podHost, podPort, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v1/ops/auth/identity_to_role",
+		host:     podHost,
+		port:     podPort,
+		method:   method,
+		timeout:  60 * time.Second,
+		body:     body,
+	}
+
+	_, err = callNodeMgmtEndpoint(client, request, "application/json")
+	return err
+}
+
 type User struct {
 	Name        string `json:"name"`
 	Super       string `json:"super"`

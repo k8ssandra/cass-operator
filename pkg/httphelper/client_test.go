@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
@@ -570,18 +571,37 @@ func TestInsertIdentityToRole(t *testing.T) {
 		require.Equal("/api/v1/ops/auth/identity_to_role", req.URL.Path)
 		require.Equal("application/json", req.Header.Get("Content-Type"))
 
-		var payload map[string]string
+		var payload identityToRoleRequest
 		require.NoError(json.NewDecoder(req.Body).Decode(&payload))
-		require.Equal(map[string]string{
-			"identity": identity,
-			"role":     "schema_reader",
+		require.Equal(identityToRoleRequest{
+			Identity: identity,
+			Role:     "schema_reader",
+			TTL:      3600,
 		}, payload)
 	}, func() *http.Response {
 		return newHttpResponseMarshalled("OK", http.StatusOK)
 	})
 
 	mgmtClient := newMockMgmtClient(httpClient)
-	require.NoError(mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, identity, "schema_reader"))
+	require.NoError(mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, identity, "schema_reader", time.Hour))
+}
+
+func TestInsertIdentityToRoleWithoutTTL(t *testing.T) {
+	require := require.New(t)
+	identity := "spiffe://sidecar.prod.example.com/user/u_12345/credential/credential-id"
+
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		var payload map[string]any
+		require.NoError(json.NewDecoder(req.Body).Decode(&payload))
+		require.Equal(identity, payload["identity"])
+		require.Equal("schema_reader", payload["role"])
+		require.NotContains(payload, "ttl")
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
+
+	mgmtClient := newMockMgmtClient(httpClient)
+	require.NoError(mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, identity, "schema_reader", 0))
 }
 
 func TestDeleteIdentityToRole(t *testing.T) {
@@ -609,8 +629,10 @@ func TestDeleteIdentityToRole(t *testing.T) {
 func TestIdentityToRoleValidation(t *testing.T) {
 	mgmtClient := newMockMgmtClient(nil)
 
-	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "", "schema_reader"), "identity cannot be empty")
-	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "spiffe://example.com/user/1", ""), "role cannot be empty")
+	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "", "schema_reader", time.Hour), "identity and role must be set")
+	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "spiffe://example.com/user/1", "", time.Hour), "identity and role must be set")
+	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "spiffe://example.com/user/1", "schema_reader", -time.Second), "ttl must be at least one second")
+	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "spiffe://example.com/user/1", "schema_reader", time.Millisecond), "ttl must be at least one second")
 	assert.EqualError(t, mgmtClient.CallDeleteIdentityToRoleEndpoint(goodPod, ""), "identity cannot be empty")
 }
 

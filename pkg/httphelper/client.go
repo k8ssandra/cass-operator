@@ -397,27 +397,29 @@ func (client *NodeMgmtClient) CallDropRoleEndpoint(pod *corev1.Pod, username str
 }
 
 type identityToRoleRequest struct {
-	Identity string `json:"identity"`
-	Role     string `json:"role,omitempty"`
+	Identity string  `json:"identity"`
+	Role     string  `json:"role,omitempty"`
+	TTL      float64 `json:"ttl,omitempty"`
 }
 
 // CallInsertIdentityToRoleEndpoint inserts a SPIFFE identity to Cassandra role mapping.
-func (client *NodeMgmtClient) CallInsertIdentityToRoleEndpoint(pod *corev1.Pod, identity, role string) error {
+func (client *NodeMgmtClient) CallInsertIdentityToRoleEndpoint(pod *corev1.Pod, identity, role string, ttl time.Duration) error {
 	client.Log.Info(
 		"calling Management API insert identity to role - POST /api/v1/ops/auth/identity_to_role",
 		"pod", pod.Name,
 	)
 
-	if identity == "" {
-		return errors.New("identity cannot be empty")
+	if identity == "" || role == "" {
+		return errors.New("identity and role must be set")
 	}
-	if role == "" {
-		return errors.New("role cannot be empty")
+	if ttl != 0 && ttl < time.Second {
+		return errors.New("ttl must be at least one second")
 	}
 
 	return client.callIdentityToRoleEndpoint(pod, http.MethodPost, identityToRoleRequest{
 		Identity: identity,
 		Role:     role,
+		TTL:      ttl.Seconds(),
 	})
 }
 

@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [FEATURE] [#964](https://github.com/k8ssandra/cass-operator/issues/964) Add `--max-concurrent-reconciles` to configure reconciling concurrency (default is `1`), `--pprof-bind-address` to enable profiling, and `--reconciliation-timeout` to limit reconciliation time (default is `2m`)
+
 ## v1.32.0
 
 * [ENHANCEMENT] [#943](https://github.com/k8ssandra/cass-operator/issues/943) Add terminating state as one of the Pod status metrics
@@ -21,6 +23,14 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] [#930](https://github.com/k8ssandra/cass-operator/issues/930) Add the missing resource-hash annotation to the NodePort service so changes to it are detected and reconciled.
 * [BUGFIX] [#938](https://github.com/k8ssandra/cass-operator/issues/938) Stripping of passwords from logs was failing if the password included characters that caused URLEncode to happen
 * [BUGFIX] [#928](https://github.com/k8ssandra/cass-operator/issues/928) Fix default storageClass selector to use annotations instead of labels
+
+## v1.30.3
+
+* [BUGFIX] [#938](https://github.com/k8ssandra/cass-operator/issues/938) Stripping of passwords from logs was failing if the password included characters that caused URLEncode to happen
+
+## v1.30.2
+
+* [BUGFIX] [#933](https://github.com/k8ssandra/cass-operator/issues/933) Fix regression introduced in the CassandraTask replacement process introduced in the full rack replacement feature.
 
 ## v1.31.0
 

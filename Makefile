@@ -277,7 +277,7 @@ OPERATOR_SDK_VERSION ?= 1.42.2
 HELM_VERSION ?= 4.2.2
 OPM_VERSION ?= 1.61.0
 TROUBLESHOOT_VERSION ?= v0.130.0
-GOLANGCI_LINT_VERSION ?= v2.12.2
+GOLANGCI_LINT_VERSION ?= v2.13.1
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 

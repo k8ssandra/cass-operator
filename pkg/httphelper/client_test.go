@@ -803,3 +803,47 @@ func TestCustomTransport(t *testing.T) {
 	require.NoError(err)
 	require.True(called)
 }
+
+// Test_callNodeMgmtEndpoint_IPv6HostIsBracketed guards against a regression where a bare
+// IPv6 PodIP was interpolated as "<host>:<port>", producing an unparseable URL such as
+// http://2001:db8::1:8080/... and failing every management API call on IPv6-only
+// clusters with `invalid port ":db8::1:8080" after host`.
+//
+// BuildPodHostFromPod returns pod.Status.PodIP verbatim, so the authority must be built
+// with net.JoinHostPort, which brackets only when the host contains a colon.
+func Test_callNodeMgmtEndpoint_IPv6HostIsBracketed(t *testing.T) {
+	tests := []struct {
+		name         string
+		podIP        string
+		expectedHost string
+	}{
+		{"ipv4 is unchanged", "1.2.3.4", "1.2.3.4:8080"},
+		{"ipv6 is bracketed", "2001:db8:ae4:ee06:1310::3", "[2001:db8:ae4:ee06:1310::3]:8080"},
+		{"ipv6 loopback is bracketed", "::1", "[::1]:8080"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
+				Status:     corev1.PodStatus{PodIP: tt.podIP},
+			}
+
+			httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+				// req.URL.Host must be a valid authority, and Hostname()/Port() must
+				// split back to the original address.
+				require.Equal(tt.expectedHost, req.URL.Host)
+				require.Equal(tt.podIP, req.URL.Hostname())
+				require.Equal("8080", req.URL.Port())
+			}, func() *http.Response {
+				return newHttpResponse([]byte("[]"), http.StatusOK)
+			})
+
+			mgmtClient := newMockMgmtClient(httpClient)
+			_, err := mgmtClient.CallListRolesEndpoint(pod)
+			require.NoError(err)
+		})
+	}
+}

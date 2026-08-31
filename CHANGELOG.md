@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [BUGFIX] [#966](https://github.com/k8ssandra/cass-operator/issues/966) Build the management API request URL with net.JoinHostPort so a bare IPv6 PodIP is bracketed. Previously every mgmt-api call failed on IPv6 clusters with `invalid port ... after host`.
+
 ## v1.32.0
 
 * [ENHANCEMENT] [#943](https://github.com/k8ssandra/cass-operator/issues/943) Add terminating state as one of the Pod status metrics

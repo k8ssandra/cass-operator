@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] Pull cass-config-builder from GHCR
+
 ## v1.32.0
 
 * [ENHANCEMENT] [#943](https://github.com/k8ssandra/cass-operator/issues/943) Add terminating state as one of the Pod status metrics

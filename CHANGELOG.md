@@ -11,7 +11,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
-* [CHANGE] Pull cass-config-builder from GHCR
+* [CHANGE] [#969](https://github.com/k8ssandra/cass-operator/issues/969) Pull cass-config-builder from GHCR
 
 ## v1.32.0
 

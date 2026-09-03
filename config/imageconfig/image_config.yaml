@@ -9,7 +9,8 @@ images:
     tag: "latest"
     registry: ghcr.io
   config-builder:
-    repository: "ghcr.io/datastax/cass-config-builder"
+    registry: "ghcr.io"
+    repository: "datastax/cass-config-builder"
     name: "cass-config-builder"
     tag: "1.0-ubi"
   k8ssandra-client:

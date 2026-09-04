@@ -60,7 +60,7 @@ func TestDefaultImageConfigParsingV2(t *testing.T) {
 	assert.NotNil(imageConfig)
 	assert.NotNil(imageConfig.Images)
 	assert.Contains(registry.GetSystemLoggerImage(), "k8ssandra/system-logger:")
-	assert.Contains(registry.GetConfigBuilderImage(), "ghcr.io/datastax/cass-config-builder/cass-config-builder:")
+	assert.Contains(registry.GetConfigBuilderImage(), "datastax/cass-config-builder:")
 	assert.Contains(registry.GetClientImage(), "k8ssandra/k8ssandra-client@sha256:")
 
 	assert.Equal("ghcr.io", imageConfig.Types["cassandra"].Registry)
@@ -94,7 +94,7 @@ func TestImageConfigParsingV2(t *testing.T) {
 	assert.NotNil(imageConfig)
 	assert.NotNil(imageConfig.Images)
 	assert.Equal("ghcr.io/k8ssandra/system-logger:latest", registry.GetSystemLoggerImage())
-	assert.Contains(registry.GetConfigBuilderImage(), "datastax/cass-config-builder/cass-config-builder:")
+	assert.Contains(registry.GetConfigBuilderImage(), "datastax/cass-config-builder:")
 	assert.Contains(registry.GetClientImage(), "k8ssandra/k8ssandra-client@sha256:")
 
 	assert.Equal("ghcr.io", imageConfig.Types["cassandra"].Registry)

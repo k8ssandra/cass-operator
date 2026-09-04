@@ -108,7 +108,7 @@ func TestImageConfigParsing(t *testing.T) {
 	assert.NotNil(imageConfig)
 	assert.NotNil(imageConfig.Images)
 	assert.True(strings.HasPrefix(imageConfig.Images.SystemLogger, "k8ssandra/system-logger:"))
-	assert.True(strings.HasPrefix(imageConfig.Images.ConfigBuilder, "datastax/cass-config-builder/cass-config-builder:"))
+	assert.True(strings.HasPrefix(imageConfig.Images.ConfigBuilder, "datastax/cass-config-builder:"))
 	assert.True(strings.Contains(imageConfig.Images.Client, "k8ssandra/k8ssandra-client:"))
 
 	assert.Equal("docker.io/k8ssandra/cass-management-api", imageConfig.DefaultImages.ImageComponents[configv1beta1.CassandraImageComponent].Repository)

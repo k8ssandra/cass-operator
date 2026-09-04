@@ -60,8 +60,9 @@ var (
 // CassandraTaskReconciler reconciles a CassandraJob object
 type CassandraTaskReconciler struct {
 	client.Client
-	APIReader client.Reader
-	Scheme    *runtime.Scheme
+	APIReader        client.Reader
+	Scheme           *runtime.Scheme
+	LifecycleContext context.Context
 }
 
 // AsyncTaskExecutorFunc is called for all methods that support async processing
@@ -773,58 +774,61 @@ func (r *CassandraTaskReconciler) startPodTask(
 			}
 		}
 
-		if len(jobRunner) >= cap(jobRunner) {
-			status.Status = api.PodWaiting
-			cassTask.Status.PodStatuses[pod.Name] = status
-			return nil
-		}
-
 		if status.Status == api.PodRunning {
-			go func() {
-				// Write value to the jobRunner to indicate we're running
+			select {
+			case jobRunner <- 1:
 				taskKey := types.NamespacedName{Name: cassTask.Name, Namespace: cassTask.Namespace}
-				logger.V(1).Info("starting execution of sync blocking job", "Pod", pod)
-				jobRunner <- 1
-				defer func() {
-					// Remove the value from the jobRunner
-					<-jobRunner
+				taskCtx := log.IntoContext(r.LifecycleContext, logger)
+				syncTaskConfig := *taskConfig
+				syncTaskConfig.Context = taskCtx
+				syncStatus := status
+
+				go func() {
+					logger := log.FromContext(taskCtx)
+					logger.V(1).Info("starting execution of sync blocking job", "Pod", pod)
+					defer func() {
+						<-jobRunner
+					}()
+
+					if syncTaskConfig.PreProcessFunc != nil {
+						if err := syncTaskConfig.PreProcessFunc(&syncTaskConfig); err != nil {
+							logger.Error(err, "executing preprocessing functionality failed", "Pod", pod)
+							syncStatus.Error = err.Error()
+							syncStatus.Status = api.PodError
+						}
+					}
+
+					if syncStatus.Error == "" {
+						if err := syncTaskConfig.SyncFunc(nodeMgmtClient, pod, &syncTaskConfig); err != nil {
+							// We only log, nothing else to do - we won't even retry this pod.
+							logger.Error(err, "executing the sync task failed", "Pod", pod)
+							syncStatus.Error = err.Error()
+							syncStatus.Status = api.PodError
+						} else {
+							syncStatus.Status = api.PodCompleted
+							syncStatus.CompletionTime = new(metav1.Now())
+						}
+					}
+
+					cassTask := &api.CassandraTask{}
+					if err := r.Get(taskCtx, taskKey, cassTask); err != nil {
+						logger.Error(err, "Failed to get task for status update", "CassandraTask", taskKey)
+						return
+					}
+
+					taskPatch := client.MergeFrom(cassTask.DeepCopy())
+					if cassTask.Status.PodStatuses == nil {
+						cassTask.Status.PodStatuses = make(map[string]api.PodProcessingStatus)
+					}
+					cassTask.Status.PodStatuses[pod.Name] = syncStatus
+
+					if err := r.Status().Patch(taskCtx, cassTask, taskPatch); err != nil {
+						logger.Error(err, "Failed to update cassandraTask's status", "CassandraTask", taskKey)
+					}
 				}()
-
-				if taskConfig.PreProcessFunc != nil {
-					if err := taskConfig.PreProcessFunc(taskConfig); err != nil {
-						logger.Error(err, "executing preprocessing functionality failed", "Pod", pod)
-						status.Error = err.Error()
-						status.Status = api.PodError
-					}
-				}
-
-				if status.Error == "" {
-					if err = taskConfig.SyncFunc(nodeMgmtClient, pod, taskConfig); err != nil {
-						// We only log, nothing else to do - we won't even retry this pod.
-						logger.Error(err, "executing the sync task failed", "Pod", pod)
-						status.Error = err.Error()
-						status.Status = api.PodError
-					} else {
-						status.Status = api.PodCompleted
-						status.CompletionTime = new(metav1.Now())
-					}
-				}
-
-				cassTask := &api.CassandraTask{}
-				if err := r.Get(context.Background(), taskKey, cassTask); err != nil {
-					logger.Error(err, "Failed to get task for status update", "CassandraTask", cassTask)
-				}
-
-				taskPatch := client.MergeFrom(cassTask.DeepCopy())
-				if cassTask.Status.PodStatuses == nil {
-					cassTask.Status.PodStatuses = make(map[string]api.PodProcessingStatus)
-				}
-				cassTask.Status.PodStatuses[pod.Name] = status
-
-				if err = r.Status().Patch(ctx, cassTask, taskPatch); err != nil {
-					logger.Error(err, "Failed to update cassandraTask's status", "CassandraTask", cassTask)
-				}
-			}()
+			default:
+				status.Status = api.PodWaiting
+			}
 		}
 	}
 

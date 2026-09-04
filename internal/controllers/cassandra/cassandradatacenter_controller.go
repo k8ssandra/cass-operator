@@ -38,6 +38,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -86,6 +87,8 @@ type CassandraDatacenterReconciler struct {
 
 	ImageRegistry    images.ImageRegistry
 	ClusterResources bool
+
+	MaxConcurrentReconciles int
 }
 
 // Reconcile reads that state of the cluster for a Datacenter object
@@ -257,7 +260,9 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 	// builder.OnlyMetadata: FindWatchers only inspects metadata (name/annotations).
 	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(toRequests), builder.OnlyMetadata)
 
-	return c.Complete(r)
+	return c.
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
+		Complete(r)
 }
 
 // blank assignment to verify that CassandraDatacenterReconciler implements reconciliation.Reconciler

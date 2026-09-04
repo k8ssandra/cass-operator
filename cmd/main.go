@@ -98,7 +98,7 @@ func main() {
 		"Use :8082 to enable the pprof endpoint, or leave as 0 to disable it.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 1,
-		"Maximum number of concurrent reconciles for each controller.")
+		"Maximum number of concurrent CassandraDatacenter reconciles.")
 	flag.DurationVar(&reconciliationTimeout, "reconciliation-timeout", 2*time.Minute,
 		"Timeout for each reconciliation.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -198,8 +198,7 @@ func main() {
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "b569adb7.cassandra.datastax.com",
 		Controller: config.Controller{
-			MaxConcurrentReconciles: maxConcurrentReconciles,
-			ReconciliationTimeout:   reconciliationTimeout,
+			ReconciliationTimeout: reconciliationTimeout,
 		},
 	}
 
@@ -302,13 +301,14 @@ func main() {
 	}
 
 	if err = (&controllers.CassandraDatacenterReconciler{
-		Client:           mgr.GetClient(),
-		APIReader:        mgr.GetAPIReader(),
-		Log:              ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
-		Scheme:           mgr.GetScheme(),
-		Recorder:         mgr.GetEventRecorder("cass-operator"),
-		ImageRegistry:    registry,
-		ClusterResources: clusterScoped,
+		Client:                  mgr.GetClient(),
+		APIReader:               mgr.GetAPIReader(),
+		Log:                     ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
+		Scheme:                  mgr.GetScheme(),
+		Recorder:                mgr.GetEventRecorder("cass-operator"),
+		ImageRegistry:           registry,
+		ClusterResources:        clusterScoped,
+		MaxConcurrentReconciles: maxConcurrentReconciles,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraDatacenter")
 		os.Exit(1)
@@ -322,9 +322,10 @@ func main() {
 	}
 
 	if err = (&controlcontrollers.CassandraTaskReconciler{
-		Client:    mgr.GetClient(),
-		APIReader: mgr.GetAPIReader(),
-		Scheme:    mgr.GetScheme(),
+		Client:           mgr.GetClient(),
+		APIReader:        mgr.GetAPIReader(),
+		Scheme:           mgr.GetScheme(),
+		LifecycleContext: ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraTask")
 		os.Exit(1)

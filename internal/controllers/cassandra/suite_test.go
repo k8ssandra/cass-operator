@@ -118,8 +118,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&control.CassandraTaskReconciler{
-		Client: k8sClient,
-		Scheme: k8sManager.GetScheme(),
+		Client:           k8sClient,
+		Scheme:           k8sManager.GetScheme(),
+		LifecycleContext: ctx,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

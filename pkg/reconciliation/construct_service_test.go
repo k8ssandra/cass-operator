@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-logr/logr"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -346,7 +346,8 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T) {
 		"DatacenterService":     "add",
 	}
 
-	service := newServiceForCassandraDatacenter(dc, logr.Discard())
+	service, err := newServiceForCassandraDatacenter(dc)
+	require.NoError(t, err)
 
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
@@ -451,7 +452,8 @@ func TestAddingAdditionalLabels(t *testing.T) {
 		"Add":                   "label",
 	}
 
-	service := newServiceForCassandraDatacenter(dc, logr.Discard())
+	service, err := newServiceForCassandraDatacenter(dc)
+	require.NoError(t, err)
 
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = %v, want %v", service.Labels, expected)
@@ -472,7 +474,8 @@ func TestAddingAdditionalAnnotations(t *testing.T) {
 		},
 	}
 
-	service := newServiceForCassandraDatacenter(dc, logr.Discard())
+	service, err := newServiceForCassandraDatacenter(dc)
+	require.NoError(t, err)
 
 	assert.Contains(t, service.Annotations, "Add")
 }
@@ -484,6 +487,7 @@ func TestServicePorts(t *testing.T) {
 		dcServicePorts      []int32
 		allPodsServicePorts []int32
 		mgmtApiPort         int32
+		expectError         bool
 	}{
 		{
 			name: "Cassandra 3.11.14",
@@ -599,9 +603,8 @@ func TestServicePorts(t *testing.T) {
 			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
 		},
-		// invalid cassandra-yaml values — error is logged, no conditional ports added
 		{
-			name: "invalid native_transport_port_ssl — no conditional ports",
+			name: "invalid native_transport_port_ssl returns error",
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{
 					ClusterName:   "bob",
@@ -612,9 +615,10 @@ func TestServicePorts(t *testing.T) {
 			},
 			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+			expectError:         true,
 		},
 		{
-			name: "invalid start_rpc — no conditional ports",
+			name: "invalid start_rpc returns error",
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{
 					ClusterName:   "bob",
@@ -625,9 +629,10 @@ func TestServicePorts(t *testing.T) {
 			},
 			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+			expectError:         true,
 		},
 		{
-			name: "invalid rpc_port — no conditional ports",
+			name: "invalid rpc_port returns error",
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{
 					ClusterName:   "bob",
@@ -638,6 +643,7 @@ func TestServicePorts(t *testing.T) {
 			},
 			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+			expectError:         true,
 		},
 	}
 
@@ -664,7 +670,13 @@ func TestServicePorts(t *testing.T) {
 				assert.Fail(t, "mgmt-api service port not found")
 			}
 			t.Run("dc service", func(t *testing.T) {
-				svc := newServiceForCassandraDatacenter(test.dc, logr.Discard())
+				svc, err := newServiceForCassandraDatacenter(test.dc)
+				if test.expectError {
+					assert.Error(t, err)
+					assert.Nil(t, svc)
+					return
+				}
+				require.NoError(t, err)
 				servicePorts := getServicePorts(svc)
 				assert.ElementsMatch(t, servicePorts, test.dcServicePorts)
 				assertMgmtApiPort(svc)

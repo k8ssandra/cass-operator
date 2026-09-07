@@ -10,7 +10,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/go-logr/logr"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
@@ -24,7 +23,7 @@ import (
 
 // Creates a headless service object for the Datacenter, for clients wanting to
 // reach out to a ready Server node for either CQL or mgmt API
-func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter, logger logr.Logger) *corev1.Service {
+func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) (*corev1.Service, error) {
 	svcName := dc.GetDatacenterServiceName()
 	service := makeGenericHeadlessService(dc)
 	service.Name = svcName
@@ -43,7 +42,7 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter, logger logr.L
 	}
 	cfgPorts, err := api.GetPortsFromCassCfg(dc.Spec.Config)
 	if err != nil {
-		logger.Error(err, "failed getting ports from config")
+		return nil, fmt.Errorf("failed to parse cassandra-yaml: %w", err)
 	}
 	if cfgPorts.NativeTransportPortSSL != nil {
 		ports = append(ports, namedServicePort("tls-native", *cfgPorts.NativeTransportPortSSL, *cfgPorts.NativeTransportPortSSL))
@@ -86,7 +85,7 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter, logger logr.L
 
 	utils.AddHashAnnotation(service)
 
-	return service
+	return service, nil
 }
 
 func addAdditionalOptions(service *corev1.Service, serviceConfig *api.ServiceConfigAdditions) {

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
@@ -345,7 +346,7 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T) {
 		"DatacenterService":     "add",
 	}
 
-	service := newServiceForCassandraDatacenter(dc)
+	service := newServiceForCassandraDatacenter(dc, logr.Discard())
 
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
@@ -450,7 +451,7 @@ func TestAddingAdditionalLabels(t *testing.T) {
 		"Add":                   "label",
 	}
 
-	service := newServiceForCassandraDatacenter(dc)
+	service := newServiceForCassandraDatacenter(dc, logr.Discard())
 
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = %v, want %v", service.Labels, expected)
@@ -471,7 +472,7 @@ func TestAddingAdditionalAnnotations(t *testing.T) {
 		},
 	}
 
-	service := newServiceForCassandraDatacenter(dc)
+	service := newServiceForCassandraDatacenter(dc, logr.Discard())
 
 	assert.Contains(t, service.Annotations, "Add")
 }
@@ -493,7 +494,7 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "3.11.14",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
 		},
 		{
@@ -505,7 +506,7 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "4.0.7",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
 		},
 		{
@@ -529,7 +530,7 @@ func TestServicePorts(t *testing.T) {
 					},
 				},
 			},
-			dcServicePorts:      []int32{8081, 9000, 9042, 9103, 9142},
+			dcServicePorts:      []int32{8081, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8081, 9000, 9042, 9103},
 			mgmtApiPort:         8081,
 		},
@@ -542,35 +543,100 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "6.8.31",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
 		},
+		// cassandra-yaml conditional ports
 		{
-			name: "Cassandra 4.0.7 with custom ports",
+			name: "native_transport_port_ssl set — adds TLS native port",
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{
 					ClusterName:   "bob",
 					ServerType:    "cassandra",
 					ServerVersion: "4.0.7",
-					PodTemplateSpec: &corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name: "cassandra",
-									Ports: []corev1.ContainerPort{
-										{
-											Name:          "metrics",
-											ContainerPort: 9004,
-										},
-									},
-								},
-							},
-						},
-					},
+					Config:        []byte(`{"cassandra-yaml":{"native_transport_port_ssl":9142}}`),
 				},
 			},
-			// FIXME: 9004 should be in the list of open ports
 			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "start_rpc true — adds thrift port",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					Config:        []byte(`{"cassandra-yaml":{"start_rpc":true}}`),
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9160},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "start_rpc true with custom rpc_port",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					Config:        []byte(`{"cassandra-yaml":{"start_rpc":true,"rpc_port":19160}}`),
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 19160},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "both native_transport_port_ssl and start_rpc true",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					Config:        []byte(`{"cassandra-yaml":{"native_transport_port_ssl":9142,"start_rpc":true}}`),
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		// invalid cassandra-yaml values — error is logged, no conditional ports added
+		{
+			name: "invalid native_transport_port_ssl — no conditional ports",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					Config:        []byte(`{"cassandra-yaml":{"native_transport_port_ssl":"notaport"}}`),
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "invalid start_rpc — no conditional ports",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					Config:        []byte(`{"cassandra-yaml":{"start_rpc":"notabool"}}`),
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "invalid rpc_port — no conditional ports",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					Config:        []byte(`{"cassandra-yaml":{"start_rpc":true,"rpc_port":"notaport"}}`),
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
 		},
 	}
@@ -598,7 +664,7 @@ func TestServicePorts(t *testing.T) {
 				assert.Fail(t, "mgmt-api service port not found")
 			}
 			t.Run("dc service", func(t *testing.T) {
-				svc := newServiceForCassandraDatacenter(test.dc)
+				svc := newServiceForCassandraDatacenter(test.dc, logr.Discard())
 				servicePorts := getServicePorts(svc)
 				assert.ElementsMatch(t, servicePorts, test.dcServicePorts)
 				assertMgmtApiPort(svc)

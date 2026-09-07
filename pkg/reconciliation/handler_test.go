@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +31,7 @@ func TestCalculateReconciliationActions(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	service := newServiceForCassandraDatacenter(rc.Datacenter)
+	service := newServiceForCassandraDatacenter(rc.Datacenter, logr.Discard())
 
 	// Objects to keep track of
 

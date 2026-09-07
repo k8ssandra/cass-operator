@@ -59,7 +59,7 @@ func (rc *ReconciliationContext) CheckHeadlessServices() result.ReconcileResult 
 
 	// Check if there is a headless service for the cluster
 
-	cqlService := newServiceForCassandraDatacenter(dc)
+	cqlService := newServiceForCassandraDatacenter(dc, logger)
 	seedService := newSeedServiceForCassandraDatacenter(dc)
 	allPodsService := newAllPodsServiceForCassandraDatacenter(dc)
 	additionalSeedService := newAdditionalSeedServiceForCassandraDatacenter(dc)

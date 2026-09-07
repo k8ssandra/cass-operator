@@ -10,6 +10,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ```
 
 ## unreleased
+* [BUGFIX] [#959](https://github.com/k8ssandra/cass-operator/issues/959) Configure rpc_port/native_transport_port_ssl service ports from cassandra.yaml
 
 ## v1.32.0
 

@@ -191,7 +191,10 @@ func setupTest() (*ReconciliationContext, *corev1.Service, func()) {
 	cleanupMockScr := MockSetControllerReference()
 
 	rc := CreateMockReconciliationContext(logger)
-	service := newServiceForCassandraDatacenter(rc.Datacenter)
+	service, err := newServiceForCassandraDatacenter(rc.Datacenter)
+	if err != nil {
+		panic(err)
+	}
 
 	return rc, service, cleanupMockScr
 }

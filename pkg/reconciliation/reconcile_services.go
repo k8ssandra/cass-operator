@@ -59,7 +59,11 @@ func (rc *ReconciliationContext) CheckHeadlessServices() result.ReconcileResult 
 
 	// Check if there is a headless service for the cluster
 
-	cqlService := newServiceForCassandraDatacenter(dc)
+	cqlService, err := newServiceForCassandraDatacenter(dc)
+	if err != nil {
+		logger.Error(err, "failed to construct datacenter service")
+		return result.Error(err)
+	}
 	seedService := newSeedServiceForCassandraDatacenter(dc)
 	allPodsService := newAllPodsServiceForCassandraDatacenter(dc)
 	additionalSeedService := newAdditionalSeedServiceForCassandraDatacenter(dc)

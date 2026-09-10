@@ -102,6 +102,7 @@ const (
 	DefaultNativePort    = 9042
 	DefaultInternodePort = 7000
 	DefaultMgmtApiPort   = 8080
+	DefaultThriftPort    = 9160
 )
 
 type AllowUpdateType string
@@ -553,6 +554,12 @@ type CassandraDatacenterList struct {
 	Items           []CassandraDatacenter `json:"items"`
 }
 
+// CassandraConfigPorts contains optional ports enabled through cassandra.yaml
+type CassandraConfigPorts struct {
+	NativeTransportPortSSL *int
+	ThriftPort             *int
+}
+
 func (dc *CassandraDatacenter) GetConfigBuilderImage() string {
 	return dc.Spec.ConfigBuilderImage
 }
@@ -780,6 +787,72 @@ func namedPort(name string, port int) corev1.ContainerPort {
 	return corev1.ContainerPort{Name: name, ContainerPort: int32(port)}
 }
 
+func GetPortsFromCassCfg(cfg json.RawMessage) (CassandraConfigPorts, error) {
+	if cfg == nil {
+		return CassandraConfigPorts{}, nil
+	}
+	var cfgPorts CassandraConfigPorts
+	var dcConfig map[string]any
+	if err := json.Unmarshal(cfg, &dcConfig); err != nil {
+		return CassandraConfigPorts{}, err
+	}
+	casYaml, found := dcConfig["cassandra-yaml"]
+	if !found {
+		return CassandraConfigPorts{}, nil
+	}
+	casYamlMap, ok := casYaml.(map[string]any)
+	if !ok {
+		err := fmt.Errorf("failed to parse cassandra-yaml")
+		return CassandraConfigPorts{}, err
+	}
+	nativeTransportPortSSL, err := buildNativeTransportPortSSL(casYamlMap)
+	if err != nil {
+		return CassandraConfigPorts{}, err
+	}
+	cfgPorts.NativeTransportPortSSL = nativeTransportPortSSL
+	thriftPort, err := buildThriftPort(casYamlMap)
+	if err != nil {
+		return CassandraConfigPorts{}, err
+	}
+	cfgPorts.ThriftPort = thriftPort
+	return cfgPorts, nil
+}
+
+func buildThriftPort(casYamlMap map[string]any) (*int, error) {
+	startRPCStr, ok := casYamlMap["start_rpc"]
+	if !ok || startRPCStr == "" {
+		return nil, nil
+	}
+	startRPC, err := strconv.ParseBool(fmt.Sprintf("%v", startRPCStr))
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert start_rpc: %w", err)
+	}
+	if !startRPC {
+		return nil, nil
+	}
+	rpcPortStr, ok := casYamlMap["rpc_port"]
+	if !ok || rpcPortStr == "" {
+		return new(DefaultThriftPort), nil
+	}
+	rpcPort, err := strconv.Atoi(fmt.Sprintf("%v", rpcPortStr))
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert rpc_port: %w", err)
+	}
+	return new(rpcPort), nil
+}
+
+func buildNativeTransportPortSSL(casYamlMap map[string]any) (*int, error) {
+	nativeTransportPortSSLStr, ok := casYamlMap["native_transport_port_ssl"]
+	if !ok || nativeTransportPortSSLStr == "" {
+		return nil, nil
+	}
+	nativeTransportPortSSL, err := strconv.Atoi(fmt.Sprintf("%v", nativeTransportPortSSLStr))
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert native_transport_port_ssl: %w", err)
+	}
+	return new(nativeTransportPortSSL), nil
+}
+
 // GetContainerPorts will return the container ports for the pods in a statefulset based on the provided config
 func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, error) {
 	nativePort := DefaultNativePort
@@ -789,7 +862,6 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 
 	ports := []corev1.ContainerPort{
 		namedPort("native", nativePort),
-		namedPort("tls-native", 9142),
 		namedPort("internode", internodePort),
 		namedPort("tls-internode", 7001),
 		namedPort("jmx", 7199),
@@ -798,9 +870,15 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 		namedPort("metrics", 9000),
 	}
 
-	if strings.HasPrefix(dc.Spec.ServerVersion, "3.") || dc.Spec.ServerType == "dse" {
-		ports = append(ports,
-			namedPort("thrift", 9160))
+	cfgPorts, err := GetPortsFromCassCfg(dc.Spec.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cassandra-yaml: %w", err)
+	}
+	if cfgPorts.NativeTransportPortSSL != nil {
+		ports = append(ports, namedPort("tls-native", *cfgPorts.NativeTransportPortSSL))
+	}
+	if cfgPorts.ThriftPort != nil {
+		ports = append(ports, namedPort("thrift", *cfgPorts.ThriftPort))
 	}
 
 	if dc.Spec.ServerType == "dse" {

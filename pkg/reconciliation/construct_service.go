@@ -23,7 +23,7 @@ import (
 
 // Creates a headless service object for the Datacenter, for clients wanting to
 // reach out to a ready Server node for either CQL or mgmt API
-func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
+func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) (*corev1.Service, error) {
 	svcName := dc.GetDatacenterServiceName()
 	service := makeGenericHeadlessService(dc)
 	service.Name = svcName
@@ -36,15 +36,19 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 
 	ports := []corev1.ServicePort{
 		namedServicePort("native", nativePort, nativePort),
-		namedServicePort("tls-native", 9142, 9142),
 		namedServicePort("mgmt-api", mgmtApiPort, mgmtApiPort),
 		namedServicePort("prometheus", 9103, 9103),
 		namedServicePort("metrics", 9000, 9000),
 	}
-
-	if strings.HasPrefix(dc.Spec.ServerVersion, "3.") || dc.Spec.ServerType == "dse" {
-		ports = append(ports,
-			namedServicePort("thrift", 9160, 9160))
+	cfgPorts, err := api.GetPortsFromCassCfg(dc.Spec.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cassandra-yaml: %w", err)
+	}
+	if cfgPorts.NativeTransportPortSSL != nil {
+		ports = append(ports, namedServicePort("tls-native", *cfgPorts.NativeTransportPortSSL, *cfgPorts.NativeTransportPortSSL))
+	}
+	if cfgPorts.ThriftPort != nil {
+		ports = append(ports, namedServicePort("thrift", *cfgPorts.ThriftPort, *cfgPorts.ThriftPort))
 	}
 
 	if dc.Spec.DseWorkloads != nil {
@@ -81,7 +85,7 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 
 	utils.AddHashAnnotation(service)
 
-	return service
+	return service, nil
 }
 
 func addAdditionalOptions(service *corev1.Service, serviceConfig *api.ServiceConfigAdditions) {

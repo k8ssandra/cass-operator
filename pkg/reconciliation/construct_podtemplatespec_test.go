@@ -1761,8 +1761,8 @@ func TestPorts(t *testing.T) {
 					ServerVersion: "3.11.14",
 				},
 			},
-			openPorts: []int32{8080, 9000, 9042, 9103, 9142, 9160},
-			notOpen:   []int32{8609},
+			openPorts: []int32{8080, 9000, 9042, 9103},
+			notOpen:   []int32{8609, 9142, 9160},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1772,8 +1772,8 @@ func TestPorts(t *testing.T) {
 					ServerVersion: "4.0.7",
 				},
 			},
-			openPorts: []int32{8080, 9000, 9042, 9103, 9142},
-			notOpen:   []int32{8609, 9160},
+			openPorts: []int32{8080, 9000, 9042, 9103},
+			notOpen:   []int32{8609, 9142, 9160},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1798,8 +1798,8 @@ func TestPorts(t *testing.T) {
 					},
 				},
 			},
-			openPorts: []int32{8081, 9000, 9042, 9103, 9142},
-			notOpen:   []int32{8080, 8609, 9160},
+			openPorts: []int32{8081, 9000, 9042, 9103},
+			notOpen:   []int32{8080, 8609, 9142, 9160},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1809,7 +1809,8 @@ func TestPorts(t *testing.T) {
 					ServerVersion: "6.8.31",
 				},
 			},
-			openPorts: []int32{8080, 8609, 9000, 9042, 9103, 9142, 9160},
+			openPorts: []int32{8080, 8609, 9000, 9042, 9103},
+			notOpen:   []int32{9142, 9160},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1834,8 +1835,57 @@ func TestPorts(t *testing.T) {
 					},
 				},
 			},
-			openPorts: []int32{8080, 9004, 9042, 9103, 9142},
-			notOpen:   []int32{8609, 9000, 9160},
+			openPorts: []int32{8080, 9004, 9042, 9103},
+			notOpen:   []int32{8609, 9000, 9142, 9160},
+		},
+		// cassandra-yaml conditional ports
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					Config:        []byte(`{"cassandra-yaml":{"native_transport_port_ssl":9142}}`),
+				},
+			},
+			openPorts: []int32{9142},
+			notOpen:   []int32{8609, 9160},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					Config:        []byte(`{"cassandra-yaml":{"start_rpc":true}}`),
+				},
+			},
+			openPorts: []int32{9160},
+			notOpen:   []int32{8609, 9142},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					Config:        []byte(`{"cassandra-yaml":{"start_rpc":true,"rpc_port":19160}}`),
+				},
+			},
+			openPorts: []int32{19160},
+			notOpen:   []int32{8609, 9142, 9160},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					Config:        []byte(`{"cassandra-yaml":{"native_transport_port_ssl":9142,"start_rpc":true}}`),
+				},
+			},
+			openPorts: []int32{9142, 9160},
+			notOpen:   []int32{8609},
 		},
 	}
 

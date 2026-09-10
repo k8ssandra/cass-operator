@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -26,6 +28,27 @@ func TestReconcileHeadlessService(t *testing.T) {
 
 	recResult := rc.CheckHeadlessServices()
 	assert.False(t, recResult.Completed(), "Reconcile loop should not be completed")
+}
+
+func TestReconcileHeadlessServiceInvalidPortConfig(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	rc.Datacenter.Spec.Config = []byte(`{"cassandra-yaml":{"native_transport_port_ssl":"notaport"}}`)
+	datacenterService := &corev1.Service{}
+	datacenterServiceKey := types.NamespacedName{
+		Name:      rc.Datacenter.GetDatacenterServiceName(),
+		Namespace: rc.Datacenter.Namespace,
+	}
+
+	recResult := rc.CheckHeadlessServices()
+
+	require.True(t, recResult.Completed())
+	_, reconcileErr := recResult.Output()
+	require.Error(t, reconcileErr)
+
+	getErr := rc.Client.Get(rc.Ctx, datacenterServiceKey, datacenterService)
+	require.True(t, apierrors.IsNotFound(getErr))
 }
 
 func TestReconcileHeadlessService_UpdateLabelsAndAnnotations(t *testing.T) {

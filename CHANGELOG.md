@@ -13,6 +13,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#969](https://github.com/k8ssandra/cass-operator/issues/969) Pull cass-config-builder from ghcr.io instead of docker.io where its no longer updated
 * [BUGFIX] [#971](https://github.com/k8ssandra/cass-operator/issues/971) Decommissioning last pod of a datacenter left its pod_status metric abandoned instead of being removed. And also we got an error logline which wasn't a real error
+* [BUGFIX] [#973](https://github.com/k8ssandra/cass-operator/issues/973) Prevent premature decommission cleanup when Cassandra metadata requests fail.
 
 ## v1.32.0
 

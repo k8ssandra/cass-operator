@@ -66,6 +66,9 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 	if currentSize <= targetSize {
 		return result.Continue()
 	}
+	if len(epData.Entity) == 0 {
+		return result.Error(fmt.Errorf("cannot decommission a node without Cassandra metadata"))
+	}
 
 	decommRackInfo, err := rc.CalculateRackInfoForDecomm(int(currentSize))
 	if err != nil {
@@ -188,6 +191,9 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 
 	for _, pod := range rc.dcPods {
 		if pod.Labels[api.CassNodeState] == stateDecommissioning {
+			if len(epData.Entity) == 0 {
+				return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
+			}
 			if !IsDoneDecommissioning(pod, epData, nodeStatuses, rc.ReqLogger) {
 				if !HasStartedDecommissioning(pod, epData, nodeStatuses) {
 					rc.ReqLogger.V(1).Info("Decommission has not started trying again", "Pod", pod.Name)

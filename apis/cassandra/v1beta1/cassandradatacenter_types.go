@@ -738,6 +738,29 @@ func (dc *CassandraDatacenter) GetSuperuserSecretNamespacedName() types.Namespac
 	}
 }
 
+func (dc *CassandraDatacenter) IsMcacEnabled() bool {
+	// MCAC requires a writable filesystem
+	if dc.ReadOnlyFs() {
+		return false
+	}
+
+	// The user can explicitly disable MCAC by setting env variable
+	if dc.Spec.PodTemplateSpec != nil {
+		for _, container := range dc.Spec.PodTemplateSpec.Spec.Containers {
+			if container.Name == "cassandra" {
+				for _, env := range container.Env {
+					if env.Name == "MGMT_API_DISABLE_MCAC" {
+						return env.Value != "true"
+					}
+				}
+			}
+		}
+	}
+
+	// MCAC is enabled by default
+	return true
+}
+
 // GetNodePortNativePort
 // Gets the defined CQL port for NodePort.
 // 0 will be returned if NodePort is not configured.
@@ -784,18 +807,21 @@ func namedPort(name string, port int) corev1.ContainerPort {
 func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, error) {
 	nativePort := DefaultNativePort
 	internodePort := DefaultInternodePort
-
+	if dc.IsNodePortEnabled() {
+		nativePort = dc.GetNodePortNativePort()
+		internodePort = dc.GetNodePortInternodePort()
+	}
 	// Note: Port Names cannot be more than 15 characters
 
 	ports := []corev1.ContainerPort{
 		namedPort("native", nativePort),
-		namedPort("tls-native", 9142),
 		namedPort("internode", internodePort),
-		namedPort("tls-internode", 7001),
-		namedPort("jmx", 7199),
 		namedPort("mgmt-api-http", DefaultMgmtApiPort),
-		namedPort("prometheus", 9103),
 		namedPort("metrics", 9000),
+	}
+
+	if dc.IsMcacEnabled() {
+		ports = append(ports, namedPort("prometheus", 9103))
 	}
 
 	if strings.HasPrefix(dc.Spec.ServerVersion, "3.") || dc.Spec.ServerType == "dse" {

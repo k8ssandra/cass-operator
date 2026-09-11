@@ -14,6 +14,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [CHANGE] [#969](https://github.com/k8ssandra/cass-operator/issues/969) Pull cass-config-builder from ghcr.io instead of docker.io where its no longer updated
 * [BUGFIX] [#971](https://github.com/k8ssandra/cass-operator/issues/971) Decommissioning last pod of a datacenter left its pod_status metric abandoned instead of being removed. And also we got an error logline which wasn't a real error
 * [BUGFIX] [#973](https://github.com/k8ssandra/cass-operator/issues/973) Prevent premature decommission cleanup when Cassandra metadata requests fail.
+* [ENHANCEMENT] [#959](https://github.com/k8ssandra/cass-operator/issues/959) Expose prometheus port and PromMetricsLabel only when MCAC is enabled, sync service ports from PodTemplateSpec container port overrides, and reflect NodePort-configured port numbers in container ports.
 
 ## v1.32.0
 

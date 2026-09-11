@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"net"
+	"slices"
 	"strings"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -36,10 +37,12 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 
 	ports := []corev1.ServicePort{
 		namedServicePort("native", nativePort, nativePort),
-		namedServicePort("tls-native", 9142, 9142),
 		namedServicePort("mgmt-api", mgmtApiPort, mgmtApiPort),
-		namedServicePort("prometheus", 9103, 9103),
 		namedServicePort("metrics", 9000, 9000),
+	}
+
+	if dc.IsMcacEnabled() {
+		ports = append(ports, namedServicePort("prometheus", 9103, 9103))
 	}
 
 	if strings.HasPrefix(dc.Spec.ServerVersion, "3.") || dc.Spec.ServerType == "dse" {
@@ -75,6 +78,7 @@ func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Servi
 		}
 	}
 
+	ports = combineServicePortSlices(ports, cassandraContainerPorts(dc))
 	service.Spec.Ports = ports
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.DatacenterService)
@@ -281,7 +285,6 @@ func newNodePortServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *core
 func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	service := makeGenericHeadlessService(dc)
 	service.Name = dc.GetAllPodsServiceName()
-	service.Labels[api.PromMetricsLabel] = "true"
 	service.Spec.PublishNotReadyAddresses = true
 
 	nativePort := api.DefaultNativePort
@@ -292,17 +295,18 @@ func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev
 
 	service.Spec.Ports = []corev1.ServicePort{
 		{
-			Name: "native", Port: int32(nativePort), TargetPort: intstr.FromInt(nativePort),
+			Name: "native", Port: int32(nativePort), TargetPort: intstr.FromInt32(int32(nativePort)),
 		},
 		{
-			Name: "mgmt-api", Port: int32(mgmtApiPort), TargetPort: intstr.FromInt(mgmtApiPort),
+			Name: "mgmt-api", Port: int32(mgmtApiPort), TargetPort: intstr.FromInt32(int32(mgmtApiPort)),
 		},
 		{
-			Name: "prometheus", Port: 9103, TargetPort: intstr.FromInt(9103),
+			Name: "metrics", Port: 9000, TargetPort: intstr.FromInt32(9000),
 		},
-		{
-			Name: "metrics", Port: 9000, TargetPort: intstr.FromInt(9000),
-		},
+	}
+	if dc.IsMcacEnabled() {
+		service.Labels[api.PromMetricsLabel] = "true"
+		service.Spec.Ports = append(service.Spec.Ports, corev1.ServicePort{Name: "prometheus", Port: 9103, TargetPort: intstr.FromInt32(9103)})
 	}
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.AllPodsService)
@@ -332,4 +336,37 @@ func makeGenericHeadlessService(dc *api.CassandraDatacenter) *corev1.Service {
 	service.Annotations = anns
 
 	return &service
+}
+
+// combineServicePortSlices merges defaults with overrides from PodTemplateSpec container ports.
+func combineServicePortSlices(defaults []corev1.ServicePort, containerPorts []corev1.ContainerPort) []corev1.ServicePort {
+	out := slices.Clone(defaults)
+	for _, cp := range containerPorts {
+		idx := slices.IndexFunc(out, func(sp corev1.ServicePort) bool {
+			return sp.Name == cp.Name
+		})
+		if idx != -1 {
+			out[idx].Port = cp.ContainerPort
+			out[idx].TargetPort = intstr.FromInt32(cp.ContainerPort)
+		} else {
+			out = append(out, corev1.ServicePort{
+				Name:       cp.Name,
+				Port:       cp.ContainerPort,
+				TargetPort: intstr.FromInt32(cp.ContainerPort),
+			})
+		}
+	}
+	return out
+}
+
+func cassandraContainerPorts(dc *api.CassandraDatacenter) []corev1.ContainerPort {
+	if dc.Spec.PodTemplateSpec == nil {
+		return nil
+	}
+	for _, container := range dc.Spec.PodTemplateSpec.Spec.Containers {
+		if container.Name == CassandraContainerName {
+			return container.Ports
+		}
+	}
+	return nil
 }

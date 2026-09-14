@@ -4009,6 +4009,13 @@ func TestFailureDetection(t *testing.T) {
 					SeedCount: 1,
 				},
 			}
+			rc.statefulSets = []*appsv1.StatefulSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rack1",
+					},
+				},
+			}
 
 			rc.dcPods = []*corev1.Pod{tc.pod}
 
@@ -4017,6 +4024,91 @@ func TestFailureDetection(t *testing.T) {
 			assert.Equal(t, tc.expectedRack, rackName, "Rack name mismatch")
 		})
 	}
+}
+
+func TestFailedStartAllowsCorrectiveStatefulSetUpdateAndIsReset(t *testing.T) {
+	require := require.New(t)
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	require.NoError(rc.CalculateRackInformation())
+	require.Equal(result.Continue(), rc.CheckRackCreation())
+	statefulSet := rc.statefulSets[0]
+	statefulSet.Status.UpdateRevision = "revision-1"
+	failedHash := statefulSet.Annotations[utils.ResourceHashAnnotationKey]
+	failedPodName := statefulSet.Name + "-0"
+	rc.Datacenter.Status.FailedStarts = []string{failedPodName}
+
+	// The replacement Pod has clean container state, but its persisted failed start
+	// must still allow a corrective update.
+	rc.dcPods = []*corev1.Pod{{ObjectMeta: metav1.ObjectMeta{
+		Name:      failedPodName,
+		Namespace: statefulSet.Namespace,
+		Labels: utils.MergeMap(rc.Datacenter.GetRackLabels("default"), map[string]string{
+			appsv1.ControllerRevisionHashLabelKey: "revision-1",
+		}),
+	}}}
+	failed, rackName := rc.failureModeDetection()
+	require.True(failed)
+	require.Equal("default", rackName)
+
+	rc.Datacenter.Spec.ServerVersion = "6.8.44"
+	res := rc.CheckRackForceUpgrade()
+	require.True(res.Completed())
+	_, err := res.Output()
+	require.NoError(err)
+	require.Equal([]string{failedPodName}, rc.Datacenter.Status.FailedStarts)
+
+	updatedStatefulSet := &appsv1.StatefulSet{}
+	require.NoError(rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(statefulSet), updatedStatefulSet))
+	require.NotEqual(failedHash, updatedStatefulSet.Annotations[utils.ResourceHashAnnotationKey])
+
+	// FailedStarts is cleared only after the replacement Pod starts successfully.
+	updatedStatefulSet.Status.UpdateRevision = "revision-2"
+	rc.statefulSets[0] = updatedStatefulSet
+	replacementPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      failedPodName,
+			Namespace: statefulSet.Namespace,
+			Labels: utils.MergeMap(rc.Datacenter.GetRackLabels("default"), map[string]string{
+				api.CassNodeState:                     stateStartedNotReady,
+				appsv1.ControllerRevisionHashLabelKey: "revision-2",
+			}),
+		},
+		Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{
+			Name:  "cassandra",
+			Ready: true,
+		}}},
+	}
+	require.NoError(rc.Client.Create(rc.Ctx, replacementPod))
+	rc.dcPods = []*corev1.Pod{replacementPod}
+	startedNotReady, err := rc.findStartedNotReadyNodes()
+	require.NoError(err)
+	require.False(startedNotReady)
+	require.Empty(rc.Datacenter.Status.FailedStarts)
+
+	// Live crash state from a superseded Pod must not force another update after
+	// the successful replacement cleared FailedStarts.
+	rc.dcPods = []*corev1.Pod{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      failedPodName,
+			Namespace: statefulSet.Namespace,
+			Labels: utils.MergeMap(rc.Datacenter.GetRackLabels("default"), map[string]string{
+				appsv1.ControllerRevisionHashLabelKey: "revision-1",
+			}),
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name: "cassandra",
+				LastTerminationState: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{ExitCode: 1},
+				},
+			}},
+		},
+	}}
+	failed, rackName = rc.failureModeDetection()
+	require.False(failed)
+	require.Empty(rackName)
 }
 
 func TestCheckDcPodDisruptionBudget(t *testing.T) {

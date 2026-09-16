@@ -60,8 +60,11 @@ func TestCassandraDatacenter_allPodsServiceLabels(t *testing.T) {
 		api.PromMetricsLabel:    "true",
 	}
 
-	service := newAllPodsServiceForCassandraDatacenter(dc)
+	service, err := newAllPodsServiceForCassandraDatacenter(dc)
 
+	if err != nil {
+		t.Fatalf("newAllPodsServiceForCassandraDatacenter() failed: %v", err)
+	}
 	gotLabels := service.Labels
 	if !reflect.DeepEqual(wantLabels, gotLabels) {
 		t.Errorf("allPodsService labels = %v, want %v", gotLabels, wantLabels)
@@ -277,8 +280,11 @@ func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T) {
 		"AllPodsService":        "add",
 	}
 
-	service := newAllPodsServiceForCassandraDatacenter(dc)
+	service, err := newAllPodsServiceForCassandraDatacenter(dc)
 
+	if err != nil {
+		t.Fatalf("newAllPodsServiceForCassandraDatacenter(%v) failed: %v", dc, err)
+	}
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
 	}
@@ -345,8 +351,11 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T) {
 		"DatacenterService":     "add",
 	}
 
-	service := newServiceForCassandraDatacenter(dc)
+	service, err := newServiceForCassandraDatacenter(dc)
 
+	if err != nil {
+		t.Fatalf("newServiceForCassandraDatacenter(%v) failed: %v", dc, err)
+	}
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
 	}
@@ -450,8 +459,11 @@ func TestAddingAdditionalLabels(t *testing.T) {
 		"Add":                   "label",
 	}
 
-	service := newServiceForCassandraDatacenter(dc)
+	service, err := newServiceForCassandraDatacenter(dc)
 
+	if err != nil {
+		t.Fatalf("newServiceForCassandraDatacenter(%v) failed: %v", dc, err)
+	}
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = %v, want %v", service.Labels, expected)
 	}
@@ -471,8 +483,9 @@ func TestAddingAdditionalAnnotations(t *testing.T) {
 		},
 	}
 
-	service := newServiceForCassandraDatacenter(dc)
+	service, err := newServiceForCassandraDatacenter(dc)
 
+	assert.NoError(t, err)
 	assert.Contains(t, service.Annotations, "Add")
 }
 
@@ -493,8 +506,8 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "3.11.14",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
-			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9160},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103, 9160},
 		},
 		{
 			name: "Cassandra 4.0.7",
@@ -505,7 +518,7 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "4.0.7",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
 		},
 		{
@@ -529,7 +542,7 @@ func TestServicePorts(t *testing.T) {
 					},
 				},
 			},
-			dcServicePorts:      []int32{8081, 9000, 9042, 9103, 9142},
+			dcServicePorts:      []int32{8081, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8081, 9000, 9042, 9103},
 			mgmtApiPort:         8081,
 		},
@@ -542,8 +555,8 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "6.8.31",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
-			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9160},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9160},
 		},
 		{
 			name: "Cassandra 4.0.7 with custom ports",
@@ -569,9 +582,62 @@ func TestServicePorts(t *testing.T) {
 					},
 				},
 			},
-			// FIXME: 9004 should be in the list of open ports
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			dcServicePorts:      []int32{8080, 9004, 9042, 9103},
+			allPodsServicePorts: []int32{8080, 9004, 9042, 9103},
+		},
+		{
+			name: "Cassandra 4.0.7 with custom internode port, which shouldn't be added to the service ports",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{
+											Name:          "internode",
+											ContainerPort: 9010,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "Cassandra 4.0.7 with a custom tls native port",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{
+											Name:          "tls-native",
+											ContainerPort: 9142,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103, 9142},
 		},
 	}
 
@@ -589,22 +655,24 @@ func TestServicePorts(t *testing.T) {
 					return
 				}
 				for _, port := range svc.Spec.Ports {
-					if port.Name == "mgmt-api" {
+					if port.Name == "mgmt-api-http" {
 						assert.Equal(t, test.mgmtApiPort, port.Port)
-						assert.Equal(t, intstr.FromInt(int(test.mgmtApiPort)), port.TargetPort)
+						assert.Equal(t, intstr.FromInt32(test.mgmtApiPort), port.TargetPort)
 						return
 					}
 				}
 				assert.Fail(t, "mgmt-api service port not found")
 			}
 			t.Run("dc service", func(t *testing.T) {
-				svc := newServiceForCassandraDatacenter(test.dc)
+				svc, err := newServiceForCassandraDatacenter(test.dc)
+				assert.NoError(t, err)
 				servicePorts := getServicePorts(svc)
 				assert.ElementsMatch(t, servicePorts, test.dcServicePorts)
 				assertMgmtApiPort(svc)
 			})
 			t.Run("all pods service", func(t *testing.T) {
-				svc := newAllPodsServiceForCassandraDatacenter(test.dc)
+				svc, err := newAllPodsServiceForCassandraDatacenter(test.dc)
+				assert.NoError(t, err)
 				servicePorts := getServicePorts(svc)
 				assert.ElementsMatch(t, servicePorts, test.allPodsServicePorts)
 				assertMgmtApiPort(svc)

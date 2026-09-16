@@ -809,7 +809,6 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 	internodePort := DefaultInternodePort
 	if dc.IsNodePortEnabled() {
 		nativePort = dc.GetNodePortNativePort()
-		internodePort = dc.GetNodePortInternodePort()
 	}
 	// Note: Port Names cannot be more than 15 characters
 

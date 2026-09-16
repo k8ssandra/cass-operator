@@ -191,7 +191,10 @@ func setupTest() (*ReconciliationContext, *corev1.Service, func()) {
 	cleanupMockScr := MockSetControllerReference()
 
 	rc := CreateMockReconciliationContext(logger)
-	service := newServiceForCassandraDatacenter(rc.Datacenter)
+	service, err := newServiceForCassandraDatacenter(rc.Datacenter)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create service for cassandra datacenter: %v", err))
+	}
 
 	return rc, service, cleanupMockScr
 }

@@ -1761,8 +1761,8 @@ func TestPorts(t *testing.T) {
 					ServerVersion: "3.11.14",
 				},
 			},
-			openPorts: []int32{8080, 9000, 9042, 9103, 9142, 9160},
-			notOpen:   []int32{8609},
+			openPorts: []int32{8080, 9000, 9042, 7000, 9160},
+			notOpen:   []int32{8609, 9142},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1772,8 +1772,8 @@ func TestPorts(t *testing.T) {
 					ServerVersion: "4.0.7",
 				},
 			},
-			openPorts: []int32{8080, 9000, 9042, 9103, 9142},
-			notOpen:   []int32{8609, 9160},
+			openPorts: []int32{8080, 9000, 9042, 9103, 7000},
+			notOpen:   []int32{8609, 9160, 9142},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1798,8 +1798,8 @@ func TestPorts(t *testing.T) {
 					},
 				},
 			},
-			openPorts: []int32{8081, 9000, 9042, 9103, 9142},
-			notOpen:   []int32{8080, 8609, 9160},
+			openPorts: []int32{8081, 9000, 9042, 7000},
+			notOpen:   []int32{8080, 8609, 9160, 9142, 9103},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1809,7 +1809,8 @@ func TestPorts(t *testing.T) {
 					ServerVersion: "6.8.31",
 				},
 			},
-			openPorts: []int32{8080, 8609, 9000, 9042, 9103, 9142, 9160},
+			openPorts: []int32{8080, 8609, 9000, 9042, 9160, 7000},
+			notOpen:   []int32{9142, 9103},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1834,8 +1835,105 @@ func TestPorts(t *testing.T) {
 					},
 				},
 			},
-			openPorts: []int32{8080, 9004, 9042, 9103, 9142},
-			notOpen:   []int32{8609, 9000, 9160},
+			openPorts: []int32{8080, 9004, 9042, 9103, 7000},
+			notOpen:   []int32{8609, 9000, 9160, 9142},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ReadOnlyRootFilesystem: new(false),
+					ClusterName:            "bob",
+					ServerType:             "cassandra",
+					ServerVersion:          "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Env: []corev1.EnvVar{{
+										Name:  "MGMT_API_DISABLE_MCAC",
+										Value: "false",
+									}},
+								},
+							},
+						},
+					},
+				},
+			},
+			openPorts: []int32{8080, 9000, 9042, 9103, 7000},
+			notOpen:   []int32{8609, 9160, 9142},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ReadOnlyRootFilesystem: new(false),
+					ClusterName:            "bob",
+					ServerType:             "cassandra",
+					ServerVersion:          "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Env: []corev1.EnvVar{{
+										Name:  "MGMT_API_DISABLE_MCAC",
+										Value: "true",
+									}},
+								},
+							},
+						},
+					},
+				},
+			},
+			openPorts: []int32{8080, 9000, 9042, 7000},
+			notOpen:   []int32{8609, 9160, 9142, 9103},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ReadOnlyRootFilesystem: new(true),
+					ClusterName:            "bob",
+					ServerType:             "cassandra",
+					ServerVersion:          "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+								},
+							},
+						},
+					},
+				},
+			},
+			openPorts: []int32{8080, 9000, 9042, 7000},
+			notOpen:   []int32{8609, 9160, 9142, 9103},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{
+											Name:          "tls-native",
+											ContainerPort: 9142,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			openPorts: []int32{8080, 7000, 9042, 9103, 9142},
+			notOpen:   []int32{8609, 9160},
 		},
 	}
 

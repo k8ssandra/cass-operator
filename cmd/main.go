@@ -237,6 +237,7 @@ func main() {
 
 	if err = (&controllers.CassandraDatacenterReconciler{
 		Client:           mgr.GetClient(),
+		APIReader:        mgr.GetAPIReader(),
 		Log:              ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
 		Scheme:           mgr.GetScheme(),
 		Recorder:         mgr.GetEventRecorder("cass-operator"),
@@ -357,16 +358,6 @@ func setupCacheIndexers(ctx context.Context, mgr ctrl.Manager) error {
 			}
 		}
 		return pvcNames
-	}); err != nil {
-		return err
-	}
-
-	if err := mgr.GetCache().IndexField(ctx, &corev1.Event{}, "involvedObject.name", func(obj client.Object) []string {
-		event := obj.(*corev1.Event)
-		if event.InvolvedObject.Kind == "Pod" {
-			return []string{event.InvolvedObject.Name}
-		}
-		return []string{}
 	}); err != nil {
 		return err
 	}

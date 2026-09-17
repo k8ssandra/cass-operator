@@ -101,10 +101,11 @@ func TestReconcile(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithStatusSubresource(dc).WithRuntimeObjects(trackObjects...).Build()
 
 	r := &controllers.CassandraDatacenterReconciler{
-		Client:   fakeClient,
-		Scheme:   s,
-		Recorder: record.NewFakeRecorder(100),
-		Log:      ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
+		Client:    fakeClient,
+		APIReader: fakeClient,
+		Scheme:    s,
+		Recorder:  record.NewFakeRecorder(100),
+		Log:       ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
 	}
 
 	request := reconcile.Request{
@@ -168,8 +169,9 @@ func TestReconcile_NotFound(t *testing.T) {
 	fakeRecorder := record.NewFakeRecorder(5)
 
 	r := &controllers.CassandraDatacenterReconciler{
-		Client: fakeClient,
-		Scheme: s,
+		Client:    fakeClient,
+		APIReader: fakeClient,
+		Scheme:    s,
 	}
 	r.Recorder = events.NewLoggingEventRecorder(fakeRecorder, r.Log.WithName("reconcile_tests"))
 
@@ -234,8 +236,9 @@ func TestReconcile_Error(t *testing.T) {
 		Build()
 
 	r := &controllers.CassandraDatacenterReconciler{
-		Client: fakeClient,
-		Scheme: s,
+		Client:    fakeClient,
+		APIReader: fakeClient,
+		Scheme:    s,
 	}
 	fakeRecorder := record.NewFakeRecorder(5)
 	r.Recorder = events.NewLoggingEventRecorder(fakeRecorder, r.Log.WithName("reconcile_tests"))

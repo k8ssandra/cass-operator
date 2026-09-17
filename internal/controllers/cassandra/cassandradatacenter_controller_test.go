@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 )
 
 const (
@@ -87,6 +88,7 @@ func waitForDatacenterCondition(ctx context.Context, dcName string, condition ca
 		for _, cond := range dc.Status.Conditions {
 			if cond.Type == condition {
 				g.Expect(cond.Status).To(Equal(status))
+				verifyMetricsSet(g, dcName, condition)
 				return
 			}
 		}
@@ -255,6 +257,12 @@ func verifyOwnerReference(g Gomega, ownerRef metav1.OwnerReference, dcName strin
 	g.Expect(ownerRef.Kind).To(Equal("CassandraDatacenter"))
 	g.Expect(ownerRef.Name).To(Equal(dcName))
 	g.Expect(ownerRef.APIVersion).To(Equal("cassandra.datastax.com/v1beta1"))
+}
+
+func verifyMetricsSet(g Gomega, dcName string, condition cassdcapi.DatacenterConditionType) {
+	val, err := monitoring.GetMetricValue("cass_operator_datacenter_status", map[string]string{"datacenter": dcName, "condition": string(condition)})
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(val).To(Equal(1.0))
 }
 
 func createStubCassDc(dcName string, nodeCount int32) cassdcapi.CassandraDatacenter {

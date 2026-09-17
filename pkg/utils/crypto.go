@@ -38,7 +38,7 @@ func setupKey() (*big.Int, time.Time, *rsa.PrivateKey, string, time.Time, error)
 	return nil, time.Time{}, nil, "", time.Time{}, err
 }
 
-func GetNewCAandKey(leafdomain, namespace string) (keypem, certpem string, err error) {
+func GetNewCAandKey(leafdomain, namespace string) (string, string, error) {
 	serialNumber, notBefore, priv, privPem, notAfter, err := setupKey()
 	if err == nil {
 		buffer := bytes.NewBufferString("")
@@ -68,7 +68,7 @@ func GetNewCAandKey(leafdomain, namespace string) (keypem, certpem string, err e
 	return "", "", err
 }
 
-func prepare_ca(ca *corev1.Secret) (ca_cert_bytes []byte, ca_certificate *x509.Certificate, ca_key *rsa.PrivateKey, err error) {
+func prepare_ca(ca *corev1.Secret) (ca_cert_bytes []byte, ca_certificate *x509.Certificate, ca_key *rsa.PrivateKey, err error) { //nolint:nonamedreturns
 	ca_certificate_pem, _ := pem.Decode(ca.Data["cert"])
 	ca_cert_bytes = ca_certificate_pem.Bytes
 	ca_key_block, _ := pem.Decode(ca.Data["key"])
@@ -82,7 +82,7 @@ func prepare_ca(ca *corev1.Secret) (ca_cert_bytes []byte, ca_certificate *x509.C
 	return
 }
 
-func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err error) {
+func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err error) { //nolint:nonamedreturns
 	serialNumber, notBefore, priv, _, notAfter, err := setupKey()
 	if err != nil {
 		return nil, err

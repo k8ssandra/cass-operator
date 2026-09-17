@@ -101,6 +101,7 @@ const (
 
 	DefaultNativePort    = 9042
 	DefaultInternodePort = 7000
+	DefaultMgmtApiPort   = 8080
 )
 
 type AllowUpdateType string
@@ -792,7 +793,7 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 		namedPort("internode", internodePort),
 		namedPort("tls-internode", 7001),
 		namedPort("jmx", 7199),
-		namedPort("mgmt-api-http", 8080),
+		namedPort("mgmt-api-http", DefaultMgmtApiPort),
 		namedPort("prometheus", 9103),
 		namedPort("metrics", 9000),
 	}

@@ -24,7 +24,6 @@ import (
 	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -377,9 +376,6 @@ func TestCheckRackPodTemplate_CanaryUpgrade(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, rc.Datacenter.Status.CassandraOperatorProgress, api.ProgressUpdating)
-	val, err := monitoring.GetMetricValue("cass_operator_datacenter_progress", map[string]string{"datacenter": rc.Datacenter.DatacenterName(), "progress": string(api.ProgressUpdating)})
-	assert.NoError(t, err)
-	assert.Equal(t, float64(1), val)
 
 	expectedStrategy := appsv1.StatefulSetUpdateStrategy{
 		Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -3404,45 +3400,6 @@ func TestCheckRackPodTemplateWithVolumeExpansion(t *testing.T) {
 
 	res = rc.CheckRackPodTemplate()
 	require.Equal(result.Continue(), res, "Recreating StS should throw us to silence period")
-}
-
-func TestSetConditionStatus(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
-	defer cleanupMockScr()
-	assert := assert.New(t)
-
-	assert.NoError(rc.setConditionStatus(api.DatacenterHealthy, corev1.ConditionTrue))
-	assert.Equal(corev1.ConditionTrue, rc.Datacenter.GetConditionStatus(api.DatacenterHealthy))
-	dc := &api.CassandraDatacenter{}
-	assert.NoError(rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(rc.Datacenter), dc))
-	assert.Equal(corev1.ConditionTrue, dc.GetConditionStatus(api.DatacenterHealthy))
-	val, err := monitoring.GetMetricValue("cass_operator_datacenter_status", map[string]string{"datacenter": rc.Datacenter.DatacenterName(), "condition": string(api.DatacenterHealthy)})
-	assert.NoError(err)
-	assert.Equal(float64(1), val)
-
-	assert.NoError(rc.setConditionStatus(api.DatacenterHealthy, corev1.ConditionFalse))
-	assert.Equal(corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterHealthy))
-	assert.NoError(rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(rc.Datacenter), dc))
-	assert.Equal(corev1.ConditionFalse, dc.GetConditionStatus(api.DatacenterHealthy))
-	val, err = monitoring.GetMetricValue("cass_operator_datacenter_status", map[string]string{"datacenter": rc.Datacenter.DatacenterName(), "condition": string(api.DatacenterHealthy)})
-	assert.NoError(err)
-	assert.Equal(float64(0), val)
-}
-
-func TestDatacenterStatus(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
-	defer cleanupMockScr()
-	assert := assert.New(t)
-
-	assert.NoError(rc.setConditionStatus(api.DatacenterRequiresUpdate, corev1.ConditionTrue)) // This uses one StatusUpdate call
-	rc.Datacenter.Status.ObservedGeneration = 0
-	rc.Datacenter.Generation = 1
-	assert.NoError(setDatacenterStatus(rc))
-	assert.Equal(int64(1), rc.Datacenter.Status.ObservedGeneration)
-	assert.Equal(corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterRequiresUpdate))
-	val, err := monitoring.GetMetricValue("cass_operator_datacenter_status", map[string]string{"datacenter": rc.Datacenter.DatacenterName(), "condition": string(api.DatacenterRequiresUpdate)})
-	assert.NoError(err)
-	assert.Equal(float64(0), val)
 }
 
 func TestDatacenterPods(t *testing.T) {

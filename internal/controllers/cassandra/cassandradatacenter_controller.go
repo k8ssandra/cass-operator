@@ -24,6 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/reconciliation"
 	appsv1 "k8s.io/api/apps/v1"
@@ -63,7 +64,7 @@ var (
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=endpoints;endpoints/restricted,verbs=list;watch;delete
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods,verbs=get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=events,verbs=get;list;watch
-// +kubebuilder:rbac:groups=events.k8s.io,namespace=cass-operator,resources=events,verbs=create
+// +kubebuilder:rbac:groups=events.k8s.io,namespace=cass-operator,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=namespaces,verbs=get
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=policy,namespace=cass-operator,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
@@ -165,6 +166,9 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	if res.RequeueAfter > 0 && res.RequeueAfter < minimumRequeueTime {
 		res.RequeueAfter = minimumRequeueTime
 	}
+
+	monitoring.RefreshDatacenterMetrics(rc.Datacenter)
+
 	return res, err
 }
 

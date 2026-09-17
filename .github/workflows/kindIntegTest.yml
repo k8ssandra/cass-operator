@@ -180,6 +180,7 @@ jobs:
           - additional_serviceoptions
           - scheduled_task
           - additional_volumes
+          - mgmt_api_port_change
           # - delete_node_terminated_container # This does not test any operator behavior
           # - podspec_simple
           # - terminate

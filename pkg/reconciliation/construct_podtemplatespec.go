@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 
 	"github.com/pkg/errors"
 
@@ -708,12 +709,14 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		cassContainer.Resources = dc.Spec.Resources
 	}
 
+	managementApiPort := httphelper.GetMgmtApiPort(baseTemplate.Spec.Containers)
+
 	if cassContainer.LivenessProbe == nil {
-		cassContainer.LivenessProbe = probe(8080, httphelper.LivenessEndpoint, 15, 15, 10)
+		cassContainer.LivenessProbe = probe(managementApiPort, httphelper.LivenessEndpoint, 15, 15, 10)
 	}
 
 	if cassContainer.ReadinessProbe == nil {
-		cassContainer.ReadinessProbe = probe(8080, httphelper.ReadinessEndpoint, 20, 10, 10)
+		cassContainer.ReadinessProbe = probe(managementApiPort, httphelper.ReadinessEndpoint, 20, 10, 10)
 	}
 
 	if cassContainer.Lifecycle == nil {
@@ -721,7 +724,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	if cassContainer.Lifecycle.PreStop == nil {
-		action, err := httphelper.GetMgmtApiPostAction(dc, httphelper.NodeDrainEndpoint, 0)
+		action, err := httphelper.GetMgmtApiPostAction(dc, httphelper.NodeDrainEndpoint, 0, managementApiPort)
 		if err != nil {
 			return err
 		}
@@ -741,6 +744,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		{Name: "USE_MGMT_API", Value: "true"},
 		{Name: "MGMT_API_NO_KEEP_ALIVE", Value: "true"},
 		{Name: "MGMT_API_EXPLICIT_START", Value: "true"},
+		{Name: "MGMT_API_LISTEN_TCP_PORT", Value: strconv.Itoa(managementApiPort)},
 	}
 
 	if dc.Spec.ServerType == "dse" {

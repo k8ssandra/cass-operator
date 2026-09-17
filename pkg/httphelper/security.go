@@ -21,11 +21,10 @@ import (
 )
 
 const (
-	NodeDrainEndpoint        = "/api/v0/ops/node/drain"
-	MgmtApiTargetHostAndPort = "localhost:8080"
-	LivenessEndpoint         = "/api/v0/probes/liveness"
-	ReadinessEndpoint        = "/api/v0/probes/readiness"
-	DefaultTimeout           = 10
+	NodeDrainEndpoint = "/api/v0/ops/node/drain"
+	LivenessEndpoint  = "/api/v0/probes/liveness"
+	ReadinessEndpoint = "/api/v0/probes/readiness"
+	DefaultTimeout    = 10
 
 	caCertPath = "/management-api-certs/ca.crt"
 	tlsCrt     = "/management-api-certs/tls.crt"
@@ -97,14 +96,18 @@ func ValidateManagementApiConfig(dc *api.CassandraDatacenter, client client.Clie
 // SPI for adding new mechanisms for securing the management API
 type ManagementApiSecurityProvider interface {
 	BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error)
-	BuildMgmtApiGetAction(endpoint string, timeout int) *corev1.ExecAction
-	BuildMgmtApiPostAction(endpoint string, timeout int) *corev1.ExecAction
+	BuildMgmtApiGetAction(endpoint string, timeout int, port int) *corev1.ExecAction
+	BuildMgmtApiPostAction(endpoint string, timeout int, port int) *corev1.ExecAction
 	AddServerSecurity(pod *corev1.PodTemplateSpec) error
 	GetProtocol() string
 	ValidateConfig(ctx context.Context, client client.Client) []error
 }
 
 type InsecureManagementApiSecurityProvider struct{}
+
+func mgmtApiTargetHostAndPort(port int) string {
+	return fmt.Sprintf("localhost:%d", port)
+}
 
 func buildInsecureManagementApiSecurityProvider(dc *api.CassandraDatacenter) (ManagementApiSecurityProvider, error) {
 	// If both are nil, then default to insecure
@@ -155,15 +158,15 @@ func (provider *ManualManagementApiSecurityProvider) GetProtocol() string {
 	return "https"
 }
 
-func GetMgmtApiPostAction(dc *api.CassandraDatacenter, endpoint string, timeout int) (*corev1.ExecAction, error) {
+func GetMgmtApiPostAction(dc *api.CassandraDatacenter, endpoint string, timeout int, port int) (*corev1.ExecAction, error) {
 	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
-	return provider.BuildMgmtApiPostAction(endpoint, timeout), nil
+	return provider.BuildMgmtApiPostAction(endpoint, timeout, port), nil
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiGetAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiGetAction(endpoint string, timeout int, port int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -175,12 +178,12 @@ func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiGetAction(end
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("http://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("http://%s%s", mgmtApiTargetHostAndPort(port), endpoint),
 		},
 	}
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiGetAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiGetAction(endpoint string, timeout int, port int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -196,12 +199,12 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiGetAction(endpo
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("https://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("https://%s%s", mgmtApiTargetHostAndPort(port), endpoint),
 		},
 	}
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiPostAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiPostAction(endpoint string, timeout int, port int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -213,12 +216,12 @@ func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiPostAction(en
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("http://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("http://%s%s", mgmtApiTargetHostAndPort(port), endpoint),
 		},
 	}
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(endpoint string, timeout int, port int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -234,7 +237,7 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(endp
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("https://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("https://%s%s", mgmtApiTargetHostAndPort(port), endpoint),
 		},
 	}
 }
@@ -281,6 +284,8 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 		return fmt.Errorf("could not find cassandra container")
 	}
 
+	mgmtApiPort := GetMgmtApiPort(pod.Spec.Containers)
+
 	// Configure Management API to use certificates
 	envVars := []corev1.EnvVar{
 		{
@@ -317,10 +322,10 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 
 	cassContainer.LivenessProbe.HTTPGet = nil
 	cassContainer.LivenessProbe.TCPSocket = nil
-	cassContainer.LivenessProbe.Exec = provider.BuildMgmtApiGetAction(LivenessEndpoint, livenessTimeout)
+	cassContainer.LivenessProbe.GRPC = nil
+	cassContainer.LivenessProbe.Exec = provider.BuildMgmtApiGetAction(LivenessEndpoint, livenessTimeout, mgmtApiPort)
 
 	// Update Readiness probe to account for mutual auth (can't just use HTTP probe now)
-	// TODO: Get endpoint from configured HTTPGet probe
 	if cassContainer.ReadinessProbe == nil {
 		cassContainer.ReadinessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{},
@@ -334,7 +339,8 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 
 	cassContainer.ReadinessProbe.HTTPGet = nil
 	cassContainer.ReadinessProbe.TCPSocket = nil
-	cassContainer.ReadinessProbe.Exec = provider.BuildMgmtApiGetAction(ReadinessEndpoint, readinessTimeout)
+	cassContainer.ReadinessProbe.GRPC = nil
+	cassContainer.ReadinessProbe.Exec = provider.BuildMgmtApiGetAction(ReadinessEndpoint, readinessTimeout, mgmtApiPort)
 
 	return nil
 }

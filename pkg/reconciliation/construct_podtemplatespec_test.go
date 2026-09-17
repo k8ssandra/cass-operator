@@ -441,6 +441,7 @@ func TestCassandraContainerEnvVars(t *testing.T) {
 	useMgmtApiEnvVar := corev1.EnvVar{Name: "USE_MGMT_API", Value: "true"}
 	explicitStartEnvVar := corev1.EnvVar{Name: "MGMT_API_EXPLICIT_START", Value: "true"}
 	noKeepAliveEnvVar := corev1.EnvVar{Name: "MGMT_API_NO_KEEP_ALIVE", Value: "true"}
+	listenPortEnvVar := corev1.EnvVar{Name: "MGMT_API_LISTEN_TCP_PORT", Value: "8080"}
 
 	templateSpec := &corev1.PodTemplateSpec{}
 	dc := &api.CassandraDatacenter{
@@ -468,6 +469,55 @@ func TestCassandraContainerEnvVars(t *testing.T) {
 	assert.True(envVarsContains(cassContainer.Env, useMgmtApiEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, explicitStartEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, noKeepAliveEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, listenPortEnvVar))
+}
+
+func TestCustomMgmtApiPortConfiguration(t *testing.T) {
+	const mgmtApiPort int32 = 8081
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "test"},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "test",
+			ServerType:    "cassandra",
+			ServerVersion: "4.0.7",
+			ManagementApiAuth: api.ManagementApiAuthConfig{
+				Manual: &api.ManagementApiAuthManualConfig{},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: CassandraContainerName,
+							Ports: []corev1.ContainerPort{
+								{Name: "mgmt-api-http", ContainerPort: mgmtApiPort},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	templateSpec := dc.Spec.PodTemplateSpec.DeepCopy()
+
+	require.NoError(t, buildContainers(dc, templateSpec, imageRegistry))
+	cassContainer := findContainer(templateSpec.Spec.Containers, CassandraContainerName)
+	require.NotNil(t, cassContainer)
+
+	assert.True(t, envVarsContains(cassContainer.Env, corev1.EnvVar{
+		Name:  "MGMT_API_LISTEN_TCP_PORT",
+		Value: "8081",
+	}))
+	require.NotNil(t, cassContainer.LivenessProbe)
+	require.NotNil(t, cassContainer.LivenessProbe.HTTPGet)
+	assert.Equal(t, mgmtApiPort, cassContainer.LivenessProbe.HTTPGet.Port.IntVal)
+	require.NotNil(t, cassContainer.ReadinessProbe)
+	require.NotNil(t, cassContainer.ReadinessProbe.HTTPGet)
+	assert.Equal(t, mgmtApiPort, cassContainer.ReadinessProbe.HTTPGet.Port.IntVal)
+	require.NotNil(t, cassContainer.Lifecycle)
+	require.NotNil(t, cassContainer.Lifecycle.PreStop)
+	require.NotNil(t, cassContainer.Lifecycle.PreStop.Exec)
+	assert.Contains(t, cassContainer.Lifecycle.PreStop.Exec.Command,
+		"https://localhost:8081/api/v0/ops/node/drain")
 }
 
 func TestHCDContainerEnvVars(t *testing.T) {

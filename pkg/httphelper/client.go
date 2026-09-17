@@ -228,20 +228,22 @@ func BuildPodHostFromPod(pod *corev1.Pod) (string, int, error) {
 		return "", 0, newNoPodIPError(pod)
 	}
 
-	mgmtApiPort := 8080
+	return pod.Status.PodIP, GetMgmtApiPort(pod.Spec.Containers), nil
+}
 
-	// Check for port override
-	for _, container := range pod.Spec.Containers {
+// GetMgmtApiPort returns the named mgmt-api port from the cassandra container.
+func GetMgmtApiPort(containers []corev1.Container) int {
+	for _, container := range containers {
 		if container.Name == "cassandra" {
 			for _, port := range container.Ports {
 				if port.Name == "mgmt-api-http" {
-					mgmtApiPort = int(port.ContainerPort)
+					return int(port.ContainerPort)
 				}
 			}
 		}
 	}
 
-	return pod.Status.PodIP, mgmtApiPort, nil
+	return cassdcapi.DefaultMgmtApiPort
 }
 
 func GetPodHost(podName, clusterName, dcName, namespace string) string {
@@ -391,6 +393,73 @@ func (client *NodeMgmtClient) CallDropRoleEndpoint(pod *corev1.Pod, username str
 	}
 
 	_, err = callNodeMgmtEndpoint(client, request, "")
+	return err
+}
+
+type identityToRoleRequest struct {
+	Identity string  `json:"identity"`
+	Role     string  `json:"role,omitempty"`
+	TTL      float64 `json:"ttl,omitempty"`
+}
+
+// CallInsertIdentityToRoleEndpoint inserts a SPIFFE identity to Cassandra role mapping.
+func (client *NodeMgmtClient) CallInsertIdentityToRoleEndpoint(pod *corev1.Pod, identity, role string, ttl time.Duration) error {
+	client.Log.Info(
+		"calling Management API insert identity to role - POST /api/v1/ops/auth/identity_to_role",
+		"pod", pod.Name,
+	)
+
+	if identity == "" || role == "" {
+		return errors.New("identity and role must be set")
+	}
+	if ttl != 0 && ttl < time.Second {
+		return errors.New("ttl must be at least one second")
+	}
+
+	return client.callIdentityToRoleEndpoint(pod, http.MethodPost, identityToRoleRequest{
+		Identity: identity,
+		Role:     role,
+		TTL:      ttl.Seconds(),
+	})
+}
+
+// CallDeleteIdentityToRoleEndpoint removes a SPIFFE identity to Cassandra role mapping.
+func (client *NodeMgmtClient) CallDeleteIdentityToRoleEndpoint(pod *corev1.Pod, identity string) error {
+	client.Log.Info(
+		"calling Management API delete identity to role - DELETE /api/v1/ops/auth/identity_to_role",
+		"pod", pod.Name,
+	)
+
+	if identity == "" {
+		return errors.New("identity cannot be empty")
+	}
+
+	return client.callIdentityToRoleEndpoint(pod, http.MethodDelete, identityToRoleRequest{
+		Identity: identity,
+	})
+}
+
+func (client *NodeMgmtClient) callIdentityToRoleEndpoint(pod *corev1.Pod, method string, payload identityToRoleRequest) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	podHost, podPort, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v1/ops/auth/identity_to_role",
+		host:     podHost,
+		port:     podPort,
+		method:   method,
+		timeout:  60 * time.Second,
+		body:     body,
+	}
+
+	_, err = callNodeMgmtEndpoint(client, request, "application/json")
 	return err
 }
 
@@ -1274,7 +1343,7 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 		nodeMgmtCallDurationMetric.WithLabelValues(request.method, urlForMetric(request.endpoint), callResult).Observe(time.Since(startTime).Seconds())
 	}()
 
-	port := 8080
+	port := cassdcapi.DefaultMgmtApiPort
 	if request.port > 0 {
 		port = request.port
 	}

@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
@@ -91,8 +90,6 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 		rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")
 		return err
 	}
-
-	monitoring.UpdateOperatorDatacenterProgressStatusMetric(rc.Datacenter, newState)
 
 	return nil
 }

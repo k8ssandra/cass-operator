@@ -11,10 +11,22 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#969](https://github.com/k8ssandra/cass-operator/issues/969) Pull cass-config-builder from ghcr.io instead of docker.io where its no longer updated
+* [ENHANCEMENT] [#947](https://github.com/k8ssandra/cass-operator/issues/947) Read Events through an uncached APIReader instead of a cluster-wide cached informer in failure detection, reducing memory usage in cluster-scoped deployments.
 * [ENHANCEMENT] [#947](https://github.com/k8ssandra/cass-operator/issues/947) Bound the informer cache in cluster-scoped mode: label-scope Pod/StatefulSet/PodDisruptionBudget/Service informers to operator-managed objects, read Secrets/PVCs/ConfigMaps/Endpoints/EndpointSlices/StorageClasses through live API calls with metadata-only Secret watches, and strip managedFields/last-applied from cached objects. Operator memory no longer scales with cluster size.
+* [BUGFIX] [#971](https://github.com/k8ssandra/cass-operator/issues/971) Decommissioning last pod of a datacenter left its pod_status metric abandoned instead of being removed. And also we got an error logline which wasn't a real error
+* [BUGFIX] [#973](https://github.com/k8ssandra/cass-operator/issues/973) Prevent premature decommission cleanup when Cassandra metadata requests fail.
+
+## v1.32.0
+
+* [ENHANCEMENT] [#943](https://github.com/k8ssandra/cass-operator/issues/943) Add terminating state as one of the Pod status metrics
+* [ENHANCEMENT] [#936](https://github.com/k8ssandra/cass-operator/issues/936) Every reconcile of the CassandraDatacenter should refresh the metrics for up-to-date state
+* [ENHANCEMENT] [#242](https://github.com/k8ssandra/cass-operator/issues/242) Allow configuring the mgmt-api port. Setting cassandra container's mgmt-api-http containerPort will override the default 8080 value.
+* [ENHANCEMENT] [#956](https://github.com/k8ssandra/cass-operator/issues/956) Add identityToRole methods to client.go to support new features in mgmt-api
 * [BUGFIX] [#933](https://github.com/k8ssandra/cass-operator/issues/933) Fix regression introduced in the CassandraTask replacement process introduced in the full rack replacement feature.
 * [BUGFIX] [#930](https://github.com/k8ssandra/cass-operator/issues/930) Add the missing resource-hash annotation to the NodePort service so changes to it are detected and reconciled.
 * [BUGFIX] [#938](https://github.com/k8ssandra/cass-operator/issues/938) Stripping of passwords from logs was failing if the password included characters that caused URLEncode to happen
+* [BUGFIX] [#928](https://github.com/k8ssandra/cass-operator/issues/928) Fix default storageClass selector to use annotations instead of labels
 
 ## v1.31.0
 

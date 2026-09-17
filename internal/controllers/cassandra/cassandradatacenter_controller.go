@@ -74,8 +74,6 @@ var (
 // CassandraDatacenterReconciler reconciles a cassandraDatacenter object
 type CassandraDatacenterReconciler struct {
 	client.Client
-	// APIReader is an uncached reader (mgr.GetAPIReader) used for high-cardinality
-	// reads deliberately kept out of the informer cache, such as Events.
 	APIReader client.Reader
 	Log       logr.Logger
 	Scheme    *runtime.Scheme

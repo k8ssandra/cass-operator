@@ -27,10 +27,8 @@ import (
 
 // ReconciliationContext contains all of the input necessary to calculate a list of ReconciliationActions
 type ReconciliationContext struct {
-	Request *reconcile.Request
-	Client  client.Client
-	// APIReader is an uncached reader (mgr.GetAPIReader) used for high-cardinality
-	// reads deliberately kept out of the informer cache, such as Events.
+	Request          *reconcile.Request
+	Client           client.Client
 	APIReader        client.Reader
 	Scheme           *runtime.Scheme
 	Datacenter       *api.CassandraDatacenter

@@ -42,22 +42,17 @@ var podOnlyPortNames = map[string]struct{}{
 
 // Creates a headless service object for the Datacenter, for clients wanting to
 // reach out to a ready Server node for either CQL or mgmt API
-func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) (*corev1.Service, error) {
+func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	svcName := dc.GetDatacenterServiceName()
 	service := makeGenericHeadlessService(dc)
 	service.Name = svcName
-
-	ports, err := servicePortsForCassandraDatacenter(dc)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get service ports for cassandra datacenter: %w", err)
-	}
-	service.Spec.Ports = ports
+	service.Spec.Ports = servicePortsForCassandraDatacenter(dc)
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.DatacenterService)
 
 	utils.AddHashAnnotation(service)
 
-	return service, nil
+	return service
 }
 
 func addAdditionalOptions(service *corev1.Service, serviceConfig *api.ServiceConfigAdditions) {
@@ -247,7 +242,7 @@ func newNodePortServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *core
 
 // newAllPodsServiceForCassandraDatacenter creates a headless service owned by the CassandraDatacenter,
 // which covers all server pods in the datacenter, whether they are ready or not
-func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) (*corev1.Service, error) {
+func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	service := makeGenericHeadlessService(dc)
 	service.Name = dc.GetAllPodsServiceName()
 	service.Spec.PublishNotReadyAddresses = true
@@ -255,17 +250,14 @@ func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) (*core
 		service.Labels[api.PromMetricsLabel] = "true"
 	}
 
-	ports, err := servicePortsForCassandraDatacenter(dc)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get service ports for all pods service: %w", err)
-	}
+	ports := servicePortsForCassandraDatacenter(dc)
 	service.Spec.Ports = ports
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.AllPodsService)
 
 	utils.AddHashAnnotation(service)
 
-	return service, nil
+	return service
 }
 
 // makeGenericHeadlessService returns a fresh k8s headless (aka ClusterIP equals "None") Service
@@ -302,15 +294,10 @@ func cassandraPodTemplatePorts(dc *api.CassandraDatacenter) []corev1.ContainerPo
 	return nil
 }
 
-func servicePortsForCassandraDatacenter(dc *api.CassandraDatacenter) ([]corev1.ServicePort, error) {
-	portDefaults, err := dc.GetContainerPorts()
-	if err != nil {
-		return nil, err
-	}
-
+func servicePortsForCassandraDatacenter(dc *api.CassandraDatacenter) []corev1.ServicePort {
+	portDefaults := dc.GetContainerPorts()
 	podTemplatePorts := cassandraPodTemplatePorts(dc)
 	combinedPorts := combinePortSlices(portDefaults, podTemplatePorts)
-
 	var servicePorts []corev1.ServicePort
 	for _, cp := range combinedPorts {
 		if cp.Name == "" {
@@ -321,6 +308,5 @@ func servicePortsForCassandraDatacenter(dc *api.CassandraDatacenter) ([]corev1.S
 		}
 		servicePorts = append(servicePorts, namedServicePort(cp.Name, cp.ContainerPort, cp.ContainerPort))
 	}
-
-	return servicePorts, nil
+	return servicePorts
 }

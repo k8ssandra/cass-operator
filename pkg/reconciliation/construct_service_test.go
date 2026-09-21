@@ -60,11 +60,7 @@ func TestCassandraDatacenter_allPodsServiceLabels(t *testing.T) {
 		api.PromMetricsLabel:    "true",
 	}
 
-	service, err := newAllPodsServiceForCassandraDatacenter(dc)
-
-	if err != nil {
-		t.Fatalf("newAllPodsServiceForCassandraDatacenter() failed: %v", err)
-	}
+	service := newAllPodsServiceForCassandraDatacenter(dc)
 	gotLabels := service.Labels
 	if !reflect.DeepEqual(wantLabels, gotLabels) {
 		t.Errorf("allPodsService labels = %v, want %v", gotLabels, wantLabels)
@@ -280,11 +276,7 @@ func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T) {
 		"AllPodsService":        "add",
 	}
 
-	service, err := newAllPodsServiceForCassandraDatacenter(dc)
-
-	if err != nil {
-		t.Fatalf("newAllPodsServiceForCassandraDatacenter(%v) failed: %v", dc, err)
-	}
+	service := newAllPodsServiceForCassandraDatacenter(dc)
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
 	}
@@ -351,11 +343,7 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T) {
 		"DatacenterService":     "add",
 	}
 
-	service, err := newServiceForCassandraDatacenter(dc)
-
-	if err != nil {
-		t.Fatalf("newServiceForCassandraDatacenter(%v) failed: %v", dc, err)
-	}
+	service := newServiceForCassandraDatacenter(dc)
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
 	}
@@ -459,11 +447,7 @@ func TestAddingAdditionalLabels(t *testing.T) {
 		"Add":                   "label",
 	}
 
-	service, err := newServiceForCassandraDatacenter(dc)
-
-	if err != nil {
-		t.Fatalf("newServiceForCassandraDatacenter(%v) failed: %v", dc, err)
-	}
+	service := newServiceForCassandraDatacenter(dc)
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = %v, want %v", service.Labels, expected)
 	}
@@ -483,9 +467,7 @@ func TestAddingAdditionalAnnotations(t *testing.T) {
 		},
 	}
 
-	service, err := newServiceForCassandraDatacenter(dc)
-
-	assert.NoError(t, err)
+	service := newServiceForCassandraDatacenter(dc)
 	assert.Contains(t, service.Annotations, "Add")
 }
 
@@ -688,15 +670,13 @@ func TestServicePorts(t *testing.T) {
 				assert.Fail(t, "mgmt-api service port not found")
 			}
 			t.Run("dc service", func(t *testing.T) {
-				svc, err := newServiceForCassandraDatacenter(test.dc)
-				assert.NoError(t, err)
+				svc := newServiceForCassandraDatacenter(test.dc)
 				servicePorts := getServicePorts(svc)
 				assert.ElementsMatch(t, servicePorts, test.dcServicePorts)
 				assertMgmtApiPort(svc)
 			})
 			t.Run("all pods service", func(t *testing.T) {
-				svc, err := newAllPodsServiceForCassandraDatacenter(test.dc)
-				assert.NoError(t, err)
+				svc := newAllPodsServiceForCassandraDatacenter(test.dc)
 				servicePorts := getServicePorts(svc)
 				assert.ElementsMatch(t, servicePorts, test.allPodsServicePorts)
 				assertMgmtApiPort(svc)

@@ -808,7 +808,7 @@ func namedPort(name string, port int) corev1.ContainerPort {
 }
 
 // GetContainerPorts will return the container ports for the pods in a statefulset based on the provided config
-func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, error) {
+func (dc *CassandraDatacenter) GetContainerPorts() []corev1.ContainerPort {
 	nativePort := DefaultNativePort
 	internodePort := DefaultInternodePort
 	if dc.IsNodePortEnabled() {
@@ -882,7 +882,7 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 		}
 	}
 
-	return ports, nil
+	return ports
 }
 
 func (dc *CassandraDatacenter) FullQueryEnabled() (bool, error) {

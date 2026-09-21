@@ -30,8 +30,7 @@ func TestCalculateReconciliationActions(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	service, err := newServiceForCassandraDatacenter(rc.Datacenter)
-	assert.NoError(t, err)
+	service := newServiceForCassandraDatacenter(rc.Datacenter)
 
 	// Objects to keep track of
 

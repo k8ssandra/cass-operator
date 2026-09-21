@@ -44,8 +44,7 @@ func TestIsMcacEnabled(t *testing.T) {
 			}
 			assert.Equal(t, tt.want, dc.IsMcacEnabled())
 
-			ports, err := dc.GetContainerPorts()
-			assert.NoError(t, err)
+			ports := dc.GetContainerPorts()
 			if tt.want {
 				assert.Contains(t, ports, namedPort("prometheus", 9103))
 			} else {

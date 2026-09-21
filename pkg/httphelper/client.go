@@ -197,10 +197,10 @@ func (f *FeatureSet) Supports(feature Feature) bool {
 	return found
 }
 
-func NewMgmtClient(ctx context.Context, client client.Client, dc *cassdcapi.CassandraDatacenter, customTransport *http.Transport) (NodeMgmtClient, error) {
+func NewMgmtClient(ctx context.Context, client client.Client, apiReader client.Reader, dc *cassdcapi.CassandraDatacenter, customTransport *http.Transport) (NodeMgmtClient, error) {
 	logger := log.FromContext(ctx)
 
-	httpClient, err := BuildManagementApiHttpClient(ctx, client, dc, customTransport)
+	httpClient, err := BuildManagementApiHttpClient(ctx, client, apiReader, dc, customTransport)
 	if err != nil {
 		logger.Error(err, "error in BuildManagementApiHttpClient")
 		return NodeMgmtClient{}, err

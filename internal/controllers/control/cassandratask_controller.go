@@ -60,7 +60,8 @@ var (
 // CassandraTaskReconciler reconciles a CassandraJob object
 type CassandraTaskReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	APIReader client.Reader
+	Scheme    *runtime.Scheme
 }
 
 // AsyncTaskExecutorFunc is called for all methods that support async processing
@@ -486,7 +487,7 @@ func (r *CassandraTaskReconciler) reconcileEveryPodTask(ctx context.Context, cas
 		maxConcurrent = *taskConfig.MaxConcurrentPods
 	}
 
-	nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, dc, nil)
+	nodeMgmtClient, err := httphelper.NewMgmtClient(ctx, r.Client, r.APIReader, dc, nil)
 	if err != nil {
 		return ctrl.Result{}, 0, 0, err
 	}

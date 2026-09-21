@@ -29,6 +29,7 @@ import (
 type ReconciliationContext struct {
 	Request          *reconcile.Request
 	Client           client.Client
+	APIReader        client.Reader
 	Scheme           *runtime.Scheme
 	Datacenter       *api.CassandraDatacenter
 	NodeMgmtClient   httphelper.NodeMgmtClient
@@ -56,6 +57,7 @@ func CreateReconciliationContext(
 	ctx context.Context,
 	req *reconcile.Request,
 	cli client.Client,
+	apiReader client.Reader,
 	scheme *runtime.Scheme,
 	rec record.EventRecorder,
 	secretWatches dynamicwatch.DynamicWatches,
@@ -66,6 +68,7 @@ func CreateReconciliationContext(
 	rc := &ReconciliationContext{}
 	rc.Request = req
 	rc.Client = cli
+	rc.APIReader = apiReader
 	rc.Scheme = scheme
 	rc.SecretWatches = secretWatches
 	rc.ReqLogger = reqLogger

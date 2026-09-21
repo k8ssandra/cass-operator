@@ -4001,6 +4001,7 @@ func TestFailureDetection(t *testing.T) {
 				Build()
 
 			rc.Client = fakeClient
+			rc.APIReader = fakeClient
 
 			rc.desiredRackInformation = []*RackInformation{
 				{

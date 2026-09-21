@@ -103,6 +103,7 @@ var _ = BeforeSuite(func() {
 
 	err = (&CassandraDatacenterReconciler{
 		Client:        k8sManager.GetClient(),
+		APIReader:     k8sManager.GetAPIReader(),
 		Log:           ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
 		Scheme:        k8sManager.GetScheme(),
 		Recorder:      k8sManager.GetEventRecorder("cass-operator"),

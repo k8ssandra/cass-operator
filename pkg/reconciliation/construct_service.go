@@ -290,7 +290,7 @@ func makeGenericHeadlessService(dc *api.CassandraDatacenter) *corev1.Service {
 	return &service
 }
 
-func cassandraContainerPorts(dc *api.CassandraDatacenter) []corev1.ContainerPort {
+func cassandraPodTemplatePorts(dc *api.CassandraDatacenter) []corev1.ContainerPort {
 	if dc.Spec.PodTemplateSpec == nil {
 		return nil
 	}
@@ -308,8 +308,8 @@ func servicePortsForCassandraDatacenter(dc *api.CassandraDatacenter) ([]corev1.S
 		return nil, err
 	}
 
-	userPorts := cassandraContainerPorts(dc)
-	combinedPorts := combinePortSlices(portDefaults, userPorts)
+	podTemplatePorts := cassandraPodTemplatePorts(dc)
+	combinedPorts := combinePortSlices(portDefaults, podTemplatePorts) 
 
 	var servicePorts []corev1.ServicePort
 	for _, cp := range combinedPorts {

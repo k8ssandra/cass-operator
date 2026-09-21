@@ -739,12 +739,17 @@ func (dc *CassandraDatacenter) GetSuperuserSecretNamespacedName() types.Namespac
 }
 
 func (dc *CassandraDatacenter) IsMcacEnabled() bool {
+	if (dc.Spec.ServerType == "cassandra" && semver.Compare("v"+dc.Spec.ServerVersion, "v5.0.0") >= 0) ||
+		(dc.Spec.ServerType == "hcd" && semver.Compare("v"+dc.Spec.ServerVersion, "v2.0.0") >= 0) {
+		return false
+	}
+
 	// MCAC requires a writable filesystem
 	if dc.ReadOnlyFs() {
 		return false
 	}
 
-	// The user can explicitly disable MCAC by setting env variable
+	// The user can explicitly disable the legacy collector by setting the environment variable.
 	if dc.Spec.PodTemplateSpec != nil {
 		for _, container := range dc.Spec.PodTemplateSpec.Spec.Containers {
 			if container.Name == "cassandra" {
@@ -757,7 +762,6 @@ func (dc *CassandraDatacenter) IsMcacEnabled() bool {
 		}
 	}
 
-	// MCAC is enabled by default
 	return true
 }
 

@@ -150,6 +150,17 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	)
 }
 
+func TestUpdateConfig_CDCDoesNotAddMissingMcacAgent(t *testing.T) {
+	dc := GetCassandraDatacenter("test-dc", "test-ns")
+	dc.Spec.ServerVersion = "5.0.0"
+	dc.Spec.ReadOnlyRootFilesystem = new(false)
+	dc.Spec.DeprecatedCDC = &cassdcapi.CDCConfiguration{}
+
+	config, err := UpdateConfig(json.RawMessage(existingConfig), dc)
+	assert.NoError(t, err)
+	assert.NotContains(t, string(config), "datastax-mcac-agent.jar")
+}
+
 // TestUpdateConfig_ExistingConfig_WithoutCDC tests that CDC is removed from additional-jvm-opts when it is present but CDC should be disabled.
 func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 	// Test case when the DC has CDC explicitly marked false.

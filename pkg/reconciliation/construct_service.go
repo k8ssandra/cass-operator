@@ -309,10 +309,13 @@ func servicePortsForCassandraDatacenter(dc *api.CassandraDatacenter) ([]corev1.S
 	}
 
 	podTemplatePorts := cassandraPodTemplatePorts(dc)
-	combinedPorts := combinePortSlices(portDefaults, podTemplatePorts) 
+	combinedPorts := combinePortSlices(portDefaults, podTemplatePorts)
 
 	var servicePorts []corev1.ServicePort
 	for _, cp := range combinedPorts {
+		if cp.Name == "" {
+			continue
+		}
 		if _, ignored := podOnlyPortNames[cp.Name]; ignored {
 			continue
 		}

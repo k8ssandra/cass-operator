@@ -586,6 +586,30 @@ func TestServicePorts(t *testing.T) {
 			allPodsServicePorts: []int32{8080, 9004, 9042, 9103},
 		},
 		{
+			name: "Cassandra 4.0.7 with an unnamed custom port",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{ContainerPort: 9004},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
 			name: "Cassandra 4.0.7 with custom internode port, which shouldn't be added to the service ports",
 			dc: &api.CassandraDatacenter{
 				Spec: api.CassandraDatacenterSpec{

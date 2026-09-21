@@ -13,6 +13,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#969](https://github.com/k8ssandra/cass-operator/issues/969) Pull cass-config-builder from ghcr.io instead of docker.io where its no longer updated
 * [ENHANCEMENT] [#947](https://github.com/k8ssandra/cass-operator/issues/947) Read Events through an uncached APIReader instead of a cluster-wide cached informer in failure detection, reducing memory usage in cluster-scoped deployments.
+* [ENHANCEMENT] [#947](https://github.com/k8ssandra/cass-operator/issues/947) Bound the informer cache in cluster-scoped mode: label-scope Pod/StatefulSet/PodDisruptionBudget/Service informers to operator-managed objects, read Secrets/PVCs/ConfigMaps/Endpoints/EndpointSlices/StorageClasses through live API calls with metadata-only Secret watches, and strip managedFields/last-applied from cached objects. Operator memory no longer scales with cluster size.
 * [BUGFIX] [#971](https://github.com/k8ssandra/cass-operator/issues/971) Decommissioning last pod of a datacenter left its pod_status metric abandoned instead of being removed. And also we got an error logline which wasn't a real error
 * [BUGFIX] [#973](https://github.com/k8ssandra/cass-operator/issues/973) Prevent premature decommission cleanup when Cassandra metadata requests fail.
 

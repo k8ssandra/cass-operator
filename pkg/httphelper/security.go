@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/secretcache"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,12 +41,12 @@ func GetManagementApiProtocol(dc *api.CassandraDatacenter) (string, error) {
 	return provider.GetProtocol(), nil
 }
 
-func BuildManagementApiHttpClient(ctx context.Context, client client.Client, dc *api.CassandraDatacenter, customTransport *http.Transport) (HttpClient, error) {
+func BuildManagementApiHttpClient(ctx context.Context, client client.Client, apiReader client.Reader, dc *api.CassandraDatacenter, customTransport *http.Transport) (HttpClient, error) {
 	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
-	return provider.BuildHttpClient(ctx, client, customTransport)
+	return provider.BuildHttpClient(ctx, client, apiReader, customTransport)
 }
 
 func AddManagementApiServerSecurity(dc *api.CassandraDatacenter, pod *corev1.PodTemplateSpec) error {
@@ -95,7 +96,7 @@ func ValidateManagementApiConfig(dc *api.CassandraDatacenter, client client.Clie
 
 // SPI for adding new mechanisms for securing the management API
 type ManagementApiSecurityProvider interface {
-	BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error)
+	BuildHttpClient(ctx context.Context, client client.Client, apiReader client.Reader, transport *http.Transport) (HttpClient, error)
 	BuildMgmtApiGetAction(endpoint string, timeout int, port int) *corev1.ExecAction
 	BuildMgmtApiPostAction(endpoint string, timeout int, port int) *corev1.ExecAction
 	AddServerSecurity(pod *corev1.PodTemplateSpec) error
@@ -121,7 +122,7 @@ func (provider *InsecureManagementApiSecurityProvider) GetProtocol() string {
 	return "http"
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error) {
+func (provider *InsecureManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, apiReader client.Reader, transport *http.Transport) (HttpClient, error) {
 	c := http.DefaultClient
 
 	if transport != nil {
@@ -711,7 +712,7 @@ func (provider *ManualManagementApiSecurityProvider) ValidateConfig(ctx context.
 	return validationErrors
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error) {
+func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, apiReader client.Reader, transport *http.Transport) (HttpClient, error) {
 	httpClient := &http.Client{Transport: transport}
 	if transport != nil && transport.TLSClientConfig != nil {
 		return httpClient, nil
@@ -724,17 +725,12 @@ func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context
 	}
 
 	secret := &corev1.Secret{}
-	err := client.Get(
-		ctx,
-		secretNamespacedName,
-		secret)
-	if err != nil {
-		// Couldn't get the secret
+
+	if err := secretcache.Read(ctx, client, apiReader, secretNamespacedName, secret); err != nil {
 		return nil, err
 	}
 
-	err = validateSecretStructure(secret)
-	if err != nil {
+	if err := validateSecretStructure(secret); err != nil {
 		// Secret didn't look the way we expect
 		return nil, err
 	}
@@ -743,10 +739,9 @@ func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context
 	caCertPool := x509.NewCertPool()
 	ok := caCertPool.AppendCertsFromPEM(secret.Data["ca.crt"])
 	if !ok {
-		err = fmt.Errorf("no certificates found in %s when parsing 'ca.crt' value: %v",
+		return nil, fmt.Errorf("no certificates found in %s when parsing 'ca.crt' value: %v",
 			secretNamespacedName.String(),
 			secret.Data["ca.crt"])
-		return nil, err
 	}
 
 	// Load client key pair

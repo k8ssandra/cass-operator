@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 )
 
 // UpdateConfig updates the json formatted Cassandra config which incorporates the JVM options (under key additional-jvm-opts) passed into the launch scripts
@@ -31,7 +30,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	}
 	updateCassandraYaml(&c) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
 	// Figure out what to do and reconcile config.CassEnvSh.AddtnlJVMOptions back to desired state per CDCConfig.
-	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, cassDC.Spec.DeprecatedCDC, cassDC, mcacEnabled(cassDC))
+	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, cassDC.Spec.DeprecatedCDC, cassDC, cassDC.IsMcacEnabled())
 	if err != nil {
 		return nil, err
 	}
@@ -102,31 +101,6 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 		"-javaagent:/opt/management-api/datastax-mgmtapi-agent.jar",
 	)
 	return append(out, CDCOpt), nil
-}
-
-func mcacEnabled(cassDC cassdcapi.CassandraDatacenter) bool {
-	var cassContainer *corev1.Container
-	if cassDC.Spec.PodTemplateSpec == nil {
-		return true
-	}
-	for _, c := range cassDC.Spec.PodTemplateSpec.Spec.Containers {
-		if c.Name == "cassandra" {
-			cassContainer = &c
-		}
-	}
-	if cassContainer == nil {
-		return true
-	}
-	var mcacDisabledVar *corev1.EnvVar
-	for _, e := range cassContainer.Env {
-		if e.Name == "MGMT_API_DISABLE_MCAC" {
-			mcacDisabledVar = &e
-		}
-	}
-	if mcacDisabledVar != nil && mcacDisabledVar.Value == "true" {
-		return false
-	}
-	return true
 }
 
 func updateCassandraYaml(cassConfig *configData) {

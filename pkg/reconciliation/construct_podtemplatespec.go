@@ -769,11 +769,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 
 	// Combine ports
 
-	portDefaults, err := dc.GetContainerPorts()
-	if err != nil {
-		return err
-	}
-
+	portDefaults := dc.GetContainerPorts()
 	cassContainer.Ports = combinePortSlices(portDefaults, cassContainer.Ports)
 
 	// Combine volumeMounts

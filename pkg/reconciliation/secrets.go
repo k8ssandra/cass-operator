@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/pkg/secretcache"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -96,11 +97,7 @@ func (rc *ReconciliationContext) retrieveSecret(secretNamespacedName types.Names
 		},
 	}
 
-	err := rc.Client.Get(
-		rc.Ctx,
-		secretNamespacedName,
-		secret)
-	if err != nil {
+	if err := secretcache.Read(rc.Ctx, rc.Client, rc.APIReader, secretNamespacedName, secret); err != nil {
 		return nil, err
 	}
 

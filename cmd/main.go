@@ -58,6 +58,7 @@ import (
 	controllers "github.com/k8ssandra/cass-operator/internal/controllers/cassandra"
 	controlcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/control"
 	apiwebhook "github.com/k8ssandra/cass-operator/internal/webhooks/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
@@ -211,6 +212,10 @@ func main() {
 	managedByOperator := labels.SelectorFromSet(labels.Set{
 		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
 	})
+
+	watchedByOperator := labels.SelectorFromSet(labels.Set{
+		dynamicwatch.WatchedLabel: "true",
+	})
 	options.Cache = cache.Options{
 		DefaultNamespaces: map[string]cache.Config{},
 		DefaultTransform:  stripHeavyMetadata(),
@@ -219,15 +224,15 @@ func main() {
 			&appsv1.StatefulSet{}:           {Label: managedByOperator},
 			&policyv1.PodDisruptionBudget{}: {Label: managedByOperator},
 			&corev1.Service{}:               {Label: managedByOperator},
+			&corev1.Secret{}:                {Label: watchedByOperator},
 		},
 	}
 	options.Client = client.Options{
 		Cache: &client.CacheOptions{
 			DisableFor: []client.Object{
-				&corev1.Secret{},
 				&corev1.PersistentVolumeClaim{},
 				&corev1.ConfigMap{},
-				&corev1.Endpoints{},
+				&corev1.Endpoints{}, //nolint:staticcheck // This is to remove old ones
 				&discoveryv1.EndpointSlice{},
 				&storagev1.StorageClass{},
 			},
@@ -301,8 +306,9 @@ func main() {
 	}
 
 	if err = (&controlcontrollers.CassandraTaskReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:    mgr.GetClient(),
+		APIReader: mgr.GetAPIReader(),
+		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraTask")
 		os.Exit(1)

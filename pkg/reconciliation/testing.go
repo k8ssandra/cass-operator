@@ -176,6 +176,7 @@ func CreateMockReconciliationContext(
 		EventRecorderLogger: record.NewFakeRecorder(100),
 		ReqLogger:           reqLogger,
 	}
+	rc.APIReader = fakeClient
 	rc.Ctx = context.Background()
 	rc.ImageRegistry = newTestImageRegistry()
 

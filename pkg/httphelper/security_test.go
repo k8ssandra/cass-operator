@@ -150,7 +150,7 @@ func TestBuildMTLSClient(t *testing.T) {
 	client := fake.NewClientBuilder().WithRuntimeObjects(trackObjects...).Build()
 	ctx := t.Context()
 
-	httpClient, err := BuildManagementApiHttpClient(ctx, client, dc, nil)
+	httpClient, err := BuildManagementApiHttpClient(ctx, client, client, dc, nil)
 	require.NoError(err)
 
 	tlsConfig := httpClient.(*http.Client).Transport.(*http.Transport).TLSClientConfig

@@ -19,6 +19,7 @@ linters:
     - misspell
     - nakedret
     - nolintlint
+    - nonamedreturns
     # - prealloc
     # - revive
     - staticcheck

@@ -29,8 +29,7 @@ func NewImageRegistryFromConfigMap(ctx context.Context, c client.Client) (ImageR
 	}
 
 	if len(cmList.Items) == 0 {
-		// Not found, we don't want an error here, this is perfectly acceptable situation. User might be using the v1beta1 configuration
-		return nil, nil
+		return nil, fmt.Errorf("failed to find imageconfig")
 	}
 
 	for _, cm := range cmList.Items {

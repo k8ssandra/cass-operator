@@ -13,7 +13,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: cassandra-easy-stress
-          image: docker.io/michaelburman290/cassandra-easy-stress:latest
+          image: ghcr.io/apache/cassandra-easy-stress:latest
           args:
             - run
             - BasicTimeSeries

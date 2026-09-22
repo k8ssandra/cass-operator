@@ -11,15 +11,14 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/google/go-cmp/cmp"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/k8ssandra/cass-operator/pkg/images"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // log is for logging in this package.
@@ -31,7 +30,7 @@ var log = logf.Log.WithName("api")
 
 // SetupCassandraDatacenterWebhookWithManager registers the webhook for CassandraDatacenter in the manager.
 func SetupCassandraDatacenterWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&api.CassandraDatacenter{}).
+	return ctrl.NewWebhookManagedBy(mgr, &api.CassandraDatacenter{}).
 		WithValidator(&CassandraDatacenterCustomValidator{}).
 		WithDefaulter(&CassandraDatacenterCustomDefaulter{}).
 		Complete()
@@ -44,10 +43,8 @@ func SetupCassandraDatacenterWebhookWithManager(mgr ctrl.Manager) error {
 // Kind CassandraDatacenter when those are created or updated.
 type CassandraDatacenterCustomDefaulter struct{}
 
-var _ webhook.CustomDefaulter = &CassandraDatacenterCustomDefaulter{}
-
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind CassandraDatacenter.
-func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
+func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, dc *api.CassandraDatacenter) error {
 	return nil
 }
 
@@ -55,14 +52,8 @@ func (d *CassandraDatacenterCustomDefaulter) Default(ctx context.Context, obj ru
 // when it is created, updated, or deleted.
 type CassandraDatacenterCustomValidator struct{}
 
-var _ webhook.CustomValidator = &CassandraDatacenterCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
-func (v *CassandraDatacenterCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	dc, ok := obj.(*api.CassandraDatacenter)
-	if !ok {
-		return nil, fmt.Errorf("expected a CassandraDatacenter object but got %T", obj)
-	}
+func (v *CassandraDatacenterCustomValidator) ValidateCreate(ctx context.Context, dc *api.CassandraDatacenter) (admission.Warnings, error) {
 	log.Info("Validation for CassandraDatacenter upon creation", "name", dc.GetName())
 
 	if err := ValidateSingleDatacenter(dc); err != nil {
@@ -73,18 +64,15 @@ func (v *CassandraDatacenterCustomValidator) ValidateCreate(ctx context.Context,
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
-func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	dc, ok := newObj.(*api.CassandraDatacenter)
-	if !ok {
-		return nil, fmt.Errorf("expected a CassandraDatacenter object for the newObj but got %T", newObj)
-	}
-
-	oldDc, ok := oldObj.(*api.CassandraDatacenter)
-	if !ok {
-		return nil, fmt.Errorf("expected a CassandraDatacenter object for the oldObj but got %T", oldObj)
-	}
-
+func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context, oldDc, dc *api.CassandraDatacenter) (admission.Warnings, error) {
 	log.Info("Validation for CassandraDatacenter upon update", "name", dc.GetName())
+
+	if metav1.HasAnnotation(dc.ObjectMeta, api.BypassWebhookValidationsAnnotation) &&
+		dc.Annotations[api.BypassWebhookValidationsAnnotation] == "true" {
+		log.Info("Webhook validations bypassed with annotation")
+
+		return nil, nil
+	}
 
 	if err := ValidateSingleDatacenter(dc); err != nil {
 		return nil, err
@@ -98,43 +86,27 @@ func (v *CassandraDatacenterCustomValidator) ValidateUpdate(ctx context.Context,
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type CassandraDatacenter.
-func (v *CassandraDatacenterCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *CassandraDatacenterCustomValidator) ValidateDelete(ctx context.Context, dc *api.CassandraDatacenter) (admission.Warnings, error) {
 	return nil, nil
 }
 
 // ValidateSingleDatacenter checks that no values are improperly set on a CassandraDatacenter
 func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
-	// Ensure serverVersion and serverType are compatible
-
-	if dc.Spec.ServerType == "dse" {
-		if !images.IsDseVersionSupported(dc.Spec.ServerVersion) {
-			return attemptedTo("use unsupported DSE version '%s'", dc.Spec.ServerVersion)
-		}
-	}
-
-	if dc.Spec.ServerType == "hcd" {
-		if !images.IsHCDVersionSupported(dc.Spec.ServerVersion) {
-			return attemptedTo("use unsupported HCD version '%s'", dc.Spec.ServerVersion)
-		}
-	}
-
 	if dc.Spec.ServerType == "cassandra" && dc.Spec.DseWorkloads != nil {
 		if dc.Spec.DseWorkloads.AnalyticsEnabled || dc.Spec.DseWorkloads.GraphEnabled || dc.Spec.DseWorkloads.SearchEnabled {
 			return attemptedTo("enable DSE workloads if server type is Cassandra")
 		}
 	}
 
-	if dc.Spec.ServerType == "cassandra" {
-		if !images.IsOssVersionSupported(dc.Spec.ServerVersion) {
-			return attemptedTo("use unsupported Cassandra version '%s'", dc.Spec.ServerVersion)
-		}
-	}
-
 	isDse := dc.Spec.ServerType == "dse"
 	isCassandra3 := dc.Spec.ServerType == "cassandra" && strings.HasPrefix(dc.Spec.ServerVersion, "3.")
 
-	var c map[string]interface{}
-	_ = json.Unmarshal(dc.Spec.Config, &c)
+	var c map[string]any
+	if dc.Spec.Config != nil {
+		if err := json.Unmarshal(dc.Spec.Config, &c); err != nil {
+			return fmt.Errorf("unable to parse config json: %v", err)
+		}
+	}
 
 	_, hasJvmOptions := c["jvm-options"]
 	_, hasJvmServerOptions := c["jvm-server-options"]
@@ -149,6 +121,13 @@ func ValidateSingleDatacenter(dc *api.CassandraDatacenter) error {
 	}
 	if hasDseYaml && !isDse {
 		return attemptedTo("define config dse-yaml with %s", serverStr)
+	}
+
+	if dc.Spec.MaxUnavailable != nil {
+		maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(dc.Spec.MaxUnavailable, int(dc.Spec.Size), true)
+		if err != nil || maxUnavailable < 0 {
+			return attemptedTo("use invalid maxUnavailable value '%s'", dc.Spec.MaxUnavailable.String())
+		}
 	}
 
 	// if using multiple nodes per worker, requests and limits should be set for both cpu and memory
@@ -197,6 +176,15 @@ func ValidateDatacenterFieldChanges(oldDc *api.CassandraDatacenter, newDc *api.C
 
 	oldClaimSpec := oldDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec.DeepCopy()
 	newClaimSpec := newDc.Spec.StorageConfig.CassandraDataVolumeClaimSpec.DeepCopy()
+	if oldClaimSpec != nil && newClaimSpec != nil {
+		oldStorageRequest := oldClaimSpec.Resources.Requests[corev1.ResourceStorage]
+		newStorageRequest := newClaimSpec.Resources.Requests[corev1.ResourceStorage]
+
+		if oldStorageRequest.Cmp(newStorageRequest) > 0 {
+			return attemptedTo(
+				"shrink storageConfig.CassandraDataVolumeClaimSpec from %s to %s", oldStorageRequest.String(), newStorageRequest.String())
+		}
+	}
 
 	// CassandraDataVolumeClaimSpec changes are disallowed
 	if metav1.HasAnnotation(newDc.ObjectMeta, api.AllowStorageChangesAnnotation) && newDc.Annotations[api.AllowStorageChangesAnnotation] == "true" {
@@ -207,6 +195,17 @@ func ValidateDatacenterFieldChanges(oldDc *api.CassandraDatacenter, newDc *api.C
 	if !apiequality.Semantic.DeepEqual(oldClaimSpec, newClaimSpec) {
 		pvcSourceDiff := cmp.Diff(oldClaimSpec, newClaimSpec)
 		return attemptedTo("change storageConfig.CassandraDataVolumeClaimSpec, diff: %s", pvcSourceDiff)
+	}
+
+	if oldDc.Spec.Size != newDc.Spec.Size {
+		if oldDc.GetConditionStatus(api.DatacenterScalingUp) == corev1.ConditionTrue {
+			return attemptedTo("change size while datacenter is still scaling up")
+		}
+
+		if oldDc.GetConditionStatus(api.DatacenterScalingDown) == corev1.ConditionTrue {
+			// Here we don't want to allow any changes as scaling down is a lot heavier operation
+			return attemptedTo("change size while datacenter is still scaling down")
+		}
 	}
 
 	// Topology changes - Racks
@@ -358,7 +357,7 @@ func containsReservedPrefixes(config map[string]string) bool {
 	return false
 }
 
-func attemptedTo(action string, actionStrArgs ...interface{}) error {
+func attemptedTo(action string, actionStrArgs ...any) error {
 	var msg string
 	if actionStrArgs != nil {
 		msg = fmt.Sprintf(action, actionStrArgs...)

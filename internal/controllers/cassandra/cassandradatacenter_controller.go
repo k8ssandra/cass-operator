@@ -24,6 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/reconciliation"
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,11 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -58,8 +60,12 @@ var (
 
 // Kubernetes core
 // +kubebuilder:rbac:groups=apps,namespace=cass-operator,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods;endpoints;endpoints/restricted;services;configmaps;secrets;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=events,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=services;secrets;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=endpoints;endpoints/restricted,verbs=list;watch;delete
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=pods,verbs=get;list;watch;update;patch;delete
+// +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=events,verbs=get;list;watch
+// +kubebuilder:rbac:groups=events.k8s.io,namespace=cass-operator,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=core,namespace=cass-operator,resources=namespaces,verbs=get
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=policy,namespace=cass-operator,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
@@ -69,9 +75,10 @@ var (
 // CassandraDatacenterReconciler reconciles a cassandraDatacenter object
 type CassandraDatacenterReconciler struct {
 	client.Client
-	Log      logr.Logger
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	APIReader client.Reader
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	Recorder  events.EventRecorder
 
 	// SecretWatches is used in the controller when setting up the watches and
 	// during reconciliation where we update the mappings for the watches.
@@ -80,6 +87,8 @@ type CassandraDatacenterReconciler struct {
 
 	ImageRegistry    images.ImageRegistry
 	ClusterResources bool
+
+	MaxConcurrentReconciles int
 }
 
 // Reconcile reads that state of the cluster for a Datacenter object
@@ -110,7 +119,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 	logger.Info("======== handler::Reconcile has been called")
 
-	rc, err := reconciliation.CreateReconciliationContext(ctx, &request, r.Client, r.Scheme, r.Recorder, r.SecretWatches, r.ImageRegistry, r.ClusterResources)
+	rc, err := reconciliation.CreateReconciliationContext(ctx, &request, r.Client, r.APIReader, r.Scheme, r.Recorder, r.SecretWatches, r.ImageRegistry, r.ClusterResources)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -127,7 +136,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 
 	if err := rc.IsValid(rc.Datacenter); err != nil {
 		logger.Error(err, "CassandraDatacenter resource is invalid")
-		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ValidationFailed", err.Error())
+		rc.Recorder.Event(rc.Datacenter, "Warning", "ValidationFailed", err.Error())
 		return ctrl.Result{}, reconcile.TerminalError(err)
 	}
 
@@ -151,13 +160,16 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 	res, err := rc.CalculateReconciliationActions()
 	if err != nil {
 		logger.Error(err, "calculateReconciliationActions returned an error")
-		rc.Recorder.Eventf(rc.Datacenter, "Warning", "ReconcileFailed", err.Error())
+		rc.Recorder.Event(rc.Datacenter, "Warning", "ReconcileFailed", err.Error())
 	}
 
 	// Prevent immediate requeue
 	if res.RequeueAfter > 0 && res.RequeueAfter < minimumRequeueTime {
 		res.RequeueAfter = minimumRequeueTime
 	}
+
+	monitoring.RefreshDatacenterMetrics(rc.Datacenter)
+
 	return res, err
 }
 
@@ -187,13 +199,14 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		Owns(&policyv1.PodDisruptionBudget{}, builder.WithPredicates(managedByCassandraOperatorPredicate)).
 		Owns(&corev1.Service{}, builder.WithPredicates(managedByCassandraOperatorPredicate))
 
+	// Uses only object metadata (no *corev1.Secret assertion) so it works with the
+	// metadata-only projected watch below.
 	configSecretMapFn := func(ctx context.Context, mapObj client.Object) []reconcile.Request {
 		requests := make([]reconcile.Request, 0)
-		secret := mapObj.(*corev1.Secret)
-		if v, ok := secret.Annotations[api.DatacenterAnnotation]; ok {
+		if v, ok := mapObj.GetAnnotations()[api.DatacenterAnnotation]; ok {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Namespace: secret.Namespace,
+					Namespace: mapObj.GetNamespace(),
 					Name:      v,
 				},
 			})
@@ -225,7 +238,10 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		},
 	}
 
-	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(configSecretMapFn), builder.WithPredicates(configSecretPredicate))
+	// builder.OnlyMetadata: the map fn and predicate above only need annotations, so
+	// cache Secret metadata instead of full objects (Secret data reads go through the
+	// live client — see Client.Cache.DisableFor in cmd/main.go).
+	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(configSecretMapFn), builder.WithPredicates(configSecretPredicate), builder.OnlyMetadata)
 
 	// Setup watches for Secrets. These secrets are often not owned by or created by
 	// the operator, so we must create a mapping back to the appropriate datacenters.
@@ -241,9 +257,12 @@ func (r *CassandraDatacenterReconciler) SetupWithManager(mgr ctrl.Manager) error
 		return requests
 	}
 
-	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(toRequests))
+	// builder.OnlyMetadata: FindWatchers only inspects metadata (name/annotations).
+	c = c.Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(toRequests), builder.OnlyMetadata)
 
-	return c.Complete(r)
+	return c.
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
+		Complete(r)
 }
 
 // blank assignment to verify that CassandraDatacenterReconciler implements reconciliation.Reconciler

@@ -77,7 +77,7 @@ func (i *Images) UnmarshalJSON(b []byte) error {
 	}
 	*i = Images(imagesTemp)
 
-	var otherFields map[string]interface{}
+	var otherFields map[string]any
 	if err := json.Unmarshal(b, &otherFields); err != nil {
 		return err
 	}
@@ -140,8 +140,4 @@ type ImageComponent struct {
 	Repository string `json:"repository,omitempty"`
 	Suffix     string `json:"suffix,omitempty"`
 	ImagePolicy
-}
-
-func init() {
-	SchemeBuilder.Register(&ImageConfig{}, &Images{})
 }

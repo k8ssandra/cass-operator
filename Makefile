@@ -4,11 +4,20 @@
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 
-VERSION ?= 1.29.0
+VERSION ?= 1.33.0
+BASE_VERSION := $(VERSION)
 
 COMMIT := $(shell git rev-parse --short HEAD)
 DATE := $(shell date +%Y%m%d)
-VERSION := $(VERSION)-dev.$(COMMIT)-$(DATE)
+BRANCH ?= $(or $(GITHUB_REF_NAME),$(shell git symbolic-ref --short -q HEAD 2>/dev/null))
+
+ifeq ($(BRANCH),master)
+VERSION := $(BASE_VERSION)-dev.$(COMMIT)-$(DATE)
+else ifneq ($(filter 1.%.x,$(BRANCH)),)
+VERSION := $(BASE_VERSION)-stable.$(COMMIT)-$(DATE)
+else
+VERSION := $(BASE_VERSION)-dev.$(COMMIT)-$(DATE)
+endif
 
 # TODO For daily pushes, create dev channel (k8ssandra bundle, not datastax) - or set these in the
 # .github
@@ -140,17 +149,17 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 .PHONY: test
 test: manifests generate fmt vet lint envtest ## Run tests.
 	# Old unit tests first - these use mocked client / fakeclient
-	go test ./pkg/... -coverprofile cover-pkg.out
+	go test -v ./cmd/... ./pkg/... -coverprofile cover-pkg.out
 	# Then the envtest ones
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./apis/... ./internal/... -coverprofile cover.out
 
 .PHONY: integ-test
-integ-test: kustomize cert-manager helm ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
+integ-test: kustomize cert-manager helm support-bundle ## Run integration tests from directory M_INTEG_DIR or set M_INTEG_DIR=all to run all the integration tests.
 ifeq ($(M_INTEG_DIR), all)
 	# Run all the tests (exclude kustomize & testdata directories)
-	cd tests && go test -v ./... -timeout 60m --ginkgo.show-node-events --ginkgo.v
+	cd tests && PATH="$(abspath $(LOCALBIN)):$$PATH" go test -v ./... -timeout 60m --ginkgo.show-node-events --ginkgo.v
 else
-	cd tests/${M_INTEG_DIR} && go test -v ./... -timeout 60m --ginkgo.show-node-events --ginkgo.v
+	cd tests/${M_INTEG_DIR} && PATH="$(abspath $(LOCALBIN)):$$PATH" go test -v ./... -timeout 60m --ginkgo.show-node-events --ginkgo.v
 endif
 
 .PHONY: version
@@ -212,9 +221,8 @@ uninstall: manifests ## Uninstall CRDs from the K8s cluster specified in ~/.kube
 	kubectl delete --ignore-not-found=$(ignore-not-found) -k config/crd
 
 .PHONY: deploy
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: manifests kustomize cert-manager ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	LOG_IMG=${LOG_IMG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 	TAG=${TAG} yq eval -i '.images.system-logger.tag = env(TAG)' config/imageconfig/image_config.yaml
 	yq eval -i 'del(.images.system-logger.registry)' config/imageconfig/image_config.yaml
 	kubectl apply --force-conflicts --server-side -k config/deployments/cluster
@@ -229,7 +237,6 @@ ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	LOG_IMG=${LOG_IMG} yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 	TAG=${TAG} yq eval -i '.images.system-logger.tag = env(TAG)' config/imageconfig/image_config.yaml
 	yq eval -i 'del(.images.system-logger.registry)' config/imageconfig/image_config.yaml
 	kubectl apply --force-conflicts --server-side -k tests/$(TEST_DIR)
@@ -240,6 +247,10 @@ ifneq ($(strip $(NAMESPACE)),)
 	cd tests/kustomize && $(KUSTOMIZE) edit set namespace $(NAMESPACE)
 endif
 	kubectl delete -k tests/$(TEST_DIR)
+
+.PHONY: reload
+reload: ## Deploy new build of cass-operator in development
+	kubectl rollout restart deployment.apps/cass-operator-controller-manager -n cass-operator
 
 ##@ Tools / Dependencies
 
@@ -256,15 +267,17 @@ GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
 HELM ?= $(LOCALBIN)/helm
 OPM ?= $(LOCALBIN)/opm
+SUPPORT_BUNDLE ?= $(LOCALBIN)/kubectl-support_bundle
 
 ## Tool Versions
-CERT_MANAGER_VERSION ?= v1.18.1
-KUSTOMIZE_VERSION ?= v5.6.0
-CONTROLLER_TOOLS_VERSION ?= v0.18.0
-OPERATOR_SDK_VERSION ?= 1.40.0
-HELM_VERSION ?= 3.18.3
-OPM_VERSION ?= 1.55.0
-GOLANGCI_LINT_VERSION ?= v2.4.0
+CERT_MANAGER_VERSION ?= v1.20.2
+KUSTOMIZE_VERSION ?= v5.8.1
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
+OPERATOR_SDK_VERSION ?= 1.42.2
+HELM_VERSION ?= 4.2.2
+OPM_VERSION ?= 1.61.0
+TROUBLESHOOT_VERSION ?= v0.130.0
+GOLANGCI_LINT_VERSION ?= v2.13.1
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 
@@ -307,6 +320,31 @@ golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
+OS=$(shell go env GOOS)
+ARCH=$(shell go env GOARCH)
+
+.PHONY: support-bundle
+support-bundle: $(SUPPORT_BUNDLE) ## Download the troubleshoot.sh kubectl support-bundle plugin locally if necessary.
+
+TROUBLESHOOT_ARCH ?= $(ARCH)
+ifeq ($(OS),darwin)
+TROUBLESHOOT_ARCH = all
+endif
+TROUBLESHOOT_TARNAME = support-bundle_${OS}_${TROUBLESHOOT_ARCH}.tar.gz
+SUPPORT_BUNDLE_VERSIONED = $(SUPPORT_BUNDLE)-$(TROUBLESHOOT_VERSION)
+$(SUPPORT_BUNDLE): $(SUPPORT_BUNDLE_VERSIONED)
+	ln -sf $(SUPPORT_BUNDLE_VERSIONED) $(SUPPORT_BUNDLE)
+
+$(SUPPORT_BUNDLE_VERSIONED): $(LOCALBIN)
+	@{ \
+	set -e ;\
+	curl -sSLo $(LOCALBIN)/$(TROUBLESHOOT_TARNAME) https://github.com/replicatedhq/troubleshoot/releases/download/$(TROUBLESHOOT_VERSION)/$(TROUBLESHOOT_TARNAME) ;\
+	tar -zxf $(LOCALBIN)/$(TROUBLESHOOT_TARNAME) -C $(LOCALBIN)/ ;\
+	mv $(LOCALBIN)/support-bundle $(SUPPORT_BUNDLE_VERSIONED) ;\
+	rm -f $(LOCALBIN)/$(TROUBLESHOOT_TARNAME) ;\
+	chmod +x $(SUPPORT_BUNDLE_VERSIONED) ;\
+	}
+
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
 # $2 - package url which can be installed
@@ -322,10 +360,6 @@ mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $(1)-$(3) $(1)
 endef
-
-
-OS=$(shell go env GOOS)
-ARCH=$(shell go env GOARCH)
 
 HELMTARNAME = helm-v$(HELM_VERSION)-${OS}-${ARCH}.tar.gz
 .PHONY: helm

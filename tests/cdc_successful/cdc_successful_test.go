@@ -4,7 +4,6 @@
 package cdc_successful
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -28,24 +27,13 @@ var (
 )
 
 func TestLifecycle(t *testing.T) {
-	AfterSuite(func() {
-		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		err := kubectl.DumpAllLogs(logPath).ExecV()
-		if err != nil {
-			t.Logf("Failed to dump all the logs: %v", err)
+	ginkgo_util.RunTestLifecycleWithCleanup(t, testName, ns, func() error {
+		if err := kustomize.Undeploy(namespace); err != nil {
+			return err
 		}
-
-		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
-		ns.Terminate()
-		err = kustomize.Undeploy(namespace)
-		if err != nil {
-			t.Logf("Failed to undeploy cass-operator: %v", err)
-		}
-		kubectl.Delete("ns", "pulsar").OutputPanic()
+		_, err := kubectl.Delete("ns", "pulsar").Output()
+		return err
 	})
-
-	RegisterFailHandler(Fail)
-	RunSpecs(t, testName)
 }
 
 var _ = Describe(testName, func() {

@@ -9,6 +9,7 @@ images:
     name: "system-logger"
     tag: "latest"
   config-builder:
+    registry: "ghcr.io"
     repository: "datastax"
     name: "cass-config-builder"
     tag: "1.0-ubi"

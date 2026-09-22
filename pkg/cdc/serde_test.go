@@ -42,15 +42,15 @@ func Test_MarshallConfig(t *testing.T) {
 	c := configData{
 		CassEnvSh: &cassEnvSh{
 			AddtnlJVMOptions: &[]string{"-Ddse.system_distributed_replication_dc_names=dc1"},
-			UnknownFields: map[string]interface{}{
+			UnknownFields: map[string]any{
 				"initial_heap_size": "800M",
 			},
 		},
-		CassandraYaml: map[string]interface{}{
+		CassandraYaml: map[string]any{
 			"authenticator": "PasswordAuthenticator",
 		},
-		UnknownFields: map[string]interface{}{
-			"unknownfields": map[string]interface{}{
+		UnknownFields: map[string]any{
+			"unknownfields": map[string]any{
 				"unknown1": true,
 			},
 		},
@@ -58,11 +58,11 @@ func Test_MarshallConfig(t *testing.T) {
 	jsonConfig, err := json.Marshal(&c)
 	assert.NoError(t, err, err)
 	// Have to marshall everything back to a map[string]interface{} to avoid issues with line breaks etc.
-	actual := make(map[string]interface{})
+	actual := make(map[string]any)
 	err = json.Unmarshal(jsonConfig, &actual)
 	assert.NoError(t, err, err)
 
-	expected := make(map[string]interface{})
+	expected := make(map[string]any)
 	err = json.Unmarshal([]byte(serdeTestConfig), &expected)
 	assert.NoError(t, err, err)
 	assert.Equal(t, expected, actual)

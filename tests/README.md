@@ -79,10 +79,17 @@ each step. This provides a snapshot in time for easy inspection of the cluster
 state throughout the life of the test.
 
 After the test is done running, whether it was successful or not, we do a
-final log dump for the entire cluster.
+final log dump for the entire cluster. If the suite fails, we also collect a
+troubleshoot.sh support bundle before cleanup runs.
 
 By default, we dump logs out at:
 
 ```
 build/kubectl_dump/<test name>/<date/time stamp>/<steps>
+```
+
+Support bundles are written under:
+
+```
+build/kubectl_dump/<test name>/<date/time stamp>/support-bundle
 ```

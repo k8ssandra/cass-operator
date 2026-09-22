@@ -48,7 +48,7 @@ type CassandraTaskTemplate struct {
 	// Jobs defines the jobs this task will execute (and their order)
 	Jobs []CassandraJob `json:"jobs,omitempty"`
 
-	// RestartPolicy indicates the behavior n case of failure. Default is Never.
+	// RestartPolicy indicates the behavior n case of failure. Default is OnFailure.
 	// +optional
 	RestartPolicy corev1.RestartPolicy `json:"restartPolicy,omitempty"`
 
@@ -63,6 +63,17 @@ type CassandraTaskTemplate struct {
 	// The "Allow" property is only valid if all the other active Tasks have "Allow" as well.
 	// +optional
 	ConcurrencyPolicy batchv1.ConcurrencyPolicy `json:"concurrencyPolicy,omitempty"`
+
+	// MaxConcurrentPods specifies the maximum number of pods to process concurrently in a rack.
+	// If not set or set to 0 defaults to 1.
+	// +optional
+	MaxConcurrentPods *int `json:"maxConcurrentPods,omitempty"`
+
+	// Retries specifies the maximum number of times a failed pod operation can be retried.
+	// This is only relevant if the RestartPolicy is set to OnFailure. If not set,
+	// the default value is 1.
+	// +optional
+	Retries *int `json:"retries,omitempty"`
 }
 
 type CassandraCommand string
@@ -114,6 +125,13 @@ type JobArguments struct {
 	// command, ignored otherwise. Pods referenced in this map must exist; any existing pod not
 	// referenced in this map will not be moved.
 	NewTokens map[string]string `json:"new_tokens,omitempty"`
+
+	// Fast modifies the behavior of rolling restart to restart multiple nodes (or entire rack) at the same time.
+	// If the cluster is degraded in availability, the fast path isn't used
+	Fast bool `json:"fast,omitempty"`
+
+	// Force is used to force the execution of a command even if the operator thinks it is unsafe
+	Force bool `json:"force,omitempty"`
 }
 
 // CassandraTaskStatus defines the observed state of CassandraJob
@@ -156,6 +174,11 @@ type CassandraTaskStatus struct {
 	// The number of pods which reached phase Failed.
 	// +optional
 	Failed int `json:"failed,omitempty"`
+
+	// PodStatuses tracks the processing status of each pod for bookkeeping.
+	// Keys are pod names (not including pod UID to handle recreation scenarios).
+	// +optional
+	PodStatuses map[string]PodProcessingStatus `json:"podStatuses,omitempty"`
 }
 
 type JobConditionType string
@@ -170,6 +193,43 @@ const (
 	// DatacenterUpdated
 	DatacenterUpdated JobConditionType = "DatacenterUpdated"
 )
+
+// PodProcessingPhase represents the current phase of a pod being processed by a task.
+type PodProcessingPhase string
+
+const (
+	// PodWaiting means the pod is waiting to be processed.
+	PodWaiting PodProcessingPhase = "WAITING"
+	// PodRunning means the pod is currently being processed.
+	PodRunning PodProcessingPhase = "RUNNING"
+	// PodCompleted means the pod has been successfully processed.
+	PodCompleted PodProcessingPhase = "COMPLETED"
+	// PodError means the pod processing failed.
+	PodError PodProcessingPhase = "ERROR"
+)
+
+// PodProcessingStatus represents the status of a pod being processed by a CassandraTask.
+type PodProcessingStatus struct {
+	// Status of the pod processing.
+	Status PodProcessingPhase `json:"status"`
+
+	// JobID for async operations (mgmt-api).
+	JobID string `json:"jobId,omitempty"`
+
+	// Retry count
+	Retries int `json:"retries,omitempty"`
+
+	// Error message if failed.
+	Error string `json:"error,omitempty"`
+
+	// Represents time when the job controller started processing this pod.
+	// +optional
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+
+	// Represents time when the pod was completed (success or fail).
+	// +optional
+	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
+}
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
@@ -195,8 +255,4 @@ type CassandraTaskList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CassandraTask `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&CassandraTask{}, &CassandraTaskList{})
 }

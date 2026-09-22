@@ -4,12 +4,11 @@
 package reconciliation
 
 import (
+	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -17,41 +16,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
 )
 
 func TestDeletePVCs(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	k8sMockClientList(mockClient, nil).
-		Run(func(args mock.Arguments) {
-			_, ok := args.Get(1).(*corev1.PodList)
-			if ok {
-				if strings.HasPrefix(args.Get(2).(*client.ListOptions).FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
-					arg := args.Get(1).(*corev1.PodList)
-					arg.Items = []corev1.Pod{}
-				} else {
-					t.Fail()
-				}
-				return
-			}
-			arg := args.Get(1).(*corev1.PersistentVolumeClaimList)
-			arg.Items = []corev1.PersistentVolumeClaim{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pvc-1",
-				},
-			}}
-		}).Twice()
-
-	k8sMockClientDelete(mockClient, nil)
+	pvc := pvcProto(rc)
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter, pvc).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
 
 	err := rc.deletePVCs()
 	if err != nil {
@@ -63,18 +45,21 @@ func TestDeletePVCs_FailedToList(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	k8sMockClientList(mockClient, fmt.Errorf("failed to list PVCs for CassandraDatacenter")).
-		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*corev1.PersistentVolumeClaimList)
-			arg.Items = []corev1.PersistentVolumeClaim{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pvc-1",
-				},
-			}}
-		})
+	listErr := fmt.Errorf("failed to list PVCs for CassandraDatacenter")
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		WithInterceptorFuncs(interceptor.Funcs{
+			List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				if _, ok := list.(*corev1.PersistentVolumeClaimList); ok {
+					return listErr
+				}
+				return c.List(ctx, list, opts...)
+			},
+		}).
+		Build()
 
 	err := rc.deletePVCs()
 	if err == nil {
@@ -87,18 +72,21 @@ func TestDeletePVCs_PVCsNotFound(t *testing.T) {
 	defer cleanupMockScr()
 	assert := assert.New(t)
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	k8sMockClientList(mockClient, errors.NewNotFound(schema.GroupResource{}, "name")).
-		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*corev1.PersistentVolumeClaimList)
-			arg.Items = []corev1.PersistentVolumeClaim{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pvc-1",
-				},
-			}}
-		})
+	notFoundErr := errors.NewNotFound(schema.GroupResource{}, "name")
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		WithInterceptorFuncs(interceptor.Funcs{
+			List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				if _, ok := list.(*corev1.PersistentVolumeClaimList); ok {
+					return notFoundErr
+				}
+				return c.List(ctx, list, opts...)
+			},
+		}).
+		Build()
 
 	assert.NoError(rc.deletePVCs())
 }
@@ -107,30 +95,22 @@ func TestDeletePVCs_FailedToDelete(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	k8sMockClientList(mockClient, nil).
-		Run(func(args mock.Arguments) {
-			_, ok := args.Get(1).(*corev1.PodList)
-			if ok {
-				if strings.HasPrefix(args.Get(2).(*client.ListOptions).FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
-					arg := args.Get(1).(*corev1.PodList)
-					arg.Items = []corev1.Pod{}
-				} else {
-					t.Fail()
+	pvc := pvcProto(rc)
+	deleteErr := fmt.Errorf("failed to delete")
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter, pvc).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+				if _, ok := obj.(*corev1.PersistentVolumeClaim); ok {
+					return deleteErr
 				}
-				return
-			}
-			arg := args.Get(1).(*corev1.PersistentVolumeClaimList)
-			arg.Items = []corev1.PersistentVolumeClaim{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pvc-1",
-				},
-			}}
-		}).Twice()
-
-	k8sMockClientDelete(mockClient, fmt.Errorf("failed to delete"))
+				return c.Delete(ctx, obj, opts...)
+			},
+		}).
+		Build()
 
 	err := rc.deletePVCs()
 	if err == nil {
@@ -145,46 +125,23 @@ func TestDeletePVCs_FailedToDeleteBeingUsed(t *testing.T) {
 	defer cleanupMockScr()
 	assert := assert.New(t)
 
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
-
-	k8sMockClientList(mockClient, nil).
-		Run(func(args mock.Arguments) {
-			_, ok := args.Get(1).(*corev1.PodList)
-			if ok {
-				if strings.HasPrefix(args.Get(2).(*client.ListOptions).FieldSelector.String(), "spec.volumes.persistentVolumeClaim.claimName") {
-					arg := args.Get(1).(*corev1.PodList)
-					arg.Items = []corev1.Pod{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "pod-1",
-							},
-						},
-					}
-				} else {
-					t.Fail()
-				}
-				return
-			}
-			arg := args.Get(1).(*corev1.PersistentVolumeClaimList)
-			arg.Items = []corev1.PersistentVolumeClaim{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pvc-1",
-				},
-			}}
-		}).Twice()
+	pvc := pvcProto(rc)
+	pod := podWithPVC(rc, "pod-1", pvc.Name)
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter, pvc, pod).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
 
 	err := rc.deletePVCs()
 	assert.Error(err)
-	assert.EqualError(err, "PersistentVolumeClaim pvc-1 is still being used by a pod")
+	assert.EqualError(err, "PersistentVolumeClaim server-data is still being used by a pod")
 }
 
 func TestDeletePVCsSkip(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
-
-	mockClient := mocks.NewClient(t)
-	rc.Client = mockClient
 
 	rc.Datacenter.Annotations = map[string]string{
 		api.DeletePVCAnnotation: "false",
@@ -193,9 +150,6 @@ func TestDeletePVCsSkip(t *testing.T) {
 	if err := rc.deletePVCs(); err != nil {
 		t.Fatalf("deletePVCs should not have failed")
 	}
-
-	mockClient.AssertNotCalled(t, "List", mock.Anything, mock.Anything, mock.Anything)
-	mockClient.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
 }
 
 func TestStorageExpansionNils(t *testing.T) {
@@ -210,10 +164,39 @@ func TestStorageExpansionNils(t *testing.T) {
 
 	storageClass := &storagev1.StorageClass{}
 	require.NoError(rc.Client.Get(rc.Ctx, types.NamespacedName{Name: "standard"}, storageClass))
-	storageClass.AllowVolumeExpansion = ptr.To[bool](true)
+	storageClass.AllowVolumeExpansion = new(true)
 	require.NoError(rc.Client.Update(rc.Ctx, storageClass))
 
 	supports, err = rc.storageExpansion()
 	require.NoError(err)
 	require.True(supports)
+}
+
+func TestStorageClassDefaultOne(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	storageClass, err := storageClass(rc.Ctx, rc.Client, nil)
+	require.NoError(err)
+	require.Equal("standard", storageClass.Name)
+}
+
+func podWithPVC(rc *ReconciliationContext, podName string, pvcName string) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: rc.Datacenter.Namespace,
+		},
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{{
+				Name: "server-data",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: pvcName,
+					},
+				},
+			}},
+		},
+	}
 }

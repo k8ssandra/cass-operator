@@ -103,9 +103,10 @@ var _ = BeforeSuite(func() {
 
 	err = (&CassandraDatacenterReconciler{
 		Client:        k8sManager.GetClient(),
+		APIReader:     k8sManager.GetAPIReader(),
 		Log:           ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
 		Scheme:        k8sManager.GetScheme(),
-		Recorder:      k8sManager.GetEventRecorderFor("cass-operator"),
+		Recorder:      k8sManager.GetEventRecorder("cass-operator"),
 		ImageRegistry: registry,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -117,8 +118,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&control.CassandraTaskReconciler{
-		Client: k8sClient,
-		Scheme: k8sManager.GetScheme(),
+		Client:           k8sClient,
+		Scheme:           k8sManager.GetScheme(),
+		LifecycleContext: ctx,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

@@ -6,10 +6,10 @@ package reconciliation
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 
@@ -441,6 +441,7 @@ func TestCassandraContainerEnvVars(t *testing.T) {
 	useMgmtApiEnvVar := corev1.EnvVar{Name: "USE_MGMT_API", Value: "true"}
 	explicitStartEnvVar := corev1.EnvVar{Name: "MGMT_API_EXPLICIT_START", Value: "true"}
 	noKeepAliveEnvVar := corev1.EnvVar{Name: "MGMT_API_NO_KEEP_ALIVE", Value: "true"}
+	listenPortEnvVar := corev1.EnvVar{Name: "MGMT_API_LISTEN_TCP_PORT", Value: "8080"}
 
 	templateSpec := &corev1.PodTemplateSpec{}
 	dc := &api.CassandraDatacenter{
@@ -468,6 +469,55 @@ func TestCassandraContainerEnvVars(t *testing.T) {
 	assert.True(envVarsContains(cassContainer.Env, useMgmtApiEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, explicitStartEnvVar))
 	assert.True(envVarsContains(cassContainer.Env, noKeepAliveEnvVar))
+	assert.True(envVarsContains(cassContainer.Env, listenPortEnvVar))
+}
+
+func TestCustomMgmtApiPortConfiguration(t *testing.T) {
+	const mgmtApiPort int32 = 8081
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "test"},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "test",
+			ServerType:    "cassandra",
+			ServerVersion: "4.0.7",
+			ManagementApiAuth: api.ManagementApiAuthConfig{
+				Manual: &api.ManagementApiAuthManualConfig{},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: CassandraContainerName,
+							Ports: []corev1.ContainerPort{
+								{Name: "mgmt-api-http", ContainerPort: mgmtApiPort},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	templateSpec := dc.Spec.PodTemplateSpec.DeepCopy()
+
+	require.NoError(t, buildContainers(dc, templateSpec, imageRegistry))
+	cassContainer := findContainer(templateSpec.Spec.Containers, CassandraContainerName)
+	require.NotNil(t, cassContainer)
+
+	assert.True(t, envVarsContains(cassContainer.Env, corev1.EnvVar{
+		Name:  "MGMT_API_LISTEN_TCP_PORT",
+		Value: "8081",
+	}))
+	require.NotNil(t, cassContainer.LivenessProbe)
+	require.NotNil(t, cassContainer.LivenessProbe.HTTPGet)
+	assert.Equal(t, mgmtApiPort, cassContainer.LivenessProbe.HTTPGet.Port.IntVal)
+	require.NotNil(t, cassContainer.ReadinessProbe)
+	require.NotNil(t, cassContainer.ReadinessProbe.HTTPGet)
+	assert.Equal(t, mgmtApiPort, cassContainer.ReadinessProbe.HTTPGet.Port.IntVal)
+	require.NotNil(t, cassContainer.Lifecycle)
+	require.NotNil(t, cassContainer.Lifecycle.PreStop)
+	require.NotNil(t, cassContainer.Lifecycle.PreStop.Exec)
+	assert.Contains(t, cassContainer.Lifecycle.PreStop.Exec.Command,
+		"https://localhost:8081/api/v0/ops/node/drain")
 }
 
 func TestHCDContainerEnvVars(t *testing.T) {
@@ -1008,21 +1058,11 @@ func volumeMountNameMatcher(name string) VolumeMountMatcher {
 }
 
 func volumeMountsContains(volumeMounts []corev1.VolumeMount, matcher VolumeMountMatcher) bool {
-	for _, mount := range volumeMounts {
-		if matcher(mount) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(volumeMounts, matcher)
 }
 
 func volumesContains(volumes []corev1.Volume, matcher VolumeMatcher) bool {
-	for _, volume := range volumes {
-		if matcher(volume) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(volumes, matcher)
 }
 
 func envVarsMatch(expected, actual []corev1.EnvVar) bool {
@@ -1257,7 +1297,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 					Name: "default",
 				},
 			},
-			ReadOnlyRootFilesystem: ptr.To(false),
+			ReadOnlyRootFilesystem: new(false),
 		},
 	}
 
@@ -1271,7 +1311,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage(t *testing.T) {
 					Name: "default",
 				},
 			},
-			ReadOnlyRootFilesystem: ptr.To(false),
+			ReadOnlyRootFilesystem: new(false),
 		},
 	}
 
@@ -1337,7 +1377,7 @@ func TestCassandraDatacenter_buildPodTemplateSpec_clientImage_withContainerOverr
 					Name: "default",
 				},
 			},
-			ReadOnlyRootFilesystem: ptr.To(false),
+			ReadOnlyRootFilesystem: new(false),
 			PodTemplateSpec: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
@@ -1581,26 +1621,6 @@ func Test_makeImage(t *testing.T) {
 			errString: "",
 		},
 		{
-			name: "test unknown dse version",
-			args: args{
-				serverImage:   "",
-				serverType:    "dse",
-				serverVersion: "6.7.0",
-			},
-			want:      "",
-			errString: "server 'dse' and version '6.7.0' do not work together",
-		},
-		{
-			name: "test unknown cassandra version",
-			args: args{
-				serverImage:   "",
-				serverType:    "cassandra",
-				serverVersion: "3.10.0",
-			},
-			want:      "",
-			errString: "server 'cassandra' and version '3.10.0' do not work together",
-		},
-		{
 			name: "test fallback",
 			args: args{
 				serverImage:   "",
@@ -1741,8 +1761,8 @@ func TestPorts(t *testing.T) {
 					ServerVersion: "3.11.14",
 				},
 			},
-			openPorts: []int32{8080, 9000, 9042, 9103, 9142, 9160},
-			notOpen:   []int32{8609},
+			openPorts: []int32{8080, 9000, 9042, 7000, 9160},
+			notOpen:   []int32{8609, 9142},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1752,8 +1772,8 @@ func TestPorts(t *testing.T) {
 					ServerVersion: "4.0.7",
 				},
 			},
-			openPorts: []int32{8080, 9000, 9042, 9103, 9142},
-			notOpen:   []int32{8609, 9160},
+			openPorts: []int32{8080, 9000, 9042, 9103, 7000},
+			notOpen:   []int32{8609, 9160, 9142},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1778,8 +1798,8 @@ func TestPorts(t *testing.T) {
 					},
 				},
 			},
-			openPorts: []int32{8081, 9000, 9042, 9103, 9142},
-			notOpen:   []int32{8080, 8609, 9160},
+			openPorts: []int32{8081, 9000, 9042, 7000},
+			notOpen:   []int32{8080, 8609, 9160, 9142, 9103},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1789,7 +1809,8 @@ func TestPorts(t *testing.T) {
 					ServerVersion: "6.8.31",
 				},
 			},
-			openPorts: []int32{8080, 8609, 9000, 9042, 9103, 9142, 9160},
+			openPorts: []int32{8080, 8609, 9000, 9042, 9160, 7000},
+			notOpen:   []int32{9142, 9103},
 		},
 		{
 			dc: &api.CassandraDatacenter{
@@ -1814,8 +1835,105 @@ func TestPorts(t *testing.T) {
 					},
 				},
 			},
-			openPorts: []int32{8080, 9004, 9042, 9103, 9142},
-			notOpen:   []int32{8609, 9000, 9160},
+			openPorts: []int32{8080, 9004, 9042, 9103, 7000},
+			notOpen:   []int32{8609, 9000, 9160, 9142},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ReadOnlyRootFilesystem: new(false),
+					ClusterName:            "bob",
+					ServerType:             "cassandra",
+					ServerVersion:          "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Env: []corev1.EnvVar{{
+										Name:  "MGMT_API_DISABLE_MCAC",
+										Value: "false",
+									}},
+								},
+							},
+						},
+					},
+				},
+			},
+			openPorts: []int32{8080, 9000, 9042, 9103, 7000},
+			notOpen:   []int32{8609, 9160, 9142},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ReadOnlyRootFilesystem: new(false),
+					ClusterName:            "bob",
+					ServerType:             "cassandra",
+					ServerVersion:          "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Env: []corev1.EnvVar{{
+										Name:  "MGMT_API_DISABLE_MCAC",
+										Value: "true",
+									}},
+								},
+							},
+						},
+					},
+				},
+			},
+			openPorts: []int32{8080, 9000, 9042, 7000},
+			notOpen:   []int32{8609, 9160, 9142, 9103},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ReadOnlyRootFilesystem: new(true),
+					ClusterName:            "bob",
+					ServerType:             "cassandra",
+					ServerVersion:          "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+								},
+							},
+						},
+					},
+				},
+			},
+			openPorts: []int32{8080, 9000, 9042, 7000},
+			notOpen:   []int32{8609, 9160, 9142, 9103},
+		},
+		{
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{
+											Name:          "tls-native",
+											ContainerPort: 9142,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			openPorts: []int32{8080, 7000, 9042, 9103, 9142},
+			notOpen:   []int32{8609, 9160},
 		},
 	}
 
@@ -1977,7 +2095,7 @@ func TestReadOnlyRootFilesystemVolumeChanges(t *testing.T) {
 			ClusterName:            "bob",
 			ServerType:             "cassandra",
 			ServerVersion:          "4.1.5",
-			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2025,7 +2143,7 @@ func TestReadOnlyRootFilesystemVolumeChanges(t *testing.T) {
 
 	assert.Len(containers, 2, "Unexpected number of containers containers returned")
 	assert.Equal("cassandra", containers[0].Name)
-	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+	assert.Equal(new(true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
 
 	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
 		[]corev1.VolumeMount{
@@ -2063,7 +2181,7 @@ func TestReadOnlyRootFilesystemVolumeChangesHCD(t *testing.T) {
 			ClusterName:            "bob",
 			ServerType:             "hcd",
 			ServerVersion:          "1.0.0",
-			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2111,7 +2229,7 @@ func TestReadOnlyRootFilesystemVolumeChangesHCD(t *testing.T) {
 
 	assert.Len(containers, 2, "Unexpected number of containers containers returned")
 	assert.Equal("cassandra", containers[0].Name)
-	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+	assert.Equal(new(true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
 
 	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
 		[]corev1.VolumeMount{
@@ -2148,7 +2266,7 @@ func TestReadOnlyRootFilesystemVolumeChangesDSE(t *testing.T) {
 			ClusterName:            "bob",
 			ServerType:             "dse",
 			ServerVersion:          "6.9.2",
-			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2190,7 +2308,7 @@ func TestReadOnlyRootFilesystemVolumeChangesDSE(t *testing.T) {
 
 	assert.Len(containers, 2, "Unexpected number of containers containers returned")
 	assert.Equal("cassandra", containers[0].Name)
-	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+	assert.Equal(new(true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
 
 	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
 		[]corev1.VolumeMount{
@@ -2246,7 +2364,7 @@ func TestReadOnlyRootFilesystemVolumeChangesDSEWithClient(t *testing.T) {
 			ClusterName:            "bob",
 			ServerType:             "dse",
 			ServerVersion:          "6.9.2",
-			ReadOnlyRootFilesystem: ptr.To[bool](true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2294,7 +2412,7 @@ func TestReadOnlyRootFilesystemVolumeChangesDSEWithClient(t *testing.T) {
 
 	assert.Len(containers, 2, "Unexpected number of containers containers returned")
 	assert.Equal("cassandra", containers[0].Name)
-	assert.Equal(ptr.To[bool](true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
+	assert.Equal(new(true), containers[0].SecurityContext.ReadOnlyRootFilesystem)
 
 	assert.True(reflect.DeepEqual(containers[0].VolumeMounts,
 		[]corev1.VolumeMount{
@@ -2374,7 +2492,7 @@ func TestReadOnlyRootFilesystemWithSecurityContext(t *testing.T) {
 					},
 				},
 			},
-			ReadOnlyRootFilesystem: ptr.To(true),
+			ReadOnlyRootFilesystem: new(true),
 			Racks: []api.Rack{
 				{
 					Name: "r1",
@@ -2396,30 +2514,89 @@ func TestReadOnlyRootFilesystemWithSecurityContext(t *testing.T) {
 	// capabilities from the podTemplateSpec.
 	assert.Equal(CassandraContainerName, containers[0].Name)
 	assert.Equal(containers[0].SecurityContext, &corev1.SecurityContext{
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   new(true),
+		AllowPrivilegeEscalation: new(false),
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 	})
 
 	// Other containers should just get the podTemplateSpec contents.
 	assert.Equal(ServerBaseConfigContainerName, initContainers[0].Name)
 	assert.Equal(initContainers[0].SecurityContext, &corev1.SecurityContext{
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   new(true),
+		AllowPrivilegeEscalation: new(false),
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 	})
 
 	assert.Equal(ServerConfigContainerName, initContainers[1].Name)
 	assert.Equal(initContainers[1].SecurityContext, &corev1.SecurityContext{
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   new(true),
+		AllowPrivilegeEscalation: new(false),
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 	})
 
 	assert.Equal(SystemLoggerContainerName, containers[1].Name)
 	assert.Equal(containers[1].SecurityContext, &corev1.SecurityContext{
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   new(true),
+		AllowPrivilegeEscalation: new(false),
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 	})
+}
+
+func TestPodTemplateSpecAdditionalVolumeMount(t *testing.T) {
+	assert := assert.New(t)
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "pleasenobob",
+			ServerType:    "cassandra",
+			ServerVersion: "5.0.6",
+			StorageConfig: api.StorageConfig{
+				AdditionalVolumes: api.AdditionalVolumesSlice{
+					{
+						Name:      "management-api-client-certs",
+						MountPath: "/management-api-client-certs",
+						VolumeSource: &corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{
+								SecretName: "mgmt-api-client-credentials",
+							},
+						},
+					},
+				},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: CassandraContainerName,
+						},
+						{
+							Name: SystemLoggerContainerName,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/management-api-certs",
+									Name:      "management-api-client-certs",
+								},
+							},
+						},
+					},
+				},
+			},
+			ReadOnlyRootFilesystem: new(true),
+			Racks: []api.Rack{
+				{
+					Name: "r1",
+				},
+			},
+		},
+	}
+
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, imageRegistry)
+	assert.NoError(err, "failed to build PodTemplateSpec")
+
+	assert.Equal("management-api-client-certs", podTemplateSpec.Spec.Containers[0].VolumeMounts[0].Name)
+	assert.Equal("management-api-client-certs", podTemplateSpec.Spec.Containers[1].VolumeMounts[0].Name)
+	assert.Equal("/management-api-client-certs", podTemplateSpec.Spec.Containers[0].VolumeMounts[0].MountPath)
+	assert.Equal("/management-api-certs", podTemplateSpec.Spec.Containers[1].VolumeMounts[0].MountPath)
 }

@@ -8,21 +8,22 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
@@ -49,6 +50,63 @@ func Test_BuildPodHostFromPod(t *testing.T) {
 	assert.Equal(t, 8080, podPort)
 
 	assert.Equal(t, expected, result)
+}
+
+func TestGetMgmtApiPort(t *testing.T) {
+	tests := []struct {
+		name       string
+		containers []corev1.Container
+		expected   int
+	}{
+		{
+			name:     "default without containers",
+			expected: api.DefaultMgmtApiPort,
+		},
+		{
+			name: "ignore management API port on another container",
+			containers: []corev1.Container{
+				{
+					Name:  "sidecar",
+					Ports: []corev1.ContainerPort{{Name: "mgmt-api-http", ContainerPort: 8081}},
+				},
+			},
+			expected: api.DefaultMgmtApiPort,
+		},
+		{
+			name: "ignore other Cassandra ports",
+			containers: []corev1.Container{
+				{
+					Name: "cassandra",
+					Ports: []corev1.ContainerPort{
+						{Name: "native", ContainerPort: 9042},
+						{Name: "metrics", ContainerPort: 9000},
+					},
+				},
+			},
+			expected: api.DefaultMgmtApiPort,
+		},
+		{
+			name: "custom management API port among other Cassandra ports",
+			containers: []corev1.Container{
+				{Name: "sidecar", Ports: []corev1.ContainerPort{{Name: "http", ContainerPort: 8082}}},
+				{
+					Name: "cassandra",
+					Ports: []corev1.ContainerPort{
+						{Name: "native", ContainerPort: 9042},
+						{Name: "mgmt-api-http", ContainerPort: 8081},
+						{Name: "metrics", ContainerPort: 9000},
+					},
+				},
+			},
+			expected: 8081,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, GetMgmtApiPort(test.containers))
+		})
+	}
 }
 
 func Test_parseMetadataEndpointsResponseBody(t *testing.T) {
@@ -224,7 +282,7 @@ func TestNodeMgmtClient_GetKeyspaceReplication(t *testing.T) {
 		name         string
 		pod          *corev1.Pod
 		keyspaceName string
-		httpClient   *mocks.HttpClient
+		httpClient   HttpClient
 		expected     map[string]string
 		err          error
 	}{
@@ -287,7 +345,7 @@ func TestNodeMgmtClient_ListTables(t *testing.T) {
 		name         string
 		pod          *corev1.Pod
 		keyspaceName string
-		httpClient   *mocks.HttpClient
+		httpClient   HttpClient
 		expected     []string
 		err          error
 	}{
@@ -357,7 +415,7 @@ func TestNodeMgmtClient_CreateTable(t *testing.T) {
 		name       string
 		pod        *corev1.Pod
 		table      *TableDefinition
-		httpClient *mocks.HttpClient
+		httpClient HttpClient
 		err        error
 	}{
 		{
@@ -459,16 +517,14 @@ func TestListRoles(t *testing.T) {
 	require.NoError(err)
 	require.Equal(3, len(roles))
 
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodGet
-			})).
-		Return(newHttpResponse(payload, http.StatusOK), nil).
-		Once()
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodGet, req.Method)
+		require.Equal("/api/v0/ops/auth/role", req.URL.Path)
+	}, func() *http.Response {
+		return newHttpResponse(payload, http.StatusOK)
+	})
 
-	mgmtClient := newMockMgmtClient(mockHttpClient)
+	mgmtClient := newMockMgmtClient(httpClient)
 	roles, err = mgmtClient.CallListRolesEndpoint(goodPod)
 	require.NoError(err)
 	require.Equal(3, len(roles))
@@ -476,40 +532,156 @@ func TestListRoles(t *testing.T) {
 
 func TestCreateRole(t *testing.T) {
 	require := require.New(t)
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodPost && req.URL.Query().Get("username") == "role1" && req.URL.Query().Get("password") == "password1" && req.URL.Query().Get("is_superuser") == "true"
-			})).
-		Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).
-		Once()
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodPost, req.Method)
+		require.Equal("/api/v0/ops/auth/role", req.URL.Path)
+		require.Equal("role1", req.URL.Query().Get("username"))
+		require.Equal("password1", req.URL.Query().Get("password"))
+		require.Equal("true", req.URL.Query().Get("is_superuser"))
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
 
-	mgmtClient := newMockMgmtClient(mockHttpClient)
+	mgmtClient := newMockMgmtClient(httpClient)
 	err := mgmtClient.CallCreateRoleEndpoint(goodPod, "role1", "password1", true)
 	require.NoError(err)
-	require.True(mockHttpClient.AssertExpectations(t))
 }
 
 func TestDropRole(t *testing.T) {
 	require := require.New(t)
-	mockHttpClient := mocks.NewHttpClient(t)
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/ops/auth/role" && req.Method == http.MethodDelete
-			})).
-		Return(newHttpResponseMarshalled("OK", http.StatusOK), nil).
-		Once()
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodDelete, req.Method)
+		require.Equal("/api/v0/ops/auth/role", req.URL.Path)
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
 
-	mgmtClient := newMockMgmtClient(mockHttpClient)
+	mgmtClient := newMockMgmtClient(httpClient)
 	err := mgmtClient.CallDropRoleEndpoint(goodPod, "role1")
 
 	require.NoError(err)
-	require.True(mockHttpClient.AssertExpectations(t))
 }
 
-func newMockMgmtClient(httpClient *mocks.HttpClient) *NodeMgmtClient {
+func TestInsertIdentityToRole(t *testing.T) {
+	require := require.New(t)
+	identity := "spiffe://sidecar.prod.example.com/user/u_12345/credential/credential-id"
+
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodPost, req.Method)
+		require.Equal("/api/v1/ops/auth/identity_to_role", req.URL.Path)
+		require.Equal("application/json", req.Header.Get("Content-Type"))
+
+		var payload identityToRoleRequest
+		require.NoError(json.NewDecoder(req.Body).Decode(&payload))
+		require.Equal(identityToRoleRequest{
+			Identity: identity,
+			Role:     "schema_reader",
+			TTL:      3600,
+		}, payload)
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
+
+	mgmtClient := newMockMgmtClient(httpClient)
+	require.NoError(mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, identity, "schema_reader", time.Hour))
+}
+
+func TestInsertIdentityToRoleWithoutTTL(t *testing.T) {
+	require := require.New(t)
+	identity := "spiffe://sidecar.prod.example.com/user/u_12345/credential/credential-id"
+
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		var payload map[string]any
+		require.NoError(json.NewDecoder(req.Body).Decode(&payload))
+		require.Equal(identity, payload["identity"])
+		require.Equal("schema_reader", payload["role"])
+		require.NotContains(payload, "ttl")
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
+
+	mgmtClient := newMockMgmtClient(httpClient)
+	require.NoError(mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, identity, "schema_reader", 0))
+}
+
+func TestDeleteIdentityToRole(t *testing.T) {
+	require := require.New(t)
+	identity := "spiffe://sidecar.prod.example.com/user/u_12345/credential/credential-id"
+
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodDelete, req.Method)
+		require.Equal("/api/v1/ops/auth/identity_to_role", req.URL.Path)
+		require.Equal("application/json", req.Header.Get("Content-Type"))
+
+		var payload map[string]string
+		require.NoError(json.NewDecoder(req.Body).Decode(&payload))
+		require.Equal(map[string]string{
+			"identity": identity,
+		}, payload)
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
+
+	mgmtClient := newMockMgmtClient(httpClient)
+	require.NoError(mgmtClient.CallDeleteIdentityToRoleEndpoint(goodPod, identity))
+}
+
+func TestIdentityToRoleValidation(t *testing.T) {
+	mgmtClient := newMockMgmtClient(nil)
+
+	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "", "schema_reader", time.Hour), "identity and role must be set")
+	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "spiffe://example.com/user/1", "", time.Hour), "identity and role must be set")
+	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "spiffe://example.com/user/1", "schema_reader", -time.Second), "ttl must be at least one second")
+	assert.EqualError(t, mgmtClient.CallInsertIdentityToRoleEndpoint(goodPod, "spiffe://example.com/user/1", "schema_reader", time.Millisecond), "ttl must be at least one second")
+	assert.EqualError(t, mgmtClient.CallDeleteIdentityToRoleEndpoint(goodPod, ""), "identity cannot be empty")
+}
+
+func TestCallDurationMetricSuccess(t *testing.T) {
+	require := require.New(t)
+
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodPost, req.Method)
+		require.Equal("/api/v0/ops/node/drain", req.URL.Path)
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("OK", http.StatusOK)
+	})
+
+	before := getHttpHelperCallDurationCount(t, "/api/v0/ops/node/drain", resultSuccessLabelName)
+
+	mgmtClient := newMockMgmtClient(httpClient)
+	require.NoError(mgmtClient.CallDrainEndpoint(goodPod))
+	require.NoError(mgmtClient.CallDrainEndpoint(goodPod))
+
+	after := getHttpHelperCallDurationCount(t, "/api/v0/ops/node/drain", resultSuccessLabelName)
+	require.Equal(before+2, after)
+}
+
+func TestCallDurationMetricError(t *testing.T) {
+	require := require.New(t)
+
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodPost, req.Method)
+		require.Equal("/api/v0/ops/seeds/reload", req.URL.Path)
+	}, func() *http.Response {
+		return newHttpResponseMarshalled("this is an error", http.StatusInternalServerError)
+	})
+
+	before := getHttpHelperCallDurationCount(t, "/api/v0/ops/seeds/reload", resultErrorLabelName)
+
+	mgmtClient := newMockMgmtClient(httpClient)
+	require.Error(mgmtClient.CallReloadSeedsEndpoint(goodPod))
+
+	after := getHttpHelperCallDurationCount(t, "/api/v0/ops/seeds/reload", resultErrorLabelName)
+	require.Equal(before+1, after)
+}
+
+type httpClientDoFunc func(*http.Request) (*http.Response, error)
+
+func (f httpClientDoFunc) Do(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func newMockMgmtClient(httpClient HttpClient) *NodeMgmtClient {
 	return &NodeMgmtClient{
 		Client:   httpClient,
 		Log:      logr.Discard(),
@@ -517,10 +689,45 @@ func newMockMgmtClient(httpClient *mocks.HttpClient) *NodeMgmtClient {
 	}
 }
 
-func newMockHttpClient(response *http.Response, err error) *mocks.HttpClient {
-	httpClient := new(mocks.HttpClient)
-	httpClient.On("Do", mock.Anything).Return(response, err)
-	return httpClient
+func newMockHttpClient(response *http.Response, err error) HttpClient {
+	return httpClientDoFunc(func(*http.Request) (*http.Response, error) {
+		return response, err
+	})
+}
+
+func newAssertingHttpClient(t *testing.T, assertRequest func(*http.Request), response func() *http.Response) HttpClient {
+	t.Helper()
+
+	return httpClientDoFunc(func(req *http.Request) (*http.Response, error) {
+		assertRequest(req)
+		return response(), nil
+	})
+}
+
+func getHttpHelperCallDurationCount(t *testing.T, route, result string) uint64 {
+	t.Helper()
+
+	metricName := fmt.Sprintf("cass_operator_httphelper_%s", callDurationMetricName)
+	families, err := metrics.Registry.Gather()
+	require.NoError(t, err)
+
+	for _, family := range families {
+		if family.GetName() != metricName {
+			continue
+		}
+
+		for _, metric := range family.GetMetric() {
+			labels := make(map[string]string, len(metric.GetLabel()))
+			for _, label := range metric.GetLabel() {
+				labels[label.GetName()] = label.GetValue()
+			}
+
+			if labels["route"] == route && labels["result"] == result {
+				return metric.GetHistogram().GetSampleCount()
+			}
+		}
+	}
+	return 0
 }
 
 func newHttpResponse(responseBody []byte, status int) *http.Response {
@@ -533,7 +740,7 @@ func newHttpResponse(responseBody []byte, status int) *http.Response {
 	}
 }
 
-func newHttpResponseMarshalled(responseBody interface{}, status int) *http.Response {
+func newHttpResponseMarshalled(responseBody any, status int) *http.Response {
 	marshalled, _ := json.Marshal(responseBody)
 	body := io.NopCloser(bytes.NewReader(marshalled))
 	bodyLength := int64(len(marshalled))
@@ -587,9 +794,7 @@ func TestCustomTransport(t *testing.T) {
 		},
 	}
 
-	mockClient := mocks.NewClient(t)
-
-	mgmtClient, err := NewMgmtClient(t.Context(), mockClient, dc, customTransport)
+	mgmtClient, err := NewMgmtClient(t.Context(), nil, nil, dc, customTransport)
 	mgmtClient.Log = logr.Discard()
 	require.NoError(err)
 

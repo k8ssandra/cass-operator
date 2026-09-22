@@ -10,11 +10,13 @@ import (
 	"testing"
 
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
+	"github.com/k8ssandra/cass-operator/pkg/utils"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
@@ -59,7 +61,6 @@ func TestCassandraDatacenter_allPodsServiceLabels(t *testing.T) {
 	}
 
 	service := newAllPodsServiceForCassandraDatacenter(dc)
-
 	gotLabels := service.Labels
 	if !reflect.DeepEqual(wantLabels, gotLabels) {
 		t.Errorf("allPodsService labels = %v, want %v", gotLabels, wantLabels)
@@ -213,6 +214,9 @@ func TestLabelsWithNewNodePortServiceForCassandraDatacenter(t *testing.T) {
 			"Add": "annotation",
 		})
 	}
+
+	assert.Contains(t, service.Annotations, utils.ResourceHashAnnotationKey,
+		"NodePort service must carry the resource-hash annotation so the operator reconciles updates to it")
 }
 
 func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T) {
@@ -273,7 +277,6 @@ func TestLabelsWithNewAllPodsServiceForCassandraDatacenter(t *testing.T) {
 	}
 
 	service := newAllPodsServiceForCassandraDatacenter(dc)
-
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
 	}
@@ -341,7 +344,6 @@ func TestLabelsWithNewServiceForCassandraDatacenter(t *testing.T) {
 	}
 
 	service := newServiceForCassandraDatacenter(dc)
-
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = \n %v \n, want \n %v", service.Labels, expected)
 	}
@@ -446,7 +448,6 @@ func TestAddingAdditionalLabels(t *testing.T) {
 	}
 
 	service := newServiceForCassandraDatacenter(dc)
-
 	if !reflect.DeepEqual(expected, service.Labels) {
 		t.Errorf("service labels = %v, want %v", service.Labels, expected)
 	}
@@ -467,7 +468,6 @@ func TestAddingAdditionalAnnotations(t *testing.T) {
 	}
 
 	service := newServiceForCassandraDatacenter(dc)
-
 	assert.Contains(t, service.Annotations, "Add")
 }
 
@@ -477,6 +477,7 @@ func TestServicePorts(t *testing.T) {
 		dc                  *api.CassandraDatacenter
 		dcServicePorts      []int32
 		allPodsServicePorts []int32
+		mgmtApiPort         int32
 	}{
 		{
 			name: "Cassandra 3.11.14",
@@ -487,8 +488,8 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "3.11.14",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
-			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9160},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103, 9160},
 		},
 		{
 			name: "Cassandra 4.0.7",
@@ -499,8 +500,33 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "4.0.7",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "Cassandra 4.0.7 with custom management API port",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{Name: "mgmt-api-http", ContainerPort: 8081},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			dcServicePorts:      []int32{8081, 9000, 9042, 9103},
+			allPodsServicePorts: []int32{8081, 9000, 9042, 9103},
+			mgmtApiPort:         8081,
 		},
 		{
 			name: "DSE 6.8.31",
@@ -511,8 +537,8 @@ func TestServicePorts(t *testing.T) {
 					ServerVersion: "6.8.31",
 				},
 			},
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142, 9160},
-			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9160},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9160},
 		},
 		{
 			name: "Cassandra 4.0.7 with custom ports",
@@ -538,9 +564,86 @@ func TestServicePorts(t *testing.T) {
 					},
 				},
 			},
-			// FIXME: 9004 should be in the list of open ports
-			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			dcServicePorts:      []int32{8080, 9004, 9042, 9103},
+			allPodsServicePorts: []int32{8080, 9004, 9042, 9103},
+		},
+		{
+			name: "Cassandra 4.0.7 with an unnamed custom port",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{ContainerPort: 9004},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
 			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "Cassandra 4.0.7 with custom internode port, which shouldn't be added to the service ports",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{
+											Name:          "internode",
+											ContainerPort: 9010,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103},
+		},
+		{
+			name: "Cassandra 4.0.7 with a custom tls native port",
+			dc: &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "bob",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					PodTemplateSpec: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "cassandra",
+									Ports: []corev1.ContainerPort{
+										{
+											Name:          "tls-native",
+											ContainerPort: 9142,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			dcServicePorts:      []int32{8080, 9000, 9042, 9103, 9142},
+			allPodsServicePorts: []int32{8080, 9000, 9042, 9103, 9142},
 		},
 	}
 
@@ -553,15 +656,30 @@ func TestServicePorts(t *testing.T) {
 				}
 				return servicePorts
 			}
+			assertMgmtApiPort := func(svc *corev1.Service) {
+				if test.mgmtApiPort == 0 {
+					return
+				}
+				for _, port := range svc.Spec.Ports {
+					if port.Name == "mgmt-api-http" {
+						assert.Equal(t, test.mgmtApiPort, port.Port)
+						assert.Equal(t, intstr.FromInt32(test.mgmtApiPort), port.TargetPort)
+						return
+					}
+				}
+				assert.Fail(t, "mgmt-api service port not found")
+			}
 			t.Run("dc service", func(t *testing.T) {
 				svc := newServiceForCassandraDatacenter(test.dc)
 				servicePorts := getServicePorts(svc)
 				assert.ElementsMatch(t, servicePorts, test.dcServicePorts)
+				assertMgmtApiPort(svc)
 			})
 			t.Run("all pods service", func(t *testing.T) {
 				svc := newAllPodsServiceForCassandraDatacenter(test.dc)
 				servicePorts := getServicePorts(svc)
 				assert.ElementsMatch(t, servicePorts, test.allPodsServicePorts)
+				assertMgmtApiPort(svc)
 			})
 		})
 	}

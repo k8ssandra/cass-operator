@@ -13,7 +13,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	record "k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -29,10 +29,11 @@ import (
 type ReconciliationContext struct {
 	Request          *reconcile.Request
 	Client           client.Client
+	APIReader        client.Reader
 	Scheme           *runtime.Scheme
 	Datacenter       *api.CassandraDatacenter
 	NodeMgmtClient   httphelper.NodeMgmtClient
-	Recorder         record.EventRecorder
+	Recorder         *events.LoggingEventRecorder
 	ReqLogger        logr.Logger
 	SecretWatches    dynamicwatch.DynamicWatches
 	ImageRegistry    images.ImageRegistry
@@ -56,6 +57,7 @@ func CreateReconciliationContext(
 	ctx context.Context,
 	req *reconcile.Request,
 	cli client.Client,
+	apiReader client.Reader,
 	scheme *runtime.Scheme,
 	rec record.EventRecorder,
 	secretWatches dynamicwatch.DynamicWatches,
@@ -66,16 +68,15 @@ func CreateReconciliationContext(
 	rc := &ReconciliationContext{}
 	rc.Request = req
 	rc.Client = cli
+	rc.APIReader = apiReader
 	rc.Scheme = scheme
-	rc.Recorder = &events.LoggingEventRecorder{EventRecorder: rec, ReqLogger: reqLogger}
 	rc.SecretWatches = secretWatches
 	rc.ReqLogger = reqLogger
 	rc.Ctx = ctx
 	rc.ImageRegistry = imageRegistry
 	rc.ClusterResources = clusterScoped
-
-	rc.ReqLogger = rc.ReqLogger.
-		WithValues("namespace", req.Namespace)
+	rc.ReqLogger = rc.ReqLogger.WithValues("namespace", req.Namespace)
+	rc.Recorder = events.NewLoggingEventRecorder(rec, reqLogger)
 
 	rc.ReqLogger.Info("handler::CreateReconciliationContext")
 
@@ -105,7 +106,7 @@ func CreateReconciliationContext(
 	log.IntoContext(ctx, rc.ReqLogger)
 
 	var err error
-	rc.NodeMgmtClient, err = httphelper.NewMgmtClient(rc.Ctx, cli, dc, nil)
+	rc.NodeMgmtClient, err = httphelper.NewMgmtClient(rc.Ctx, cli, apiReader, dc, nil)
 	if err != nil {
 		rc.ReqLogger.Error(err, "failed to build NodeMgmtClient")
 		return nil, err

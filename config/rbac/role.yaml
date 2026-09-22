@@ -23,11 +23,30 @@ rules:
   - ""
   resources:
   - configmaps
+  - events
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - endpoints
   - endpoints/restricted
-  - events
+  verbs:
+  - delete
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
   - persistentvolumeclaims
-  - pods
   - secrets
   - services
   verbs:
@@ -41,9 +60,14 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - namespaces
+  - pods
   verbs:
+  - delete
   - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - apps
   resources:
@@ -125,6 +149,13 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
 - apiGroups:
   - policy
   resources:

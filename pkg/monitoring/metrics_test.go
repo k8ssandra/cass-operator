@@ -13,7 +13,7 @@ import (
 
 func TestMetricAdder(t *testing.T) {
 	pods := make([]*corev1.Pod, 6)
-	for i := 0; i < len(pods); i++ {
+	for i := range pods {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod%d", i),
@@ -73,6 +73,22 @@ func TestMetricAdder(t *testing.T) {
 	require.NoError(err)
 	require.Equal("ready", status)
 
+	now := metav1.Now()
+	pods[1].SetDeletionTimestamp(&now)
+	UpdatePodStatusMetric(pods[1])
+	status, err = getCurrentPodStatus("pod1")
+	require.NoError(err)
+	require.Equal("terminating", status)
+
+	// Decommissioning should be preferred to Terminating if we are decommissioning the pod
+	// This would return "terminating" as seen from pods[1], but as we can previously see from
+	// pods[5], we will return "decommissioning" in this case.
+	pods[5].SetDeletionTimestamp(&now)
+	UpdatePodStatusMetric(pods[5])
+	status, err = getCurrentPodStatus("pod5")
+	require.NoError(err)
+	require.Equal("decommissioning", status)
+
 	RemoveDatacenterPods("ns", "cluster1", "datacenter1")
 	_, err = getCurrentPodStatus("pod4")
 	require.Error(err)
@@ -81,7 +97,7 @@ func TestMetricAdder(t *testing.T) {
 func TestNamespaceSeparation(t *testing.T) {
 	require := require.New(t)
 	pods := make([]*corev1.Pod, 2)
-	for i := 0; i < len(pods); i++ {
+	for i := range pods {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod%d", i),
@@ -165,13 +181,13 @@ func TestOperatorStateMetrics(t *testing.T) {
 		Status: api.CassandraDatacenterStatus{},
 	}
 
-	UpdateOperatorDatacenterProgressStatusMetric(dc, api.ProgressUpdating)
+	updateOperatorDatacenterProgressStatusMetric(dc, api.ProgressUpdating)
 
 	status, err := getCurrentDatacenterStatus("dc1")
 	require.NoError(err)
 	require.Equal("Updating", status)
 
-	UpdateOperatorDatacenterProgressStatusMetric(dc, api.ProgressReady)
+	updateOperatorDatacenterProgressStatusMetric(dc, api.ProgressReady)
 
 	status, err = getCurrentDatacenterStatus("dc1")
 	require.NoError(err)
@@ -229,14 +245,14 @@ func TestDatacenterConditionMetrics(t *testing.T) {
 		},
 	}
 
-	SetDatacenterConditionMetric(dc, api.DatacenterReady, corev1.ConditionTrue)
+	setDatacenterConditionMetric(dc, api.DatacenterReady, corev1.ConditionTrue)
 
 	status, err := getCurrentDatacenterCondition("dc1", api.DatacenterReady)
 	require.NoError(err)
 	require.Equal(float64(1), status)
 
-	SetDatacenterConditionMetric(dc, api.DatacenterInitialized, corev1.ConditionTrue)
-	SetDatacenterConditionMetric(dc, api.DatacenterReady, corev1.ConditionFalse)
+	setDatacenterConditionMetric(dc, api.DatacenterInitialized, corev1.ConditionTrue)
+	setDatacenterConditionMetric(dc, api.DatacenterReady, corev1.ConditionFalse)
 
 	status, err = getCurrentDatacenterCondition("dc1", api.DatacenterReady)
 	require.NoError(err)

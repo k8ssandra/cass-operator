@@ -8,13 +8,12 @@ import (
 	"strings"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 )
 
 // UpdateConfig updates the json formatted Cassandra config which incorporates the JVM options (under key additional-jvm-opts) passed into the launch scripts
 // for Cassandra via the config builder.
 func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) (json.RawMessage, error) {
-	if cassDC.Spec.CDC == nil {
+	if cassDC.Spec.DeprecatedCDC == nil {
 		return config, nil
 	}
 
@@ -31,7 +30,7 @@ func UpdateConfig(config json.RawMessage, cassDC cassdcapi.CassandraDatacenter) 
 	}
 	updateCassandraYaml(&c) // Add cdc_enabled: true/false to the cassandra-yaml key of the config.
 	// Figure out what to do and reconcile config.CassEnvSh.AddtnlJVMOptions back to desired state per CDCConfig.
-	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, cassDC.Spec.CDC, cassDC, mcacEnabled(cassDC))
+	newJVMOpts, err := updateAdditionalJVMOpts(additionalJVMOpts, cassDC.Spec.DeprecatedCDC, cassDC, cassDC.IsMcacEnabled())
 	if err != nil {
 		return nil, err
 	}
@@ -57,19 +56,19 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 	reflectedCDCConfig := reflect.ValueOf(*CDCConfig)
 	t := reflectedCDCConfig.Type()
 	optsSlice = []string{}
-	for i := 0; i < reflectedCDCConfig.NumField(); i++ {
+	for i := range reflectedCDCConfig.NumField() {
 		// This logic depends on the json tags from the CR mapping to the CDC agent's parameter names.
 		fieldName := t.Field(i).Name
-		t := reflect.TypeOf(*CDCConfig)
+		t := reflect.TypeFor[cassdcapi.CDCConfiguration]()
 		reflectedField, ok := t.FieldByName(fieldName)
 		if !ok {
 			return nil, errors.New(fmt.Sprint("could not get CDC field", fieldName))
 		}
 		nameTag := strings.Split(reflectedField.Tag.Get("json"), ",")[0]
-		reflectedValue := interface{}(nil)
+		reflectedValue := any(nil)
 		// We need to get value types back from pointer types here and handle nil pointers.
 		switch reflectedField.Type.Kind() {
-		case reflect.Ptr:
+		case reflect.Pointer:
 			if !reflectedCDCConfig.Field(i).IsNil() { // We only want to append the value if it is non-nil
 				reflectedValue = reflectedCDCConfig.Field(i).Elem().Interface()
 				optsSlice = append(optsSlice, nameTag+"="+fmt.Sprintf("%s", reflectedValue))
@@ -104,34 +103,9 @@ func updateAdditionalJVMOpts(optsSlice []string, CDCConfig *cassdcapi.CDCConfigu
 	return append(out, CDCOpt), nil
 }
 
-func mcacEnabled(cassDC cassdcapi.CassandraDatacenter) bool {
-	var cassContainer *corev1.Container
-	if cassDC.Spec.PodTemplateSpec == nil {
-		return true
-	}
-	for _, c := range cassDC.Spec.PodTemplateSpec.Spec.Containers {
-		if c.Name == "cassandra" {
-			cassContainer = &c
-		}
-	}
-	if cassContainer == nil {
-		return true
-	}
-	var mcacDisabledVar *corev1.EnvVar
-	for _, e := range cassContainer.Env {
-		if e.Name == "MGMT_API_DISABLE_MCAC" {
-			mcacDisabledVar = &e
-		}
-	}
-	if mcacDisabledVar != nil && mcacDisabledVar.Value == "true" {
-		return false
-	}
-	return true
-}
-
 func updateCassandraYaml(cassConfig *configData) {
 	if cassConfig.CassandraYaml == nil {
-		cassConfig.CassandraYaml = make(map[string]interface{})
+		cassConfig.CassandraYaml = make(map[string]any)
 	}
 	cassConfig.CassandraYaml["cdc_enabled"] = true
 }

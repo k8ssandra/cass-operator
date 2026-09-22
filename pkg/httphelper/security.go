@@ -15,17 +15,17 @@ import (
 	"strings"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/secretcache"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	NodeDrainEndpoint        = "/api/v0/ops/node/drain"
-	MgmtApiTargetHostAndPort = "localhost:8080"
-	LivenessEndpoint         = "/api/v0/probes/liveness"
-	ReadinessEndpoint        = "/api/v0/probes/readiness"
-	DefaultTimeout           = 10
+	NodeDrainEndpoint = "/api/v0/ops/node/drain"
+	LivenessEndpoint  = "/api/v0/probes/liveness"
+	ReadinessEndpoint = "/api/v0/probes/readiness"
+	DefaultTimeout    = 10
 
 	caCertPath = "/management-api-certs/ca.crt"
 	tlsCrt     = "/management-api-certs/tls.crt"
@@ -41,12 +41,12 @@ func GetManagementApiProtocol(dc *api.CassandraDatacenter) (string, error) {
 	return provider.GetProtocol(), nil
 }
 
-func BuildManagementApiHttpClient(ctx context.Context, client client.Client, dc *api.CassandraDatacenter, customTransport *http.Transport) (HttpClient, error) {
+func BuildManagementApiHttpClient(ctx context.Context, client client.Client, apiReader client.Reader, dc *api.CassandraDatacenter, customTransport *http.Transport) (HttpClient, error) {
 	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
-	return provider.BuildHttpClient(ctx, client, customTransport)
+	return provider.BuildHttpClient(ctx, client, apiReader, customTransport)
 }
 
 func AddManagementApiServerSecurity(dc *api.CassandraDatacenter, pod *corev1.PodTemplateSpec) error {
@@ -96,15 +96,19 @@ func ValidateManagementApiConfig(dc *api.CassandraDatacenter, client client.Clie
 
 // SPI for adding new mechanisms for securing the management API
 type ManagementApiSecurityProvider interface {
-	BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error)
-	BuildMgmtApiGetAction(endpoint string, timeout int) *corev1.ExecAction
-	BuildMgmtApiPostAction(endpoint string, timeout int) *corev1.ExecAction
+	BuildHttpClient(ctx context.Context, client client.Client, apiReader client.Reader, transport *http.Transport) (HttpClient, error)
+	BuildMgmtApiGetAction(endpoint string, timeout int, port int) *corev1.ExecAction
+	BuildMgmtApiPostAction(endpoint string, timeout int, port int) *corev1.ExecAction
 	AddServerSecurity(pod *corev1.PodTemplateSpec) error
 	GetProtocol() string
 	ValidateConfig(ctx context.Context, client client.Client) []error
 }
 
 type InsecureManagementApiSecurityProvider struct{}
+
+func mgmtApiTargetHostAndPort(port int) string {
+	return fmt.Sprintf("localhost:%d", port)
+}
 
 func buildInsecureManagementApiSecurityProvider(dc *api.CassandraDatacenter) (ManagementApiSecurityProvider, error) {
 	// If both are nil, then default to insecure
@@ -118,7 +122,7 @@ func (provider *InsecureManagementApiSecurityProvider) GetProtocol() string {
 	return "http"
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error) {
+func (provider *InsecureManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, apiReader client.Reader, transport *http.Transport) (HttpClient, error) {
 	c := http.DefaultClient
 
 	if transport != nil {
@@ -155,15 +159,15 @@ func (provider *ManualManagementApiSecurityProvider) GetProtocol() string {
 	return "https"
 }
 
-func GetMgmtApiPostAction(dc *api.CassandraDatacenter, endpoint string, timeout int) (*corev1.ExecAction, error) {
+func GetMgmtApiPostAction(dc *api.CassandraDatacenter, endpoint string, timeout int, port int) (*corev1.ExecAction, error) {
 	provider, err := BuildManagementApiSecurityProvider(dc)
 	if err != nil {
 		return nil, err
 	}
-	return provider.BuildMgmtApiPostAction(endpoint, timeout), nil
+	return provider.BuildMgmtApiPostAction(endpoint, timeout, port), nil
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiGetAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiGetAction(endpoint string, timeout int, port int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -175,12 +179,12 @@ func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiGetAction(end
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("http://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("http://%s%s", mgmtApiTargetHostAndPort(port), endpoint),
 		},
 	}
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiGetAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiGetAction(endpoint string, timeout int, port int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -196,12 +200,12 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiGetAction(endpo
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("https://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("https://%s%s", mgmtApiTargetHostAndPort(port), endpoint),
 		},
 	}
 }
 
-func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiPostAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiPostAction(endpoint string, timeout int, port int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -213,12 +217,12 @@ func (provider *InsecureManagementApiSecurityProvider) BuildMgmtApiPostAction(en
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("http://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("http://%s%s", mgmtApiTargetHostAndPort(port), endpoint),
 		},
 	}
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(endpoint string, timeout int) *corev1.ExecAction {
+func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(endpoint string, timeout int, port int) *corev1.ExecAction {
 	return &corev1.ExecAction{
 		Command: []string{
 			"curl",
@@ -234,24 +238,12 @@ func (provider *ManualManagementApiSecurityProvider) BuildMgmtApiPostAction(endp
 			"/dev/null",
 			"--show-error",
 			"--fail",
-			fmt.Sprintf("https://%s%s", MgmtApiTargetHostAndPort, endpoint),
+			fmt.Sprintf("https://%s%s", mgmtApiTargetHostAndPort(port), endpoint),
 		},
 	}
 }
 
 func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *corev1.PodTemplateSpec) error {
-	// find the container
-	var container *corev1.Container = nil
-	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name == "cassandra" {
-			container = &pod.Spec.Containers[i]
-		}
-	}
-
-	if container == nil {
-		return fmt.Errorf("could not find cassandra container")
-	}
-
 	// Add volume containing certificates
 	secretVolumeName := "management-api-server-certs-volume"
 	secretVolume := corev1.Volume{
@@ -276,11 +268,24 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 		MountPath: "/management-api-certs",
 	}
 
-	if container.VolumeMounts == nil {
-		container.VolumeMounts = []corev1.VolumeMount{}
+	var cassContainer *corev1.Container = nil
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		if pod.Spec.Containers[i].Name == "cassandra" {
+			cassContainer = container
+		}
+		if container.VolumeMounts == nil {
+			container.VolumeMounts = []corev1.VolumeMount{}
+		}
+
+		container.VolumeMounts = append(container.VolumeMounts, secretVolumeMount)
 	}
 
-	container.VolumeMounts = append(container.VolumeMounts, secretVolumeMount)
+	if cassContainer == nil {
+		return fmt.Errorf("could not find cassandra container")
+	}
+
+	mgmtApiPort := GetMgmtApiPort(pod.Spec.Containers)
 
 	// Configure Management API to use certificates
 	envVars := []corev1.EnvVar{
@@ -296,59 +301,47 @@ func (provider *ManualManagementApiSecurityProvider) AddServerSecurity(pod *core
 			Name:  "MGMT_API_TLS_KEY_FILE",
 			Value: tlsKey,
 		},
-		// TODO remove the below stuff post 1.0
-		{
-			Name:  "DSE_MGMT_TLS_CA_CERT_FILE",
-			Value: caCertPath,
-		},
-		{
-			Name:  "DSE_MGMT_TLS_CERT_FILE",
-			Value: tlsCrt,
-		},
-		{
-			Name:  "DSE_MGMT_TLS_KEY_FILE",
-			Value: tlsKey,
-		},
 	}
 
-	if container.Env == nil {
-		container.Env = []corev1.EnvVar{}
+	if cassContainer.Env == nil {
+		cassContainer.Env = []corev1.EnvVar{}
 	}
 
-	container.Env = append(envVars, container.Env...)
+	cassContainer.Env = append(envVars, cassContainer.Env...)
 
 	// Update Liveness probe to account for mutual auth (can't just use HTTP probe now)
-	if container.LivenessProbe == nil {
-		container.LivenessProbe = &corev1.Probe{
+	if cassContainer.LivenessProbe == nil {
+		cassContainer.LivenessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{},
 		}
 	}
 
-	livenessTimeout := int(container.LivenessProbe.TimeoutSeconds)
+	livenessTimeout := int(cassContainer.LivenessProbe.TimeoutSeconds)
 	if livenessTimeout < 1 {
 		livenessTimeout = DefaultTimeout
 	}
 
-	container.LivenessProbe.HTTPGet = nil
-	container.LivenessProbe.TCPSocket = nil
-	container.LivenessProbe.Exec = provider.BuildMgmtApiGetAction(LivenessEndpoint, livenessTimeout)
+	cassContainer.LivenessProbe.HTTPGet = nil
+	cassContainer.LivenessProbe.TCPSocket = nil
+	cassContainer.LivenessProbe.GRPC = nil
+	cassContainer.LivenessProbe.Exec = provider.BuildMgmtApiGetAction(LivenessEndpoint, livenessTimeout, mgmtApiPort)
 
 	// Update Readiness probe to account for mutual auth (can't just use HTTP probe now)
-	// TODO: Get endpoint from configured HTTPGet probe
-	if container.ReadinessProbe == nil {
-		container.ReadinessProbe = &corev1.Probe{
+	if cassContainer.ReadinessProbe == nil {
+		cassContainer.ReadinessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{},
 		}
 	}
 
-	readinessTimeout := int(container.ReadinessProbe.TimeoutSeconds)
+	readinessTimeout := int(cassContainer.ReadinessProbe.TimeoutSeconds)
 	if readinessTimeout < 1 {
 		readinessTimeout = DefaultTimeout
 	}
 
-	container.ReadinessProbe.HTTPGet = nil
-	container.ReadinessProbe.TCPSocket = nil
-	container.ReadinessProbe.Exec = provider.BuildMgmtApiGetAction(ReadinessEndpoint, readinessTimeout)
+	cassContainer.ReadinessProbe.HTTPGet = nil
+	cassContainer.ReadinessProbe.TCPSocket = nil
+	cassContainer.ReadinessProbe.GRPC = nil
+	cassContainer.ReadinessProbe.Exec = provider.BuildMgmtApiGetAction(ReadinessEndpoint, readinessTimeout, mgmtApiPort)
 
 	return nil
 }
@@ -719,7 +712,7 @@ func (provider *ManualManagementApiSecurityProvider) ValidateConfig(ctx context.
 	return validationErrors
 }
 
-func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, transport *http.Transport) (HttpClient, error) {
+func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, apiReader client.Reader, transport *http.Transport) (HttpClient, error) {
 	httpClient := &http.Client{Transport: transport}
 	if transport != nil && transport.TLSClientConfig != nil {
 		return httpClient, nil
@@ -732,17 +725,12 @@ func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context
 	}
 
 	secret := &corev1.Secret{}
-	err := client.Get(
-		ctx,
-		secretNamespacedName,
-		secret)
-	if err != nil {
-		// Couldn't get the secret
+
+	if err := secretcache.Read(ctx, client, apiReader, secretNamespacedName, secret); err != nil {
 		return nil, err
 	}
 
-	err = validateSecretStructure(secret)
-	if err != nil {
+	if err := validateSecretStructure(secret); err != nil {
 		// Secret didn't look the way we expect
 		return nil, err
 	}
@@ -751,10 +739,9 @@ func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context
 	caCertPool := x509.NewCertPool()
 	ok := caCertPool.AppendCertsFromPEM(secret.Data["ca.crt"])
 	if !ok {
-		err = fmt.Errorf("no certificates found in %s when parsing 'ca.crt' value: %v",
+		return nil, fmt.Errorf("no certificates found in %s when parsing 'ca.crt' value: %v",
 			secretNamespacedName.String(),
 			secret.Data["ca.crt"])
-		return nil, err
 	}
 
 	// Load client key pair

@@ -67,7 +67,3 @@ type ScheduledTaskList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ScheduledTask `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&ScheduledTask{}, &ScheduledTaskList{})
-}

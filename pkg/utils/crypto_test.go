@@ -31,7 +31,7 @@ func Test_newCA(t *testing.T) {
 			if _, err = cert.Verify(verify_opts); err != nil {
 				t.Errorf("Error: %e", err)
 			}
-			var untyped_verify_key interface{}
+			var untyped_verify_key any
 			untyped_verify_key, err = x509.ParsePKCS8PrivateKey(key.Bytes)
 			if err != nil {
 				t.Errorf("Parsing key failed: %e", err)

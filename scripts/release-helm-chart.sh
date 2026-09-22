@@ -121,14 +121,14 @@ yq -i '.appVersion = "'"$VERSION"'"' $CHART_HOME/Chart.yaml
 yq -i '.image.tag = "'v"$VERSION"'"' $CHART_HOME/values.yaml
 
 # Update imageConfig settings to the current one
-echo "Updating .Values.imageConfig to match config/manager/image_config.yaml"
-SYSTEM_LOGGER_IMAGE=$(yq '.images.system-logger' config/manager/image_config.yaml)
-K8SSANDRA_CLIENT_IMAGE=$(yq '.images.k8ssandra-client' config/manager/image_config.yaml)
-CONFIG_BUILDER_IMAGE=$(yq '.images.config-builder' config/manager/image_config.yaml)
+# echo "Updating .Values.imageConfig to match config/manager/image_config.yaml"
+# SYSTEM_LOGGER_IMAGE=$(yq '.images.system-logger' config/manager/image_config.yaml)
+# K8SSANDRA_CLIENT_IMAGE=$(yq '.images.k8ssandra-client' config/manager/image_config.yaml)
+# CONFIG_BUILDER_IMAGE=$(yq '.images.config-builder' config/manager/image_config.yaml)
 
-yq -i '.imageConfig.systemLogger = "'"$SYSTEM_LOGGER_IMAGE"'"' $CHART_HOME/values.yaml
-yq -i '.imageConfig.k8ssandraClient = "'"$K8SSANDRA_CLIENT_IMAGE"'"' $CHART_HOME/values.yaml
-yq -i '.imageConfig.configBuilder = "'"$CONFIG_BUILDER_IMAGE"'"' $CHART_HOME/values.yaml
+# yq -i '.imageConfig.systemLogger = "'"$SYSTEM_LOGGER_IMAGE"'"' $CHART_HOME/values.yaml
+# yq -i '.imageConfig.k8ssandraClient = "'"$K8SSANDRA_CLIENT_IMAGE"'"' $CHART_HOME/values.yaml
+# yq -i '.imageConfig.configBuilder = "'"$CONFIG_BUILDER_IMAGE"'"' $CHART_HOME/values.yaml
 
 echo "Updating .global.imageConfig to match config/imageconfig/image_config.yaml"
 yq -i '.global.imageConfig.images = (load("config/imageconfig/image_config.yaml") | .images)' $CHART_HOME/values.yaml

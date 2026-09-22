@@ -5,7 +5,6 @@ package nodeport_service
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,23 +27,7 @@ var (
 )
 
 func TestLifecycle(t *testing.T) {
-	AfterSuite(func() {
-		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		err := kubectl.DumpAllLogs(logPath).ExecV()
-		if err != nil {
-			t.Logf("Failed to dump all the logs: %v", err)
-		}
-
-		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
-		ns.Terminate()
-		err = kustomize.Undeploy(namespace)
-		if err != nil {
-			t.Logf("Failed to undeploy cass-operator: %v", err)
-		}
-	})
-
-	RegisterFailHandler(Fail)
-	RunSpecs(t, testName)
+	ginkgo_util.RunTestLifecycle(t, testName, ns)
 }
 
 func checkNodePortService() {
@@ -52,20 +35,20 @@ func checkNodePortService() {
 
 	k := kubectl.Get(nodePortServiceResource).FormatOutput("json")
 	output := ns.OutputPanic(k)
-	data := map[string]interface{}{}
+	data := map[string]any{}
 	err := json.Unmarshal([]byte(output), &data)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = json.Unmarshal([]byte(output), &data)
 	Expect(err).ToNot(HaveOccurred())
 
-	spec := data["spec"].(map[string]interface{})
+	spec := data["spec"].(map[string]any)
 	policy := spec["externalTrafficPolicy"].(string)
 	Expect(policy).To(Equal("Local"), "Expected externalTrafficPolicy %s to be Local", policy)
 
-	portData := spec["ports"].([]interface{})
-	port0 := portData[0].(map[string]interface{})
-	port1 := portData[1].(map[string]interface{})
+	portData := spec["ports"].([]any)
+	port0 := portData[0].(map[string]any)
+	port1 := portData[1].(map[string]any)
 
 	// for some reason, k8s is giving the port numbers back as floats
 	ns.ExpectKeyValues(port0, map[string]string{

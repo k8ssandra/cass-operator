@@ -20,20 +20,25 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	"go.uber.org/zap/zapcore"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -42,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -54,7 +60,9 @@ import (
 	controllers "github.com/k8ssandra/cass-operator/internal/controllers/cassandra"
 	controlcontrollers "github.com/k8ssandra/cass-operator/internal/controllers/control"
 	apiwebhook "github.com/k8ssandra/cass-operator/internal/webhooks/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
 	"github.com/k8ssandra/cass-operator/pkg/images"
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 )
 
@@ -73,22 +81,34 @@ func init() {
 
 func main() {
 	var metricsAddr string
+	var pprofAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
+	var maxConcurrentReconciles int
+	var reconciliationTimeout time.Duration
 	var enableLeaderElection bool
 	var probeAddr string
 	var secureMetrics bool
+	var secureMetricsAuth bool
 	var enableHTTP2 bool
-	var configFile string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
+	flag.StringVar(&pprofAddr, "pprof-bind-address", "0", "The address the pprof endpoint binds to. "+
+		"Use :8082 to enable the pprof endpoint, or leave as 0 to disable it.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 1,
+		"Maximum number of concurrent CassandraDatacenter reconciles.")
+	flag.DurationVar(&reconciliationTimeout, "reconciliation-timeout", 2*time.Minute,
+		"Timeout for each reconciliation.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&secureMetrics, "metrics-secure", true,
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
+	flag.BoolVar(&secureMetricsAuth, "metrics-secure-auth", false,
+		"If set, the metrics endpoint is secured with authentication and authorization. "+
+			"Only applies when --metrics-secure=true. Use --metrics-secure-auth=true to also enable authentication and authorization.")
 	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
 	flag.StringVar(&webhookCertName, "webhook-cert-name", "tls.crt", "The name of the webhook certificate file.")
 	flag.StringVar(&webhookCertKey, "webhook-cert-key", "tls.key", "The name of the webhook key file.")
@@ -99,9 +119,6 @@ func main() {
 
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.StringVar(&configFile, "config", "",
-		"The cass-operator will load its configuration from this file. "+
-			"Omit this flag to use the default configuration values. ")
 
 	opts := zap.Options{
 		Development: true,
@@ -130,39 +147,23 @@ func main() {
 	// Create watchers for metrics and webhooks certificates
 	var metricsCertWatcher, webhookCertWatcher *certwatcher.CertWatcher
 
-	// Initial webhook TLS options
-	webhookTLSOpts := tlsOpts
-
-	if len(webhookCertPath) > 0 {
-		setupLog.Info("Initializing webhook certificate watcher using provided certificates",
-			"webhook-cert-path", webhookCertPath, "webhook-cert-name", webhookCertName, "webhook-cert-key", webhookCertKey)
-
-		var err error
-		webhookCertWatcher, err = certwatcher.New(
-			filepath.Join(webhookCertPath, webhookCertName),
-			filepath.Join(webhookCertPath, webhookCertKey),
-		)
-		if err != nil {
-			setupLog.Error(err, "Failed to initialize webhook certificate watcher")
-			os.Exit(1)
-		}
-
-		webhookTLSOpts = append(webhookTLSOpts, func(config *tls.Config) {
-			config.GetCertificate = webhookCertWatcher.GetCertificate
-		})
+	webhookServer, webhookCertWatcher, webhookEnabled, err := setupWebhookServer(
+		webhookCertPath,
+		webhookCertName,
+		webhookCertKey,
+		tlsOpts,
+	)
+	if err != nil {
+		setupLog.Error(err, "Failed to initialize webhook certificate watcher")
+		os.Exit(1)
 	}
-
-	webhookServer := webhook.NewServer(webhook.Options{
-		TLSOpts: webhookTLSOpts,
-	})
-
 	metricsServerOptions := metricsserver.Options{
 		BindAddress:   metricsAddr,
 		SecureServing: secureMetrics,
 		TLSOpts:       tlsOpts,
 	}
 
-	if secureMetrics {
+	if secureMetrics && secureMetricsAuth {
 		// FilterProvider is used to protect the metrics endpoint with authn/authz.
 		// These configurations ensure that only authorized users and service accounts
 		// can access the metrics endpoint. The RBAC are configured in 'config/rbac/kustomization.yaml'. More info:
@@ -189,30 +190,68 @@ func main() {
 		})
 	}
 
-	operConfig := &configv1beta1.OperatorConfig{}
 	options := ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
-		WebhookServer:          webhookServer,
+		PprofBindAddress:       pprofAddr,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "b569adb7.cassandra.datastax.com",
-	}
-	if configFile != "" {
-		var err error
-		operConfig, err = readOperConfig(configFile)
-		if err != nil {
-			setupLog.Error(err, "unable to load the config file")
-			os.Exit(1)
-		}
+		Controller: config.Controller{
+			ReconciliationTimeout: reconciliationTimeout,
+		},
 	}
 
-	if operConfig.ImageConfigFile == "" {
-		operConfig.ImageConfigFile = "/configs/image_config.yaml"
+	if webhookEnabled {
+		options.WebhookServer = webhookServer
+	} else {
+		setupLog.Info("webhooks disabled because --webhook-cert-path was not provided")
 	}
 
+	// Bound the informer cache so cluster-scoped mode (empty WATCH_NAMESPACE) does not
+	// cache every object of every watched type across all namespaces:
+	//
+	//   * Pod/StatefulSet/PodDisruptionBudget/Service informers are label-scoped to
+	//     managed-by=cass-operator: the operator only ever reads objects it created,
+	//     and it labels all of them. These are the hot read paths (every reconcile),
+	//     so they stay cached.
+	//   * Secrets are read through live API calls (Client.Cache.DisableFor) because
+	//     the operator also reads user-provided secrets (SuperuserSecretName,
+	//     Spec.Users, ConfigSecret, management API TLS) that carry no operator label;
+	//     the two Secret watches use metadata-only projection (builder.OnlyMetadata),
+	//     so no full-object Secret informer ever exists. PVC/StorageClass/
+	//     EndpointSlice/Endpoints/ConfigMap reads are cold paths and also go live,
+	//     avoiding lazily-created cluster-wide informers for those types.
+	//   * All cached objects are stripped of managedFields and the kubectl
+	//     last-applied-configuration annotation, which often dominate object size.
+	managedByOperator := labels.SelectorFromSet(labels.Set{
+		oplabels.ManagedByLabel: oplabels.ManagedByLabelValue,
+	})
+
+	watchedByOperator := labels.SelectorFromSet(labels.Set{
+		dynamicwatch.WatchedLabel: "true",
+	})
 	options.Cache = cache.Options{
 		DefaultNamespaces: map[string]cache.Config{},
+		DefaultTransform:  stripHeavyMetadata(),
+		ByObject: map[client.Object]cache.ByObject{
+			&corev1.Pod{}:                   {Label: managedByOperator},
+			&appsv1.StatefulSet{}:           {Label: managedByOperator},
+			&policyv1.PodDisruptionBudget{}: {Label: managedByOperator},
+			&corev1.Service{}:               {Label: managedByOperator},
+			&corev1.Secret{}:                {Label: watchedByOperator},
+		},
+	}
+	options.Client = client.Options{
+		Cache: &client.CacheOptions{
+			DisableFor: []client.Object{
+				&corev1.PersistentVolumeClaim{},
+				&corev1.ConfigMap{},
+				&corev1.Endpoints{}, //nolint:staticcheck // This is to remove old ones
+				&discoveryv1.EndpointSlice{},
+				&storagev1.StorageClass{},
+			},
+		},
 	}
 
 	clusterScoped := len(ns) == 0
@@ -221,8 +260,8 @@ func main() {
 	if strings.Contains(ns, ",") {
 		setupLog.Info("manager set up with multiple namespaces", "namespaces", ns)
 		// configure cluster-scoped with MultiNamespacedCacheBuilder
-		namespaces := strings.Split(ns, ",")
-		for _, namespace := range namespaces {
+		namespaces := strings.SplitSeq(ns, ",")
+		for namespace := range namespaces {
 			options.Cache.DefaultNamespaces[namespace] = cache.Config{}
 		}
 	} else if ns != "" {
@@ -250,53 +289,45 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	registry, err := setupImageRegistry(ctx, cfg, operConfig)
+	registry, err := setupImageRegistry(ctx, cfg)
 	if err != nil {
 		setupLog.Error(err, "unable to set up image registry")
 		os.Exit(1)
 	}
 
+	if err := setupCacheIndexers(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to set up field indexers")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.CassandraDatacenterReconciler{
-		Client:           mgr.GetClient(),
-		Log:              ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
-		Scheme:           mgr.GetScheme(),
-		Recorder:         mgr.GetEventRecorderFor("cass-operator"),
-		ImageRegistry:    registry,
-		ClusterResources: clusterScoped,
+		Client:                  mgr.GetClient(),
+		APIReader:               mgr.GetAPIReader(),
+		Log:                     ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
+		Scheme:                  mgr.GetScheme(),
+		Recorder:                mgr.GetEventRecorder("cass-operator"),
+		ImageRegistry:           registry,
+		ClusterResources:        clusterScoped,
+		MaxConcurrentReconciles: maxConcurrentReconciles,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraDatacenter")
 		os.Exit(1)
 	}
 
-	if !operConfig.DisableWebhooks {
+	if webhookEnabled {
 		if err = apiwebhook.SetupCassandraDatacenterWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "CassandraDatacenter")
 			os.Exit(1)
 		}
 	}
+
 	if err = (&controlcontrollers.CassandraTaskReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:           mgr.GetClient(),
+		APIReader:        mgr.GetAPIReader(),
+		Scheme:           mgr.GetScheme(),
+		LifecycleContext: ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CassandraTask")
-		os.Exit(1)
-	}
-
-	if err := mgr.GetCache().IndexField(ctx, &corev1.Pod{}, "spec.volumes.persistentVolumeClaim.claimName", func(obj client.Object) []string {
-		pod, ok := obj.(*corev1.Pod)
-		if !ok {
-			return nil
-		}
-
-		var pvcNames []string
-		for _, volume := range pod.Spec.Volumes {
-			if volume.PersistentVolumeClaim != nil {
-				pvcNames = append(pvcNames, volume.PersistentVolumeClaim.ClaimName)
-			}
-		}
-		return pvcNames
-	}); err != nil {
-		setupLog.Error(err, "unable to set up field indexer")
 		os.Exit(1)
 	}
 
@@ -335,17 +366,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := mgr.GetCache().IndexField(ctx, &corev1.Event{}, "involvedObject.name", func(obj client.Object) []string {
-		event := obj.(*corev1.Event)
-		if event.InvolvedObject.Kind == "Pod" {
-			return []string{event.InvolvedObject.Name}
-		}
-		return []string{}
-	}); err != nil {
-		setupLog.Error(err, "unable to set up event index")
-		os.Exit(1)
-	}
-
 	setupLog.Info("starting manager")
 	startErrCh := make(chan error, 1)
 	go func() {
@@ -366,7 +386,78 @@ func main() {
 	}
 }
 
-func setupImageRegistry(ctx context.Context, cfg *rest.Config, operConfig *configv1beta1.OperatorConfig) (images.ImageRegistry, error) {
+func setupWebhookServer(webhookCertPath, webhookCertName, webhookCertKey string, tlsOpts []func(*tls.Config)) (webhook.Server, *certwatcher.CertWatcher, bool, error) {
+	if len(webhookCertPath) == 0 {
+		return nil, nil, false, nil
+	}
+
+	setupLog.Info("Initializing webhook certificate watcher using provided certificates",
+		"webhook-cert-path", webhookCertPath, "webhook-cert-name", webhookCertName, "webhook-cert-key", webhookCertKey)
+
+	webhookCertWatcher, err := certwatcher.New(
+		filepath.Join(webhookCertPath, webhookCertName),
+		filepath.Join(webhookCertPath, webhookCertKey),
+	)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	webhookTLSOpts := append([]func(*tls.Config){}, tlsOpts...)
+	webhookTLSOpts = append(webhookTLSOpts, func(config *tls.Config) {
+		config.GetCertificate = webhookCertWatcher.GetCertificate
+	})
+
+	return webhook.NewServer(webhook.Options{
+		TLSOpts: webhookTLSOpts,
+	}), webhookCertWatcher, true, nil
+}
+
+// stripHeavyMetadata extends cache.TransformStripManagedFields by also dropping the
+// kubectl last-applied-configuration annotation from every cached object: for a
+// kubectl-applied object that annotation embeds the full object (including Secret
+// data), so it dominates cached-object size — and even survives metadata-only
+// projection, since annotations are part of PartialObjectMetadata. Nothing in the
+// operator reads it.
+func stripHeavyMetadata() toolscache.TransformFunc {
+	stripManagedFields := cache.TransformStripManagedFields()
+	return func(obj interface{}) (interface{}, error) {
+		obj, err := stripManagedFields(obj)
+		if err != nil {
+			return obj, err
+		}
+		if m, ok := obj.(metav1.Object); ok {
+			annotations := m.GetAnnotations()
+			if _, found := annotations[corev1.LastAppliedConfigAnnotation]; found {
+				delete(annotations, corev1.LastAppliedConfigAnnotation)
+				m.SetAnnotations(annotations)
+			}
+		}
+		return obj, nil
+	}
+}
+
+func setupCacheIndexers(ctx context.Context, mgr ctrl.Manager) error {
+	if err := mgr.GetCache().IndexField(ctx, &corev1.Pod{}, "spec.volumes.persistentVolumeClaim.claimName", func(obj client.Object) []string {
+		pod, ok := obj.(*corev1.Pod)
+		if !ok {
+			return nil
+		}
+
+		var pvcNames []string
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim != nil {
+				pvcNames = append(pvcNames, volume.PersistentVolumeClaim.ClaimName)
+			}
+		}
+		return pvcNames
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func setupImageRegistry(ctx context.Context, cfg *rest.Config) (images.ImageRegistry, error) {
 	operatorNs, err := utils.GetOperatorNamespace()
 	if err != nil {
 		setupLog.Error(err, "unable to get operator namespace")
@@ -385,34 +476,5 @@ func setupImageRegistry(ctx context.Context, cfg *rest.Config, operConfig *confi
 		return nil, err
 	}
 
-	if registry == nil {
-		setupLog.Info("v1beta2 image config not found, falling back to v1beta1 from the disk")
-		registry, err = images.NewImageRegistry(operConfig.ImageConfigFile)
-		if err != nil {
-			setupLog.Error(err, "unable to load the image config file")
-			return nil, err
-		}
-	}
-
 	return registry, nil
-}
-
-func readOperConfig(configFile string) (*configv1beta1.OperatorConfig, error) {
-	operConfig := &configv1beta1.OperatorConfig{}
-	_, err := os.Stat(configFile)
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := os.ReadFile(configFile)
-	if err != nil {
-		return nil, err
-	}
-
-	codecs := serializer.NewCodecFactory(scheme)
-	if err := runtime.DecodeInto(codecs.UniversalDecoder(), content, operConfig); err != nil {
-		return nil, fmt.Errorf("could not decode file into runtime.Object: %v", err)
-	}
-
-	return operConfig, nil
 }

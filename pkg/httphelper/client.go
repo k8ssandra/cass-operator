@@ -18,12 +18,35 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/prometheus/client_golang/prometheus"
 
 	cassdcapi "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
+
+const (
+	callDurationMetricName = "call_duration_seconds"
+	resultSuccessLabelName = "success"
+	resultErrorLabelName   = "error"
+)
+
+var nodeMgmtCallDurationMetric = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Namespace: "cass_operator",
+		Subsystem: "httphelper",
+		Name:      callDurationMetricName,
+		Help:      "Duration of management API calls.",
+		Buckets:   []float64{0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30},
+	},
+	[]string{"method", "route", "result"},
+)
+
+func init() {
+	metrics.Registry.MustRegister(nodeMgmtCallDurationMetric)
+}
 
 type NodeMgmtClient struct {
 	Client   HttpClient
@@ -152,7 +175,7 @@ const (
 )
 
 func (f *FeatureSet) UnmarshalJSON(b []byte) error {
-	var input map[string]interface{}
+	var input map[string]any
 	if err := json.Unmarshal(b, &input); err != nil {
 		return err
 	}
@@ -160,7 +183,7 @@ func (f *FeatureSet) UnmarshalJSON(b []byte) error {
 	f.CassandraVersion = input["cassandra_version"].(string)
 	var empty struct{}
 	f.Features = make(map[string]struct{})
-	if fList, ok := input["features"].([]interface{}); ok {
+	if fList, ok := input["features"].([]any); ok {
 		for _, feature := range fList {
 			f.Features[feature.(string)] = empty
 		}
@@ -174,10 +197,10 @@ func (f *FeatureSet) Supports(feature Feature) bool {
 	return found
 }
 
-func NewMgmtClient(ctx context.Context, client client.Client, dc *cassdcapi.CassandraDatacenter, customTransport *http.Transport) (NodeMgmtClient, error) {
+func NewMgmtClient(ctx context.Context, client client.Client, apiReader client.Reader, dc *cassdcapi.CassandraDatacenter, customTransport *http.Transport) (NodeMgmtClient, error) {
 	logger := log.FromContext(ctx)
 
-	httpClient, err := BuildManagementApiHttpClient(ctx, client, dc, customTransport)
+	httpClient, err := BuildManagementApiHttpClient(ctx, client, apiReader, dc, customTransport)
 	if err != nil {
 		logger.Error(err, "error in BuildManagementApiHttpClient")
 		return NodeMgmtClient{}, err
@@ -205,20 +228,22 @@ func BuildPodHostFromPod(pod *corev1.Pod) (string, int, error) {
 		return "", 0, newNoPodIPError(pod)
 	}
 
-	mgmtApiPort := 8080
+	return pod.Status.PodIP, GetMgmtApiPort(pod.Spec.Containers), nil
+}
 
-	// Check for port override
-	for _, container := range pod.Spec.Containers {
+// GetMgmtApiPort returns the named mgmt-api port from the cassandra container.
+func GetMgmtApiPort(containers []corev1.Container) int {
+	for _, container := range containers {
 		if container.Name == "cassandra" {
 			for _, port := range container.Ports {
 				if port.Name == "mgmt-api-http" {
-					mgmtApiPort = int(port.ContainerPort)
+					return int(port.ContainerPort)
 				}
 			}
 		}
 	}
 
-	return pod.Status.PodIP, mgmtApiPort, nil
+	return cassdcapi.DefaultMgmtApiPort
 }
 
 func GetPodHost(podName, clusterName, dcName, namespace string) string {
@@ -330,6 +355,11 @@ func (client *NodeMgmtClient) CallCreateRoleEndpoint(pod *corev1.Pod, username s
 	if _, err = callNodeMgmtEndpoint(client, request, ""); err != nil {
 		// The error could include a password, strip it
 		strippedErrMsg := strings.ReplaceAll(err.Error(), password, "******")
+		encodedPassword := url.QueryEscape(password)
+		if encodedPassword != password {
+			strippedErrMsg = strings.ReplaceAll(strippedErrMsg, encodedPassword, "******")
+		}
+
 		return errors.New(strippedErrMsg)
 	}
 	return nil
@@ -366,6 +396,73 @@ func (client *NodeMgmtClient) CallDropRoleEndpoint(pod *corev1.Pod, username str
 	return err
 }
 
+type identityToRoleRequest struct {
+	Identity string  `json:"identity"`
+	Role     string  `json:"role,omitempty"`
+	TTL      float64 `json:"ttl,omitempty"`
+}
+
+// CallInsertIdentityToRoleEndpoint inserts a SPIFFE identity to Cassandra role mapping.
+func (client *NodeMgmtClient) CallInsertIdentityToRoleEndpoint(pod *corev1.Pod, identity, role string, ttl time.Duration) error {
+	client.Log.Info(
+		"calling Management API insert identity to role - POST /api/v1/ops/auth/identity_to_role",
+		"pod", pod.Name,
+	)
+
+	if identity == "" || role == "" {
+		return errors.New("identity and role must be set")
+	}
+	if ttl != 0 && ttl < time.Second {
+		return errors.New("ttl must be at least one second")
+	}
+
+	return client.callIdentityToRoleEndpoint(pod, http.MethodPost, identityToRoleRequest{
+		Identity: identity,
+		Role:     role,
+		TTL:      ttl.Seconds(),
+	})
+}
+
+// CallDeleteIdentityToRoleEndpoint removes a SPIFFE identity to Cassandra role mapping.
+func (client *NodeMgmtClient) CallDeleteIdentityToRoleEndpoint(pod *corev1.Pod, identity string) error {
+	client.Log.Info(
+		"calling Management API delete identity to role - DELETE /api/v1/ops/auth/identity_to_role",
+		"pod", pod.Name,
+	)
+
+	if identity == "" {
+		return errors.New("identity cannot be empty")
+	}
+
+	return client.callIdentityToRoleEndpoint(pod, http.MethodDelete, identityToRoleRequest{
+		Identity: identity,
+	})
+}
+
+func (client *NodeMgmtClient) callIdentityToRoleEndpoint(pod *corev1.Pod, method string, payload identityToRoleRequest) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	podHost, podPort, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: "/api/v1/ops/auth/identity_to_role",
+		host:     podHost,
+		port:     podPort,
+		method:   method,
+		timeout:  60 * time.Second,
+		body:     body,
+	}
+
+	_, err = callNodeMgmtEndpoint(client, request, "application/json")
+	return err
+}
+
 type User struct {
 	Name        string `json:"name"`
 	Super       string `json:"super"`
@@ -377,7 +474,6 @@ type User struct {
 func parseListRoles(body []byte) ([]User, error) {
 	var users []User
 	if err := json.Unmarshal(body, &users); err != nil {
-		fmt.Printf("Received an error: %v\n", err)
 		return nil, err
 	}
 	return users, nil
@@ -474,7 +570,7 @@ func (client *NodeMgmtClient) CallKeyspaceCleanupEndpoint(pod *corev1.Pod, jobs 
 }
 
 func createKeySpaceRequest(pod *corev1.Pod, jobs int, keyspaceName string, tables []string, endpoint string) (*nodeMgmtRequest, error) {
-	postData := make(map[string]interface{})
+	postData := make(map[string]any)
 	if jobs > -1 {
 		postData["jobs"] = strconv.Itoa(jobs)
 	}
@@ -673,7 +769,7 @@ func (client *NodeMgmtClient) CallCompactionEndpoint(pod *corev1.Pod, compactReq
 	return nil
 }
 
-// CallTSReloadEndpoint calls the async version of TSReload
+// CallTSReloadEndpoint calls the sync version of TSReload
 func (client *NodeMgmtClient) CallinodeTsReloadEndpoint(pod *corev1.Pod) error {
 	client.Log.Info(
 		"calling Management API TS REload endpoint - POST /api/v0/node/encryption/internode/truststore/reload",
@@ -784,7 +880,7 @@ func (client *NodeMgmtClient) AlterKeyspace(pod *corev1.Pod, keyspaceName string
 }
 
 func (client *NodeMgmtClient) modifyKeyspace(endpoint string, pod *corev1.Pod, keyspaceName string, replicationSettings []map[string]string) error {
-	postData := make(map[string]interface{})
+	postData := make(map[string]any)
 
 	if keyspaceName == "" || replicationSettings == nil {
 		return fmt.Errorf("keyspacename and replication settings are required")
@@ -915,10 +1011,10 @@ func (client *NodeMgmtClient) ListTables(pod *corev1.Pod, keyspaceName string) (
 }
 
 type TableDefinition struct {
-	KeyspaceName string                 `json:"keyspace_name"`
-	TableName    string                 `json:"table_name"`
-	Columns      []*ColumnDefinition    `json:"columns"`
-	Options      map[string]interface{} `json:"options,omitempty"`
+	KeyspaceName string              `json:"keyspace_name"`
+	TableName    string              `json:"table_name"`
+	Columns      []*ColumnDefinition `json:"columns"`
+	Options      map[string]any      `json:"options,omitempty"`
 }
 
 func NewTableDefinition(keyspaceName string, tableName string, columns ...*ColumnDefinition) *TableDefinition {
@@ -1241,8 +1337,13 @@ func (client *NodeMgmtClient) CallMove(pod *corev1.Pod, newToken string) (string
 
 func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, contentType string) ([]byte, error) {
 	client.Log.Info("client::callNodeMgmtEndpoint")
+	callResult := resultErrorLabelName
+	startTime := time.Now()
+	defer func() {
+		nodeMgmtCallDurationMetric.WithLabelValues(request.method, urlForMetric(request.endpoint), callResult).Observe(time.Since(startTime).Seconds())
+	}()
 
-	port := 8080
+	port := cassdcapi.DefaultMgmtApiPort
 	if request.port > 0 {
 		port = request.port
 	}
@@ -1303,7 +1404,16 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 		return nil, reqErr
 	}
 
+	callResult = resultSuccessLabelName
 	return body, nil
+}
+
+func urlForMetric(endpoint string) string {
+	parsedEndpoint, err := url.Parse(endpoint)
+	if err != nil {
+		return ""
+	}
+	return parsedEndpoint.Path
 }
 
 type RequestError struct {
@@ -1341,7 +1451,7 @@ func (client *NodeMgmtClient) CallIsFullQueryLogEnabledEndpoint(pod *corev1.Pod)
 		client.Log.Error(err, "failed to call endpoint /api/v0/ops/node/fullquerylogging")
 		return false, err
 	}
-	var parsedResponse map[string]interface{}
+	var parsedResponse map[string]any
 	err = json.Unmarshal(apiResponse, &parsedResponse)
 	if err != nil {
 		client.Log.Error(err, "failed to unmarshall JSON response from /api/v0/ops/node/fullquerylogging", "response", string(apiResponse))

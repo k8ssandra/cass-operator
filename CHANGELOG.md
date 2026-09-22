@@ -11,6 +11,69 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#969](https://github.com/k8ssandra/cass-operator/issues/969) Pull cass-config-builder from ghcr.io instead of docker.io where its no longer updated
+* [FEATURE] [#964](https://github.com/k8ssandra/cass-operator/issues/964) Add `--max-concurrent-reconciles` to configure reconciling concurrency (default is `1`), `--pprof-bind-address` to enable profiling, and `--reconciliation-timeout` to limit reconciliation time (default is `2m`)
+* [ENHANCEMENT] [#947](https://github.com/k8ssandra/cass-operator/issues/947) Read Events through an uncached APIReader instead of a cluster-wide cached informer in failure detection, reducing memory usage in cluster-scoped deployments.
+* [ENHANCEMENT] [#947](https://github.com/k8ssandra/cass-operator/issues/947) Bound the informer cache in cluster-scoped mode: label-scope Pod/StatefulSet/PodDisruptionBudget/Service informers to operator-managed objects, read Secrets/PVCs/ConfigMaps/Endpoints/EndpointSlices/StorageClasses through live API calls with metadata-only Secret watches, and strip managedFields/last-applied from cached objects. Operator memory no longer scales with cluster size.
+* [ENHANCEMENT] [#959](https://github.com/k8ssandra/cass-operator/issues/959) Synchronize Cassandra Services with configured container ports and remove ports that are unavailable or intended only for pod-level communication
+* [BUGFIX] [#971](https://github.com/k8ssandra/cass-operator/issues/971) Decommissioning last pod of a datacenter left its pod_status metric abandoned instead of being removed. And also we got an error logline which wasn't a real error
+* [BUGFIX] [#973](https://github.com/k8ssandra/cass-operator/issues/973) Prevent premature decommission cleanup when Cassandra metadata requests fail.
+
+## v1.32.0
+
+* [ENHANCEMENT] [#943](https://github.com/k8ssandra/cass-operator/issues/943) Add terminating state as one of the Pod status metrics
+* [ENHANCEMENT] [#936](https://github.com/k8ssandra/cass-operator/issues/936) Every reconcile of the CassandraDatacenter should refresh the metrics for up-to-date state
+* [ENHANCEMENT] [#242](https://github.com/k8ssandra/cass-operator/issues/242) Allow configuring the mgmt-api port. Setting cassandra container's mgmt-api-http containerPort will override the default 8080 value.
+* [ENHANCEMENT] [#956](https://github.com/k8ssandra/cass-operator/issues/956) Add identityToRole methods to client.go to support new features in mgmt-api
+* [BUGFIX] [#933](https://github.com/k8ssandra/cass-operator/issues/933) Fix regression introduced in the CassandraTask replacement process introduced in the full rack replacement feature.
+* [BUGFIX] [#930](https://github.com/k8ssandra/cass-operator/issues/930) Add the missing resource-hash annotation to the NodePort service so changes to it are detected and reconciled.
+* [BUGFIX] [#938](https://github.com/k8ssandra/cass-operator/issues/938) Stripping of passwords from logs was failing if the password included characters that caused URLEncode to happen
+* [BUGFIX] [#928](https://github.com/k8ssandra/cass-operator/issues/928) Fix default storageClass selector to use annotations instead of labels
+
+## v1.30.3
+
+* [BUGFIX] [#938](https://github.com/k8ssandra/cass-operator/issues/938) Stripping of passwords from logs was failing if the password included characters that caused URLEncode to happen
+
+## v1.30.2
+
+* [BUGFIX] [#933](https://github.com/k8ssandra/cass-operator/issues/933) Fix regression introduced in the CassandraTask replacement process introduced in the full rack replacement feature.
+
+## v1.31.0
+
+* [CHANGE] [#919](https://github.com/k8ssandra/cass-operator/issues/919) Update to Kubernetes 1.35 and Go 1.26, update events usage.
+* [ENHANCEMENT] [#912](https://github.com/k8ssandra/cass-operator/issues/912) Add new webhook validations for maxUnavailable string format as well as PVC sizes
+* [ENHANCEMENT] [#902](https://github.com/k8ssandra/cass-operator/issues/902) If scaling down or scaling up process is still ongoing, the webhook will prevent changing the cluster size.
+
+## v1.30.0
+
+* [CHANGE] [#905](https://github.com/k8ssandra/cass-operator/issues/905) Relax the ServerVersion checks to structure only without separating OSS/DSE/HCD.
+* [FEATURE] [#893](https://github.com/k8ssandra/cass-operator/issues/893) Add support for maxUnavailable (Kubernetes 1.35 and up). This allows to make changes to the Cassandra pods in parallel, thus speeding up changes in larger clusters. Allows integer or percentage setting, but will never target more than one rack at a time. 
+* [ENHANCEMENT] [#888](https://github.com/k8ssandra/cass-operator/issues/888) Add new metrics around all calls to the mgmt-api. This allows to track if some calls are taking longer to execute than expected.
+* [ENHANCEMENT] [#873](https://github.com/k8ssandra/cass-operator/issues/873) Allow replacing multiple previously bootstrapped nodes in parallel. Also, the CassandraTask to replace pod accepts RackName as alternative to PodName as filtering rule.
+
+## v1.29.1
+
+* [BUGFIX] [#899](https://github.com/k8ssandra/cass-operator/issues/899) Skip webhook startup when the manager is launched without `--webhook-cert-path` (Helm chart behavior).
+* [BUGFIX] [#887](https://github.com/k8ssandra/cass-operator/issues/887) Prevents infinite loop when seed refresh times out during node failures, allowing the operator to recover.
+
+## v1.29.0
+
+* [CHANGE] [#875](https://github.com/k8ssandra/cass-operator/issues/875) Update to Go 1.25, Kubernetes 1.34 and UBI10 as the base image. Also, Vector to 0.53.0 and other smaller dependency updates. Deprecate CDC support.
+* [CHANGE] [#876](https://github.com/k8ssandra/cass-operator/issues/876) Drop support for ImageConfig v1beta1, the only supported version from now on is v1beta2
+* [CHANGE] [#865](https://github.com/k8ssandra/cass-operator/issues/865) Add VolumeMount for the management-api-server-certs-volume volume to all containers instead of only cassandra container
+* [CHANGE] [#850](https://github.com/k8ssandra/cass-operator/issues/850) The default retry policy for CassandraTask has changed to OnFailure
+* [CHANGE] [#775](https://github.com/k8ssandra/cass-operator/issues/775) Set generic podFilter as default filter for CassandraTask
+* [FEATURE] [#885](https://github.com/k8ssandra/cass-operator/issues/885) Add the ability to define retryCount in CassandraTasks
+* [FEATURE] [#850](https://github.com/k8ssandra/cass-operator/issues/850) Added EnableParallelCleanupWithinRack annotation which speeds up post-scale-out cleanup by processing nodes in parallel within a rack
+* [ENHANCEMENT] [#841](https://github.com/k8ssandra/cass-operator/issues/841) Add the ability for the rolling restart to restart an entire rack at once. This speeds up the rolling restart process in a cluster that has large amount of nodes in a single rack.
+* [ENHANCEMENT] [#861](https://github.com/k8ssandra/cass-operator/issues/861) CassandraTasks have now configurable pod concurrency. maxConcurrentPods will determine how many pods in the same rack (never multiple racks) can be processed in parallel. Also, state of the processed pods is now moved to the CassandraTask status with some additional information.
+
+## v1.28.1
+
+* [ENHANCEMENT] [#868](https://github.com/k8ssandra/cass-operator/issues/868) Add new flag to the controller, --metrics-secure-auth to enable/disable the authentication/authorization of metrics endpoint. Default is disabled (TLS is still enabled by default)
+* [BUGFIX] [#862](https://github.com/k8ssandra/cass-operator/issues/862) If volumeMount was provided in PodTemplateSpec and AdditionalVolumes, the latter would override the PodTemplateSpec one. This was unintentional, the PodTemplateSpec selection should be the final one.
+* [BUGFIX] [#870](https://github.com/k8ssandra/cass-operator/issues/870) Fix Kustomize deployment to properly add the path to the TLS cert for the webhooks. Remove OperConfig and ImageConfig v1
+
 ## v1.28.0
 
 * [FEATURE] [#838](https://github.com/k8ssandra/cass-operator/issues/838) If cass-operator is not deployed in clusterScoped mode, disable features that require such rights and continue functioning correctly otherwise. 

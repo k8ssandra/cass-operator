@@ -26,23 +26,7 @@ var (
 )
 
 func TestLifecycle(t *testing.T) {
-	AfterSuite(func() {
-		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		err := kubectl.DumpAllLogs(logPath).ExecV()
-		if err != nil {
-			t.Logf("Failed to dump all the logs: %v", err)
-		}
-
-		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
-		ns.Terminate()
-		err = kustomize.Undeploy(namespace)
-		if err != nil {
-			t.Logf("Failed to undeploy cass-operator: %v", err)
-		}
-	})
-
-	RegisterFailHandler(Fail)
-	RunSpecs(t, testName)
+	ginkgo_util.RunTestLifecycle(t, testName, ns)
 }
 
 var _ = Describe(testName, func() {
@@ -79,6 +63,16 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
 			ns.WaitForDatacenterReady(dcName)
+
+			// Verify the server-system-logger and cassandra container have different mount paths for certs
+			step = "verifying cert volume mount paths"
+			json = "jsonpath={.spec.containers[?(@.name=='cassandra')].volumeMounts[?(@.name=='management-api-client-certs')].mountPath}"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "/management-api-client-certs", 30)
+
+			json = "jsonpath={.spec.containers[?(@.name=='server-system-logger')].volumeMounts[?(@.name=='management-api-client-certs')].mountPath}"
+			k = kubectl.Get("pod/cluster1-dc1-r1-sts-0").FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "/management-api-certs-client", 30) // This is intentionally "wrong" to verify the correct priority of volumeMount processing
 
 			// TODO FIXME: re-enable this when the following issue is fixed:
 			// https://github.com/datastax/management-api-for-apache-cassandra/issues/42

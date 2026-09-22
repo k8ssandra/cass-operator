@@ -36,10 +36,14 @@ fi
 # 1. Create registry container unless it already exists
 reg_name='kind-registry'
 reg_port='5001'
-if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)" != 'true' ]; then
+if docker inspect "${reg_name}" >/dev/null 2>&1; then
+  if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}")" != 'true' ]; then
+    docker start "${reg_name}"
+  fi
+else
   docker run \
     -d --restart=always -p "127.0.0.1:${reg_port}:5000" --network bridge --name "${reg_name}" \
-    registry:2
+    registry:3
 fi
 
 # 2. Create kind cluster with containerd registry config dir enabled
@@ -60,6 +64,7 @@ containerdConfigPatches:
 $(if [ -n "${NETWORKING_CONFIG}" ]; then printf '%s\n' "${NETWORKING_CONFIG}"; fi)
 nodes:
 - role: control-plane
+- role: worker
 - role: worker
 - role: worker
 - role: worker

@@ -30,7 +30,7 @@ scripts/update-makefile-version.sh
 cd config/manager && $KUSTOMIZE edit set image controller=$IMG && cd -
 
 # Return config/manager/image_config.yaml to :latest
-LOG_IMG=k8ssandra/system-logger:latest yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
+# LOG_IMG=k8ssandra/system-logger:latest yq eval -i '.images.system-logger = env(LOG_IMG)' config/manager/image_config.yaml
 
 # Update new imageconfig
 yq eval -i '.images.system-logger.tag = "latest"' config/imageconfig/image_config.yaml
@@ -43,7 +43,7 @@ NEXT_VERSION=$(gawk 'match($0, /^VERSION \?= /) { print substr($0, RLENGTH+1)}' 
 git add Makefile
 git add CHANGELOG.md
 git add config/manager/kustomization.yaml
-git add config/manager/image_config.yaml
+# git add config/manager/image_config.yaml
 git add config/imageconfig/image_config.yaml
 
 git commit -m "Prepare for next version $NEXT_VERSION"

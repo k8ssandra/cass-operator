@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 
@@ -23,6 +22,27 @@ import (
 // newPodDisruptionBudgetForDatacenter creates a PodDisruptionBudget object for the Datacenter
 func newPodDisruptionBudgetForDatacenter(dc *api.CassandraDatacenter) *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(int(dc.Spec.Size - 1))
+
+	if dc.Spec.MaxUnavailable != nil {
+		racks := dc.GetRacks()
+		rackNodeCounts := api.SplitRacks(int(dc.Spec.Size), len(racks))
+		maxRackNodeCount := 0
+		for _, rackNodeCount := range rackNodeCounts {
+			if rackNodeCount > maxRackNodeCount {
+				maxRackNodeCount = rackNodeCount
+			}
+		}
+
+		if maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(dc.Spec.MaxUnavailable, maxRackNodeCount, true); err == nil {
+			if maxUnavailable > maxRackNodeCount {
+				maxUnavailable = maxRackNodeCount
+			}
+			calculatedMinAvailable := int(dc.Spec.Size) - maxUnavailable
+			minAvailable = intstr.FromInt(calculatedMinAvailable)
+		}
+		// If err was not nil, we'll stick to the original minAvailable of size-1
+	}
+
 	labels := dc.GetDatacenterLabels()
 	oplabels.AddOperatorLabels(labels, dc)
 	selectorLabels := dc.GetDatacenterLabels()
@@ -70,8 +90,6 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 		rc.ReqLogger.Error(err, "error updating the Cassandra Operator Progress state")
 		return err
 	}
-
-	monitoring.UpdateOperatorDatacenterProgressStatusMetric(rc.Datacenter, newState)
 
 	return nil
 }

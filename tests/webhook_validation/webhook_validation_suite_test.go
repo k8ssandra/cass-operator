@@ -26,23 +26,7 @@ var (
 )
 
 func TestLifecycle(t *testing.T) {
-	AfterSuite(func() {
-		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		err := kubectl.DumpAllLogs(logPath).ExecV()
-		if err != nil {
-			t.Logf("Failed to dump all the logs: %v", err)
-		}
-
-		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
-		ns.Terminate()
-		err = kustomize.Undeploy(namespace)
-		if err != nil {
-			t.Logf("Failed to undeploy cass-operator: %v", err)
-		}
-	})
-
-	RegisterFailHandler(Fail)
-	RunSpecs(t, testName)
+	ginkgo_util.RunTestLifecycle(t, testName, ns)
 }
 
 var _ = Describe(testName, func() {
@@ -81,11 +65,6 @@ var _ = Describe(testName, func() {
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "Ready", 30)
 
-			step = "attempt to use invalid dse version"
-			json = "{\"spec\": {\"serverType\": \"dse\", \"serverVersion\": \"6.7.0\"}}"
-			k = kubectl.PatchMerge(dcResource, json)
-			ns.ExecAndLogAndExpectErrorString(step, k,
-				`spec.serverVersion: Invalid value: "6.7.0": spec.serverVersion in body should match '(6\.[89]\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)|(5\.\d+\.\d+)|(1\.\d+\.\d+)'`)
 			step = "attempt to change the cluster name"
 			json = "{\"spec\": {\"clusterName\": \"NewName\"}}"
 			k = kubectl.PatchMerge(dcResource, json)

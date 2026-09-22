@@ -11,6 +11,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
@@ -30,23 +31,7 @@ var (
 )
 
 func TestLifecycle(t *testing.T) {
-	AfterSuite(func() {
-		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
-		err := kubectl.DumpAllLogs(logPath).ExecV()
-		if err != nil {
-			t.Logf("Failed to dump all the logs: %v", err)
-		}
-
-		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
-		ns.Terminate()
-		err = kustomize.Undeploy(namespace)
-		if err != nil {
-			t.Logf("Failed to undeploy cass-operator: %v", err)
-		}
-	})
-
-	RegisterFailHandler(Fail)
-	RunSpecs(t, testName)
+	ginkgo_util.RunTestLifecycle(t, testName, ns)
 }
 
 var _ = Describe(testName, func() {
@@ -90,6 +75,12 @@ var _ = Describe(testName, func() {
 				WithLabel(dcLabel).
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, dcName, 60)
+
+			step = "verify CassandraTask has RestartPolicy OnFailure by default"
+			json = "jsonpath={.items[0].spec.restartPolicy}"
+			k = kubectl.Get("CassandraTask").FormatOutput(json)
+			restartPolicy := ns.OutputAndLog(step, k)
+			Expect(restartPolicy).To(BeEquivalentTo(string(corev1.RestartPolicyOnFailure)))
 
 			step = "verify LastExecution is updated after task completion"
 			json = "jsonpath={.status.lastExecution}"

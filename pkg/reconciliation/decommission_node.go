@@ -66,6 +66,9 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 	if currentSize <= targetSize {
 		return result.Continue()
 	}
+	if len(epData.Entity) == 0 {
+		return result.Error(fmt.Errorf("cannot decommission a node without Cassandra metadata"))
+	}
 
 	decommRackInfo, err := rc.CalculateRackInfoForDecomm(int(currentSize))
 	if err != nil {
@@ -94,8 +97,7 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 				"desiredSize", desiredNodeCount,
 			)
 
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.ScalingDownRack,
-				"Scaling down rack %s", rackInfo.RackName)
+			rc.Recorder.Eventf(rc.Datacenter, nil, corev1.EventTypeNormal, fmt.Sprintf("Scaling down rack %s", rackInfo.RackName), events.ScalingDownRack, "")
 
 			if err := setOperatorProgressStatus(rc, api.ProgressUpdating); err != nil {
 				return result.Error(err)
@@ -139,8 +141,7 @@ func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData 
 
 			monitoring.UpdatePodStatusMetric(pod)
 
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.LabeledPodAsDecommissioning,
-				"Labeled node as decommissioning %s", pod.Name)
+			rc.Recorder.Eventf(rc.Datacenter, nil, corev1.EventTypeNormal, fmt.Sprintf("Labeled node as decommissioning %s", pod.Name), events.LabeledPodAsDecommissioning, "")
 
 			return nil
 		}
@@ -190,6 +191,9 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 
 	for _, pod := range rc.dcPods {
 		if pod.Labels[api.CassNodeState] == stateDecommissioning {
+			if len(epData.Entity) == 0 {
+				return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
+			}
 			if !IsDoneDecommissioning(pod, epData, nodeStatuses, rc.ReqLogger) {
 				if !HasStartedDecommissioning(pod, epData, nodeStatuses) {
 					rc.ReqLogger.V(1).Info("Decommission has not started trying again", "Pod", pod.Name)
@@ -204,7 +208,7 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 					return res
 				}
 			}
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.DecommissioningNode, fmt.Sprintf("Decommissioning node %s", pod.Name))
+			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DecommissioningNode, fmt.Sprintf("Decommissioning node %s", pod.Name))
 			return result.RequeueSoon(5)
 		}
 	}
@@ -321,8 +325,8 @@ func (rc *ReconciliationContext) DeletePodPvcs(pod *corev1.Pod) error {
 			return err
 		}
 
-		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.DeletedPvc,
-			"Claim Name: %s", pvcName)
+		rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DeletedPvc,
+			fmt.Sprintf("Claim Name: %s", pvcName))
 	}
 	return nil
 }
@@ -343,6 +347,11 @@ func (rc *ReconciliationContext) RemoveDecommissionedPodFromSts(pod *corev1.Pod)
 	}
 
 	maxReplicas := *sts.Spec.Replicas
+	if maxReplicas == 0 {
+		monitoring.RemovePodStatusMetric(pod)
+		return nil
+	}
+
 	lastPodSuffix := stsLastPodSuffix(maxReplicas)
 	if strings.HasSuffix(pod.Name, lastPodSuffix) {
 		monitoring.RemovePodStatusMetric(pod)
@@ -397,7 +406,7 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 				pod.Name, free, int64(spaceUsedByDecommPod),
 			)
 			rc.ReqLogger.Error(errors.New(msg), msg)
-			rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeWarning, events.InvalidDatacenterSpec, msg)
+			rc.Recorder.Eventf(rc.Datacenter, nil, corev1.EventTypeWarning, "Not enough free space available to decommission", events.InvalidDatacenterSpec, msg)
 
 			if err := rc.setCondition(
 				api.NewDatacenterConditionWithReason(api.DatacenterValid,

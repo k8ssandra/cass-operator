@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 
 	"github.com/pkg/errors"
 
@@ -25,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -663,8 +663,8 @@ func securityContext(dc *api.CassandraDatacenter, container *corev1.Container) {
 	}
 
 	if dc.ReadOnlyFs() {
-		container.SecurityContext.ReadOnlyRootFilesystem = ptr.To(true)
-		container.SecurityContext.AllowPrivilegeEscalation = ptr.To(false)
+		container.SecurityContext.ReadOnlyRootFilesystem = new(true)
+		container.SecurityContext.AllowPrivilegeEscalation = new(false)
 	}
 }
 
@@ -709,12 +709,14 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		cassContainer.Resources = dc.Spec.Resources
 	}
 
+	managementApiPort := httphelper.GetMgmtApiPort(baseTemplate.Spec.Containers)
+
 	if cassContainer.LivenessProbe == nil {
-		cassContainer.LivenessProbe = probe(8080, httphelper.LivenessEndpoint, 15, 15, 10)
+		cassContainer.LivenessProbe = probe(managementApiPort, httphelper.LivenessEndpoint, 15, 15, 10)
 	}
 
 	if cassContainer.ReadinessProbe == nil {
-		cassContainer.ReadinessProbe = probe(8080, httphelper.ReadinessEndpoint, 20, 10, 10)
+		cassContainer.ReadinessProbe = probe(managementApiPort, httphelper.ReadinessEndpoint, 20, 10, 10)
 	}
 
 	if cassContainer.Lifecycle == nil {
@@ -722,7 +724,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 	}
 
 	if cassContainer.Lifecycle.PreStop == nil {
-		action, err := httphelper.GetMgmtApiPostAction(dc, httphelper.NodeDrainEndpoint, 0)
+		action, err := httphelper.GetMgmtApiPostAction(dc, httphelper.NodeDrainEndpoint, 0, managementApiPort)
 		if err != nil {
 			return err
 		}
@@ -742,6 +744,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		{Name: "USE_MGMT_API", Value: "true"},
 		{Name: "MGMT_API_NO_KEEP_ALIVE", Value: "true"},
 		{Name: "MGMT_API_EXPLICIT_START", Value: "true"},
+		{Name: "MGMT_API_LISTEN_TCP_PORT", Value: strconv.Itoa(managementApiPort)},
 	}
 
 	if dc.Spec.ServerType == "dse" {
@@ -766,11 +769,7 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 
 	// Combine ports
 
-	portDefaults, err := dc.GetContainerPorts()
-	if err != nil {
-		return err
-	}
-
+	portDefaults := dc.GetContainerPorts()
 	cassContainer.Ports = combinePortSlices(portDefaults, cassContainer.Ports)
 
 	// Combine volumeMounts
@@ -891,9 +890,9 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		MountPath: "/var/lib/vector",
 	}
 
-	volumeMounts = combineVolumeMountSlices([]corev1.VolumeMount{cassServerLogsMount, vectorMount}, loggerContainer.VolumeMounts)
+	volumeMounts = combineVolumeMountSlices([]corev1.VolumeMount{cassServerLogsMount, vectorMount}, generateStorageConfigVolumesMount(dc))
 
-	loggerContainer.VolumeMounts = combineVolumeMountSlices(volumeMounts, generateStorageConfigVolumesMount(dc))
+	loggerContainer.VolumeMounts = combineVolumeMountSlices(volumeMounts, loggerContainer.VolumeMounts)
 
 	loggerContainer.Resources = *getResourcesOrDefault(&dc.Spec.SystemLoggerResources, &DefaultsLoggerContainer)
 
@@ -947,7 +946,7 @@ func buildPodTemplateSpec(dc *api.CassandraDatacenter, rack api.Rack, addLegacyI
 			RunAsUser:    &userID,
 			RunAsGroup:   &userID,
 			FSGroup:      &userID,
-			RunAsNonRoot: ptr.To(true),
+			RunAsNonRoot: new(true),
 		}
 	}
 

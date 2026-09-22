@@ -2,18 +2,15 @@ package reconciliation
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/internal/result"
-	"github.com/k8ssandra/cass-operator/pkg/httphelper"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var fqlEnabledConfig string = `{"cassandra-yaml": { 
@@ -37,258 +34,195 @@ var (
 	httpResponseFullQueryDisabled string = `{"entity": false}`
 )
 
-func setupPodList(t *testing.T, rc *ReconciliationContext) {
+func setupPodList(rc *ReconciliationContext) {
 	podIP := "192.168.101.11"
-
-	mockClient := mocks.NewClient(t)
 
 	pods := []corev1.Pod{{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-sts-0",
+			Name:      "test-sts-0",
+			Namespace: rc.Datacenter.Namespace,
+			Labels:    rc.Datacenter.GetClusterLabels(),
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{
+				Name: "cassandra",
+			}},
 		},
 		Status: corev1.PodStatus{
 			PodIP: podIP,
 		},
 	}}
 
+	rc.clusterPods = []*corev1.Pod{
+		&pods[0],
+	}
 	rc.dcPods = []*corev1.Pod{
 		&pods[0],
 	}
 
-	k8sMockClientList(mockClient, nil).
-		Run(func(args mock.Arguments) {
-			arg := args.Get(1).(*corev1.PodList)
-			arg.Items = pods
-		})
-
-	rc.Client = mockClient
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter, &pods[0]).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
 }
 
-func mockFeaturesEnabled(mockHttpClient *mocks.HttpClient) {
-	resFeatureSet := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader(fullQueryIsSupported)),
-	}
-
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/metadata/versions/features"
-			})).
-		Return(resFeatureSet, nil).
-		Once()
+func fqlFakeMgmtServer(t *testing.T, supportFQL bool, currentEnabled bool) *fakeMgmtApiServer {
+	return newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.RequestURI() {
+		case "/api/v0/metadata/versions/features":
+			if !supportFQL {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(fullQueryIsSupported))
+		case "/api/v0/ops/node/fullquerylogging":
+			w.Header().Set("Content-Type", "application/json")
+			if currentEnabled {
+				_, _ = w.Write([]byte(httpResponseFullQueryEnabled))
+			} else {
+				_, _ = w.Write([]byte(httpResponseFullQueryDisabled))
+			}
+		case "/api/v0/ops/node/fullquerylogging?enabled=true", "/api/v0/ops/node/fullquerylogging?enabled=false":
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
 }
 
-func mockFeaturesNotAvailable(mockHttpClient *mocks.HttpClient) {
-	resFeatureSet := &http.Response{
-		StatusCode: http.StatusNotFound,
-		Body:       io.NopCloser(strings.NewReader("")),
-	}
-
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/metadata/versions/features"
-			})).
-		Return(resFeatureSet, nil).
-		Once()
-}
-
-func mockFullQueryLoggingRequestToTrue(mockHttpClient *mocks.HttpClient) {
-	resFullQueryStatus := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader(httpResponseFullQueryEnabled)),
-	}
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/ops/node/fullquerylogging"
-			})).
-		Return(resFullQueryStatus, nil).
-		Once()
-}
-
-func mockFullQueryLoggingRequestToFalse(mockHttpClient *mocks.HttpClient) {
-	resFullQueryStatus := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader(httpResponseFullQueryDisabled)),
-	}
-	mockHttpClient.On("Do",
-		mock.MatchedBy(
-			func(req *http.Request) bool {
-				return req.URL.Path == "/api/v0/ops/node/fullquerylogging"
-			})).
-		Return(resFullQueryStatus, nil).
-		Once()
-}
-
-func setupTestEnv(t *testing.T) (*ReconciliationContext, func()) {
+func setupTestEnv() (*ReconciliationContext, func()) {
 	rc, _, cleanupMockScr := setupTest()
-	setupPodList(t, rc)
+	setupPodList(rc)
 	rc.Datacenter.Spec.ServerType = "cassandra"
 	rc.Datacenter.Spec.ServerVersion = "4.0.1"
 	return rc, cleanupMockScr
 }
 
+func attachPods(t *testing.T, rc *ReconciliationContext, server *fakeMgmtApiServer) {
+	server.attachToPod(t, rc.dcPods[0])
+	server.attachToPod(t, rc.clusterPods[0])
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithStatusSubresource(rc.Datacenter, rc.dcPods[0]).
+		WithRuntimeObjects(rc.Datacenter, rc.dcPods[0]).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
+}
+
 func TestCheckFullQueryLoggingNoChangeEnabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv(t)
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-
-	mockHttpClient := mocks.NewHttpClient(t)
-
-	// Mock features request to support FQL
-	mockFeaturesEnabled(mockHttpClient)
-
-	// Mock fullQueryLogging to return true
-	mockFullQueryLoggingRequestToTrue(mockHttpClient)
+	server := fqlFakeMgmtServer(t, true, true)
+	for _, pod := range rc.dcPods {
+		server.attachToPod(t, pod)
+	}
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	// Enable FQL config in the Datacenter
 	rc.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
-
-	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
-		Protocol: "http",
-	}
+	attachPods(t, rc, server)
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	r := rc.CheckFullQueryLogging()
 	if r != result.Continue() {
 		t.Fatalf("expected result of result.Continue() but got %s", r)
 	}
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging?enabled=true", 0)
 }
 
 func TestCheckFullQueryLoggingNoChangeDisabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv(t)
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-
-	mockHttpClient := mocks.NewHttpClient(t)
-
-	// Mock features request to support FQL
-	mockFeaturesEnabled(mockHttpClient)
-
-	// Mock fullQueryLogging to return true
-	mockFullQueryLoggingRequestToFalse(mockHttpClient)
+	server := fqlFakeMgmtServer(t, true, false)
 
 	// Don't enable FQL config in the Datacenter
 	// rc.Datacenter.Spec.Config = json.RawMessage(fqlDisabledConfig)
-
-	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
-		Protocol: "http",
-	}
+	attachPods(t, rc, server)
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	r := rc.CheckFullQueryLogging()
 	if r != result.Continue() {
 		t.Fatalf("expected result of result.Continue() but got %s", r)
 	}
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging?enabled=false", 0)
 }
 
 func TestCheckFullQueryNotSupported(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv(t)
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-
-	mockHttpClient := mocks.NewHttpClient(t)
-
-	// Mock features request to not support FQL
-	mockFeaturesNotAvailable(mockHttpClient)
-
-	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
-		Protocol: "http",
-	}
+	server := fqlFakeMgmtServer(t, false, false)
+	attachPods(t, rc, server)
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	r := rc.CheckFullQueryLogging()
 	if r != result.Continue() {
 		t.Fatalf("expected result of result.Continue() but got %s", r)
 	}
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 0)
 }
 
 func TestCheckFullQueryLoggingChangeToEnabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv(t)
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-
-	mockHttpClient := mocks.NewHttpClient(t)
-
-	// Mock features request to support FQL
-	mockFeaturesEnabled(mockHttpClient)
-
-	// Mock fullQueryLogging to return false
-	mockFullQueryLoggingRequestToFalse(mockHttpClient)
-
-	// Mock fullQueryLogging change request
-	mockFullQueryLoggingRequestToTrue(mockHttpClient)
+	server := fqlFakeMgmtServer(t, true, false)
 
 	// Enable FQL config in the Datacenter
 	rc.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
-
-	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
-		Protocol: "http",
-	}
+	attachPods(t, rc, server)
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	r := rc.CheckFullQueryLogging()
 	if r != result.Continue() {
 		t.Fatalf("expected result of result.Continue() but got %s", r)
 	}
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 2)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging?enabled=true", 1)
 }
 
 func TestCheckFullQueryLoggingChangeToDisabled(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv(t)
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-
-	mockHttpClient := mocks.NewHttpClient(t)
-
-	// Mock features request to support FQL
-	mockFeaturesEnabled(mockHttpClient)
-
-	// Mock fullQueryLogging to return true
-	mockFullQueryLoggingRequestToTrue(mockHttpClient)
-
-	// Mock fullQueryLogging change request to false
-	mockFullQueryLoggingRequestToFalse(mockHttpClient)
+	server := fqlFakeMgmtServer(t, true, true)
 
 	// Keep FQL config disabled in the Datacenter
-
-	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
-		Protocol: "http",
-	}
+	attachPods(t, rc, server)
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	r := rc.CheckFullQueryLogging()
 	if r != result.Continue() {
 		t.Fatalf("expected result of result.Continue() but got %s", r)
 	}
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 2)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging?enabled=false", 1)
 }
 
 func TestCheckFullQueryNotSupportedTriedToUse(t *testing.T) {
-	rc, cleanupMockScr := setupTestEnv(t)
+	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
-
-	mockHttpClient := mocks.NewHttpClient(t)
-
-	// Mock features request to not support FQL
-	mockFeaturesNotAvailable(mockHttpClient)
+	server := fqlFakeMgmtServer(t, false, false)
 
 	// Enable FQL config in the Datacenter
 	rc.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
-
-	rc.NodeMgmtClient = httphelper.NodeMgmtClient{
-		Client:   mockHttpClient,
-		Log:      rc.ReqLogger,
-		Protocol: "http",
-	}
+	attachPods(t, rc, server)
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	// The error is thrown in handler, but this test bypasses the validation - that's why we take Continue
 	// as correct result.
 	r := rc.CheckFullQueryLogging()
 	_, err := r.Output()
-	if err == nil {
-		t.Fatalf("expected result of result.Error() but got %s", r)
-	}
+	require.Error(t, err)
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 0)
 }
 
 func TestNotSupportedVersion(t *testing.T) {

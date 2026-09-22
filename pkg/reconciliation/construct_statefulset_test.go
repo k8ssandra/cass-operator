@@ -8,11 +8,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -191,7 +193,7 @@ func TestStatefulSetWithAdditionalVolumesFromSource(t *testing.T) {
 			ServerType:             "cassandra",
 			ServerVersion:          "4.1.0",
 			ClusterName:            "cluster1",
-			ReadOnlyRootFilesystem: ptr.To(false),
+			ReadOnlyRootFilesystem: new(false),
 			StorageConfig: api.StorageConfig{
 				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
 					StorageClassName: &storageClassName,
@@ -441,10 +443,10 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 	}
 
 	defaultSecurityContext := &corev1.PodSecurityContext{
-		RunAsUser:    ptr.To(int64(999)),
-		RunAsGroup:   ptr.To(int64(999)),
-		FSGroup:      ptr.To(int64(999)),
-		RunAsNonRoot: ptr.To[bool](true),
+		RunAsUser:    new(int64(999)),
+		RunAsGroup:   new(int64(999)),
+		FSGroup:      new(int64(999)),
+		RunAsNonRoot: new(true),
 	}
 
 	tests := []struct {
@@ -488,18 +490,18 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 					PodTemplateSpec: &corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							SecurityContext: &corev1.PodSecurityContext{
-								RunAsUser:  ptr.To(int64(12345)),
-								RunAsGroup: ptr.To(int64(54321)),
-								FSGroup:    ptr.To(int64(11111)),
+								RunAsUser:  new(int64(12345)),
+								RunAsGroup: new(int64(54321)),
+								FSGroup:    new(int64(11111)),
 							},
 						},
 					},
 				},
 			},
 			expected: &corev1.PodSecurityContext{
-				RunAsUser:  ptr.To(int64(12345)),
-				RunAsGroup: ptr.To(int64(54321)),
-				FSGroup:    ptr.To(int64(11111)),
+				RunAsUser:  new(int64(12345)),
+				RunAsGroup: new(int64(54321)),
+				FSGroup:    new(int64(11111)),
 			},
 		},
 		{
@@ -513,18 +515,18 @@ func Test_newStatefulSetForCassandraPodSecurityContext(t *testing.T) {
 					PodTemplateSpec: &corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							SecurityContext: &corev1.PodSecurityContext{
-								RunAsUser:  ptr.To(int64(12345)),
-								RunAsGroup: ptr.To(int64(54321)),
-								FSGroup:    ptr.To(int64(11111)),
+								RunAsUser:  new(int64(12345)),
+								RunAsGroup: new(int64(54321)),
+								FSGroup:    new(int64(11111)),
 							},
 						},
 					},
 				},
 			},
 			expected: &corev1.PodSecurityContext{
-				RunAsUser:  ptr.To(int64(12345)),
-				RunAsGroup: ptr.To(int64(54321)),
-				FSGroup:    ptr.To(int64(11111)),
+				RunAsUser:  new(int64(12345)),
+				RunAsGroup: new(int64(54321)),
+				FSGroup:    new(int64(11111)),
 			},
 		},
 		{
@@ -627,7 +629,7 @@ func TestEmptyDatacenterStatusName(t *testing.T) {
 			ClusterName: "cluster1",
 		},
 		Status: api.CassandraDatacenterStatus{
-			DatacenterName: ptr.To[string](""),
+			DatacenterName: new(""),
 		},
 	}
 
@@ -767,4 +769,177 @@ func TestMinReadySecondsChange(t *testing.T) {
 	assert.NoError(err, "failed to build statefulset")
 
 	assert.Equal(int32(10), sts.Spec.MinReadySeconds)
+}
+
+func TestMaxUnavailableChange(t *testing.T) {
+	tests := []struct {
+		name            string
+		maxUnavailable  intstr.IntOrString
+		expectedRolling *appsv1.RollingUpdateStatefulSetStrategy
+	}{
+		{
+			name:           "integer",
+			maxUnavailable: intstr.FromInt32(1),
+			expectedRolling: &appsv1.RollingUpdateStatefulSetStrategy{
+				MaxUnavailable: new(intstr.FromInt32(1)),
+			},
+		},
+		{
+			name:           "percentage",
+			maxUnavailable: intstr.Parse("25%"),
+			expectedRolling: &appsv1.RollingUpdateStatefulSetStrategy{
+				MaxUnavailable: new(intstr.Parse("25%")),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dc := &api.CassandraDatacenter{
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName:   "test",
+					ServerType:    "cassandra",
+					ServerVersion: "4.0.7",
+					StorageConfig: api.StorageConfig{
+						CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+					},
+					Racks: []api.Rack{
+						{
+							Name: "r1",
+						},
+					},
+					PodTemplateSpec: &corev1.PodTemplateSpec{},
+					MaxUnavailable:  new(tt.maxUnavailable),
+				},
+			}
+
+			sts, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3, imageRegistry)
+			require.NoError(t, err, "failed to build statefulset")
+
+			expectedStrategy := appsv1.StatefulSetUpdateStrategy{
+				Type:          appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: tt.expectedRolling,
+			}
+			assert.Equal(t, expectedStrategy, sts.Spec.UpdateStrategy)
+		})
+	}
+}
+
+func TestMaxUnavailableMergedWithCanaryUpgrade(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:        "test",
+			ServerType:         "cassandra",
+			ServerVersion:      "4.0.7",
+			CanaryUpgrade:      true,
+			CanaryUpgradeCount: 1,
+			MaxUnavailable:     new(intstr.Parse("25%")),
+			StorageConfig: api.StorageConfig{
+				CassandraDataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+			},
+			Racks: []api.Rack{
+				{
+					Name: "r1",
+				},
+			},
+			PodTemplateSpec: &corev1.PodTemplateSpec{},
+		},
+	}
+
+	sts, err := newStatefulSetForCassandraDatacenter(nil, dc.Spec.Racks[0].Name, dc, 3, imageRegistry)
+	require.NoError(t, err, "failed to build statefulset")
+
+	expectedStrategy := appsv1.StatefulSetUpdateStrategy{
+		Type: appsv1.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+			Partition:      new(int32(2)),
+			MaxUnavailable: new(intstr.Parse("25%")),
+		},
+	}
+
+	assert.Equal(t, expectedStrategy, sts.Spec.UpdateStrategy)
+}
+
+func TestAddManagementApiServerSecurity(t *testing.T) {
+	require := require.New(t)
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "pleasenobob",
+			ServerType:    "cassandra",
+			ServerVersion: "5.0.6",
+			PodTemplateSpec: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: CassandraContainerName,
+							Ports: []corev1.ContainerPort{
+								{Name: "mgmt-api-http", ContainerPort: 8081},
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{GRPC: &corev1.GRPCAction{Port: 8081}},
+							},
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{GRPC: &corev1.GRPCAction{Port: 8081}},
+							},
+						},
+					},
+				},
+			},
+			ManagementApiAuth: api.ManagementApiAuthConfig{
+				Manual: &api.ManagementApiAuthManualConfig{
+					ClientSecretName: "mgmt-api-client-credentials",
+					ServerSecretName: "mgmt-api-server-credentials",
+				},
+			},
+			Racks: []api.Rack{
+				{
+					Name: "default",
+				},
+			},
+		},
+	}
+	podTemplateSpec, err := buildPodTemplateSpec(dc, dc.Spec.Racks[0], false, imageRegistry)
+	require.NoError(err, "failed to build PodTemplateSpec")
+	require.NoError(httphelper.AddManagementApiServerSecurity(dc, podTemplateSpec), "failed to add management api certs")
+
+	volumes := podTemplateSpec.Spec.Volumes
+	require.Len(volumes, 7, "expected 7 volumes in PodTemplateSpec")
+
+	foundServerCertVolume := false
+	for _, v := range volumes {
+		if v.Name == "management-api-server-certs-volume" {
+			foundServerCertVolume = true
+			require.NotNil(v.Secret, "expected server cert volume to be a secret volume")
+			require.Equal(dc.Spec.ManagementApiAuth.Manual.ServerSecretName, v.Secret.SecretName, "unexpected server cert secret name")
+		}
+	}
+	require.True(foundServerCertVolume, "did not find management api server certs")
+
+	for _, c := range podTemplateSpec.Spec.Containers {
+		foundServerCertsMount := false
+		require.True(len(c.VolumeMounts) >= 1, "expected at least one volume mount in container %s", c.Name)
+		for _, vm := range c.VolumeMounts {
+			if vm.Name == "management-api-server-certs-volume" {
+				require.Equal("/management-api-certs", vm.MountPath, "unexpected mount path for management api server certs")
+				foundServerCertsMount = true
+			}
+		}
+		require.True(foundServerCertsMount, "did not find management api server certs volume mount in container %s", c.Name)
+	}
+
+	cassContainer := findContainer(podTemplateSpec.Spec.Containers, CassandraContainerName)
+	require.NotNil(cassContainer)
+	require.NotNil(cassContainer.LivenessProbe)
+	require.Nil(cassContainer.LivenessProbe.GRPC)
+	require.NotNil(cassContainer.LivenessProbe.Exec)
+	require.Contains(cassContainer.LivenessProbe.Exec.Command,
+		"https://localhost:8081/api/v0/probes/liveness")
+	require.NotNil(cassContainer.ReadinessProbe)
+	require.Nil(cassContainer.ReadinessProbe.GRPC)
+	require.NotNil(cassContainer.ReadinessProbe.Exec)
+	require.Contains(cassContainer.ReadinessProbe.Exec.Command,
+		"https://localhost:8081/api/v0/probes/readiness")
 }

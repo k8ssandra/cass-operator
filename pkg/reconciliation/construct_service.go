@@ -6,6 +6,7 @@ package reconciliation
 // This file defines constructors for k8s service-related objects
 import (
 	"fmt"
+	"maps"
 	"net"
 	"strings"
 
@@ -19,60 +20,33 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+var podOnlyPortNames = map[string]struct{}{
+	"internode":       {},
+	"internode-msg":   {},
+	"dsefs-internode": {},
+	"spark-internode": {},
+	"spark-master":    {},
+	"jobserver-jmx":   {},
+	"spark-app-4040":  {},
+	"spark-app-4041":  {},
+	"spark-app-4042":  {},
+	"spark-app-4043":  {},
+	"spark-app-4044":  {},
+	"spark-app-4045":  {},
+	"spark-app-4046":  {},
+	"spark-app-4047":  {},
+	"spark-app-4048":  {},
+	"spark-app-4049":  {},
+	"spark-app-4050":  {},
+}
+
 // Creates a headless service object for the Datacenter, for clients wanting to
 // reach out to a ready Server node for either CQL or mgmt API
 func newServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	svcName := dc.GetDatacenterServiceName()
 	service := makeGenericHeadlessService(dc)
 	service.Name = svcName
-
-	nativePort := api.DefaultNativePort
-	if dc.IsNodePortEnabled() {
-		nativePort = dc.GetNodePortNativePort()
-	}
-
-	ports := []corev1.ServicePort{
-		namedServicePort("native", nativePort, nativePort),
-		namedServicePort("tls-native", 9142, 9142),
-		namedServicePort("mgmt-api", 8080, 8080),
-		namedServicePort("prometheus", 9103, 9103),
-		namedServicePort("metrics", 9000, 9000),
-	}
-
-	if strings.HasPrefix(dc.Spec.ServerVersion, "3.") || dc.Spec.ServerType == "dse" {
-		ports = append(ports,
-			namedServicePort("thrift", 9160, 9160))
-	}
-
-	if dc.Spec.DseWorkloads != nil {
-		if dc.Spec.DseWorkloads.AnalyticsEnabled {
-			ports = append(
-				ports,
-				namedServicePort("dsefs-public", 5598, 5598),
-				namedServicePort("spark-worker", 7081, 7081),
-				namedServicePort("jobserver", 8090, 8090),
-				namedServicePort("always-on-sql", 9077, 9077),
-				namedServicePort("sql-thrift", 10000, 10000),
-				namedServicePort("spark-history", 18080, 18080),
-			)
-		}
-
-		if dc.Spec.DseWorkloads.GraphEnabled {
-			ports = append(
-				ports,
-				namedServicePort("gremlin", 8182, 8182),
-			)
-		}
-
-		if dc.Spec.DseWorkloads.SearchEnabled {
-			ports = append(
-				ports,
-				namedServicePort("solr", 8983, 8983),
-			)
-		}
-	}
-
-	service.Spec.Ports = ports
+	service.Spec.Ports = servicePortsForCassandraDatacenter(dc)
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.DatacenterService)
 
@@ -86,23 +60,19 @@ func addAdditionalOptions(service *corev1.Service, serviceConfig *api.ServiceCon
 		if service.Labels == nil {
 			service.Labels = make(map[string]string, len(serviceConfig.Labels))
 		}
-		for k, v := range serviceConfig.Labels {
-			service.Labels[k] = v
-		}
+		maps.Copy(service.Labels, serviceConfig.Labels)
 	}
 
 	if len(serviceConfig.Annotations) > 0 {
 		if service.Annotations == nil {
 			service.Annotations = make(map[string]string, len(serviceConfig.Annotations))
 		}
-		for k, v := range serviceConfig.Annotations {
-			service.Annotations[k] = v
-		}
+		maps.Copy(service.Annotations, serviceConfig.Annotations)
 	}
 }
 
-func namedServicePort(name string, port int, targetPort int) corev1.ServicePort {
-	return corev1.ServicePort{Name: name, Port: int32(port), TargetPort: intstr.FromInt(targetPort)}
+func namedServicePort(name string, port int32, targetPort int32) corev1.ServicePort {
+	return corev1.ServicePort{Name: name, Port: port, TargetPort: intstr.FromInt32(targetPort)}
 }
 
 func buildLabelSelectorForSeedService(dc *api.CassandraDatacenter) map[string]string {
@@ -264,6 +234,9 @@ func newNodePortServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *core
 	}
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.NodePortService)
+
+	utils.AddHashAnnotation(service)
+
 	return service
 }
 
@@ -272,28 +245,13 @@ func newNodePortServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *core
 func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	service := makeGenericHeadlessService(dc)
 	service.Name = dc.GetAllPodsServiceName()
-	service.Labels[api.PromMetricsLabel] = "true"
 	service.Spec.PublishNotReadyAddresses = true
-
-	nativePort := api.DefaultNativePort
-	if dc.IsNodePortEnabled() {
-		nativePort = dc.GetNodePortNativePort()
+	if dc.IsMcacEnabled() {
+		service.Labels[api.PromMetricsLabel] = "true"
 	}
 
-	service.Spec.Ports = []corev1.ServicePort{
-		{
-			Name: "native", Port: int32(nativePort), TargetPort: intstr.FromInt(nativePort),
-		},
-		{
-			Name: "mgmt-api", Port: 8080, TargetPort: intstr.FromInt(8080),
-		},
-		{
-			Name: "prometheus", Port: 9103, TargetPort: intstr.FromInt(9103),
-		},
-		{
-			Name: "metrics", Port: 9000, TargetPort: intstr.FromInt(9000),
-		},
-	}
+	ports := servicePortsForCassandraDatacenter(dc)
+	service.Spec.Ports = ports
 
 	addAdditionalOptions(service, &dc.Spec.AdditionalServiceConfig.AllPodsService)
 
@@ -322,4 +280,33 @@ func makeGenericHeadlessService(dc *api.CassandraDatacenter) *corev1.Service {
 	service.Annotations = anns
 
 	return &service
+}
+
+func cassandraPodTemplatePorts(dc *api.CassandraDatacenter) []corev1.ContainerPort {
+	if dc.Spec.PodTemplateSpec == nil {
+		return nil
+	}
+	for _, container := range dc.Spec.PodTemplateSpec.Spec.Containers {
+		if container.Name == CassandraContainerName {
+			return container.Ports
+		}
+	}
+	return nil
+}
+
+func servicePortsForCassandraDatacenter(dc *api.CassandraDatacenter) []corev1.ServicePort {
+	portDefaults := dc.GetContainerPorts()
+	podTemplatePorts := cassandraPodTemplatePorts(dc)
+	combinedPorts := combinePortSlices(portDefaults, podTemplatePorts)
+	var servicePorts []corev1.ServicePort
+	for _, cp := range combinedPorts {
+		if cp.Name == "" {
+			continue
+		}
+		if _, ignored := podOnlyPortNames[cp.Name]; ignored {
+			continue
+		}
+		servicePorts = append(servicePorts, namedServicePort(cp.Name, cp.ContainerPort, cp.ContainerPort))
+	}
+	return servicePorts
 }

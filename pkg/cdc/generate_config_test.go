@@ -41,19 +41,19 @@ type testCase struct {
 	InitialConfig  string
 	DC             cassdcapi.CassandraDatacenter
 	Expected       string
-	ParsedExpected map[string]interface{}
-	Actual         map[string]interface{}
+	ParsedExpected map[string]any
+	Actual         map[string]any
 }
 
 // run runs the testCase and populates the actual and ParsedExpected maps.
 func (c *testCase) run(t *testing.T) {
 	newConfig, err := UpdateConfig(json.RawMessage(c.InitialConfig), c.DC)
 	assert.NoError(t, err, err)
-	c.Actual = make(map[string]interface{})
+	c.Actual = make(map[string]any)
 	err = json.Unmarshal(newConfig, &c.Actual)
 	assert.NoError(t, err, err)
 	if c.Expected != "" {
-		c.ParsedExpected = make(map[string]interface{})
+		c.ParsedExpected = make(map[string]any)
 		err = json.Unmarshal([]byte(c.Expected), &c.ParsedExpected)
 		assert.NoError(t, err, err)
 	}
@@ -63,7 +63,7 @@ func (c *testCase) run(t *testing.T) {
 // The main purpose here is to ensure that when marshalling and unmarshalling from the structs, we aren't losing fields.
 func TestUpdateConfig_ExistingConfig_NoCDC(t *testing.T) {
 	dc := GetCassandraDatacenter("test-dc", "test-ns")
-	dc.Spec.CDC = (*cassdcapi.CDCConfiguration)(nil)
+	dc.Spec.DeprecatedCDC = (*cassdcapi.CDCConfiguration)(nil)
 	test := testCase{
 		Description:   "When CDC not requested and a config json exists, UpdateConfig() does nothing.",
 		InitialConfig: existingConfig,
@@ -134,7 +134,7 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	dc := GetCassandraDatacenter("test-dc", "test-ns")
 	pulsarServiceUrl := "pulsar://pulsar:6650"
 	topicPrefix := "test-prefix-"
-	dc.Spec.CDC = &cassdcapi.CDCConfiguration{
+	dc.Spec.DeprecatedCDC = &cassdcapi.CDCConfiguration{
 		PulsarServiceUrl: &pulsarServiceUrl,
 		TopicPrefix:      &topicPrefix,
 	}
@@ -145,16 +145,27 @@ func TestUpdateConfig_ExistingConfig_WithCDC(t *testing.T) {
 	}
 	test.run(t)
 	assert.Contains(t,
-		test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"],
+		test.Actual["cassandra-env-sh"].(map[string]any)["additional-jvm-opts"],
 		"-javaagent:/opt/cdc_agent/cdc-agent.jar=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-",
 	)
+}
+
+func TestUpdateConfig_CDCDoesNotAddMissingMcacAgent(t *testing.T) {
+	dc := GetCassandraDatacenter("test-dc", "test-ns")
+	dc.Spec.ServerVersion = "5.0.0"
+	dc.Spec.ReadOnlyRootFilesystem = new(false)
+	dc.Spec.DeprecatedCDC = &cassdcapi.CDCConfiguration{}
+
+	config, err := UpdateConfig(json.RawMessage(existingConfig), dc)
+	assert.NoError(t, err)
+	assert.NotContains(t, string(config), "datastax-mcac-agent.jar")
 }
 
 // TestUpdateConfig_ExistingConfig_WithoutCDC tests that CDC is removed from additional-jvm-opts when it is present but CDC should be disabled.
 func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 	// Test case when the DC has CDC explicitly marked false.
 	dc := GetCassandraDatacenter("test-dc", "test-ns")
-	dc.Spec.CDC = (*cassdcapi.CDCConfiguration)(nil)
+	dc.Spec.DeprecatedCDC = (*cassdcapi.CDCConfiguration)(nil)
 	jvmAddtnlOptionsJson := `
 	{
 		"cassandra-env-sh": {
@@ -171,6 +182,6 @@ func TestUpdateConfig_ExistingConfig_WithoutCDC(t *testing.T) {
 		Expected:      jvmAddtnlOptionsJson,
 	}
 	test.run(t)
-	assert.NotContains(t, test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"], "-javaagent:/opt/cdc_agent/cdc-agent.jar=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-")
-	assert.Contains(t, test.Actual["cassandra-env-sh"].(map[string]interface{})["additional-jvm-opts"], "additional-option2")
+	assert.NotContains(t, test.Actual["cassandra-env-sh"].(map[string]any)["additional-jvm-opts"], "-javaagent:/opt/cdc_agent/cdc-agent.jar=pulsarServiceUrl=pulsar://pulsar:6650,topicPrefix=test-prefix-")
+	assert.Contains(t, test.Actual["cassandra-env-sh"].(map[string]any)["additional-jvm-opts"], "additional-option2")
 }

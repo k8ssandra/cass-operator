@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -84,6 +85,12 @@ const (
 	// Allow disabling the creation of PodDisruptionBudget for the datacenter
 	DisablePodDisruptionBudgetAnnotation = "cassandra.datastax.com/disable-pdb-creation"
 
+	// EnableParallelCleanupWithinRackAnnotation speeds up post-scale-out cleanup by processing nodes in parallel within a rack.
+	EnableParallelCleanupWithinRackAnnotation = "cassandra.datastax.com/enable-parallel-cleanup-within-rack"
+
+	// BypassWebhookValidationsAnnotation allows bypassing CassandraDatacenter update webhook validations
+	BypassWebhookValidationsAnnotation = "cassandra.datastax.com/bypass-webhook-validations"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 
@@ -94,6 +101,7 @@ const (
 
 	DefaultNativePort    = 9042
 	DefaultInternodePort = 7000
+	DefaultMgmtApiPort   = 8080
 )
 
 type AllowUpdateType string
@@ -117,7 +125,7 @@ type CassandraDatacenterSpec struct {
 
 	// Version string for config builder,
 	// used to generate Cassandra server configuration
-	// +kubebuilder:validation:Pattern=(6\.[89]\.\d+)|(3\.11\.\d+)|(4\.\d+\.\d+)|(5\.\d+\.\d+)|(1\.\d+\.\d+)
+	// +kubebuilder:validation:Pattern=(\d+\.\d+\.\d+)
 	ServerVersion string `json:"serverVersion"`
 
 	// Cassandra server image name. Use of ImageConfig to match ServerVersion is recommended instead of this value.
@@ -265,8 +273,8 @@ type CassandraDatacenterSpec struct {
 	// Additional Annotations allows to define additional labels that will be included in all objects created by the operator. Note, user can override values set by default from the cass-operator and doing so could break cass-operator functionality.
 	AdditionalAnnotations map[string]string `json:"additionalAnnotations,omitempty"`
 
-	// CDC allows configuration of the change data capture agent which can run within the Management API container. Use it to send data to Pulsar.
-	CDC *CDCConfiguration `json:"cdc,omitempty"`
+	// Deprecated this field is deprecated and will be removed in the future. DeprecatedCDC allows configuration of the change data capture agent which can run within the Management API container. Use it to send data to Pulsar.
+	DeprecatedCDC *CDCConfiguration `json:"cdc,omitempty"`
 
 	// DatacenterName allows to override the name of the Cassandra datacenter. In Cassandra the DC name will be overridden by this value.
 	// This setting can create conflicts if multiple DCs coexist in the same namespace if metadata.name for a DC with no override is set to the same value as the override name of another DC.
@@ -277,6 +285,11 @@ type CassandraDatacenterSpec struct {
 	// MinReadySeconds sets the minimum number of seconds for which a newly created pod should be ready without any of its containers crashing, for it to be considered available. Defaults to 5 seconds and is set in the StatefulSet spec.
 	// Setting to 0 might cause multiple Cassandra pods to restart at the same time despite PodDisruptionBudget settings.
 	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
+
+	// MaxUnavailable sets the maximum number of rack pods that can be modified simultaneously during an update. This can at most target a single rack, so values higher than rack size will have no effect. Requires Kubernetes 1.35 or higher. Setting percentage will
+	// calculate against single rack's percentage of pods, not the entire datacenter.
+	// +kubebuilder:validation:XIntOrString
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// ReadOnlyRootFilesystem makes the cassandra container to be run with a read-only root filesystem. This is enabled by default when using OSS Cassandra 4.1.0 and or newer, DSE 6.8 and newer (from datastax/dse-mgmtapi-6_8 repository) or HCD.
 	// If serverImage override is used, this setting defaults to false.
@@ -540,10 +553,6 @@ type CassandraDatacenterList struct {
 	Items           []CassandraDatacenter `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&CassandraDatacenter{}, &CassandraDatacenterList{})
-}
-
 func (dc *CassandraDatacenter) GetConfigBuilderImage() string {
 	return dc.Spec.ConfigBuilderImage
 }
@@ -729,6 +738,33 @@ func (dc *CassandraDatacenter) GetSuperuserSecretNamespacedName() types.Namespac
 	}
 }
 
+func (dc *CassandraDatacenter) IsMcacEnabled() bool {
+	if (dc.Spec.ServerType == "cassandra" && semver.Compare("v"+dc.Spec.ServerVersion, "v5.0.0") >= 0) ||
+		(dc.Spec.ServerType == "hcd" && semver.Compare("v"+dc.Spec.ServerVersion, "v2.0.0") >= 0) {
+		return false
+	}
+
+	// MCAC requires a writable filesystem
+	if dc.ReadOnlyFs() {
+		return false
+	}
+
+	// The user can explicitly disable the legacy collector by setting the environment variable.
+	if dc.Spec.PodTemplateSpec != nil {
+		for _, container := range dc.Spec.PodTemplateSpec.Spec.Containers {
+			if container.Name == "cassandra" {
+				for _, env := range container.Env {
+					if env.Name == "MGMT_API_DISABLE_MCAC" {
+						return env.Value != "true"
+					}
+				}
+			}
+		}
+	}
+
+	return true
+}
+
 // GetNodePortNativePort
 // Gets the defined CQL port for NodePort.
 // 0 will be returned if NodePort is not configured.
@@ -772,21 +808,23 @@ func namedPort(name string, port int) corev1.ContainerPort {
 }
 
 // GetContainerPorts will return the container ports for the pods in a statefulset based on the provided config
-func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, error) {
+func (dc *CassandraDatacenter) GetContainerPorts() []corev1.ContainerPort {
 	nativePort := DefaultNativePort
 	internodePort := DefaultInternodePort
-
+	if dc.IsNodePortEnabled() {
+		nativePort = dc.GetNodePortNativePort()
+	}
 	// Note: Port Names cannot be more than 15 characters
 
 	ports := []corev1.ContainerPort{
 		namedPort("native", nativePort),
-		namedPort("tls-native", 9142),
 		namedPort("internode", internodePort),
-		namedPort("tls-internode", 7001),
-		namedPort("jmx", 7199),
-		namedPort("mgmt-api-http", 8080),
-		namedPort("prometheus", 9103),
+		namedPort("mgmt-api-http", DefaultMgmtApiPort),
 		namedPort("metrics", 9000),
+	}
+
+	if dc.IsMcacEnabled() {
+		ports = append(ports, namedPort("prometheus", 9103))
 	}
 
 	if strings.HasPrefix(dc.Spec.ServerVersion, "3.") || dc.Spec.ServerType == "dse" {
@@ -844,13 +882,13 @@ func (dc *CassandraDatacenter) GetContainerPorts() ([]corev1.ContainerPort, erro
 		}
 	}
 
-	return ports, nil
+	return ports
 }
 
 func (dc *CassandraDatacenter) FullQueryEnabled() (bool, error) {
 	// TODO Cleanup to more common processing after ModelValues is moved to apis
 	if dc.Spec.Config != nil {
-		var dcConfig map[string]interface{}
+		var dcConfig map[string]any
 		if err := json.Unmarshal(dc.Spec.Config, &dcConfig); err != nil {
 			return false, err
 		}
@@ -858,7 +896,7 @@ func (dc *CassandraDatacenter) FullQueryEnabled() (bool, error) {
 		if !found {
 			return false, nil
 		}
-		casYamlMap, ok := casYaml.(map[string]interface{})
+		casYamlMap, ok := casYaml.(map[string]any)
 		if !ok {
 			err := fmt.Errorf("failed to parse cassandra-yaml")
 			return false, err
@@ -889,7 +927,7 @@ func SplitRacks(nodeCount, rackCount int) []int {
 
 	var topology []int
 
-	for rackIdx := 0; rackIdx < rackCount; rackIdx++ {
+	for rackIdx := range rackCount {
 		nodesForThisRack := nodesPerRack
 		if rackIdx < extraNodes {
 			nodesForThisRack++

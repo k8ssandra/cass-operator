@@ -1,5 +1,6 @@
 package v1beta1
 
+// DEPRECATED This functionality is deprecated.
 // CDCConfiguration holds CDC config for the CassandraDatacenter. Note that it cannot contain arrays, channels, maps etc. because of the way the
 // reflection logic works which marshalls it into a string for the purposes of passing on the command line.
 type CDCConfiguration struct {

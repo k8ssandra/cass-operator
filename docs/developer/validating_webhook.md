@@ -14,5 +14,5 @@ Validating webhooks have specific requirements in kubernetes:
 explicitly configured in the kubernetes validatingwebhookconfiguration object.
 
 To support the above scenarios, the operator uses cert-manager to take care of generating and
-injecting the certificates. The validating webhook can be disabled in the OperatorConfig, which is
-mounted as a ConfigMap to the container.
+injecting the certificates. The validating webhook is only started when the manager is launched
+with `--webhook-cert-path` set, otherwise webhooks are disabled.

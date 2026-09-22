@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/pkg/errors"
@@ -21,16 +22,155 @@ import (
 	. "github.com/onsi/gomega"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
+	shutil "github.com/k8ssandra/cass-operator/tests/util/sh"
 )
 
 const (
 	EnvNoCleanup = "M_NO_CLEANUP"
 )
 
+type LifecycleCleanup func() error
+
+func RunTestLifecycle(t *testing.T, testName string, ns NsWrapper) {
+	RunTestLifecycleWithCleanup(t, testName, ns, func() error {
+		return kustomize.Undeploy(ns.Namespace)
+	})
+}
+
+func RunTestLifecycleWithAdditionalNamespaces(t *testing.T, testName string, ns NsWrapper, additionalNamespaces ...string) {
+	RunTestLifecycleWithCleanup(t, testName, ns, func() error {
+		return kustomize.Undeploy(ns.Namespace)
+	}, additionalNamespaces...)
+}
+
+func RunTestLifecycleWithCleanup(t *testing.T, testName string, ns NsWrapper, cleanup LifecycleCleanup, additionalNamespaces ...string) {
+	ginkgo.ReportAfterSuite("collect support bundle and clean up", func(report ginkgo.Report) {
+		if !report.SuiteSucceeded {
+			CollectSupportBundle(t, ns, additionalNamespaces...)
+		}
+
+		logPath := fmt.Sprintf("%s/aftersuite", ns.LogDir)
+		err := kubectl.DumpAllLogs(logPath).ExecV()
+		if err != nil {
+			t.Logf("Failed to dump all the logs: %v", err)
+		}
+
+		fmt.Printf("\n\tPost-run logs dumped at: %s\n\n", logPath)
+		if ShouldSkipCleanup() {
+			fmt.Printf("Skipping cleanup and deletion because %s is set.\n", EnvNoCleanup)
+			return
+		}
+
+		ns.Terminate()
+		if cleanup != nil {
+			err = cleanup()
+			if err != nil {
+				t.Logf("Failed to cleanup test suite: %v", err)
+			}
+		}
+	})
+
+	RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecs(t, testName)
+}
+
+func ShouldSkipCleanup() bool {
+	value, set := os.LookupEnv(EnvNoCleanup)
+	return set && !strings.EqualFold(value, "false") && value != "0"
+}
+
+func CollectSupportBundle(t *testing.T, ns NsWrapper, additionalNamespaces ...string) {
+	t.Helper()
+
+	outputDir := filepath.Join(ns.LogDir, "support-bundle")
+	if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
+		t.Logf("Failed to create support bundle output directory: %v", err)
+		return
+	}
+
+	spec, err := SupportBundleSpec(ns.Namespace, additionalNamespaces...)
+	if err != nil {
+		t.Logf("Failed to generate support bundle spec: %v", err)
+		return
+	}
+
+	specPath := filepath.Join(outputDir, "support-bundle.yaml")
+	if err := os.WriteFile(specPath, spec, os.ModePerm); err != nil {
+		t.Logf("Failed to write support bundle spec: %v", err)
+		return
+	}
+
+	outputPath := filepath.Join(outputDir, "support-bundle.tar.gz")
+	err = shutil.RunV(
+		"kubectl",
+		"support-bundle",
+		specPath,
+		"--interactive=false",
+		"--output",
+		outputPath,
+	)
+	if err != nil {
+		t.Logf("Failed to collect support bundle: %v", err)
+		return
+	}
+
+	fmt.Printf("\n\tSupport bundle dumped at: %s\n\n", outputPath)
+}
+
+func SupportBundleSpec(primaryNamespace string, additionalNamespaces ...string) ([]byte, error) {
+	namespaces := supportBundleNamespaces(primaryNamespace, additionalNamespaces...)
+	collectors := []map[string]any{
+		{"clusterInfo": map[string]any{}},
+		{"clusterResources": map[string]any{}},
+	}
+
+	for _, namespace := range namespaces {
+		collectors = append(collectors, map[string]any{
+			"logs": map[string]any{
+				"name":      fmt.Sprintf("pod-logs/%s", namespace),
+				"namespace": namespace,
+				"selector":  []string{},
+				"limits": map[string]any{
+					"maxAge":   "6h",
+					"maxBytes": 50000000,
+				},
+				"timestamps": true,
+			},
+		})
+	}
+
+	return yaml.Marshal(map[string]any{
+		"apiVersion": "troubleshoot.sh/v1beta2",
+		"kind":       "SupportBundle",
+		"metadata": map[string]any{
+			"name": "cass-operator-e2e",
+		},
+		"spec": map[string]any{
+			"collectors": collectors,
+		},
+	})
+}
+
+func supportBundleNamespaces(primaryNamespace string, additionalNamespaces ...string) []string {
+	var namespaces []string
+	seen := map[string]bool{}
+	for _, namespace := range append([]string{primaryNamespace}, additionalNamespaces...) {
+		namespace = strings.TrimSpace(namespace)
+		if namespace == "" || seen[namespace] {
+			continue
+		}
+
+		namespaces = append(namespaces, namespace)
+		seen[namespace] = true
+	}
+	return namespaces
+}
+
 func duplicate(value string, count int) string {
 	result := []string{}
-	for i := 0; i < count; i++ {
+	for range count {
 		result = append(result, value)
 	}
 
@@ -75,7 +215,7 @@ func CreateTestFile(dcYaml string) (string, error) {
 	}
 
 	if spec["config"] != nil {
-		config := spec["config"].(map[string]interface{})
+		config := spec["config"].(map[string]any)
 
 		// jvm-options <-> jvm-server-options
 		if strings.HasPrefix(cassandraVersion, "3.") {
@@ -261,8 +401,7 @@ func (k *NsWrapper) countStep() int {
 }
 
 func (ns NsWrapper) Terminate() {
-	noCleanup := os.Getenv(EnvNoCleanup)
-	if strings.ToLower(noCleanup) == "true" {
+	if ShouldSkipCleanup() {
 		fmt.Println("Skipping namespace cleanup and deletion.")
 		return
 	}
@@ -554,7 +693,7 @@ func (ns *NsWrapper) WaitForOperatorReady() {
 }
 
 // Note that the actual value will be cast to a string before the comparison with the expectedValue
-func (ns NsWrapper) ExpectKeyValue(m map[string]interface{}, key string, expectedValue string) {
+func (ns NsWrapper) ExpectKeyValue(m map[string]any, key string, expectedValue string) {
 	actualValue, ok := m[key].(string)
 	if !ok {
 		// Note: floats will end up as strings with six decimal points
@@ -571,7 +710,7 @@ func (ns NsWrapper) ExpectKeyValue(m map[string]interface{}, key string, expecte
 }
 
 // Compare all key/values from an expected map to an actual map
-func (ns NsWrapper) ExpectKeyValues(actual map[string]interface{}, expected map[string]string) {
+func (ns NsWrapper) ExpectKeyValues(actual map[string]any, expected map[string]string) {
 	for key := range expected {
 		ns.ExpectKeyValue(actual, key, expected[key])
 	}
@@ -696,12 +835,16 @@ func (ns *NsWrapper) WaitForCompletedCassandraTasks(dcName, command string, coun
 }
 
 func (ns *NsWrapper) WaitForCompleteTask(taskName string) {
+	ns.WaitForCompleteTaskTimeout(taskName, 360)
+}
+
+func (ns *NsWrapper) WaitForCompleteTaskTimeout(taskName string, seconds int) {
 	step := "checking that cassandratask status CompletionTime has a value"
 	json := "jsonpath={.status.completionTime}"
 	k := kubectl.Get("cassandratask", taskName).
 		FormatOutput(json)
 
-	ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, 360)
+	ns.WaitForOutputPatternAndLog(step, k, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, seconds)
 }
 
 func (ns *NsWrapper) ExpectDatacenterNameStatusUpdated(dcName, dcNameOverride string) {

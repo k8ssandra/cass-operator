@@ -45,7 +45,7 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 
 	if rc.Datacenter.Status.GetConditionStatus(api.DatacenterScalingDown) == corev1.ConditionTrue {
 		// ScalingDown is still happening
-		rc.Recorder.Eventf(rc.Datacenter, corev1.EventTypeNormal, events.DecommissionDatacenter, "Datacenter is decommissioning")
+		rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DecommissionDatacenter, "Datacenter is decommissioning")
 		rc.ReqLogger.V(1).Info("Waiting for the decommission to complete first, before deleting")
 		return result.Continue()
 	}
@@ -221,17 +221,24 @@ func (rc *ReconciliationContext) listPVCs(selector map[string]string) ([]corev1.
 func storageClass(ctx context.Context, c client.Client, storageClassName *string) (*storagev1.StorageClass, error) {
 	if storageClassName == nil || *storageClassName == "" {
 		storageClassList := &storagev1.StorageClassList{}
-		if err := c.List(ctx, storageClassList, client.MatchingLabels{"storageclass.kubernetes.io/is-default-class": "true"}); err != nil {
+		if err := c.List(ctx, storageClassList); err != nil {
 			return nil, err
 		}
 
-		if len(storageClassList.Items) > 1 {
+		defaultStorageClasses := make([]storagev1.StorageClass, 0, len(storageClassList.Items))
+		for _, storageClass := range storageClassList.Items {
+			if metav1.HasAnnotation(storageClass.ObjectMeta, "storageclass.kubernetes.io/is-default-class") && storageClass.Annotations["storageclass.kubernetes.io/is-default-class"] == "true" {
+				defaultStorageClasses = append(defaultStorageClasses, storageClass)
+			}
+		}
+
+		if len(defaultStorageClasses) > 1 {
 			return nil, fmt.Errorf("found multiple default storage classes, please specify StorageClassName in the CassandraDatacenter spec")
-		} else if len(storageClassList.Items) == 0 {
+		} else if len(defaultStorageClasses) == 0 {
 			return nil, fmt.Errorf("no default storage class found, please specify StorageClassName in the CassandraDatacenter spec")
 		}
 
-		return &storageClassList.Items[0], nil
+		return &defaultStorageClasses[0], nil
 	}
 
 	storageClass := &storagev1.StorageClass{}

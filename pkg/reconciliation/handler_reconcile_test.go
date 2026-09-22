@@ -7,8 +7,7 @@ import (
 	"time"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
-	"github.com/k8ssandra/cass-operator/pkg/mocks"
-	"github.com/stretchr/testify/mock"
+	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/stretchr/testify/require"
 
 	controllers "github.com/k8ssandra/cass-operator/internal/controllers/cassandra"
@@ -18,10 +17,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
+	record "k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -92,7 +92,6 @@ func TestReconcile(t *testing.T) {
 		}}
 		pod.Labels[api.CassNodeState] = "Started"
 		pod.Status.PodIP = fmt.Sprintf("192.168.1.%d", i)
-		fmt.Printf("Adding pod %s\n", pod.Name)
 		trackObjects = append(trackObjects, pod)
 	}
 
@@ -102,10 +101,11 @@ func TestReconcile(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithStatusSubresource(dc).WithRuntimeObjects(trackObjects...).Build()
 
 	r := &controllers.CassandraDatacenterReconciler{
-		Client:   fakeClient,
-		Scheme:   s,
-		Recorder: record.NewFakeRecorder(100),
-		Log:      ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
+		Client:    fakeClient,
+		APIReader: fakeClient,
+		Scheme:    s,
+		Recorder:  record.NewFakeRecorder(100),
+		Log:       ctrl.Log.WithName("controllers").WithName("CassandraDatacenter"),
 	}
 
 	request := reconcile.Request{
@@ -166,11 +166,14 @@ func TestReconcile_NotFound(t *testing.T) {
 	s.AddKnownTypes(api.GroupVersion, dc)
 
 	fakeClient := fake.NewClientBuilder().WithStatusSubresource(dc).WithRuntimeObjects(trackObjects...).Build()
+	fakeRecorder := record.NewFakeRecorder(5)
 
 	r := &controllers.CassandraDatacenterReconciler{
-		Client: fakeClient,
-		Scheme: s,
+		Client:    fakeClient,
+		APIReader: fakeClient,
+		Scheme:    s,
 	}
+	r.Recorder = events.NewLoggingEventRecorder(fakeRecorder, r.Log.WithName("reconcile_tests"))
 
 	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -223,27 +226,22 @@ func TestReconcile_Error(t *testing.T) {
 	s := scheme.Scheme
 	s.AddKnownTypes(api.GroupVersion, dc)
 
-	mockClient := &mocks.Client{}
-	mockClient.On("Get",
-		mock.MatchedBy(
-			func(ctx context.Context) bool {
-				return ctx != nil
-			}),
-		mock.MatchedBy(
-			func(key client.ObjectKey) bool {
-				return key != client.ObjectKey{}
-			}),
-		mock.MatchedBy(
-			func(obj runtime.Object) bool {
-				return obj != nil
-			})).
-		Return(fmt.Errorf("some cryptic error")).
-		Once()
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(s).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				return fmt.Errorf("some cryptic error")
+			},
+		}).
+		Build()
 
 	r := &controllers.CassandraDatacenterReconciler{
-		Client: mockClient,
-		Scheme: s,
+		Client:    fakeClient,
+		APIReader: fakeClient,
+		Scheme:    s,
 	}
+	fakeRecorder := record.NewFakeRecorder(5)
+	r.Recorder = events.NewLoggingEventRecorder(fakeRecorder, r.Log.WithName("reconcile_tests"))
 
 	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{

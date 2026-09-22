@@ -33,6 +33,19 @@ if [ "${IP_FAMILY}" != "ipv4" ]; then
   fi
 fi
 
+# Kind otherwise creates a dual-stack Docker network even for IPv6 clusters.
+# Keep IPv4 loopback available, but give the nodes only IPv6 connectivity.
+if [ "${IP_FAMILY}" = "ipv6" ]; then
+  if docker network inspect kind >/dev/null 2>&1; then
+    if [ "$(docker network inspect -f '{{.EnableIPv4}} {{.EnableIPv6}}' kind)" != 'false true' ]; then
+      echo 'The existing kind network is not IPv6-only. Remove unused clusters and the kind network before retrying.' >&2
+      exit 1
+    fi
+  else
+    docker network create --ipv6 --ipv4=false kind
+  fi
+fi
+
 # 1. Create registry container unless it already exists
 reg_name='kind-registry'
 reg_port='5001'

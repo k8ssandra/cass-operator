@@ -67,7 +67,11 @@ fi
 # https://github.com/kubernetes-sigs/kind/issues/2875
 # https://github.com/containerd/containerd/blob/main/docs/cri/config.md#registry-configuration
 # See: https://github.com/containerd/containerd/blob/main/docs/hosts.md
-cat <<EOF | kind create cluster --retain --config=-
+set --
+if [ -n "${KIND_NODE_IMAGE:-}" ]; then
+  set -- --image "${KIND_NODE_IMAGE}"
+fi
+cat <<EOF | kind create cluster --retain --config=- "$@"
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:

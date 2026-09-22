@@ -37,9 +37,41 @@ runs:
         mkdir bin
         ln -s /usr/local/bin/kustomize bin/kustomize
     - name: Create kind cluster
+      id: cluster
       shell: bash
       run: |
         hack/cluster.sh ${{ inputs.networking }}
+    - name: Collect cluster creation diagnostics
+      if: ${{ failure() && steps.cluster.outcome == 'failure' }}
+      shell: bash
+      run: |
+        diagnostics=build/kubectl_dump/cluster-creation
+        mkdir -p "$diagnostics"
+        # Collect independently: an exited node or missing tool must not hide
+        # the other diagnostics or replace the original creation failure.
+        {
+          kind version
+          docker version
+          docker info
+          uname -a
+          free -h
+          df -h
+          sysctl fs.inotify.max_user_instances fs.inotify.max_user_watches
+          ip address
+          ip route
+          ip -6 route
+        } > "$diagnostics/host.txt" 2>&1 || true
+        docker ps -a > "$diagnostics/containers.txt" 2>&1 || true
+        docker network inspect kind > "$diagnostics/network.json" 2>&1 || true
+        sudo dmesg --ctime > "$diagnostics/dmesg.txt" 2>&1 || true
+        for node in $(docker ps -a --filter label=io.x-k8s.kind.cluster=kind --format '{{.Names}}'); do
+          docker logs --timestamps "$node" > "$diagnostics/$node.log" 2>&1 || true
+          docker inspect "$node" > "$diagnostics/$node-inspect.json" 2>&1 || true
+          docker exec "$node" journalctl --no-pager -b > "$diagnostics/$node-journal.txt" 2>&1 || true
+          docker exec "$node" sh -c 'ip address; ip route; ip -6 route; cat /etc/resolv.conf; getent ahostsv4 host.docker.internal' \
+            > "$diagnostics/$node-network.txt" 2>&1 || true
+        done
+        kind export logs "$diagnostics/kind" --name kind > "$diagnostics/export.log" 2>&1 || true
     - name: Configure registry proxies for IPv6 tests
       if: ${{ inputs.networking == 'ipv6' }}
       shell: bash

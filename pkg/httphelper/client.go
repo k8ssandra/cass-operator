@@ -1348,7 +1348,7 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 		port = request.port
 	}
 
-	url := fmt.Sprintf("%s://%s:%d%s", client.Protocol, request.host, port, request.endpoint)
+	url := fmt.Sprintf("%s://%s%s", client.Protocol, net.JoinHostPort(request.host, strconv.Itoa(port)), request.endpoint)
 
 	var reqBody io.Reader
 	if len(request.body) > 0 {

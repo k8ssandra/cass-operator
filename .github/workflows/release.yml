@@ -19,6 +19,13 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: false
+      - name: OSV-Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@7f58dd6750d78fc29a900ba64b1a0f946f62fba4 # v2.6.0
+        with:
+          scan-args: |-
+            --no-call-analysis=go
+            --recursive
+            ./
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx

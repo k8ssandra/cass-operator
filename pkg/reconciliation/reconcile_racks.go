@@ -2071,6 +2071,7 @@ func (rc *ReconciliationContext) startOneNodePerRack(endpointData httphelper.Cas
 
 	// labelSeedBeforeStart := readySeeds == 0 && !hasAdditionalSeeds
 	runningPods := 0
+	waitingForRack := false
 
 RackLoop:
 	for idx := range rc.desiredRackInformation {
@@ -2082,34 +2083,33 @@ RackLoop:
 			continue
 		}
 
+		var podToStart *corev1.Pod
 		for podRankWithinRack := maxPodRankInThisRack; podRankWithinRack >= 0; podRankWithinRack-- {
-			podName := getStatefulSetPodNameForIdx(statefulSet, int32(maxPodRankInThisRack))
+			podName := getStatefulSetPodNameForIdx(statefulSet, int32(podRankWithinRack))
 			pod := rc.getDCPodByName(podName)
 			if pod == nil {
 				return false, fmt.Errorf("pod %s: %w", podName, errPodNotFound)
 			}
-			if !isServerReady(pod) {
-				if isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
-					notReady, err := rc.startNode(pod, labelSeedBeforeStart, endpointData)
-					if notReady || err != nil {
-						return notReady, err
-					}
-					continue RackLoop // This rack had a node running, so we can skip the rest of the rack's pods
-				}
-			} else {
-				// This rack had a node running, so we can skip the rest of the rack's pods
+			if isServerReady(pod) {
+				// This rack already has a node running. Do not start a second one here.
 				runningPods++
 				continue RackLoop
 			}
-			// Note, it's possible that the rack didn't have any pods that could be started (they could be in Pending state), but
-			// we don't want to interrupt other racks from starting even if this rack is down (such as zone failure)
+			if podToStart == nil && isServerReadyToStart(pod) && isMgmtApiRunning(pod) {
+				podToStart = pod
+			}
 		}
+		if podToStart != nil {
+			return rc.startNode(podToStart, labelSeedBeforeStart, endpointData)
+		}
+		// No node in this rack is running or ready to start yet.
+		waitingForRack = true
 	}
 
 	if runningPods < 1 && rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) != corev1.ConditionTrue {
 		return true, fmt.Errorf("no pods were ready to be started in any rack")
 	}
-	return false, nil
+	return waitingForRack, nil
 }
 
 // startAllNodes starts all nodes in the datacenter in a deterministic order, dictated by the order
@@ -2124,14 +2124,36 @@ func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetad
 	if err != nil {
 		return false, fmt.Errorf("failed to create start sequence: %w", err)
 	}
+
+	readyNodesByRack := make(map[string]int, len(rc.desiredRackInformation))
+	minReadyNodes := 0
+	waitingForNodes := false
+	for _, rackInfo := range rc.desiredRackInformation {
+		for _, pod := range rc.rackPods(rackInfo.RackName) {
+			if isServerReady(pod) {
+				readyNodesByRack[rackInfo.RackName]++
+			}
+		}
+		readyNodes := readyNodesByRack[rackInfo.RackName]
+		if readyNodes < rackInfo.NodeCount {
+			if !waitingForNodes || readyNodes < minReadyNodes {
+				minReadyNodes = readyNodes
+			}
+			waitingForNodes = true
+		}
+	}
+
 	for _, pod := range podsToStart {
+		if readyNodesByRack[pod.Labels[api.RackLabel]] > minReadyNodes {
+			continue
+		}
 		notReady, err := rc.startNode(pod, false, endpointData)
 		if notReady || err != nil {
 			return notReady, err
 		}
 	}
 
-	return false, nil
+	return waitingForNodes, nil
 }
 
 func (rc *ReconciliationContext) createStartSequence() ([]*corev1.Pod, error) {

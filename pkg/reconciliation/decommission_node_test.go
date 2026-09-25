@@ -118,6 +118,8 @@ func TestRetryDecommissionNode(t *testing.T) {
 	wg.Add(1)
 	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.RequestURI() {
+		case "/api/v0/metadata/endpoints":
+			_, _ = w.Write([]byte(`{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`))
 		case "/api/v0/metadata/versions/features":
 			http.NotFound(w, r)
 		case "/api/v0/ops/node/decommission?force=true":
@@ -169,6 +171,7 @@ func TestRetryDecommissionNode(t *testing.T) {
 		t.Fatalf("expected result of result.RequeueSoon(5) but got %s", r)
 	}
 	wg.Wait()
+	server.assertCallCount(t, "/api/v0/metadata/endpoints", 1)
 	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
 	server.assertCallCount(t, "/api/v0/ops/node/decommission", 1)
 }
@@ -254,10 +257,11 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 		{name: "gone from peer and local left", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS_WITH_PORT":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
 		{name: "gone from peer but local normal", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, wantCalls: 1},
 		{name: "local request fails", peerStatus: "LEFT", localCode: http.StatusInternalServerError, wantCalls: 1, wantError: true},
-		{name: "override bypasses unavailable pod", peerStatus: "LEFT", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true},
-		{name: "override permits missing peer entry and unavailable pod", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true},
+		{name: "override bypasses unavailable pod", peerStatus: "LEFT", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true, wantCalls: 1},
+		{name: "override permits missing peer entry and unavailable pod", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true, wantCalls: 1},
+		{name: "override does not bypass local normal", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, annotation: "true", wantCalls: 1},
 		{name: "false annotation does not bypass", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, annotation: "false", wantCalls: 1},
-		{name: "override still requires peer completion", peerStatus: "NORMAL", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"LEFT"}]}`, annotation: "true"},
+		{name: "local left is authoritative even when peer reports normal", peerStatus: "NORMAL", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
 	}
 
 	for _, tt := range tests {

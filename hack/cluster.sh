@@ -1,6 +1,51 @@
 #!/bin/sh
 set -o errexit
 
+usage() {
+  cat <<'EOF'
+Usage: hack/cluster.sh [ipv4|ipv6|dual]
+
+Creates a kind cluster with an optional networking mode.
+EOF
+}
+
+IP_FAMILY="${1:-ipv4}"
+case "${IP_FAMILY}" in
+  ipv4|ipv6|dual)
+    ;;
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac
+
+NETWORKING_CONFIG=""
+if [ "${IP_FAMILY}" != "ipv4" ]; then
+  NETWORKING_CONFIG="networking:
+  ipFamily: ${IP_FAMILY}"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    NETWORKING_CONFIG="${NETWORKING_CONFIG}
+  apiServerAddress: 127.0.0.1"
+  fi
+fi
+
+# Kind otherwise creates a dual-stack Docker network even for IPv6 clusters.
+# Keep IPv4 loopback available, but give the nodes only IPv6 connectivity.
+if [ "${IP_FAMILY}" = "ipv6" ]; then
+  if docker network inspect kind >/dev/null 2>&1; then
+    if [ "$(docker network inspect -f '{{.EnableIPv4}} {{.EnableIPv6}}' kind)" != 'false true' ]; then
+      echo 'The existing kind network is not IPv6-only. Remove unused clusters and the kind network before retrying.' >&2
+      exit 1
+    fi
+  else
+    docker network create --ipv6 --ipv4=false kind
+  fi
+fi
+
 # 1. Create registry container unless it already exists
 reg_name='kind-registry'
 reg_port='5001'
@@ -22,15 +67,18 @@ fi
 # https://github.com/kubernetes-sigs/kind/issues/2875
 # https://github.com/containerd/containerd/blob/main/docs/cri/config.md#registry-configuration
 # See: https://github.com/containerd/containerd/blob/main/docs/hosts.md
-cat <<EOF | kind create cluster --config=-
+set --
+if [ -n "${KIND_NODE_IMAGE:-}" ]; then
+  set -- --image "${KIND_NODE_IMAGE}"
+fi
+cat <<EOF | kind create cluster --retain --config=- "$@"
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry]
     config_path = "/etc/containerd/certs.d"
-featureGates:
-  MaxUnavailableStatefulSet: false
+$(if [ -n "${NETWORKING_CONFIG}" ]; then printf '%s\n' "${NETWORKING_CONFIG}"; fi)
 nodes:
 - role: control-plane
 - role: worker

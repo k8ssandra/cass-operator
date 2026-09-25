@@ -12,6 +12,9 @@ inputs:
   serverImage:
     description: "Override server image used in the test file"
     required: false
+  networking:
+    description: "Set networking mode for kind cluster (default: ipv4)"
+    required: false
 
 runs:
   using: "composite"
@@ -33,10 +36,111 @@ runs:
       run: |
         mkdir bin
         ln -s /usr/local/bin/kustomize bin/kustomize
-    - name: Create kind cluster
+    - name: Prepare IPv6 Kind node image
+      if: ${{ inputs.networking == 'ipv6' }}
       shell: bash
       run: |
-        hack/cluster.sh
+        # Patch the actual image entrypoint, not a separately downloaded version.
+        base_image=kindest/node:v1.37.0
+        patched_image=cass-operator-kind-ipv6:v1.37.0
+        build_dir=$(mktemp -d)
+        docker pull "$base_image"
+        container=$(docker create "$base_image")
+        trap 'docker rm "$container" >/dev/null; rm -rf "$build_dir"' EXIT
+        docker cp "$container:/usr/local/bin/entrypoint" "$build_dir/entrypoint"
+        python3 .github/actions/run-integ-test/patch-kind-entrypoint.py "$build_dir/entrypoint"
+        bash -n "$build_dir/entrypoint"
+        printf 'FROM %s\nCOPY --chmod=755 entrypoint /usr/local/bin/entrypoint\n' "$base_image" > "$build_dir/Dockerfile"
+        docker build -t "$patched_image" "$build_dir"
+        echo "KIND_NODE_IMAGE=$patched_image" >> "$GITHUB_ENV"
+    - name: Create kind cluster
+      id: cluster
+      shell: bash
+      run: |
+        hack/cluster.sh ${{ inputs.networking }}
+    - name: Collect cluster creation diagnostics
+      if: ${{ failure() && steps.cluster.outcome == 'failure' }}
+      shell: bash
+      run: |
+        diagnostics=build/kubectl_dump/cluster-creation
+        mkdir -p "$diagnostics"
+        # Collect independently: an exited node or missing tool must not hide
+        # the other diagnostics or replace the original creation failure.
+        {
+          kind version
+          docker version
+          docker info
+          uname -a
+          free -h
+          df -h
+          sysctl fs.inotify.max_user_instances fs.inotify.max_user_watches
+          ip address
+          ip route
+          ip -6 route
+        } > "$diagnostics/host.txt" 2>&1 || true
+        docker ps -a > "$diagnostics/containers.txt" 2>&1 || true
+        docker network inspect kind > "$diagnostics/network.json" 2>&1 || true
+        sudo dmesg --ctime > "$diagnostics/dmesg.txt" 2>&1 || true
+        for node in $(docker ps -a --filter label=io.x-k8s.kind.cluster=kind --format '{{.Names}}'); do
+          docker logs --timestamps "$node" > "$diagnostics/$node.log" 2>&1 || true
+          docker inspect "$node" > "$diagnostics/$node-inspect.json" 2>&1 || true
+          docker exec "$node" journalctl --no-pager -b > "$diagnostics/$node-journal.txt" 2>&1 || true
+          docker exec "$node" sh -c 'ip address; ip route; ip -6 route; cat /etc/resolv.conf; getent ahostsv4 host.docker.internal' \
+            > "$diagnostics/$node-network.txt" 2>&1 || true
+        done
+        kind export logs "$diagnostics/kind" --name kind > "$diagnostics/export.log" 2>&1 || true
+    - name: Configure IPv6 DNS forwarding
+      if: ${{ inputs.networking == 'ipv6' }}
+      shell: bash
+      run: |
+        # This infrastructure container alone can use the host's IPv4 egress.
+        # Nodes retain 127.0.0.11 for Docker names and image-pull DNS.
+        dns_config="$RUNNER_TEMP/kind-dns.Corefile"
+        printf '.:53 {\n    errors\n    forward . /etc/resolv.conf\n}\n' > "$dns_config"
+        docker run -d --name kind-dns --network bridge \
+          -v "$dns_config:/Corefile:ro" \
+          registry.k8s.io/coredns/coredns:v1.12.0 -conf /Corefile
+        docker network connect kind kind-dns
+        dns_ip=$(docker inspect -f '{{.NetworkSettings.Networks.kind.GlobalIPv6Address}}' kind-dns)
+        test -n "$dns_ip"
+        kubectl -n kube-system get configmap coredns -o json > "$RUNNER_TEMP/coredns.json"
+        DNS_IP="$dns_ip" python3 - <<'PY'
+        import json, os, pathlib
+        path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "coredns.json"
+        config = json.loads(path.read_text())
+        original = config["data"]["Corefile"]
+        target = "forward . /etc/resolv.conf"
+        if original.count(target) != 1:
+            raise SystemExit("CoreDNS configuration changed; review IPv6 forwarding")
+        config["data"]["Corefile"] = original.replace(target, "forward . " + os.environ["DNS_IP"])
+        path.write_text(json.dumps(config))
+        PY
+        kubectl apply -f "$RUNNER_TEMP/coredns.json"
+        kubectl -n kube-system rollout restart deployment coredns
+        kubectl -n kube-system rollout status deployment coredns --timeout=120s
+    - name: Configure registry proxies for IPv6 tests
+      if: ${{ inputs.networking == 'ipv6' }}
+      shell: bash
+      run: |
+        # Only the caches have IPv4 upstream access. Nodes reach them over IPv6.
+        # Keep cluster.sh's writable local registry separate from these CI caches.
+        for registry in localhost:5001 quay.io docker.io; do
+          case "$registry" in
+            localhost:5001) cache_name=kind-registry-ghcr; upstream=https://ghcr.io ;;
+            quay.io) cache_name=kind-registry-quay; upstream=https://quay.io ;;
+            docker.io) cache_name=kind-registry-docker; upstream=https://registry-1.docker.io ;;
+          esac
+          docker run -d --restart=always --network bridge --name "$cache_name" \
+            -e "REGISTRY_PROXY_REMOTEURL=$upstream" registry:3
+          docker network connect kind "$cache_name"
+          for node in $(kind get nodes); do
+            registry_dir="/etc/containerd/certs.d/$registry"
+            docker exec "$node" mkdir -p "$registry_dir"
+            # Set server to prevent direct upstream fallback.
+            printf 'server = "http://%s:5000"\n' "$cache_name" |
+              docker exec -i "$node" cp /dev/stdin "$registry_dir/hosts.toml"
+          done
+        done
     - name: Install gatekeeper rules
       if: ${{ !env.SKIP_GATEKEEPER }}
       shell: bash
@@ -63,6 +167,18 @@ runs:
       run: |
         kind load docker-image --name=kind ${{ steps.load.outputs.operator_img }}
         kind load docker-image --name=kind ${{ steps.load.outputs.logger_img }}
+    - name: Use GHCR pull-through cache for IPv6 tests
+      if: ${{ inputs.networking == 'ipv6' }}
+      shell: bash
+      env:
+        LOGGER_IMAGE: ${{ steps.load.outputs.logger_img }}
+      run: |
+        yq eval -i '.overrides.registry = "localhost:5001"' config/imageconfig/image_config.yaml
+        # The registry override also applies to the locally built logger. Load
+        # the same image under that name so it never needs to exist in GHCR.
+        proxy_logger="localhost:5001/${LOGGER_IMAGE#docker.io/}"
+        docker tag "$LOGGER_IMAGE" "$proxy_logger"
+        kind load docker-image --name=kind "$proxy_logger"
     - name: Run integration test ( ${{ inputs.integration_test }} )
       shell: bash
       run: |

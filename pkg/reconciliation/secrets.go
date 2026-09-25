@@ -110,12 +110,20 @@ func (rc *ReconciliationContext) retrieveSuperuserSecret() (*corev1.Secret, erro
 	return rc.retrieveSecret(secretNamespacedName)
 }
 
+func (rc *ReconciliationContext) allowMissingExternalSuperuserSecret() bool {
+	return !rc.Datacenter.ShouldGenerateSuperuserSecret() &&
+		(rc.Datacenter.GetDeletionTimestamp() != nil || rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionTrue)
+}
+
 func (rc *ReconciliationContext) retrieveSuperuserSecretOrCreateDefault() error {
 	dc := rc.Datacenter
 
 	_, retrieveErr := rc.retrieveSuperuserSecret()
 	if retrieveErr != nil {
 		if errors.IsNotFound(retrieveErr) {
+			if rc.allowMissingExternalSuperuserSecret() {
+				return nil
+			}
 			secret, err := buildDefaultSuperuserSecret(dc)
 
 			if err == nil && secret == nil {
@@ -274,6 +282,9 @@ func (rc *ReconciliationContext) validateSuperuserSecret() []error {
 	secret, err := rc.retrieveSuperuserSecret()
 	if err != nil {
 		if errors.IsNotFound(err) {
+			if rc.allowMissingExternalSuperuserSecret() {
+				return nil
+			}
 			if dc.ShouldGenerateSuperuserSecret() {
 				return []error{}
 			} else {

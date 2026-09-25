@@ -177,6 +177,16 @@ func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
 				continue
 			}
 			rackName := pod.Labels[api.RackLabel]
+			if utils.IndexOfString(rc.Datacenter.Status.FailedStarts, pod.Name) > -1 {
+				rc.ReqLogger.Info("Found previously failed start", "pod", pod.Name)
+				return true, rackName
+			}
+
+			if !rc.podMatchesCurrentRackRevision(pod) {
+				// We have an update going on (or some weird Canary state), this isn't expected Pod state in any case
+				continue
+			}
+
 			if pod.Status.Phase == corev1.PodPending {
 				if pod.Status.StartTime == nil || hasBeenXMinutes(5, pod.Status.StartTime.Time) {
 					// Pod has been over 5 minutes in Pending state. This can be normal, but lets see
@@ -1368,6 +1378,18 @@ func hasCassandraContainerTerminated(pod *corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func (rc *ReconciliationContext) podMatchesCurrentRackRevision(pod *corev1.Pod) bool {
+	rackName := pod.Labels[api.RackLabel]
+	for idx, rackInfo := range rc.desiredRackInformation {
+		if rackInfo.RackName == rackName {
+			expectedRevision := rc.statefulSets[idx].Status.UpdateRevision
+			podRevision := pod.Labels[appsv1.ControllerRevisionHashLabelKey]
+			return podRevision == expectedRevision
+		}
+	}
+	return true
 }
 
 func getCassContainerStatus(pod *corev1.Pod) *corev1.ContainerStatus {

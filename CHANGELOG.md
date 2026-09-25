@@ -18,6 +18,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#959](https://github.com/k8ssandra/cass-operator/issues/959) Synchronize Cassandra Services with configured container ports and remove ports that are unavailable or intended only for pod-level communication
 * [BUGFIX] [#971](https://github.com/k8ssandra/cass-operator/issues/971) Decommissioning last pod of a datacenter left its pod_status metric abandoned instead of being removed. And also we got an error logline which wasn't a real error
 * [BUGFIX] [#973](https://github.com/k8ssandra/cass-operator/issues/973) Prevent premature decommission cleanup when Cassandra metadata requests fail.
+* [BUGFIX] [#975](https://github.com/k8ssandra/cass-operator/issues/975) Use FailedStarts and StatefulSet revisions as part of the failureModeDetection to allow forced apply of change
 
 ## v1.32.0
 

@@ -51,6 +51,10 @@ const (
 	// CassandraDatacenter is deleted.
 	DecommissionOnDeleteAnnotation = "cassandra.datastax.com/decommission-on-delete"
 
+	// SkipLocalDecommissionCheckAnnotation allows scale down / decommission to continue when the
+	// decommissioning pod's mgmt-api is unavailable
+	SkipLocalDecommissionCheckAnnotation = "cassandra.datastax.com/skip-local-decommission-check"
+
 	// NoFinalizerAnnotation prevents cass-operator from re-adding the finalizer to managed objects if finalizer is
 	// removed. Removing finalizer means deletion is not processed as usual.
 	NoFinalizerAnnotation = "cassandra.datastax.com/no-finalizer"

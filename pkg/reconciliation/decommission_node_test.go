@@ -118,6 +118,8 @@ func TestRetryDecommissionNode(t *testing.T) {
 	wg.Add(1)
 	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.RequestURI() {
+		case "/api/v0/metadata/endpoints":
+			_, _ = w.Write([]byte(`{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`))
 		case "/api/v0/metadata/versions/features":
 			http.NotFound(w, r)
 		case "/api/v0/ops/node/decommission?force=true":
@@ -169,6 +171,7 @@ func TestRetryDecommissionNode(t *testing.T) {
 		t.Fatalf("expected result of result.RequeueSoon(5) but got %s", r)
 	}
 	wg.Wait()
+	server.assertCallCount(t, "/api/v0/metadata/endpoints", 1)
 	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
 	server.assertCallCount(t, "/api/v0/ops/node/decommission", 1)
 }
@@ -182,6 +185,14 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 		Status: corev1.ConditionTrue,
 		Type:   api.DatacenterScalingDown,
 	})
+	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v0/metadata/endpoints" {
+			_, _ = w.Write([]byte(`{"entity":[{"IS_LOCAL":"true","STATUS":"LEFT"}]}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	labels := make(map[string]string)
 	labels[api.CassNodeState] = stateDecommissioning
@@ -191,8 +202,10 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 			Name:   "pod-1",
 			Labels: labels,
 		},
+		Spec:   corev1.PodSpec{Containers: []corev1.Container{{Name: "cassandra"}}},
 		Status: corev1.PodStatus{},
 	}}
+	server.attachToPod(t, rc.dcPods[0])
 
 	makeInt := func(i int32) *int32 {
 		return &i
@@ -220,6 +233,96 @@ func TestRemoveResourcesWhenDone(t *testing.T) {
 	r := rc.CheckDecommissioningNodes(epData)
 	if r != result.RequeueSoon(5) {
 		t.Fatalf("expected result of blah but got %s", r)
+	}
+	server.assertCallCount(t, "/api/v0/metadata/endpoints", 1)
+}
+
+func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
+	tests := []struct {
+		name          string
+		peerStatus    string
+		localResponse string
+		localCode     int
+		annotation    string
+		podReady      bool
+		wantCleaned   bool
+		wantCalls     int
+		wantRetries   int
+		wantError     bool
+	}{
+		{name: "peer left and local left", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
+		{name: "peer left but local normal", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, wantCalls: 1},
+		{name: "peer left but local still leaving", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"LEAVING"}]}`, podReady: true, wantCalls: 1, wantRetries: 1},
+		{name: "peer left but only remote left", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"false","STATUS":"LEFT"}]}`, wantCalls: 1},
+		{name: "gone from peer and local left", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS_WITH_PORT":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
+		{name: "gone from peer but local normal", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, wantCalls: 1},
+		{name: "local request fails", peerStatus: "LEFT", localCode: http.StatusInternalServerError, wantCalls: 1, wantError: true},
+		{name: "override bypasses unavailable pod", peerStatus: "LEFT", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true, wantCalls: 1},
+		{name: "override permits missing peer entry and unavailable pod", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true, wantCalls: 1},
+		{name: "override does not bypass local normal", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, annotation: "true", wantCalls: 1},
+		{name: "false annotation does not bypass", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, annotation: "false", wantCalls: 1},
+		{name: "local left is authoritative even when peer reports normal", peerStatus: "NORMAL", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, cleanupMockScr := setupTest()
+			defer cleanupMockScr()
+			rc.Datacenter.SetCondition(api.DatacenterCondition{Status: corev1.ConditionTrue, Type: api.DatacenterScalingDown})
+			if tt.annotation != "" {
+				rc.Datacenter.Annotations = map[string]string{api.SkipLocalDecommissionCheckAnnotation: tt.annotation}
+			}
+
+			server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/v0/metadata/endpoints" {
+					if tt.localCode != 0 {
+						w.WriteHeader(tt.localCode)
+						return
+					}
+					_, _ = w.Write([]byte(tt.localResponse))
+					return
+				}
+				if r.URL.Path == "/api/v0/metadata/versions/features" {
+					_, _ = w.Write([]byte(`{"cassandra_version":"4.0","features":["async_sstable_tasks"]}`))
+					return
+				}
+				if r.URL.Path == "/api/v1/ops/node/decommission" {
+					_, _ = w.Write([]byte(`"job-1"`))
+					return
+				}
+				http.NotFound(w, r)
+			}))
+			rc.NodeMgmtClient = server.client(rc.ReqLogger)
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Labels: map[string]string{api.CassNodeState: stateDecommissioning, api.RackLabel: "default"}},
+				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "cassandra"}}},
+				Status:     corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "cassandra", Ready: tt.podReady}}},
+			}
+			server.attachToPod(t, pod)
+			rc.dcPods = []*corev1.Pod{pod}
+			rc.Datacenter.Status.NodeStatuses = api.CassandraStatusMap{pod.Name: {HostID: "target-host"}}
+			zero := int32(0)
+			rc.statefulSets = []*appsv1.StatefulSet{{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{api.RackLabel: "default"}}, Spec: appsv1.StatefulSetSpec{Replicas: &zero}}}
+
+			peer := httphelper.EndpointState{RpcAddress: "other-pod-ip", HostID: "other-host", Status: "NORMAL"}
+			if tt.peerStatus != "" {
+				peer.RpcAddress = pod.Status.PodIP
+				peer.HostID = "target-host"
+				peer.Status = tt.peerStatus
+			}
+			res := rc.CheckDecommissioningNodes(httphelper.CassMetadataEndpoints{Entity: []httphelper.EndpointState{peer}})
+			_, err := res.Output()
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			_, remains := rc.Datacenter.Status.NodeStatuses[pod.Name]
+			require.Equal(t, tt.wantCleaned, !remains)
+			server.assertCallCount(t, "/api/v0/metadata/endpoints", tt.wantCalls)
+			server.assertCallCount(t, "/api/v0/metadata/versions/features", tt.wantRetries)
+			server.assertCallCount(t, "/api/v1/ops/node/decommission", tt.wantRetries)
+		})
 	}
 }
 

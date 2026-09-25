@@ -2497,6 +2497,127 @@ func TestStartingSequenceBuilder(t *testing.T) {
 	}
 }
 
+func TestRackStartsWaitForLaggingRack(t *testing.T) {
+	type podState struct {
+		ready     bool
+		startable bool
+	}
+	tests := []struct {
+		name         string
+		racks        [][]podState
+		firstPodPass bool
+		wantStart    string
+	}{
+		{
+			name: "first pod pass waits for an unscheduled rack",
+			racks: [][]podState{
+				{{ready: true}, {startable: true}},
+				{{ready: true}, {startable: true}},
+				{{}, {}},
+			},
+			firstPodPass: true,
+		},
+		{
+			name: "pending first pod blocks the next round",
+			racks: [][]podState{
+				{{ready: true}, {startable: true}},
+				{{ready: true}, {startable: true}},
+				{{}},
+			},
+		},
+		{
+			name: "lagging rack starts when its pod becomes available",
+			racks: [][]podState{
+				{{ready: true}, {startable: true}},
+				{{ready: true}, {startable: true}},
+				{{startable: true}},
+			},
+			wantStart: "rack3-0",
+		},
+		{
+			name: "pending second pod blocks a third pod",
+			racks: [][]podState{
+				{{ready: true}, {ready: true}, {startable: true}},
+				{{ready: true}, {ready: true}, {startable: true}},
+				{{ready: true}, {}},
+			},
+		},
+		{
+			name: "lagging rack starts before a rack that is ahead",
+			racks: [][]podState{
+				{{ready: true}, {ready: true}, {startable: true}},
+				{{ready: true}, {startable: true}},
+				{{ready: true}, {}},
+			},
+			wantStart: "rack2-1",
+		},
+		{
+			name: "rack with extra desired node can finish after other racks",
+			racks: [][]podState{
+				{{ready: true}, {ready: true}, {startable: true}},
+				{{ready: true}, {ready: true}},
+				{{ready: true}, {ready: true}},
+			},
+			wantStart: "rack1-2",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, cleanup := setupTest()
+			defer cleanup()
+			var objects []runtime.Object
+			objects = append(objects, rc.Datacenter)
+			for rackIndex, states := range tt.racks {
+				rackName := fmt.Sprintf("rack%d", rackIndex+1)
+				sts := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: rackName}}
+				rc.statefulSets = append(rc.statefulSets, sts)
+				rc.desiredRackInformation = append(rc.desiredRackInformation, &RackInformation{RackName: rackName, NodeCount: len(states)})
+				objects = append(objects, sts)
+				for ordinal, state := range states {
+					pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-%d", rackName, ordinal), Namespace: rc.Datacenter.Namespace, Labels: map[string]string{api.RackLabel: rackName, api.CassNodeState: stateReadyToStart}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "cassandra"}}}}
+					pod.Status.Phase = corev1.PodPending
+					if state.ready || state.startable {
+						pod.Status.Phase = corev1.PodRunning
+						pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "cassandra", Ready: state.ready, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)}}}}}
+					}
+					if state.ready {
+						pod.Labels[api.CassNodeState] = stateStarted
+					}
+					rc.dcPods = append(rc.dcPods, pod)
+					objects = append(objects, pod)
+				}
+			}
+			server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			for _, pod := range rc.dcPods {
+				server.attachToPod(t, pod)
+			}
+			rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(objects...).Build()
+			rc.NodeMgmtClient = server.client(rc.ReqLogger)
+
+			var notReady bool
+			var err error
+			if tt.firstPodPass {
+				notReady, err = rc.startOneNodePerRack(httphelper.CassMetadataEndpoints{}, 2)
+			} else {
+				notReady, err = rc.startAllNodes(httphelper.CassMetadataEndpoints{})
+			}
+			require.NoError(t, err)
+			require.True(t, notReady)
+			if tt.wantStart == "" {
+				server.assertCallCount(t, "/api/v0/lifecycle/start", 0)
+				for _, pod := range rc.dcPods {
+					assert.NotEqual(t, stateStarting, pod.Labels[api.CassNodeState], pod.Name)
+				}
+			} else {
+				require.Eventually(t, func() bool { return server.callCount("/api/v0/lifecycle/start") == 1 }, time.Second, time.Millisecond)
+				assert.Equal(t, stateStarting, rc.getDCPodByName(tt.wantStart).Labels[api.CassNodeState])
+			}
+		})
+	}
+}
+
 func TestReconciliationContext_startAllNodes(t *testing.T) {
 	t.Skip("Testify is broken here with Go 1.26")
 	// A boolean representing the state of a pod (started or not).

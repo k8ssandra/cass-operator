@@ -4099,8 +4099,9 @@ func TestFailedStartAllowsCorrectiveStatefulSetUpdateAndIsReset(t *testing.T) {
 		},
 		Status: corev1.PodStatus{
 			ContainerStatuses: []corev1.ContainerStatus{{
-				Name: "cassandra",
-				LastTerminationState: corev1.ContainerState{
+				Name:         "cassandra",
+				RestartCount: 1,
+				State: corev1.ContainerState{
 					Terminated: &corev1.ContainerStateTerminated{ExitCode: 1},
 				},
 			}},

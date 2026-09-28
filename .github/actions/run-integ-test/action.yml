@@ -167,6 +167,15 @@ runs:
       run: |
         kind load docker-image --name=kind ${{ steps.load.outputs.operator_img }}
         kind load docker-image --name=kind ${{ steps.load.outputs.logger_img }}
+    - name: Load GHCR-tagged system-logger for non-IPv6 tests
+      if: ${{ inputs.networking != 'ipv6' }}
+      shell: bash
+      env:
+        LOGGER_IMAGE: ${{ steps.load.outputs.logger_img }}
+      run: |
+        ghcr_logger="ghcr.io/${LOGGER_IMAGE#docker.io/}"
+        docker tag "$LOGGER_IMAGE" "$ghcr_logger"
+        kind load docker-image --name=kind "$ghcr_logger"
     - name: Use GHCR pull-through cache for IPv6 tests
       if: ${{ inputs.networking == 'ipv6' }}
       shell: bash

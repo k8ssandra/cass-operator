@@ -431,6 +431,14 @@ jobs:
         run: |
           kind load docker-image --name=topolvm-example ${{ steps.load.outputs.operator_img }}
           kind load docker-image --name=topolvm-example ${{ steps.load.outputs.logger_img }}
+      - name: Load GHCR-tagged system-logger
+        shell: bash
+        env:
+          LOGGER_IMAGE: ${{ steps.load.outputs.logger_img }}
+        run: |
+          ghcr_logger="ghcr.io/${LOGGER_IMAGE#docker.io/}"
+          docker tag "$LOGGER_IMAGE" "$ghcr_logger"
+          kind load docker-image --name=topolvm-example "$ghcr_logger"
       - name: Run integration test
         shell: bash
         run: |

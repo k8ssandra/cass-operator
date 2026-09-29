@@ -264,19 +264,18 @@ jobs:
           - "5.0.9"
           - "6.8.59"
           - "6.9.17"
+          - "2.0.8"
         integration_test:
           - test_all_the_things
-          - smoke_test_read_only_fs
         include:
-          - version: 6.8.59
+          - version: 6.8.65
             serverType: dse
-          - version: 6.9.17
+          - version: 6.9.25
             serverType: dse
+          - version: 2.0.8
+            serverType: hcd
           - version: 4.0.21
             skipGatekeeper: true
-        exclude:
-          - version: 4.0.21
-            integration_test: "smoke_test_read_only_fs"
       fail-fast: true
     runs-on: ubuntu-latest
     env:
@@ -295,6 +294,21 @@ jobs:
       - name: Set SKIP_GATEKEEPER
         if: ${{ matrix.skipGatekeeper }}
         run: echo "SKIP_GATEKEEPER=true" >> $GITHUB_ENV
+      - id: docker-login-icr
+        if: ${{ matrix.serverType == 'hcd' || matrix.serverType == 'dse' }}
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: iamapikey
+          password: ${{ secrets.MC_ICR_IO_API_KEY }}
+          registry: icr.io
+      - name: Configure icr.io pull secret
+        if: ${{ matrix.serverType == 'hcd' || matrix.serverType == 'dse' }}
+        run: |
+          yq eval -i '.defaults.pullSecrets = ["cass-operator-pull-secret"]' config/imageconfig/image_config.yaml
+        env:
+          M_DOCKER_SERVER: icr.io
+          M_DOCKER_USERNAME: iamapikey
+          M_DOCKER_PASSWORD: ${{ secrets.MC_ICR_IO_API_KEY }}
       - uses: ./.github/actions/run-integ-test
         with:
           integration_test: ${{ matrix.integration_test }}

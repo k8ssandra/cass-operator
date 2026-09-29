@@ -41,13 +41,13 @@ types:
     repository: "k8ssandra"
     name: "cass-management-api"
     suffix: "-ubi"
-  dse:
-    repository: "datastax"
-    name: "dse-mgmtapi-6_8"
+  hcd:
+    registry: "cp.icr.io"
+    repository: "cp/ibm-ds-mission-control"
+    name: "hcd"
     suffix: "-ubi"
-  # hcd:
-  #   repository: "datastax"
-  #   name: "hcd"
-  #   suffix: "-ubi"
-  #   pullSecret: "hcd-pull-secret" # Use of pullSecret removes the default pullSecrets for this image
-  #   pullPolicy: IfNotPresent
+  dse:
+    registry: "cp.icr.io"
+    repository: "cp/ibm-ds-mission-control"
+    name: "dse-mgmtapi"
+    suffix: "-ubi"

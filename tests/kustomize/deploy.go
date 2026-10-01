@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
 )
 
 func Deploy(namespace string) error {
@@ -17,11 +19,40 @@ func Undeploy(namespace string) error {
 }
 
 func DeployDir(namespace, testDir string) error {
-	return runMake(namespace, "deploy-test", testDir)
+	if err := runMake(namespace, "deploy-test", testDir); err != nil {
+		return err
+	}
+	if kubectl.DockerCredentialsDefined() {
+		return createDockerRegistrySecret(namespace)
+	}
+	return nil
 }
 
 func UndeployDir(namespace, testDir string) error {
 	return runMake(namespace, "undeploy-test", testDir)
+}
+
+func createDockerRegistrySecret(namespace string) error {
+	server := os.Getenv(kubectl.EnvDockerServer)
+	username := os.Getenv(kubectl.EnvDockerUsername)
+	password := os.Getenv(kubectl.EnvDockerPassword)
+
+	args := []string{
+		"create", "secret", "docker-registry", "cass-operator-pull-secret",
+		"--docker-server=" + server,
+		"--docker-username=" + username,
+		"--docker-password=" + password,
+		"--namespace=" + namespace,
+	}
+	cmd := exec.Command("kubectl", args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("createDockerRegistrySecret error output:\n%s\n", out.String())
+		return err
+	}
+	return nil
 }
 
 func runMake(namespace, command, dir string) error {

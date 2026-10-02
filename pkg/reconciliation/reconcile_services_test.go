@@ -200,9 +200,11 @@ func TestEndpointSliceControllerIntegration(t *testing.T) {
 }
 
 func TestCheckAdditionalSeedEndpointSlicesLegacyEndpointCleanup(t *testing.T) {
+	//nolint:staticcheck // Intentionally test migration from the deprecated API.
 	makeLegacyEndpoint := func(dc *api.CassandraDatacenter, name string) *corev1.Endpoints {
 		labels := dc.GetDatacenterLabels()
 		labels[oplabels.ManagedByLabel] = oplabels.ManagedByLabelValue
+		//nolint:staticcheck // Intentionally test migration from the deprecated API.
 		return &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -332,6 +334,7 @@ func TestAdditionalSeedEndpointSliceCleanupFailureDoesNotAdvanceMetadataVersion(
 			dc := rc.Datacenter
 			labels := dc.GetDatacenterLabels()
 			labels[oplabels.ManagedByLabel] = oplabels.ManagedByLabelValue
+			//nolint:staticcheck // Intentionally test migration from the deprecated API.
 			legacyEndpoint := &corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{
 				Name: "legacy-ep", Namespace: dc.Namespace, Labels: labels,
 			}}
@@ -348,6 +351,7 @@ func TestAdditionalSeedEndpointSliceCleanupFailureDoesNotAdvanceMetadataVersion(
 						return c.List(ctx, list, opts...)
 					},
 					Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+						//nolint:staticcheck // Intentionally test migration from the deprecated API.
 						if _, ok := obj.(*corev1.Endpoints); ok && failure == "delete" {
 							return fmt.Errorf("legacy endpoint deletion failed")
 						}

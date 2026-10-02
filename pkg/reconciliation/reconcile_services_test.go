@@ -302,7 +302,8 @@ func TestCheckAdditionalSeedEndpointSlicesLegacyEndpointCleanup(t *testing.T) {
 			require.NoError(t, fakeClient.List(rc.Ctx, epList, client.InNamespace(dc.Namespace)))
 			assert.Len(t, epList.Items, tt.wantRemainingEndpoints)
 			assert.EqualValues(t, tt.metadataVersion, rc.Datacenter.Status.MetadataVersion)
-			assert.Equal(t, tt.metadataVersion < 2, rc.legacyEndpointsCleanupCompleted)
+			wasCleanupExpected := tt.metadataVersion < 2
+			assert.Equal(t, wasCleanupExpected, rc.legacyEndpointsCleanupCompleted)
 			if tt.metadataVersion == 0 {
 				assert.Len(t, rc.datacenterPods(), 1, "old-labeled pods must remain visible before status is advanced")
 			}

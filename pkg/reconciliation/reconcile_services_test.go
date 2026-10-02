@@ -9,15 +9,20 @@ import (
 	"maps"
 	"testing"
 
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
+	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 	"github.com/k8ssandra/cass-operator/pkg/utils"
-	discoveryv1 "k8s.io/api/discovery/v1"
 )
 
 func TestReconcileHeadlessService(t *testing.T) {
@@ -127,7 +132,11 @@ func TestEndpointSliceControllerIntegration(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	fakeClient := fake.NewClientBuilder().WithScheme(setupScheme()).WithRuntimeObjects(rc.Datacenter).Build()
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter).
+		Build()
 
 	rc.Client = fakeClient
 	rc.Datacenter.Spec.AdditionalSeeds = []string{
@@ -188,4 +197,176 @@ func TestEndpointSliceControllerIntegration(t *testing.T) {
 	assert.Equal(t, 1, addressTypeCounts[discoveryv1.AddressTypeIPv4])
 	assert.Equal(t, 1, addressTypeCounts[discoveryv1.AddressTypeIPv6])
 	assert.Equal(t, 1, addressTypeCounts[discoveryv1.AddressTypeFQDN])
+}
+
+func TestCheckAdditionalSeedEndpointSlicesLegacyEndpointCleanup(t *testing.T) {
+	makeLegacyEndpoint := func(dc *api.CassandraDatacenter, name string) *corev1.Endpoints {
+		labels := dc.GetDatacenterLabels()
+		labels[oplabels.ManagedByLabel] = oplabels.ManagedByLabelValue
+		return &corev1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: dc.Namespace,
+				Labels:    labels,
+			},
+		}
+	}
+
+	tests := []struct {
+		name                   string
+		metadataVersion        int64
+		legacyEndpointNames    []string
+		wantEndpointListCalled bool
+		wantRemainingEndpoints int
+		wantMetadataVersion    int64
+	}{
+		{
+			name:                   "legacy endpoints are deleted and metadataVersion set to 2 when metadataVersion is 0",
+			metadataVersion:        0,
+			legacyEndpointNames:    []string{"legacy-ep-1", "legacy-ep-2"},
+			wantEndpointListCalled: true,
+			wantRemainingEndpoints: 0,
+			wantMetadataVersion:    2,
+		},
+		{
+			name:                   "metadataVersion 1 advances even when no legacy endpoints remain",
+			metadataVersion:        1,
+			wantEndpointListCalled: true,
+			wantRemainingEndpoints: 0,
+			wantMetadataVersion:    2,
+		},
+		{
+			name:                   "legacy endpoints are not touched when metadataVersion is already 2",
+			metadataVersion:        2,
+			legacyEndpointNames:    []string{"legacy-ep-1"},
+			wantEndpointListCalled: false,
+			wantRemainingEndpoints: 1,
+			wantMetadataVersion:    2,
+		},
+		{
+			name:                   "a future metadataVersion is preserved",
+			metadataVersion:        3,
+			legacyEndpointNames:    []string{"legacy-ep-1"},
+			wantEndpointListCalled: false,
+			wantRemainingEndpoints: 1,
+			wantMetadataVersion:    3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, cleanupMockScr := setupTest()
+			defer cleanupMockScr()
+
+			rc.Datacenter.Spec.AdditionalSeeds = []string{"192.168.1.1"}
+			rc.Datacenter.Status.MetadataVersion = tt.metadataVersion
+			dc := rc.Datacenter
+			dc.Status.ObservedGeneration = dc.Generation
+			if tt.metadataVersion == 0 {
+				dc.Spec.DatacenterName = "old-dc-name"
+				dc.Status.DatacenterName = new("old-dc-name")
+				rc.clusterPods = []*corev1.Pod{{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
+						api.ClusterLabel:    api.CleanLabelValue(dc.Spec.ClusterName),
+						api.DatacenterLabel: api.CleanLabelValue(dc.Spec.DatacenterName),
+					}},
+				}}
+			}
+
+			runtimeObjs := []runtime.Object{dc}
+			for _, epName := range tt.legacyEndpointNames {
+				runtimeObjs = append(runtimeObjs, makeLegacyEndpoint(dc, epName))
+			}
+
+			endpointListCalled := false
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(setupScheme()).
+				WithStatusSubresource(dc).
+				WithRuntimeObjects(runtimeObjs...).
+				WithInterceptorFuncs(interceptor.Funcs{
+					List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+						if _, ok := list.(*corev1.EndpointsList); ok {
+							endpointListCalled = true
+						}
+						return c.List(ctx, list, opts...)
+					},
+				}).
+				Build()
+			rc.Client = fakeClient
+
+			res := rc.CheckAdditionalSeedEndpointSlices()
+
+			require.False(t, res.Completed())
+			assert.Equal(t, tt.wantEndpointListCalled, endpointListCalled)
+			epList := &corev1.EndpointsList{}
+			require.NoError(t, fakeClient.List(rc.Ctx, epList, client.InNamespace(dc.Namespace)))
+			assert.Len(t, epList.Items, tt.wantRemainingEndpoints)
+			assert.EqualValues(t, tt.metadataVersion, rc.Datacenter.Status.MetadataVersion)
+			assert.Equal(t, tt.metadataVersion < 2, rc.legacyEndpointsCleanupCompleted)
+			if tt.metadataVersion == 0 {
+				assert.Len(t, rc.datacenterPods(), 1, "old-labeled pods must remain visible before status is advanced")
+			}
+
+			storedDC := &api.CassandraDatacenter{}
+			dcKey := types.NamespacedName{Name: dc.Name, Namespace: dc.Namespace}
+			require.NoError(t, fakeClient.Get(rc.Ctx, dcKey, storedDC))
+			assert.EqualValues(t, tt.metadataVersion, storedDC.Status.MetadataVersion)
+
+			require.NoError(t, setDatacenterStatus(rc))
+			assert.EqualValues(t, tt.wantMetadataVersion, rc.Datacenter.Status.MetadataVersion)
+			require.NoError(t, fakeClient.Get(rc.Ctx, dcKey, storedDC))
+			assert.EqualValues(t, tt.wantMetadataVersion, storedDC.Status.MetadataVersion)
+		})
+	}
+}
+
+func TestAdditionalSeedEndpointSliceCleanupFailureDoesNotAdvanceMetadataVersion(t *testing.T) {
+	for _, failure := range []string{"list", "delete"} {
+		t.Run(failure, func(t *testing.T) {
+			rc, _, cleanupMockScr := setupTest()
+			defer cleanupMockScr()
+
+			rc.Datacenter.Spec.AdditionalSeeds = []string{"192.168.1.1"}
+			rc.Datacenter.Status.MetadataVersion = 1
+			dc := rc.Datacenter
+			labels := dc.GetDatacenterLabels()
+			labels[oplabels.ManagedByLabel] = oplabels.ManagedByLabelValue
+			legacyEndpoint := &corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{
+				Name: "legacy-ep", Namespace: dc.Namespace, Labels: labels,
+			}}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(setupScheme()).
+				WithStatusSubresource(dc).
+				WithRuntimeObjects(dc, legacyEndpoint).
+				WithInterceptorFuncs(interceptor.Funcs{
+					List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+						if _, ok := list.(*corev1.EndpointsList); ok && failure == "list" {
+							return fmt.Errorf("legacy endpoints list failed")
+						}
+						return c.List(ctx, list, opts...)
+					},
+					Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+						if _, ok := obj.(*corev1.Endpoints); ok && failure == "delete" {
+							return fmt.Errorf("legacy endpoint deletion failed")
+						}
+						return c.Delete(ctx, obj, opts...)
+					},
+				}).
+				Build()
+			rc.Client = fakeClient
+
+			res := rc.CheckAdditionalSeedEndpointSlices()
+			require.True(t, res.Completed())
+			_, err := res.Output()
+			require.Error(t, err)
+			assert.False(t, rc.legacyEndpointsCleanupCompleted)
+			assert.EqualValues(t, 1, rc.Datacenter.Status.MetadataVersion)
+
+			storedDC := &api.CassandraDatacenter{}
+			dcKey := types.NamespacedName{Name: dc.Name, Namespace: dc.Namespace}
+			require.NoError(t, fakeClient.Get(rc.Ctx, dcKey, storedDC))
+			assert.EqualValues(t, 1, storedDC.Status.MetadataVersion)
+		})
+	}
 }

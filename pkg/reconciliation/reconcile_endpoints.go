@@ -22,7 +22,6 @@ import (
 
 func (rc *ReconciliationContext) CheckAdditionalSeedEndpointSlices() result.ReconcileResult {
 	logger := rc.ReqLogger
-	client := rc.Client
 
 	logger.Info("reconcile_services::checkAdditionalSeedEndpointSlices")
 
@@ -37,12 +36,15 @@ func (rc *ReconciliationContext) CheckAdditionalSeedEndpointSlices() result.Reco
 		}
 	}
 
-	if err := ReconcileEndpointSlices(rc.Ctx, client, logger, slices); err != nil {
+	if err := ReconcileEndpointSlices(rc.Ctx, rc.Client, logger, slices); err != nil {
 		return result.Error(err)
 	}
 
-	if err := rc.removeLegacyEndpoints(rc.Ctx, client); err != nil {
-		return result.Error(err)
+	if rc.Datacenter.Status.MetadataVersion < 2 {
+		if err := rc.removeLegacyEndpoints(rc.Ctx, rc.Client); err != nil {
+			return result.Error(err)
+		}
+		rc.legacyEndpointsCleanupCompleted = true
 	}
 
 	return result.Continue()

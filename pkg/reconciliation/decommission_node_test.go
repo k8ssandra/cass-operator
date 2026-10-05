@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -330,4 +331,163 @@ func TestDecommissionNodesRequiresMetadata(t *testing.T) {
 	require.Error(t, err)
 	require.NotEqual(t, corev1.ConditionTrue, rc.Datacenter.GetConditionStatus(api.DatacenterScalingDown))
 	require.Equal(t, int32(2), *rc.statefulSets[0].Spec.Replicas)
+}
+
+// podWithServerDataPvc builds a datacenter pod with the given IP together with
+// the server-data PVC that EnsurePodsCanAbsorbDecommData looks up for it.
+func podWithServerDataPvc(rc *ReconciliationContext, podName, podIP, capacity string) (*corev1.Pod, *corev1.PersistentVolumeClaim) {
+	pvcName := fmt.Sprintf("%s-%s", PvcName, podName)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: rc.Datacenter.Namespace,
+			Labels: map[string]string{
+				api.ClusterLabel:    rc.Datacenter.Spec.ClusterName,
+				api.DatacenterLabel: rc.Datacenter.Name,
+				api.CassNodeState:   stateStarted,
+				api.RackLabel:       "default",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Name: "cassandra"}},
+			Volumes: []corev1.Volume{{
+				Name: "server-data",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
+				},
+			}},
+		},
+		Status: corev1.PodStatus{
+			PodIP:             podIP,
+			ContainerStatuses: []corev1.ContainerStatus{{Name: "cassandra", Ready: true}},
+		},
+	}
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: pvcName, Namespace: rc.Datacenter.Namespace},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Capacity: corev1.ResourceList{"storage": resource.MustParse(capacity)},
+		},
+	}
+	return pod, pvc
+}
+
+// setupAbsorbDecommDataTest builds a two pod datacenter, each pod backed by a
+// 1Gi server-data PVC, and returns the decommission target. sts-0 is the pod
+// that would have to absorb the data of sts-1.
+func setupAbsorbDecommDataTest(rc *ReconciliationContext) *corev1.Pod {
+	decommPod, decommPVC := podWithServerDataPvc(rc, "cassandradatacenter-example-default-sts-1", "10.0.0.2", "1Gi")
+	remainingPod, remainingPVC := podWithServerDataPvc(rc, "cassandradatacenter-example-default-sts-0", "10.0.0.1", "1Gi")
+
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithRuntimeObjects(rc.Datacenter, decommPod, decommPVC, remainingPod, remainingPVC).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
+	rc.dcPods = []*corev1.Pod{decommPod, remainingPod}
+
+	return decommPod
+}
+
+func TestEnsurePodsCanAbsorbDecommDataRequiresDecommPodLoad(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	decommPod := setupAbsorbDecommDataTest(rc)
+
+	// The endpoint snapshot covers the remaining pod but omits the node we are
+	// about to decommission, so no load is reported for it. Defaulting that to
+	// zero would compare the remaining free space against nothing to absorb and
+	// approve the decommission whatever the actual data size is.
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{
+			{NativeAddressAndPort: "10.0.0.1:9042", Load: "600000000"},
+		},
+	}
+
+	err := rc.EnsurePodsCanAbsorbDecommData(decommPod, epData)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "could not determine used storage")
+}
+
+func TestEnsurePodsCanAbsorbDecommDataRequiresRemainingPodLoad(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	decommPod := setupAbsorbDecommDataTest(rc)
+
+	// The snapshot covers the decommission target but omits the pod that would
+	// have to absorb its data. Defaulting that pod's load to zero reports its
+	// whole 1Gi PVC as free. With its real load of 600000000 bytes only
+	// 473741824 bytes are free, which cannot absorb 900000000 bytes.
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{
+			{NativeAddressAndPort: "10.0.0.2:9042", Load: "900000000"},
+		},
+	}
+
+	err := rc.EnsurePodsCanAbsorbDecommData(decommPod, epData)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "could not determine used storage")
+}
+
+func TestEnsurePodsCanAbsorbDecommDataAllowsCompleteEndpointData(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	decommPod := setupAbsorbDecommDataTest(rc)
+
+	// Every pod reports a load and the remaining pod has 473741824 bytes free,
+	// enough to absorb 100000000 bytes.
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{
+			{NativeAddressAndPort: "10.0.0.1:9042", Load: "600000000"},
+			{NativeAddressAndPort: "10.0.0.2:9042", Load: "100000000"},
+		},
+	}
+
+	require.NoError(t, rc.EnsurePodsCanAbsorbDecommData(decommPod, epData))
+}
+
+func TestEnsurePodsCanAbsorbDecommDataWithoutRemainingPods(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	decommPod, decommPVC := podWithServerDataPvc(rc, "cassandradatacenter-example-default-sts-0", "10.0.0.1", "1Gi")
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithRuntimeObjects(rc.Datacenter, decommPod, decommPVC).
+		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		Build()
+	rc.dcPods = []*corev1.Pod{decommPod}
+
+	// Decommissioning the last pod of a datacenter leaves no pod behind to
+	// absorb anything, so a load missing for it does not block the scale-down.
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{
+			{NativeAddressAndPort: "10.1.0.1:9042", Load: "600000000"},
+		},
+	}
+
+	require.NoError(t, rc.EnsurePodsCanAbsorbDecommData(decommPod, epData))
+}
+
+func TestEnsurePodsCanAbsorbDecommDataRefusesWhenSpaceIsShort(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	decommPod := setupAbsorbDecommDataTest(rc)
+
+	// Complete endpoint data, but sts-0 only has 473741824 bytes free and would
+	// have to absorb 900000000 bytes. The capacity check still has to refuse.
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{
+			{NativeAddressAndPort: "10.0.0.1:9042", Load: "600000000"},
+			{NativeAddressAndPort: "10.0.0.2:9042", Load: "900000000"},
+		},
+	}
+
+	err := rc.EnsurePodsCanAbsorbDecommData(decommPod, epData)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Not enough free space available to decommission")
+	require.Equal(t, corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterValid))
 }

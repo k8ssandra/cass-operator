@@ -376,10 +376,15 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 		return err
 	}
 
-	spaceUsedByDecommPod := podsUsedStorage[decommPod.Name]
+	spaceUsedByDecommPod, decommPodLoadReported := podsUsedStorage[decommPod.Name]
+
 	for _, pod := range rc.dcPods {
 		if pod.Name == decommPod.Name {
 			continue
+		}
+
+		if !decommPodLoadReported {
+			return fmt.Errorf("could not determine used storage of pod %s when checking if scale-down attempt is valid", decommPod.Name)
 		}
 
 		serverDataPvc, err := rc.getServerDataPvc(pod)
@@ -398,7 +403,11 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 		}
 
 		total := storage.AsDec().UnscaledBig().Int64()
-		used := podsUsedStorage[pod.Name]
+		used, ok := podsUsedStorage[pod.Name]
+		if !ok {
+			return fmt.Errorf("could not determine used storage of pod %s when checking if scale-down attempt is valid", pod.Name)
+		}
+
 		free := total - int64(used)
 
 		if free < int64(spaceUsedByDecommPod) {

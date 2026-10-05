@@ -2503,10 +2503,11 @@ func TestRackStartsWaitForLaggingRack(t *testing.T) {
 		startable bool
 	}
 	tests := []struct {
-		name         string
-		racks        [][]podState
-		firstPodPass bool
-		wantStart    string
+		name           string
+		racks          [][]podState
+		firstPodPass   bool
+		extraReadyRack string
+		wantStart      string
 	}{
 		{
 			name: "first pod pass waits for an unscheduled rack",
@@ -2533,6 +2534,15 @@ func TestRackStartsWaitForLaggingRack(t *testing.T) {
 				{{startable: true}},
 			},
 			wantStart: "rack3-0",
+		},
+		{
+			name: "extra ready pod does not hide a blocked desired pod",
+			racks: [][]podState{
+				{{ready: true}, {startable: true}},
+				{{ready: true}, {startable: true}},
+				{{}},
+			},
+			extraReadyRack: "rack3",
 		},
 		{
 			name: "pending second pod blocks a third pod",
@@ -2582,6 +2592,14 @@ func TestRackStartsWaitForLaggingRack(t *testing.T) {
 					}
 					if state.ready {
 						pod.Labels[api.CassNodeState] = stateStarted
+					}
+					rc.dcPods = append(rc.dcPods, pod)
+					objects = append(objects, pod)
+				}
+				if rackName == tt.extraReadyRack {
+					pod := &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-%d", rackName, len(states)), Namespace: rc.Datacenter.Namespace, Labels: map[string]string{api.RackLabel: rackName, api.CassNodeState: stateStarted}},
+						Status:     corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "cassandra", Ready: true}}},
 					}
 					rc.dcPods = append(rc.dcPods, pod)
 					objects = append(objects, pod)
@@ -2698,7 +2716,7 @@ func TestReconciliationContext_startAllNodes(t *testing.T) {
 				for i, started := range rackPods {
 					p := &corev1.Pod{}
 					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
-					p.Labels = map[string]string{}
+					p.Labels = map[string]string{api.RackLabel: rackName}
 					p.Spec.Containers = []corev1.Container{
 						{
 							Name: "cassandra",
@@ -2845,7 +2863,7 @@ func TestReconciliationContext_startAllNodes_onlyRackInformation(t *testing.T) {
 				for i, started := range rackPods {
 					p := &corev1.Pod{}
 					p.Name = getStatefulSetPodNameForIdx(sts, int32(i))
-					p.Labels = map[string]string{}
+					p.Labels = map[string]string{api.RackLabel: rackName}
 					p.Status.ContainerStatuses = []corev1.ContainerStatus{
 						{
 							Name: "cassandra",

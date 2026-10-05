@@ -2150,8 +2150,10 @@ func (rc *ReconciliationContext) startAllNodes(endpointData httphelper.CassMetad
 	readyNodesByRack := make(map[string]int, len(rc.desiredRackInformation))
 	minReadyNodes := 0
 	waitingForNodes := false
-	for _, rackInfo := range rc.desiredRackInformation {
-		for _, pod := range rc.rackPods(rackInfo.RackName) {
+	for idx, rackInfo := range rc.desiredRackInformation {
+		for ordinal := 0; ordinal < rackInfo.NodeCount; ordinal++ {
+			podName := getStatefulSetPodNameForIdx(rc.statefulSets[idx], int32(ordinal))
+			pod := rc.getDCPodByName(podName)
 			if isServerReady(pod) {
 				readyNodesByRack[rackInfo.RackName]++
 			}

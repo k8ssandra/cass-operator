@@ -257,18 +257,10 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 		{name: "gone from peer and local left", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS_WITH_PORT":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
 		{name: "gone from peer but local normal", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, wantCalls: 1},
 		{name: "local request fails", peerStatus: "LEFT", localCode: http.StatusInternalServerError, wantCalls: 1, wantError: true},
-<<<<<<< HEAD
-		{name: "override bypasses unavailable pod", peerStatus: "LEFT", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true, wantCalls: 1},
-		{name: "override permits missing peer entry and unavailable pod", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true, wantCalls: 1},
-		{name: "override does not bypass local normal", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, annotation: "true", wantCalls: 1},
-		{name: "false annotation does not bypass", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, annotation: "false", wantCalls: 1},
-		{name: "local left is authoritative even when peer reports normal", peerStatus: "NORMAL", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
-=======
 		{name: "override bypasses unavailable pod", peerStatus: "LEFT", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true},
 		{name: "override permits missing peer entry and unavailable pod", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true},
 		{name: "false annotation does not bypass", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"NORMAL"}]}`, annotation: "false", wantCalls: 1},
 		{name: "override still requires peer completion", peerStatus: "NORMAL", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"LEFT"}]}`, annotation: "true"},
->>>>>>> 61ece0b6 (Verify the HasLeft status from the pod with IS_LOCAL set instead of relying on the ring state from other nodes)
 	}
 
 	for _, tt := range tests {

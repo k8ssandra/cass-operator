@@ -278,8 +278,14 @@ func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData h
 		}
 		return false, fmt.Errorf("cannot verify decommissioned state on pod %s: %w", pod.Name, err)
 	}
+
+	hostID := ""
+	if nodeStatus, found := nodeStatuses[pod.Name]; found {
+		hostID = nodeStatus.HostID
+	}
+
 	for _, endpoint := range localMetadata.Entity {
-		if endpoint.IsLocal == "true" {
+		if endpoint.IsLocal == "true" && endpoint.HostID == hostID {
 			done := endpoint.HasStatus(httphelper.StatusLeft)
 			if !done {
 				rc.ReqLogger.V(1).Info("Waiting for local metadata to report LEFT", "Pod", pod.Name)

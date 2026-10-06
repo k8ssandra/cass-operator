@@ -530,6 +530,15 @@ If this requirement is not met, the operator will log error messages displaying
 the storage capacity requirements. The `Valid` condition on the datacenter will
 be set to `FALSE` in the event of a failed scale down.
 
+Before removing a decommissioned pod, the operator queries the pod's own
+Management API. Its `IS_LOCAL` entry must report `LEFT` and match the pod's
+recorded, nonempty HostID. If the pod's Management API is unavailable, set
+`cassandra.datastax.com/skip-local-decommission-check: "true"` on the
+`CassandraDatacenter` to use another node's ring metadata as a fallback.
+The fetched ring metadata must also report `LEFT` for the target, including
+when the annotation is set. An absent target entry does not confirm completion.
+Remove the annotation after the affected pod has been removed.
+
 Just like with scaling up, the size should be reduced to a number that can be
 divided evenly into the number of racks so that they can act effectively as a
 fault-containment zone.

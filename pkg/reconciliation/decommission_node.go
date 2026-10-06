@@ -3,10 +3,10 @@ package reconciliation
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -80,9 +80,9 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 		statefulSet := rc.statefulSets[idx]
 		desiredNodeCount := int32(rackInfo.NodeCount)
 		maxReplicas := *statefulSet.Spec.Replicas
-		lastPodSuffix := stsLastPodSuffix(maxReplicas)
 
 		if maxReplicas > desiredNodeCount {
+			lastPodName := getStatefulSetPodNameForIdx(statefulSet, maxReplicas-1)
 			logger.V(1).Info("reconcile_racks::DecommissionNodes::scaleDownRack", "Rack", rackInfo.RackName, "maxReplicas", maxReplicas, "desiredNodeCount", desiredNodeCount)
 
 			if err := rc.setConditionStatus(api.DatacenterScalingDown, corev1.ConditionTrue); err != nil {
@@ -102,7 +102,7 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 				return result.Error(err)
 			}
 
-			err := rc.DecommissionNodeOnRack(rackInfo.RackName, epData, lastPodSuffix)
+			err := rc.DecommissionNodeOnRack(rackInfo.RackName, epData, lastPodName)
 			if err != nil {
 				return result.Error(err)
 			}
@@ -114,10 +114,10 @@ func (rc *ReconciliationContext) DecommissionNodes(epData httphelper.CassMetadat
 	return result.Continue()
 }
 
-func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData httphelper.CassMetadataEndpoints, lastPodSuffix string) error {
+func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData httphelper.CassMetadataEndpoints, podName string) error {
 	for _, pod := range rc.dcPods {
 		podRack := pod.Labels[api.RackLabel]
-		if podRack == rackName && strings.HasSuffix(pod.Name, lastPodSuffix) {
+		if podRack == rackName && pod.Name == podName {
 			mgmtApiUp := isMgmtApiRunning(pod)
 			if !mgmtApiUp {
 				return fmt.Errorf("management API is not up on node that we are trying to decommission")
@@ -189,7 +189,14 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 	nodeStatuses := rc.Datacenter.Status.NodeStatuses
 
 	for _, pod := range rc.dcPods {
-		if pod.Labels[api.CassNodeState] == stateDecommissioning {
+		state := pod.Labels[api.CassNodeState]
+		if state == stateDecommissioned {
+			if res := rc.cleanUpAfterDecommissionedPod(pod); res != nil {
+				return res
+			}
+			return result.RequeueSoon(5)
+		}
+		if state == stateDecommissioning {
 			if len(epData.Entity) == 0 {
 				return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
 			}
@@ -206,10 +213,22 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 					}
 				}
 			} else {
+				// This is just to avoid those multiple lines of "Node finished decommissioning" in the logs
+				patch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
+				completedPod := pod.DeepCopy()
+				metav1.SetMetaDataLabel(&completedPod.ObjectMeta, api.CassNodeState, stateDecommissioned)
+				if err := rc.Client.Patch(rc.Ctx, completedPod, patch); err != nil {
+					if apierrors.IsConflict(err) || apierrors.IsNotFound(err) {
+						// Wait for the cache
+						return result.RequeueSoon(5)
+					}
+					return result.Error(err)
+				}
 				rc.ReqLogger.V(1).Info("Node finished decommissioning", "Pod", pod.Name)
-				if res := rc.cleanUpAfterDecommissionedPod(pod); res != nil {
+				if res := rc.cleanUpAfterDecommissionedPod(completedPod); res != nil {
 					return res
 				}
+				return result.RequeueSoon(5)
 			}
 			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DecommissioningNode, fmt.Sprintf("Decommissioning node %s", pod.Name))
 			return result.RequeueSoon(5)
@@ -224,23 +243,28 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 }
 
 func (rc *ReconciliationContext) cleanUpAfterDecommissionedPod(pod *corev1.Pod) result.ReconcileResult {
-	rc.ReqLogger.Info("Scaling down statefulset")
-	err := rc.RemoveDecommissionedPodFromSts(pod)
+	sts, err := rc.statefulSetForDecommissionedPod(pod)
 	if err != nil {
 		return result.Error(err)
+	}
+	if *sts.Spec.Replicas == 0 || pod.Name != getStatefulSetPodNameForIdx(sts, *sts.Spec.Replicas-1) {
+		return nil
 	}
 	rc.ReqLogger.Info("Deleting pod PVCs")
-	err = rc.DeletePodPvcs(pod)
-	if err != nil {
+	if err := rc.DeletePodPvcs(pod); err != nil {
 		return result.Error(err)
 	}
 
-	dcPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
-	delete(rc.Datacenter.Status.NodeStatuses, pod.Name)
+	if _, found := rc.Datacenter.Status.NodeStatuses[pod.Name]; found {
+		dcPatch := client.MergeFromWithOptions(rc.Datacenter.DeepCopy(), client.MergeFromWithOptimisticLock{})
+		delete(rc.Datacenter.Status.NodeStatuses, pod.Name)
+		if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch); err != nil {
+			rc.ReqLogger.Error(err, "error patching datacenter status to remove decommissioned pod from node status")
+			return result.Error(err)
+		}
+	}
 
-	err = rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, dcPatch)
-	if err != nil {
-		rc.ReqLogger.Error(err, "error patching datacenter status to remove decommissioned pod from node status")
+	if err := rc.RemoveDecommissionedPodFromSts(pod); err != nil {
 		return result.Error(err)
 	}
 
@@ -274,6 +298,9 @@ func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData h
 		// This is fallback for cases where we can't verify from the target pod (lets say it's no longer available)
 		// so we need a workaround to remove this one
 		if rc.Datacenter.Annotations[api.SkipLocalDecommissionCheckAnnotation] == "true" {
+			if len(epData.Entity) == 0 {
+				return false, fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata: %w", pod.Name, err)
+			}
 			return isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses), nil
 		}
 		return false, fmt.Errorf("cannot verify decommissioned state on pod %s: %w", pod.Name, err)
@@ -283,12 +310,20 @@ func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData h
 	if nodeStatus, found := nodeStatuses[pod.Name]; found {
 		hostID = nodeStatus.HostID
 	}
+	if hostID == "" {
+		rc.ReqLogger.V(1).Info("Cannot verify decommission without a known HostID", "Pod", pod.Name)
+		return false, nil
+	}
 
 	for _, endpoint := range localMetadata.Entity {
 		if endpoint.IsLocal == "true" && endpoint.HostID == hostID {
-			done := endpoint.HasStatus(httphelper.StatusLeft)
-			if !done {
+			if !endpoint.HasStatus(httphelper.StatusLeft) {
 				rc.ReqLogger.V(1).Info("Waiting for local metadata to report LEFT", "Pod", pod.Name)
+				return false, nil
+			}
+			done := isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses)
+			if !done {
+				rc.ReqLogger.V(1).Info("Waiting for peer metadata to report LEFT", "Pod", pod.Name)
 			}
 			return done, nil
 		}
@@ -315,8 +350,7 @@ func isDoneDecommissioningInPeerMetadata(pod *corev1.Pod, epData httphelper.Cass
 		}
 	}
 
-	// Gone from the ring completely?
-	return true
+	return false
 }
 
 func isPodUp(pod *corev1.Pod) bool {
@@ -347,12 +381,21 @@ func (rc *ReconciliationContext) DeletePodPvcs(pod *corev1.Pod) error {
 		podPvc := &corev1.PersistentVolumeClaim{}
 		err := rc.Client.Get(rc.Ctx, name, podPvc)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			rc.ReqLogger.Error(err, "Failed to get pod PVC", "Claim Name", pvcName)
 			return err
 		}
 
-		err = rc.Client.Delete(rc.Ctx, podPvc)
+		if podPvc.DeletionTimestamp != nil {
+			continue
+		}
+		err = rc.Client.Delete(rc.Ctx, podPvc, client.Preconditions{UID: &podPvc.UID})
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			rc.ReqLogger.Error(err, "Failed to delete pod PVC", "Claim Name", pvcName)
 			return err
 		}
@@ -364,10 +407,24 @@ func (rc *ReconciliationContext) DeletePodPvcs(pod *corev1.Pod) error {
 }
 
 func (rc *ReconciliationContext) RemoveDecommissionedPodFromSts(pod *corev1.Pod) error {
+	sts, err := rc.statefulSetForDecommissionedPod(pod)
+	if err != nil {
+		return err
+	}
+	maxReplicas := *sts.Spec.Replicas
+	monitoring.RemovePodStatusMetric(pod)
+	if maxReplicas == 0 || pod.Name != getStatefulSetPodNameForIdx(sts, maxReplicas-1) {
+		return nil
+	}
+	rc.ReqLogger.Info(fmt.Sprintf("UpdateRackNodeCount in STS %s to %d", sts.Name, maxReplicas-1))
+	return rc.UpdateRackNodeCount(sts, maxReplicas-1)
+}
+
+func (rc *ReconciliationContext) statefulSetForDecommissionedPod(pod *corev1.Pod) (*appsv1.StatefulSet, error) {
 	podRack := pod.Labels[api.RackLabel]
 	var sts *appsv1.StatefulSet
 	for _, s := range rc.statefulSets {
-		if s.Labels[api.RackLabel] == podRack {
+		if s != nil && s.Labels[api.RackLabel] == podRack {
 			sts = s
 			break
 		}
@@ -375,31 +432,15 @@ func (rc *ReconciliationContext) RemoveDecommissionedPodFromSts(pod *corev1.Pod)
 
 	if sts == nil {
 		// Failed to find the statefulset for this pod
-		return fmt.Errorf("failed to find matching statefulSet for pod rack: %s", podRack)
+		return nil, fmt.Errorf("failed to find matching statefulSet for pod rack: %s", podRack)
 	}
 
-	maxReplicas := *sts.Spec.Replicas
-	if maxReplicas == 0 {
-		monitoring.RemovePodStatusMetric(pod)
-		return nil
+	// The cache may still contain the old replica count after cleanup has
+	// already reduced it. Use the live count before repeating any cleanup.
+	if err := rc.APIReader.Get(rc.Ctx, client.ObjectKeyFromObject(sts), sts); err != nil {
+		return nil, err
 	}
-
-	lastPodSuffix := stsLastPodSuffix(maxReplicas)
-	if strings.HasSuffix(pod.Name, lastPodSuffix) {
-		monitoring.RemovePodStatusMetric(pod)
-		rc.ReqLogger.Info(fmt.Sprintf("UpdateRackNodeCount in STS %s to %d", sts.Name, *sts.Spec.Replicas-1))
-		return rc.UpdateRackNodeCount(sts, *sts.Spec.Replicas-1)
-	} else {
-		rc.ReqLogger.Error(fmt.Errorf("pod does not match the last pod in the STS"), "Could not find last matching pod", "PodName", pod.Name, "lastPodSuffix", lastPodSuffix)
-		// Pod does not match the last pod in statefulSet
-		// This scenario should only happen if the pod
-		// has already been terminated
-		return nil
-	}
-}
-
-func stsLastPodSuffix(maxReplicas int32) string {
-	return fmt.Sprintf("sts-%v", maxReplicas-1)
+	return sts, nil
 }
 
 func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1.Pod, epData httphelper.CassMetadataEndpoints) error {

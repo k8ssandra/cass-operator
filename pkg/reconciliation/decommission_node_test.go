@@ -509,3 +509,44 @@ func TestEnsurePodsCanAbsorbDecommDataRefusesWhenTargetExceedsRemainingCapacity(
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Not enough free space available to decommission")
 }
+
+func TestEnsurePodsCanAbsorbDecommDataWithTargetNotUp(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	decommPod := setupAbsorbDecommDataTest(rc)
+
+	// A pod that was killed reports no load. callDecommission skips a pod that
+	// is not up, so scale-down has to proceed instead of being blocked here.
+	// scale_down_unbalanced_racks decommissions exactly such a pod.
+	decommPod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "cassandra", Ready: false}}
+
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{
+			{NativeAddressAndPort: "10.0.0.1:9042", Load: "600000000"},
+		},
+	}
+
+	require.NoError(t, rc.EnsurePodsCanAbsorbDecommData(decommPod, epData))
+}
+
+func TestEnsurePodsCanAbsorbDecommDataChecksCapacityForATargetThatIsNotUp(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	decommPod := setupAbsorbDecommDataTest(rc)
+	decommPod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "cassandra", Ready: false}}
+
+	// Being down only matters when the load is unknown. The load is reported
+	// here, so the capacity check still applies and still has to refuse.
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{
+			{NativeAddressAndPort: "10.0.0.1:9042", Load: "600000000"},
+			{NativeAddressAndPort: "10.0.0.2:9042", Load: "900000000"},
+		},
+	}
+
+	err := rc.EnsurePodsCanAbsorbDecommData(decommPod, epData)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Not enough free space available to decommission")
+}

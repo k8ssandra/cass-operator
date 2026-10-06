@@ -377,6 +377,11 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 	}
 
 	spaceUsedByDecommPod, decommPodLoadReported := podsUsedStorage[decommPod.Name]
+	if !decommPodLoadReported && !isPodUp(decommPod) {
+		// callDecommission does not decommission a pod that is not up, so no
+		// data is streamed anywhere and there is no capacity to check.
+		return nil
+	}
 
 	for _, pod := range rc.dcPods {
 		if pod.Name == decommPod.Name {

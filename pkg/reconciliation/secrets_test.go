@@ -4,17 +4,65 @@
 package reconciliation
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/k8ssandra/cass-operator/pkg/oplabels"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
+
+func TestMissingExternalSuperuserSecretDuringDeletion(t *testing.T) {
+	tests := []struct {
+		name         string
+		deleting     bool
+		decommission bool
+		wantError    bool
+	}{
+		{name: "active datacenter", wantError: true},
+		{name: "deletion before decommission condition", deleting: true},
+		{name: "decommission condition", decommission: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dc := &api.CassandraDatacenter{
+				ObjectMeta: metav1.ObjectMeta{Name: "dc", Namespace: "default"},
+				Spec: api.CassandraDatacenterSpec{
+					ClusterName: "cluster", SuperuserSecretName: "external-superuser",
+				},
+			}
+			if test.deleting {
+				now := metav1.Now()
+				dc.SetDeletionTimestamp(&now)
+			}
+			if test.decommission {
+				dc.SetCondition(api.DatacenterCondition{
+					Type: api.DatacenterDecommission, Status: corev1.ConditionTrue,
+				})
+			}
+			client := fake.NewClientBuilder().WithScheme(setupScheme()).Build()
+			rc := &ReconciliationContext{
+				Ctx: context.Background(), Client: client, APIReader: client,
+				Datacenter: dc, ReqLogger: logr.Discard(),
+			}
+
+			if got := len(rc.validateSuperuserSecret()) > 0; got != test.wantError {
+				t.Errorf("validateSuperuserSecret() error = %v, want %v", got, test.wantError)
+			}
+			if got := rc.CheckSuperuserSecretCreation().Completed(); got != test.wantError {
+				t.Errorf("CheckSuperuserSecretCreation() completed = %v, want %v", got, test.wantError)
+			}
+		})
+	}
+}
 
 func Test_buildDefaultSuperuserSecret(t *testing.T) {
 	t.Run("test default superuser secret is created", func(t *testing.T) {

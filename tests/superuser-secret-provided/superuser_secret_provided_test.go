@@ -30,7 +30,6 @@ var (
 	dcName              = "dc2"
 	dcYaml              = "../testdata/default-single-rack-2-node-dc-with-superuser-secret.yaml"
 	ns                  = ginkgo_util.NewWrapper(testName, namespace)
-	labelAnnoPrefix     = "cassandra.datastax.com/"
 )
 
 func TestLifecycle(t *testing.T) {
@@ -38,8 +37,8 @@ func TestLifecycle(t *testing.T) {
 }
 
 var _ = Describe(testName, func() {
-	Context("when in a new cluster where superuserSecretName is unspecified", func() {
-		Specify("the operator generates an appropriate superuser secret", func() {
+	Context("when in a new cluster where superuserSecretName is specified", func() {
+		Specify("the operator uses the provided superuser secret and deletes the datacenter when the secret is removed", func() {
 			var step string
 			var k kubectl.KCmd
 
@@ -122,18 +121,24 @@ var _ = Describe(testName, func() {
 				WithFlag("container", "cassandra")
 			ns.ExecAndLog(step, k)
 
-			step = "delete datacenter"
-			k = kubectl.Delete("CassandraDatacenter", dcName)
+			step = "delete the provided superuser secret"
+			k = kubectl.Delete("secret", superuserSecretName)
 			ns.ExecAndLog(step, k)
 
-			// Ensure secret annotations and labels cleaned up on DC delete
-			json := "jsonpath={.metadata.annotations}{.metadata.labels}"
-			step = "check annotations and labels removed"
-			k = kubectl.Get("secret", superuserSecretName).FormatOutput(json)
-			output := ns.OutputAndLog(step, k)
-			Expect(output).ToNot(ContainSubstring(labelAnnoPrefix),
-				"Secret %s should no longer have annotations or labels namespaced with %s",
-				superuserSecretName, labelAnnoPrefix)
+			step = "delete datacenter with its superuser secret missing"
+			k = kubectl.Delete("CassandraDatacenter", dcName).WithFlag("wait", "false")
+			ns.ExecAndLog(step, k)
+
+			step = "checking that the dc2 no longer exists"
+			json := "jsonpath={.items}"
+			k = kubectl.Get("CassandraDatacenter").
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "[]", 300)
+
+			step = "checking that no dc stateful sets remain"
+			k = kubectl.Get("statefulsets").
+				FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "[]", 300)
 		})
 	})
 })

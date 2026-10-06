@@ -293,6 +293,11 @@ func HasStartedDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEn
 }
 
 func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap) (bool, error) {
+	if _, found := nodeStatuses[pod.Name]; !found {
+		// Pod has never joined the ring
+		return true, nil
+	}
+
 	localMetadata, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
 	if err != nil {
 		// This is fallback for cases where we can't verify from the target pod (lets say it's no longer available)

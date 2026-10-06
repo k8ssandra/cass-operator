@@ -352,6 +352,7 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 		wantRetries   int
 		wantError     bool
 		unknownHostID bool
+		noNodeStatus  bool
 		noPeerData    bool
 	}{
 		{name: "peer left and local left", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
@@ -375,6 +376,8 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 		{name: "local left cannot use empty peer metadata", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, noPeerData: true, podReady: true, wantError: true},
 		{name: "empty peer metadata must not retry decommission", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, noPeerData: true, podReady: true, wantError: true},
 		{name: "fallback cannot use empty peer metadata", localCode: http.StatusInternalServerError, annotation: "true", noPeerData: true, podReady: true, wantError: true},
+		{name: "never bootstrapped pod needs no local metadata", noNodeStatus: true, localCode: http.StatusInternalServerError, wantCleaned: true},
+		{name: "never bootstrapped pod still requires fetched metadata", noNodeStatus: true, localCode: http.StatusInternalServerError, noPeerData: true, wantError: true},
 	}
 
 	for _, tt := range tests {
@@ -404,6 +407,10 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 			if tt.unknownHostID {
 				rc.Datacenter.Status.NodeStatuses[pod.Name] = api.CassandraNodeStatus{}
 			}
+			if tt.noNodeStatus {
+				delete(rc.Datacenter.Status.NodeStatuses, pod.Name)
+				require.NoError(t, rc.Client.Status().Update(rc.Ctx, rc.Datacenter))
+			}
 			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "cassandra", Ready: tt.podReady}}
 			require.NoError(t, rc.Client.Status().Update(rc.Ctx, pod))
 
@@ -428,7 +435,8 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 				require.NoError(t, err)
 			}
 			_, remains := rc.Datacenter.Status.NodeStatuses[pod.Name]
-			require.Equal(t, tt.wantCleaned, !remains)
+			require.Equal(t, tt.wantCleaned || tt.noNodeStatus, !remains)
+			require.Contains(t, rc.Datacenter.Status.NodeStatuses, getStatefulSetPodNameForIdx(sts, 0))
 			require.NoError(t, rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(sts), sts))
 			wantReplicas := int32(2)
 			if tt.wantCleaned {

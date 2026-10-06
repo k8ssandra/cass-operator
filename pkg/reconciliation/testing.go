@@ -11,20 +11,25 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-logr/logr"
 	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -34,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	taskapi "github.com/k8ssandra/cass-operator/apis/control/v1alpha1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/pkg/mocks"
@@ -121,11 +127,10 @@ func CreateMockReconciliationContext(
 		storageClass,
 	}
 
-	s := scheme.Scheme
-	setupScheme(s)
+	s := setupScheme()
 	// s.AddKnownTypes(api.GroupVersion, cassandraDatacenter)
 
-	fakeClient := fake.NewClientBuilder().WithStatusSubresource(cassandraDatacenter).WithRuntimeObjects(trackObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(cassandraDatacenter).WithRuntimeObjects(trackObjects...).Build()
 
 	request := &reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -320,12 +325,130 @@ func listOptionsFromArg(arg interface{}) *client.ListOptions {
 	}
 }
 
-func setupScheme(scheme *runtime.Scheme) *runtime.Scheme {
-	if scheme == nil {
-		scheme = runtime.NewScheme()
-	}
+func init() {
+	_ = clientgoscheme.AddToScheme(clientgoscheme.Scheme)
+	_ = api.AddToScheme(clientgoscheme.Scheme)
+	_ = taskapi.AddToScheme(clientgoscheme.Scheme)
+	_ = corev1.AddToScheme(clientgoscheme.Scheme)
+	_ = discoveryv1.AddToScheme(clientgoscheme.Scheme)
+}
+
+func setupScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	_ = clientgoscheme.AddToScheme(scheme)
 	_ = api.AddToScheme(scheme)
+	_ = taskapi.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 	_ = discoveryv1.AddToScheme(scheme)
 	return scheme
+}
+
+type callDetails struct {
+	RequestPath string
+	RequestURI  string
+}
+
+type fakeMgmtApiServer struct {
+	server *httptest.Server
+
+	mu    sync.Mutex
+	calls []callDetails
+}
+
+func newFakeMgmtApiServer(t *testing.T, handler http.HandlerFunc) *fakeMgmtApiServer {
+	server := startFakeMgmtApiTestServer(handler)
+	t.Cleanup(server.Close)
+	return server
+}
+
+func startFakeMgmtApiTestServer(handler http.HandlerFunc) *fakeMgmtApiServer {
+	server := &fakeMgmtApiServer{}
+	server.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server.mu.Lock()
+		server.calls = append(server.calls, callDetails{
+			RequestPath: r.URL.Path,
+			RequestURI:  r.URL.RequestURI(),
+		})
+		server.mu.Unlock()
+
+		handler(w, r)
+	}))
+	return server
+}
+
+func (s *fakeMgmtApiServer) Close() {
+	if s != nil && s.server != nil {
+		s.server.Close()
+	}
+}
+
+func (s *fakeMgmtApiServer) client(log logr.Logger) httphelper.NodeMgmtClient {
+	protocol := "http"
+	if strings.HasPrefix(s.server.URL, "https://") {
+		protocol = "https"
+	}
+
+	return httphelper.NodeMgmtClient{
+		Client:   s.server.Client(),
+		Log:      log,
+		Protocol: protocol,
+	}
+}
+
+func (s *fakeMgmtApiServer) attachToPod(t *testing.T, pod *corev1.Pod) {
+	host, port := s.hostPort(t)
+	pod.Status.PodIP = host
+
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		if container.Name != "cassandra" {
+			continue
+		}
+		for j := range container.Ports {
+			if container.Ports[j].Name == "mgmt-api-http" {
+				container.Ports[j].ContainerPort = int32(port)
+				return
+			}
+		}
+		container.Ports = append(container.Ports, corev1.ContainerPort{Name: "mgmt-api-http", ContainerPort: int32(port)})
+		return
+	}
+}
+
+func (s *fakeMgmtApiServer) hostPort(t *testing.T) (string, int) {
+	t.Helper()
+
+	addr := strings.TrimPrefix(strings.TrimPrefix(s.server.URL, "http://"), "https://")
+	host, portStr, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+
+	port, err := strconv.Atoi(portStr)
+	require.NoError(t, err)
+
+	return host, port
+}
+
+func (s *fakeMgmtApiServer) callCount(requestURI string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	count := 0
+	for _, call := range s.calls {
+		if strings.Contains(requestURI, "?") {
+			if call.RequestURI == requestURI {
+				count++
+			}
+			continue
+		}
+		if call.RequestPath == requestURI {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (s *fakeMgmtApiServer) assertCallCount(t *testing.T, requestURI string, expected int) {
+	t.Helper() // To ensure the line number reported on failure is the caller of this method
+	require.Equal(t, expected, s.callCount(requestURI), "expected %d calls to %s", expected, requestURI)
 }

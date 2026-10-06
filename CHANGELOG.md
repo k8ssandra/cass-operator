@@ -19,7 +19,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] [#971](https://github.com/k8ssandra/cass-operator/issues/971) Decommissioning last pod of a datacenter left its pod_status metric abandoned instead of being removed. And also we got an error logline which wasn't a real error
 * [BUGFIX] [#973](https://github.com/k8ssandra/cass-operator/issues/973) Prevent premature decommission cleanup when Cassandra metadata requests fail.
 * [BUGFIX] [#975](https://github.com/k8ssandra/cass-operator/issues/975) Use FailedStarts and StatefulSet revisions as part of the failureModeDetection to allow forced apply of change
-* [BUGFIX] [#986](https://github.com/k8ssandra/cass-operator/issues/986) Fail scale-down validation when a pod's load is missing from the endpoint snapshot instead of treating it as zero bytes used.
+* [BUGFIX] [#986](https://github.com/k8ssandra/cass-operator/issues/986) Fail scale-down validation when the decommission target's load is missing from the endpoint snapshot instead of treating it as zero bytes used.
 
 ## v1.32.0
 

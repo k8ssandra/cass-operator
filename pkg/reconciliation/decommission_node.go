@@ -403,11 +403,10 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 		}
 
 		total := storage.AsDec().UnscaledBig().Int64()
-		used, ok := podsUsedStorage[pod.Name]
-		if !ok {
-			return fmt.Errorf("could not determine used storage of pod %s when checking if scale-down attempt is valid", pod.Name)
-		}
-
+		// A pod that is down has no load reported in the endpoint snapshot.
+		// Scaling down has to keep working in that case, so an unknown load
+		// here is not treated as a reason to refuse.
+		used := podsUsedStorage[pod.Name]
 		free := total - int64(used)
 
 		if free < int64(spaceUsedByDecommPod) {

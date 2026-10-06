@@ -380,6 +380,7 @@ func setupAbsorbDecommDataTest(rc *ReconciliationContext) *corev1.Pod {
 
 	rc.Client = fake.NewClientBuilder().
 		WithScheme(setupScheme()).
+		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(rc.Datacenter, decommPod, decommPVC, remainingPod, remainingPVC).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
 		Build()
@@ -409,25 +410,22 @@ func TestEnsurePodsCanAbsorbDecommDataRequiresDecommPodLoad(t *testing.T) {
 	require.Contains(t, err.Error(), "could not determine used storage")
 }
 
-func TestEnsurePodsCanAbsorbDecommDataRequiresRemainingPodLoad(t *testing.T) {
+func TestEnsurePodsCanAbsorbDecommDataToleratesMissingRemainingPodLoad(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
 	decommPod := setupAbsorbDecommDataTest(rc)
 
-	// The snapshot covers the decommission target but omits the pod that would
-	// have to absorb its data. Defaulting that pod's load to zero reports its
-	// whole 1Gi PVC as free. With its real load of 600000000 bytes only
-	// 473741824 bytes are free, which cannot absorb 900000000 bytes.
+	// A pod that is down reports no load, and scaling down has to keep working
+	// while pods are down, so a remaining pod missing from the snapshot does
+	// not block the scale-down.
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
 			{NativeAddressAndPort: "10.0.0.2:9042", Load: "900000000"},
 		},
 	}
 
-	err := rc.EnsurePodsCanAbsorbDecommData(decommPod, epData)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "could not determine used storage")
+	require.NoError(t, rc.EnsurePodsCanAbsorbDecommData(decommPod, epData))
 }
 
 func TestEnsurePodsCanAbsorbDecommDataAllowsCompleteEndpointData(t *testing.T) {
@@ -490,4 +488,24 @@ func TestEnsurePodsCanAbsorbDecommDataRefusesWhenSpaceIsShort(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Not enough free space available to decommission")
 	require.Equal(t, corev1.ConditionFalse, rc.Datacenter.GetConditionStatus(api.DatacenterValid))
+}
+
+func TestEnsurePodsCanAbsorbDecommDataRefusesWhenTargetExceedsRemainingCapacity(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	decommPod := setupAbsorbDecommDataTest(rc)
+
+	// The remaining pod is missing from the snapshot, so its whole 1Gi reads as
+	// free. The check still has to refuse, because the target holds more than
+	// that pod could hold even when empty.
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{
+			{NativeAddressAndPort: "10.0.0.2:9042", Load: "2000000000"},
+		},
+	}
+
+	err := rc.EnsurePodsCanAbsorbDecommData(decommPod, epData)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Not enough free space available to decommission")
 }

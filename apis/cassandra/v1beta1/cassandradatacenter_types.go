@@ -514,7 +514,7 @@ type CassandraDatacenterStatus struct {
 
 	// MetadataVersion records the latest completed operator migration.
 	// 1: datacenter pod label migration completed.
-	// 2: legacy additionalSeeds Endpoints cleanup completed.
+	// 2: legacy additionalSeeds Endpoints cleanup is skipped.
 	// +optional
 	MetadataVersion int64 `json:"metadataVersion,omitempty"`
 }

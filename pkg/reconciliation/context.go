@@ -44,13 +44,12 @@ type ReconciliationContext struct {
 	// see: golang/go#22602
 	Ctx context.Context
 
-	Services                        []*corev1.Service
-	Endpoints                       *discoveryv1.EndpointSlice
-	desiredRackInformation          []*RackInformation
-	statefulSets                    []*appsv1.StatefulSet
-	dcPods                          []*corev1.Pod
-	clusterPods                     []*corev1.Pod
-	legacyEndpointsCleanupCompleted bool
+	Services               []*corev1.Service
+	Endpoints              *discoveryv1.EndpointSlice
+	desiredRackInformation []*RackInformation
+	statefulSets           []*appsv1.StatefulSet
+	dcPods                 []*corev1.Pod
+	clusterPods            []*corev1.Pod
 }
 
 // CreateReconciliationContext gathers all information needed for computeReconciliationActions into a struct.

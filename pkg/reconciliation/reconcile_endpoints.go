@@ -44,7 +44,6 @@ func (rc *ReconciliationContext) CheckAdditionalSeedEndpointSlices() result.Reco
 		if err := rc.removeLegacyEndpoints(rc.Ctx, rc.Client); err != nil {
 			return result.Error(err)
 		}
-		rc.legacyEndpointsCleanupCompleted = true
 	}
 
 	return result.Continue()

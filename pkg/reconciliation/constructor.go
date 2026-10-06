@@ -96,12 +96,11 @@ func setOperatorProgressStatus(rc *ReconciliationContext, newState api.ProgressS
 
 func setDatacenterStatus(rc *ReconciliationContext) error {
 	generationChanged := rc.Datacenter.Status.ObservedGeneration != rc.Datacenter.Generation
-	if generationChanged || rc.legacyEndpointsCleanupCompleted {
+	isMigrationPending := rc.Datacenter.Status.MetadataVersion < 2
+	if generationChanged || isMigrationPending {
 		patch := client.MergeFrom(rc.Datacenter.DeepCopy())
-		if rc.legacyEndpointsCleanupCompleted {
+		if isMigrationPending {
 			rc.Datacenter.Status.MetadataVersion = 2
-		} else if rc.Datacenter.Status.MetadataVersion < 1 {
-			rc.Datacenter.Status.MetadataVersion = 1
 		}
 		rc.Datacenter.Status.ObservedGeneration = rc.Datacenter.Generation
 		if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, patch); err != nil {

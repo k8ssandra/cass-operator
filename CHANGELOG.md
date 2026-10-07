@@ -17,9 +17,11 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#947](https://github.com/k8ssandra/cass-operator/issues/947) Bound the informer cache in cluster-scoped mode: label-scope Pod/StatefulSet/PodDisruptionBudget/Service informers to operator-managed objects, read Secrets/PVCs/ConfigMaps/Endpoints/EndpointSlices/StorageClasses through live API calls with metadata-only Secret watches, and strip managedFields/last-applied from cached objects. Operator memory no longer scales with cluster size.
 * [ENHANCEMENT] [#959](https://github.com/k8ssandra/cass-operator/issues/959) Synchronize Cassandra Services with configured container ports and remove ports that are unavailable or intended only for pod-level communication
 * [ENHANCEMENT] [#983](https://github.com/k8ssandra/cass-operator/issues/983) Poll the target decommissioning pod and ask it if it has finished decommission, do not trust other nodes in the ring by default. Add a new annotation `cassandra.datastax.com/skip-local-decommission-check` to allow old behavior
+* [ENHANCEMENT] [#952](https://github.com/k8ssandra/cass-operator/issues/952) Allow decommission to continue even in environments where user deletes superuser secret before decommission has finished
 * [BUGFIX] [#971](https://github.com/k8ssandra/cass-operator/issues/971) Decommissioning last pod of a datacenter left its pod_status metric abandoned instead of being removed. And also we got an error logline which wasn't a real error
 * [BUGFIX] [#973](https://github.com/k8ssandra/cass-operator/issues/973) Prevent premature decommission cleanup when Cassandra metadata requests fail.
 * [BUGFIX] [#975](https://github.com/k8ssandra/cass-operator/issues/975) Use FailedStarts and StatefulSet revisions as part of the failureModeDetection to allow forced apply of change
+* [BUGFIX] [#981](https://github.com/k8ssandra/cass-operator/issues/981) Enforce balance of pod bootstraps per rack even if certain StatefulSets are unable to schedule correctly.
 
 ## v1.32.0
 

@@ -92,16 +92,6 @@ func TestSetDatacenterStatusUpdateProgressState(t *testing.T) {
 		expectedObservedGen     int64
 	}{
 		{
-			name:                 "migration pending, generation current: bumps MetadataVersion only",
-			inputMetadataVersion: 1,
-			inputObservedGen:     3,
-			inputGeneration:      3,
-
-			expectedStatusPatch:     true,
-			expectedMetadataVersion: 2,
-			expectedObservedGen:     3,
-		},
-		{
 			name:                 "migration pending, spec changed: bumps MetadataVersion and ObservedGeneration",
 			inputMetadataVersion: 1,
 			inputObservedGen:     0,

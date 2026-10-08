@@ -11,13 +11,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/k8ssandra/cass-operator/pkg/utils"
+	discoveryv1 "k8s.io/api/discovery/v1"
 )
 
 func TestReconcileHeadlessService(t *testing.T) {
@@ -127,11 +127,7 @@ func TestEndpointSliceControllerIntegration(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	fakeClient := fake.NewClientBuilder().
-		WithScheme(setupScheme()).
-		WithStatusSubresource(rc.Datacenter).
-		WithRuntimeObjects(rc.Datacenter).
-		Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(setupScheme()).WithRuntimeObjects(rc.Datacenter).Build()
 
 	rc.Client = fakeClient
 	rc.Datacenter.Spec.AdditionalSeeds = []string{

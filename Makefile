@@ -50,8 +50,8 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # cassandra.datastax.com/cass-oper-bundle:$VERSION and cassandra.datastax.com/cass-oper-catalog:$VERSION.
 
-REGISTRY ?=
-ORG ?= k8ssandra
+REGISTRY ?= ghcr.io
+ORG ?= $(if $(REGISTRY),$(REGISTRY)/)k8ssandra
 IMAGE_TAG_BASE ?= $(ORG)/cass-operator
 TAG ?= v$(VERSION)
 
@@ -225,6 +225,7 @@ deploy: manifests kustomize cert-manager ## Deploy controller to the K8s cluster
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	TAG=${TAG} yq eval -i '.images.system-logger.tag = env(TAG)' config/imageconfig/image_config.yaml
 	yq eval -i 'del(.images.system-logger.registry)' config/imageconfig/image_config.yaml
+	REGISTRY=${REGISTRY} yq eval -i '.defaults.registry = env(REGISTRY)' config/imageconfig/image_config.yaml
 	kubectl apply --force-conflicts --server-side -k config/deployments/cluster
 
 .PHONY: undeploy
@@ -239,6 +240,7 @@ endif
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	TAG=${TAG} yq eval -i '.images.system-logger.tag = env(TAG)' config/imageconfig/image_config.yaml
 	yq eval -i 'del(.images.system-logger.registry)' config/imageconfig/image_config.yaml
+	REGISTRY=${REGISTRY} yq eval -i '.defaults.registry = env(REGISTRY)' config/imageconfig/image_config.yaml
 	kubectl apply --force-conflicts --server-side -k tests/$(TEST_DIR)
 
 .PHONY: undeploy-test

@@ -438,7 +438,7 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 
 func (rc *ReconciliationContext) GetUsedStorageForPods(epData httphelper.CassMetadataEndpoints) (map[string]float64, error) {
 	podStorageMap := make(map[string]float64)
-	mappedData := MapPodsToEndpointDataByName(rc.dcPods, epData)
+	mappedData := MapPodsToEndpointDataByName(rc.dcPods, epData, rc.Datacenter.Status.NodeStatuses)
 	for podName, data := range mappedData {
 		load, err := strconv.ParseFloat(data.Load, 64)
 		if err != nil {

@@ -333,9 +333,16 @@ func TestDecommissionNodesRequiresMetadata(t *testing.T) {
 	require.Equal(t, int32(2), *rc.statefulSets[0].Spec.Replicas)
 }
 
+const (
+	decommPodName      = "cassandradatacenter-example-default-sts-1"
+	remainingPodName   = "cassandradatacenter-example-default-sts-0"
+	decommPodHostID    = "11111111-1111-1111-1111-111111111111"
+	remainingPodHostID = "00000000-0000-0000-0000-000000000000"
+)
+
 // podWithServerDataPvc builds a datacenter pod with the given IP together with
 // the server-data PVC that EnsurePodsCanAbsorbDecommData looks up for it.
-func podWithServerDataPvc(rc *ReconciliationContext, podName, podIP, capacity string) (*corev1.Pod, *corev1.PersistentVolumeClaim) {
+func podWithServerDataPvc(rc *ReconciliationContext, podName, podIP, hostID, capacity string) (*corev1.Pod, *corev1.PersistentVolumeClaim) {
 	pvcName := fmt.Sprintf("%s-%s", PvcName, podName)
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -368,6 +375,12 @@ func podWithServerDataPvc(rc *ReconciliationContext, podName, podIP, capacity st
 			Capacity: corev1.ResourceList{"storage": resource.MustParse(capacity)},
 		},
 	}
+
+	if rc.Datacenter.Status.NodeStatuses == nil {
+		rc.Datacenter.Status.NodeStatuses = api.CassandraStatusMap{}
+	}
+	rc.Datacenter.Status.NodeStatuses[podName] = api.CassandraNodeStatus{HostID: hostID}
+
 	return pod, pvc
 }
 
@@ -375,8 +388,8 @@ func podWithServerDataPvc(rc *ReconciliationContext, podName, podIP, capacity st
 // 1Gi server-data PVC, and returns the decommission target. sts-0 is the pod
 // that would have to absorb the data of sts-1.
 func setupAbsorbDecommDataTest(rc *ReconciliationContext) *corev1.Pod {
-	decommPod, decommPVC := podWithServerDataPvc(rc, "cassandradatacenter-example-default-sts-1", "10.0.0.2", "1Gi")
-	remainingPod, remainingPVC := podWithServerDataPvc(rc, "cassandradatacenter-example-default-sts-0", "10.0.0.1", "1Gi")
+	decommPod, decommPVC := podWithServerDataPvc(rc, decommPodName, "10.0.0.2", decommPodHostID, "1Gi")
+	remainingPod, remainingPVC := podWithServerDataPvc(rc, remainingPodName, "10.0.0.1", remainingPodHostID, "1Gi")
 
 	rc.Client = fake.NewClientBuilder().
 		WithScheme(setupScheme()).
@@ -401,7 +414,7 @@ func TestEnsurePodsCanAbsorbDecommDataRequiresDecommPodLoad(t *testing.T) {
 	// approve the decommission whatever the actual data size is.
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
-			{NativeAddressAndPort: "10.0.0.1:9042", Load: "600000000"},
+			{HostID: remainingPodHostID, NativeAddressAndPort: "10.255.0.1:9042", Load: "600000000"},
 		},
 	}
 
@@ -421,7 +434,7 @@ func TestEnsurePodsCanAbsorbDecommDataToleratesMissingRemainingPodLoad(t *testin
 	// not block the scale-down.
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
-			{NativeAddressAndPort: "10.0.0.2:9042", Load: "900000000"},
+			{HostID: decommPodHostID, NativeAddressAndPort: "10.255.0.2:9042", Load: "900000000"},
 		},
 	}
 
@@ -438,8 +451,8 @@ func TestEnsurePodsCanAbsorbDecommDataAllowsCompleteEndpointData(t *testing.T) {
 	// enough to absorb 100000000 bytes.
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
-			{NativeAddressAndPort: "10.0.0.1:9042", Load: "600000000"},
-			{NativeAddressAndPort: "10.0.0.2:9042", Load: "100000000"},
+			{HostID: remainingPodHostID, NativeAddressAndPort: "10.255.0.1:9042", Load: "600000000"},
+			{HostID: decommPodHostID, NativeAddressAndPort: "10.255.0.2:9042", Load: "100000000"},
 		},
 	}
 
@@ -450,7 +463,7 @@ func TestEnsurePodsCanAbsorbDecommDataWithoutRemainingPods(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
-	decommPod, decommPVC := podWithServerDataPvc(rc, "cassandradatacenter-example-default-sts-0", "10.0.0.1", "1Gi")
+	decommPod, decommPVC := podWithServerDataPvc(rc, remainingPodName, "10.0.0.1", remainingPodHostID, "1Gi")
 	rc.Client = fake.NewClientBuilder().
 		WithScheme(setupScheme()).
 		WithRuntimeObjects(rc.Datacenter, decommPod, decommPVC).
@@ -462,7 +475,7 @@ func TestEnsurePodsCanAbsorbDecommDataWithoutRemainingPods(t *testing.T) {
 	// absorb anything, so a load missing for it does not block the scale-down.
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
-			{NativeAddressAndPort: "10.1.0.1:9042", Load: "600000000"},
+			{HostID: "99999999-9999-9999-9999-999999999999", NativeAddressAndPort: "10.255.9.9:9042", Load: "600000000"},
 		},
 	}
 
@@ -479,8 +492,8 @@ func TestEnsurePodsCanAbsorbDecommDataRefusesWhenSpaceIsShort(t *testing.T) {
 	// have to absorb 900000000 bytes. The capacity check still has to refuse.
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
-			{NativeAddressAndPort: "10.0.0.1:9042", Load: "600000000"},
-			{NativeAddressAndPort: "10.0.0.2:9042", Load: "900000000"},
+			{HostID: remainingPodHostID, NativeAddressAndPort: "10.255.0.1:9042", Load: "600000000"},
+			{HostID: decommPodHostID, NativeAddressAndPort: "10.255.0.2:9042", Load: "900000000"},
 		},
 	}
 
@@ -501,7 +514,7 @@ func TestEnsurePodsCanAbsorbDecommDataRefusesWhenTargetExceedsRemainingCapacity(
 	// that pod could hold even when empty.
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
-			{NativeAddressAndPort: "10.0.0.2:9042", Load: "2000000000"},
+			{HostID: decommPodHostID, NativeAddressAndPort: "10.255.0.2:9042", Load: "2000000000"},
 		},
 	}
 
@@ -523,7 +536,7 @@ func TestEnsurePodsCanAbsorbDecommDataWithTargetNotUp(t *testing.T) {
 
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
-			{NativeAddressAndPort: "10.0.0.1:9042", Load: "600000000"},
+			{HostID: remainingPodHostID, NativeAddressAndPort: "10.255.0.1:9042", Load: "600000000"},
 		},
 	}
 
@@ -541,8 +554,8 @@ func TestEnsurePodsCanAbsorbDecommDataChecksCapacityForATargetThatIsNotUp(t *tes
 	// here, so the capacity check still applies and still has to refuse.
 	epData := httphelper.CassMetadataEndpoints{
 		Entity: []httphelper.EndpointState{
-			{NativeAddressAndPort: "10.0.0.1:9042", Load: "600000000"},
-			{NativeAddressAndPort: "10.0.0.2:9042", Load: "900000000"},
+			{HostID: remainingPodHostID, NativeAddressAndPort: "10.255.0.1:9042", Load: "600000000"},
+			{HostID: decommPodHostID, NativeAddressAndPort: "10.255.0.2:9042", Load: "900000000"},
 		},
 	}
 

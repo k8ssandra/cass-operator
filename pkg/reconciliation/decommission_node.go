@@ -376,10 +376,20 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 		return err
 	}
 
-	spaceUsedByDecommPod := podsUsedStorage[decommPod.Name]
+	spaceUsedByDecommPod, decommPodLoadReported := podsUsedStorage[decommPod.Name]
+	if !decommPodLoadReported && !isPodUp(decommPod) {
+		// callDecommission does not decommission a pod that is not up, so no
+		// data is streamed anywhere and there is no capacity to check.
+		return nil
+	}
+
 	for _, pod := range rc.dcPods {
 		if pod.Name == decommPod.Name {
 			continue
+		}
+
+		if !decommPodLoadReported {
+			return fmt.Errorf("could not determine used storage of pod %s when checking if scale-down attempt is valid", decommPod.Name)
 		}
 
 		serverDataPvc, err := rc.getServerDataPvc(pod)
@@ -398,6 +408,9 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 		}
 
 		total := storage.AsDec().UnscaledBig().Int64()
+		// A pod that is down has no load reported in the endpoint snapshot.
+		// Scaling down has to keep working in that case, so an unknown load
+		// here is not treated as a reason to refuse.
 		used := podsUsedStorage[pod.Name]
 		free := total - int64(used)
 
@@ -425,7 +438,7 @@ func (rc *ReconciliationContext) EnsurePodsCanAbsorbDecommData(decommPod *corev1
 
 func (rc *ReconciliationContext) GetUsedStorageForPods(epData httphelper.CassMetadataEndpoints) (map[string]float64, error) {
 	podStorageMap := make(map[string]float64)
-	mappedData := MapPodsToEndpointDataByName(rc.dcPods, epData)
+	mappedData := MapPodsToEndpointDataByName(rc.dcPods, epData, rc.Datacenter.Status.NodeStatuses)
 	for podName, data := range mappedData {
 		load, err := strconv.ParseFloat(data.Load, 64)
 		if err != nil {

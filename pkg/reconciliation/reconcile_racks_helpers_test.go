@@ -4,9 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestMapContains(t *testing.T) {
@@ -220,4 +223,57 @@ func TestFindHostIdForIpFromEndpointsDataLegacy(t *testing.T) {
 			assert.Equal(t, tc.expectedHostId, hostId, "Expected host ID doesn't match")
 		})
 	}
+}
+
+func TestMapPodsToEndpointDataByName(t *testing.T) {
+	pod := func(name, ip string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status:     corev1.PodStatus{PodIP: ip},
+		}
+	}
+
+	pods := []*corev1.Pod{pod("sts-0", "10.0.0.1"), pod("sts-1", "10.0.0.2")}
+
+	// The addresses in the snapshot are stale: the pods have been recreated
+	// since and no longer hold them.
+	epData := httphelper.CassMetadataEndpoints{
+		Entity: []httphelper.EndpointState{
+			{HostID: "host-0", NativeAddressAndPort: "10.9.9.1:9042", Load: "100"},
+			{HostID: "host-1", NativeAddressAndPort: "10.9.9.2:9042", Load: "200"},
+		},
+	}
+
+	t.Run("matches on host id and not on pod ip", func(t *testing.T) {
+		result := MapPodsToEndpointDataByName(pods, epData, api.CassandraStatusMap{
+			"sts-0": {HostID: "host-0"},
+			"sts-1": {HostID: "host-1"},
+		})
+		require.Len(t, result, 2)
+		require.Equal(t, "100", result["sts-0"].Load)
+		require.Equal(t, "200", result["sts-1"].Load)
+	})
+
+	t.Run("skips a pod with no host id recorded", func(t *testing.T) {
+		result := MapPodsToEndpointDataByName(pods, epData, api.CassandraStatusMap{
+			"sts-0": {HostID: "host-0"},
+		})
+		require.Len(t, result, 1)
+		require.Contains(t, result, "sts-0")
+		require.NotContains(t, result, "sts-1")
+	})
+
+	t.Run("returns nothing without node statuses", func(t *testing.T) {
+		require.Empty(t, MapPodsToEndpointDataByName(pods, epData, api.CassandraStatusMap{}))
+		require.Empty(t, MapPodsToEndpointDataByName(pods, epData, nil))
+	})
+
+	t.Run("skips a host id that is not in the snapshot", func(t *testing.T) {
+		result := MapPodsToEndpointDataByName(pods, epData, api.CassandraStatusMap{
+			"sts-0": {HostID: "host-0"},
+			"sts-1": {HostID: "host-gone"},
+		})
+		require.Len(t, result, 1)
+		require.Contains(t, result, "sts-0")
+	})
 }

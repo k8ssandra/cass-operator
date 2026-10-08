@@ -166,6 +166,6 @@ jobs:
       #     platforms: linux/amd64
       #     cache-from: type=local,src=/tmp/.buildx-cache
       #     cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Build and update cass-operator-catalog
-        run: |
-          make VERSION=${{ steps.vars.outputs.version }} CHANNEL=dev catalog-build catalog-push
+      # - name: Build and update cass-operator-catalog
+      #   run: |
+      #     make VERSION=${{ steps.vars.outputs.version }} CHANNEL=dev catalog-build catalog-push

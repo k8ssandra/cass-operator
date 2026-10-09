@@ -1399,6 +1399,9 @@ func isNodeStuckAfterLosingReadiness(pod *corev1.Pod) bool {
 func (rc *ReconciliationContext) getCassMetadataEndpoints() httphelper.CassMetadataEndpoints {
 	var metadata httphelper.CassMetadataEndpoints
 	for _, pod := range rc.clusterPods {
+		if pod.Labels[api.CassNodeState] == stateDecommissioning {
+			continue
+		}
 		// Try to query the first ready pod we find.
 		// We won't get any endpoints back if no pods are ready yet.
 		if !isServerReady(pod) {

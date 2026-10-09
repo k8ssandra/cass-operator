@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [ENHANCEMENT] [#983](https://github.com/k8ssandra/cass-operator/issues/983) Poll the target decommissioning pod and ask it if it has finished decommission, do not trust other nodes in the ring by default. Add a new annotation `cassandra.datastax.com/skip-local-decommission-check` to allow old behavior
+
 ## v1.29.1
 
 * [BUGFIX] [#899](https://github.com/k8ssandra/cass-operator/issues/899) Skip webhook startup when the manager is launched without `--webhook-cert-path` (Helm chart behavior).

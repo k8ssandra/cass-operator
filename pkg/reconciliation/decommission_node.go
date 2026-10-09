@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/go-logr/logr"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/events"
@@ -190,7 +189,14 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 
 	for _, pod := range rc.dcPods {
 		if pod.Labels[api.CassNodeState] == stateDecommissioning {
-			if !IsDoneDecommissioning(pod, epData, nodeStatuses, rc.ReqLogger) {
+			if len(epData.Entity) == 0 {
+				return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
+			}
+			done, err := rc.IsDoneDecommissioning(pod, epData, nodeStatuses)
+			if err != nil {
+				return result.Error(err)
+			}
+			if !done {
 				if !HasStartedDecommissioning(pod, epData, nodeStatuses) {
 					rc.ReqLogger.V(1).Info("Decommission has not started trying again", "Pod", pod.Name)
 					err := rc.callDecommission(pod)
@@ -261,7 +267,52 @@ func HasStartedDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEn
 	return false
 }
 
-func IsDoneDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap, logger logr.Logger) bool {
+func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap) (bool, error) {
+	if _, found := nodeStatuses[pod.Name]; !found {
+		// Pod has never joined the ring
+		return true, nil
+	}
+
+	localMetadata, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
+	if err != nil {
+		// This is fallback for cases where we can't verify from the target pod (lets say it's no longer available)
+		// so we need a workaround to remove this one
+		if rc.Datacenter.Annotations[api.SkipLocalDecommissionCheckAnnotation] == "true" {
+			if len(epData.Entity) == 0 {
+				return false, fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata: %w", pod.Name, err)
+			}
+			return isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses), nil
+		}
+		return false, fmt.Errorf("cannot verify decommissioned state on pod %s: %w", pod.Name, err)
+	}
+
+	hostID := ""
+	if nodeStatus, found := nodeStatuses[pod.Name]; found {
+		hostID = nodeStatus.HostID
+	}
+	if hostID == "" {
+		rc.ReqLogger.V(1).Info("Cannot verify decommission without a known HostID", "Pod", pod.Name)
+		return false, nil
+	}
+
+	for _, endpoint := range localMetadata.Entity {
+		if endpoint.IsLocal == "true" && endpoint.HostID == hostID {
+			if !endpoint.HasStatus(httphelper.StatusLeft) {
+				rc.ReqLogger.V(1).Info("Waiting for local metadata to report LEFT", "Pod", pod.Name)
+				return false, nil
+			}
+			done := isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses)
+			if !done {
+				rc.ReqLogger.V(1).Info("Waiting for peer metadata to report LEFT", "Pod", pod.Name)
+			}
+			return done, nil
+		}
+	}
+	rc.ReqLogger.V(1).Info("Waiting for local metadata to report LEFT", "Pod", pod.Name)
+	return false, nil
+}
+
+func isDoneDecommissioningInPeerMetadata(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap) bool {
 	for idx := range epData.Entity {
 		ep := &epData.Entity[idx]
 		if ep.GetRpcAddress() == pod.Status.PodIP || ep.EndpointIP == pod.Status.PodIP {
@@ -279,8 +330,7 @@ func IsDoneDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoi
 		}
 	}
 
-	// Gone from the ring completely?
-	return true
+	return false
 }
 
 func isPodUp(pod *corev1.Pod) bool {

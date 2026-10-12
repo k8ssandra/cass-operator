@@ -112,7 +112,7 @@ func TestSetDatacenterStatusUpdateProgressState(t *testing.T) {
 			expectedObservedGen:     2,
 		},
 		{
-			name:                 "migration done, generation current: skips status patch",
+			name:                 "no changes made, skipping status patch",
 			inputMetadataVersion: 2,
 			inputObservedGen:     3,
 			inputGeneration:      3,

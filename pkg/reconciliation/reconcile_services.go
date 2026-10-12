@@ -128,7 +128,9 @@ func (rc *ReconciliationContext) CheckHeadlessServices() result.ReconcileResult 
 
 	if len(createNeeded) > 0 {
 		rc.Services = createNeeded
-		return rc.CreateHeadlessServices()
+		if res := rc.CreateHeadlessServices(); res.Completed() {
+			return res
+		}
 	}
 
 	if len(dc.Spec.AdditionalSeeds) > 0 {

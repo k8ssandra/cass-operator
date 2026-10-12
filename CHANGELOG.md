@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.29.2
 
 * [BUGFIX] [#983](https://github.com/k8ssandra/cass-operator/issues/983) Poll the target decommissioning pod and ask it if it has finished decommission, do not trust other nodes in the ring by default. Add a new annotation `cassandra.datastax.com/skip-local-decommission-check` to allow old behavior

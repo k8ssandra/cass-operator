@@ -123,13 +123,10 @@ func (provider *InsecureManagementApiSecurityProvider) GetProtocol() string {
 }
 
 func (provider *InsecureManagementApiSecurityProvider) BuildHttpClient(ctx context.Context, client client.Client, apiReader client.Reader, transport *http.Transport) (HttpClient, error) {
-	c := http.DefaultClient
-
-	if transport != nil {
-		c.Transport = transport
+	if transport == nil {
+		return &http.Client{}, nil
 	}
-
-	return c, nil
+	return &http.Client{Transport: transport}, nil
 }
 
 func (provider *InsecureManagementApiSecurityProvider) AddServerSecurity(pod *corev1.PodTemplateSpec) error {
@@ -759,11 +756,14 @@ func (provider *ManualManagementApiSecurityProvider) BuildHttpClient(ctx context
 		VerifyPeerCertificate: buildVerifyPeerCertificateNoHostCheck(caCertPool),
 	}
 
-	if transport != nil && transport.TLSClientConfig == nil {
-		transport.TLSClientConfig = tlsConfig
-	} else if transport == nil {
-		transport = &http.Transport{TLSClientConfig: tlsConfig}
+	// Clone the supplied transport so that the TLS configuration of this
+	// datacenter is not written into a transport shared with other callers.
+	if transport != nil {
+		transport = transport.Clone()
+	} else {
+		transport = http.DefaultTransport.(*http.Transport).Clone()
 	}
+	transport.TLSClientConfig = tlsConfig
 
 	httpClient.Transport = transport
 

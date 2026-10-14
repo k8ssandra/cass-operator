@@ -19,10 +19,12 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [ENHANCEMENT] [#983](https://github.com/k8ssandra/cass-operator/issues/983) Poll the target decommissioning pod and ask it if it has finished decommission, do not trust other nodes in the ring by default. Add a new annotation `cassandra.datastax.com/skip-local-decommission-check` to allow old behavior
 * [ENHANCEMENT] [#952](https://github.com/k8ssandra/cass-operator/issues/952) Allow decommission to continue even in environments where user deletes superuser secret before decommission has finished
 * [ENHANCEMENT] [#977](https://github.com/k8ssandra/cass-operator/issues/977) Skip repeated legacy `additionalSeeds` Endpoints cleanup checks after successful cleanup, reducing API-server traffic.
+* [ENHANCEMENT] [#215](https://github.com/k8ssandra/cass-operator/issues/215) Mark pods where full query logging was enabled with the annotation `cassandra.datastax.com/fql-enabled` and only call the mgmt-api when the pod is recreated or the configuration changes.
 * [BUGFIX] [#971](https://github.com/k8ssandra/cass-operator/issues/971) Decommissioning last pod of a datacenter left its pod_status metric abandoned instead of being removed. And also we got an error logline which wasn't a real error
 * [BUGFIX] [#973](https://github.com/k8ssandra/cass-operator/issues/973) Prevent premature decommission cleanup when Cassandra metadata requests fail.
 * [BUGFIX] [#975](https://github.com/k8ssandra/cass-operator/issues/975) Use FailedStarts and StatefulSet revisions as part of the failureModeDetection to allow forced apply of change
 * [BUGFIX] [#981](https://github.com/k8ssandra/cass-operator/issues/981) Enforce balance of pod bootstraps per rack even if certain StatefulSets are unable to schedule correctly.
+* [BUGFIX] [#990](https://github.com/k8ssandra/cass-operator/issues/990) Full query logging was applied to pods of every datacenter in the cluster instead of only the target datacenter and a pod without FQL support stopped processing the remaining pods
 
 ## v1.32.0
 

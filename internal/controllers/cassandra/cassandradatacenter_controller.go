@@ -109,7 +109,7 @@ func (r *CassandraDatacenterReconciler) Reconcile(ctx context.Context, request c
 		// loopID is used to tie all events together that are spawned by the same reconciliation loop
 		WithValues("loopID", uuid.New().String())
 
-	log.IntoContext(ctx, logger)
+	ctx = log.IntoContext(ctx, logger)
 
 	defer func() {
 		reconcileDuration := time.Since(startReconcile).Seconds()

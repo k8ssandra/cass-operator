@@ -204,7 +204,7 @@ func (r *CassandraTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	logger = log.FromContext(ctx, "datacenterName", dc.LabelResourceName(), "clusterName", dc.Spec.ClusterName)
-	log.IntoContext(ctx, logger)
+	ctx = log.IntoContext(ctx, logger)
 
 	// If we're active, we can proceed - otherwise verify if we're allowed to run
 	if !found {

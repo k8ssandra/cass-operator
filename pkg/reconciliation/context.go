@@ -103,7 +103,7 @@ func CreateReconciliationContext(
 		WithValues("datacenterName", dc.LabelResourceName()).
 		WithValues("clusterName", dc.Spec.ClusterName)
 
-	log.IntoContext(ctx, rc.ReqLogger)
+	rc.Ctx = log.IntoContext(ctx, rc.ReqLogger)
 
 	var err error
 	rc.NodeMgmtClient, err = httphelper.NewMgmtClient(rc.Ctx, cli, apiReader, dc, nil)

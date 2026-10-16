@@ -1923,14 +1923,14 @@ func (rc *ReconciliationContext) enableQuietPeriod(seconds int) error {
 }
 
 func (rc *ReconciliationContext) labelServerPodStarted(pod *corev1.Pod) error {
-	patch := client.MergeFrom(pod.DeepCopy())
+	patch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	pod.Labels[api.CassNodeState] = stateStarted
 	err := rc.Client.Patch(rc.Ctx, pod, patch)
 	return err
 }
 
 func (rc *ReconciliationContext) labelServerPodStartedNotReady(pod *corev1.Pod) error {
-	patch := client.MergeFrom(pod.DeepCopy())
+	patch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	pod.Labels[api.CassNodeState] = stateStartedNotReady
 	err := rc.Client.Patch(rc.Ctx, pod, patch)
 	return err

@@ -300,12 +300,12 @@ jobs:
         with:
           username: iamapikey
           password: ${{ secrets.MC_ICR_IO_API_KEY }}
-          registry: icr.io
-      - name: Configure icr.io pull secret
+          registry: cp.icr.io
+      - name: Configure cp.icr.io pull secret
         if: ${{ github.event_name != 'pull_request' && (matrix.serverType == 'hcd' || matrix.serverType == 'dse') }}
         run: |
           yq eval -i '.defaults.pullSecrets = ["cass-operator-pull-secret"]' config/imageconfig/image_config.yaml
-          echo "M_DOCKER_SERVER=icr.io" >> "$GITHUB_ENV"
+          echo "M_DOCKER_SERVER=cp.icr.io" >> "$GITHUB_ENV"
           echo "M_DOCKER_USERNAME=iamapikey" >> "$GITHUB_ENV"
           echo "M_DOCKER_PASSWORD=${{ secrets.MC_ICR_IO_API_KEY }}" >> "$GITHUB_ENV"
       - uses: ./.github/actions/run-integ-test

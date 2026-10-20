@@ -247,20 +247,21 @@ func (rc *ReconciliationContext) cleanUpAfterDecommissionedPod(pod *corev1.Pod) 
 }
 
 func HasStartedDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap) bool {
-	for idx := range epData.Entity {
-		ep := &epData.Entity[idx]
-		if ep.GetRpcAddress() == pod.Status.PodIP || ep.EndpointIP == pod.Status.PodIP {
-			return ep.HasStatus(httphelper.StatusLeaving)
-		}
-	}
-
-	// Lets try with HostID next
-	if nodeStatus, found := nodeStatuses[pod.Name]; found {
+	// HostID is the stable identifier, use it first
+	if nodeStatus, found := nodeStatuses[pod.Name]; found && nodeStatus.HostID != "" {
 		for idx := range epData.Entity {
 			ep := &epData.Entity[idx]
 			if ep.HostID == nodeStatus.HostID {
 				return ep.HasStatus(httphelper.StatusLeaving)
 			}
+		}
+	}
+
+	// Fallback to IP address matching
+	for idx := range epData.Entity {
+		ep := &epData.Entity[idx]
+		if ep.GetRpcAddress() == pod.Status.PodIP || ep.EndpointIP == pod.Status.PodIP {
+			return ep.HasStatus(httphelper.StatusLeaving)
 		}
 	}
 
@@ -281,7 +282,7 @@ func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData h
 			if len(epData.Entity) == 0 {
 				return false, fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata: %w", pod.Name, err)
 			}
-			return isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses), nil
+			return isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses, rc.Datacenter.Spec.ServerType), nil
 		}
 		return false, fmt.Errorf("cannot verify decommissioned state on pod %s: %w", pod.Name, err)
 	}
@@ -301,7 +302,7 @@ func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData h
 				rc.ReqLogger.V(1).Info("Waiting for local metadata to report LEFT", "Pod", pod.Name)
 				return false, nil
 			}
-			done := isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses)
+			done := isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses, rc.Datacenter.Spec.ServerType)
 			if !done {
 				rc.ReqLogger.V(1).Info("Waiting for peer metadata to report LEFT", "Pod", pod.Name)
 			}
@@ -312,16 +313,9 @@ func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData h
 	return false, nil
 }
 
-func isDoneDecommissioningInPeerMetadata(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap) bool {
-	for idx := range epData.Entity {
-		ep := &epData.Entity[idx]
-		if ep.GetRpcAddress() == pod.Status.PodIP || ep.EndpointIP == pod.Status.PodIP {
-			return ep.HasStatus(httphelper.StatusLeft)
-		}
-	}
-
-	// Lets try with HostID next
-	if nodeStatus, found := nodeStatuses[pod.Name]; found {
+func isDoneDecommissioningInPeerMetadata(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap, serverType string) bool {
+	// HostID is the stable identifier, use it first
+	if nodeStatus, found := nodeStatuses[pod.Name]; found && nodeStatus.HostID != "" {
 		for idx := range epData.Entity {
 			ep := &epData.Entity[idx]
 			if ep.HostID == nodeStatus.HostID {
@@ -330,7 +324,17 @@ func isDoneDecommissioningInPeerMetadata(pod *corev1.Pod, epData httphelper.Cass
 		}
 	}
 
-	return false
+	// Fallback to IP address matching
+	for idx := range epData.Entity {
+		ep := &epData.Entity[idx]
+		if ep.GetRpcAddress() == pod.Status.PodIP || ep.EndpointIP == pod.Status.PodIP {
+			return ep.HasStatus(httphelper.StatusLeft)
+		}
+	}
+
+	// The node is no longer part of the ring, peers have already removed it. DSE removes the LEFT nodes
+	// from the peers' metadata, so for DSE this means the decommission is done.
+	return serverType == "dse"
 }
 
 func isPodUp(pod *corev1.Pod) bool {

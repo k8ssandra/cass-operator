@@ -355,17 +355,20 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 		unknownHostID bool
 		noNodeStatus  bool
 		noPeerData    bool
+		serverType    string
 	}{
 		{name: "peer left and local left", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
 		{name: "peer left but local normal", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, wantCalls: 1},
 		{name: "peer left but local still leaving", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEAVING"}]}`, podReady: true, wantCalls: 1, wantRetries: 1},
 		{name: "peer left but only remote left", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"false","HOST_ID":"target-host","STATUS":"LEFT"}]}`, wantCalls: 1},
-		{name: "gone from peer and local left", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS_WITH_PORT":"LEFT"}]}`, wantCalls: 1},
+		{name: "gone from peer and local left", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS_WITH_PORT":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
+		{name: "gone from peer and local left with cassandra", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS_WITH_PORT":"LEFT"}]}`, serverType: "cassandra", wantCalls: 1},
 		{name: "peer left and local left with port", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS_WITH_PORT":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
 		{name: "gone from peer but local normal", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, wantCalls: 1},
 		{name: "local request fails", peerStatus: "LEFT", localCode: http.StatusInternalServerError, wantCalls: 1, wantError: true},
 		{name: "override bypasses unavailable pod", peerStatus: "LEFT", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true, wantCalls: 1},
-		{name: "override cannot bypass missing peer entry", localCode: http.StatusInternalServerError, annotation: "true", wantCalls: 1},
+		{name: "override accepts missing peer entry", localCode: http.StatusInternalServerError, annotation: "true", wantCleaned: true, wantCalls: 1},
+		{name: "override cannot bypass missing peer entry with cassandra", localCode: http.StatusInternalServerError, annotation: "true", serverType: "cassandra", wantCalls: 1},
 		{name: "false annotation does not bypass", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, annotation: "false", wantCalls: 1},
 		{name: "fallback still requires peer completion", peerStatus: "NORMAL", localCode: http.StatusInternalServerError, annotation: "true", wantCalls: 1},
 		{name: "local left but peer normal", peerStatus: "NORMAL", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, wantCalls: 1},
@@ -402,6 +405,9 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 				}
 				http.NotFound(w, r)
 			})
+			if tt.serverType != "" {
+				rc.Datacenter.Spec.ServerType = tt.serverType
+			}
 			if tt.annotation != "" {
 				rc.Datacenter.Annotations = map[string]string{api.SkipLocalDecommissionCheckAnnotation: tt.annotation}
 			}
@@ -859,4 +865,35 @@ func TestEnsurePodsCanAbsorbDecommDataChecksCapacityForATargetThatIsNotUp(t *tes
 	err := rc.EnsurePodsCanAbsorbDecommData(decommPod, epData)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Not enough free space available to decommission")
+}
+
+func TestDecommissionPeerMetadataPrefersHostID(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+		Status:     corev1.PodStatus{PodIP: "192.168.101.11"},
+	}
+	nodeStatuses := api.CassandraStatusMap{pod.Name: {HostID: "target-host"}}
+
+	// Another node has taken over the pod's old IP, while the target node is found with a different IP
+	crossedIP := httphelper.EndpointState{RpcAddress: pod.Status.PodIP, HostID: "other-host", Status: "NORMAL"}
+	target := httphelper.EndpointState{RpcAddress: "192.168.101.12", HostID: "target-host", Status: "LEFT"}
+	epData := httphelper.CassMetadataEndpoints{Entity: []httphelper.EndpointState{crossedIP, target}}
+	require.True(t, isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses, "dse"))
+	require.False(t, HasStartedDecommissioning(pod, epData, nodeStatuses))
+
+	target.Status = "LEAVING"
+	epData = httphelper.CassMetadataEndpoints{Entity: []httphelper.EndpointState{crossedIP, target}}
+	require.False(t, isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses, "dse"))
+	require.True(t, HasStartedDecommissioning(pod, epData, nodeStatuses))
+
+	// Without a known HostID, fallback to IP matching
+	noHostID := api.CassandraStatusMap{pod.Name: {}}
+	require.False(t, isDoneDecommissioningInPeerMetadata(pod, epData, noHostID, "dse"))
+
+	// Node gone from the ring entirely, only accepted as done with DSE
+	epData = httphelper.CassMetadataEndpoints{Entity: []httphelper.EndpointState{{RpcAddress: "192.168.101.13", HostID: "third-host", Status: "NORMAL"}}}
+	require.True(t, isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses, "dse"))
+	require.False(t, isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses, "cassandra"))
+	require.False(t, isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses, "hcd"))
+	require.False(t, HasStartedDecommissioning(pod, epData, nodeStatuses))
 }

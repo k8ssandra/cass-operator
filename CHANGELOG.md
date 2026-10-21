@@ -23,6 +23,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] [#973](https://github.com/k8ssandra/cass-operator/issues/973) Prevent premature decommission cleanup when Cassandra metadata requests fail.
 * [BUGFIX] [#975](https://github.com/k8ssandra/cass-operator/issues/975) Use FailedStarts and StatefulSet revisions as part of the failureModeDetection to allow forced apply of change
 * [BUGFIX] [#981](https://github.com/k8ssandra/cass-operator/issues/981) Enforce balance of pod bootstraps per rack even if certain StatefulSets are unable to schedule correctly.
+* [BUGFIX] [#997](https://github.com/k8ssandra/cass-operator/issues/997) Pod labeling could cause delay in the fast path startup, causing certain pods to never start until restarted by the operator (10 minutes timeout)
 
 ## v1.32.0
 

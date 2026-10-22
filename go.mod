@@ -1,6 +1,6 @@
 module github.com/k8ssandra/cass-operator
 
-go 1.26.9
+go 1.26.10
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -12,9 +12,9 @@ require (
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/term v0.46.0
-	k8s.io/api v0.36.4
-	k8s.io/apimachinery v0.36.4
-	k8s.io/client-go v0.36.4
+	k8s.io/api v0.36.5
+	k8s.io/apimachinery v0.36.5
+	k8s.io/client-go v0.36.5
 	sigs.k8s.io/controller-runtime v0.24.1
 )
 
@@ -103,12 +103,12 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	k8s.io/apiextensions-apiserver v0.36.4 // indirect
-	k8s.io/apiserver v0.36.4 // indirect
-	k8s.io/component-base v0.36.4 // indirect
+	k8s.io/apiextensions-apiserver v0.36.5 // indirect
+	k8s.io/apiserver v0.36.5 // indirect
+	k8s.io/component-base v0.36.5 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad // indirect
-	k8s.io/streaming v0.36.4 // indirect
+	k8s.io/streaming v0.36.5 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect

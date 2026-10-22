@@ -4491,3 +4491,56 @@ func assertStartingPodsAndStatusPatched(t *testing.T, rc *ReconciliationContext,
 		return dc.Status.LastServerNodeStarted.IsZero()
 	}, 2*time.Second, 20*time.Millisecond, "expected persisted starting pod and datacenter status updates")
 }
+
+func TestFindStartedNotReadyNodesDoesNotLabelRecreatedPod(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+	require := require.New(t)
+
+	rc.Client = fake.NewClientBuilder().
+		WithScheme(setupScheme()).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(rc.Datacenter).
+		Build()
+
+	podName := "cluster1-dc1-r1-sts-0"
+	oldPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: rc.Datacenter.Namespace,
+			Labels: utils.MergeMap(rc.Datacenter.GetRackLabels("r1"), map[string]string{
+				api.CassNodeState: stateStarted,
+			}),
+		},
+		Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{
+			Name:  "cassandra",
+			Ready: false,
+		}}},
+	}
+	require.NoError(rc.Client.Create(rc.Ctx, oldPod))
+	stalePod := oldPod.DeepCopy()
+
+	require.NoError(rc.Client.Delete(rc.Ctx, oldPod))
+	newPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: rc.Datacenter.Namespace,
+			Labels: utils.MergeMap(rc.Datacenter.GetRackLabels("r1"), map[string]string{
+				api.CassNodeState: stateReadyToStart,
+			}),
+		},
+	}
+	require.NoError(rc.Client.Create(rc.Ctx, newPod))
+	metav1.SetMetaDataAnnotation(&newPod.ObjectMeta, "test", "bump-resource-version")
+	require.NoError(rc.Client.Update(rc.Ctx, newPod))
+	require.NotEqual(stalePod.ResourceVersion, newPod.ResourceVersion)
+
+	rc.dcPods = []*corev1.Pod{stalePod}
+	_, err := rc.findStartedNotReadyNodes()
+	require.Error(err)
+	require.True(apierrors.IsConflict(err))
+
+	currentPod := &corev1.Pod{}
+	require.NoError(rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(newPod), currentPod))
+	require.Equal(stateReadyToStart, currentPod.Labels[api.CassNodeState])
+}

@@ -25,6 +25,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] [#975](https://github.com/k8ssandra/cass-operator/issues/975) Use FailedStarts and StatefulSet revisions as part of the failureModeDetection to allow forced apply of change
 * [BUGFIX] [#986](https://github.com/k8ssandra/cass-operator/issues/986) Match pods to their endpoint state by host id instead of pod IP when reading the load used by the scale-down capacity check, and fail the validation when a running decommission target has no load reported instead of treating it as zero bytes used.
 * [BUGFIX] [#981](https://github.com/k8ssandra/cass-operator/issues/981) Enforce balance of pod bootstraps per rack even if certain StatefulSets are unable to schedule correctly.
+* [BUGFIX] [#997](https://github.com/k8ssandra/cass-operator/issues/997) Pod labeling could cause delay in the fast path startup, causing certain pods to never start until restarted by the operator (10 minutes timeout)
 * [BUGFIX] [#990](https://github.com/k8ssandra/cass-operator/issues/990) Full query logging was applied to pods of every datacenter in the cluster instead of only the target datacenter and a pod without FQL support stopped processing the remaining pods
 
 ## v1.32.0

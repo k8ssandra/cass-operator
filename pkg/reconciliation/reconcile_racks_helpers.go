@@ -103,14 +103,22 @@ func PodPtrsFromPodList(podList *corev1.PodList) []*corev1.Pod {
 	return pods
 }
 
-func MapPodsToEndpointDataByName(pods []*corev1.Pod, epData httphelper.CassMetadataEndpoints) map[string]httphelper.EndpointState {
+// MapPodsToEndpointDataByName matches pods to their endpoint state by host id,
+// which is stable across restarts, instead of by pod IP, which is not. A pod
+// that has no host id recorded has not finished bootstrapping and gets no
+// entry.
+func MapPodsToEndpointDataByName(pods []*corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap) map[string]httphelper.EndpointState {
 	result := make(map[string]httphelper.EndpointState)
 	for idx := range pods {
 		pod := pods[idx]
+		hostID := nodeStatuses[pod.Name].HostID
+		if hostID == "" {
+			continue
+		}
 		for _, data := range epData.Entity {
-			if data.GetRpcAddress() == pod.Status.PodIP {
+			if data.HostID == hostID {
 				result[pod.Name] = data
-				continue
+				break
 			}
 		}
 	}

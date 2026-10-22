@@ -95,6 +95,9 @@ const (
 	// BypassWebhookValidationsAnnotation allows bypassing CassandraDatacenter update webhook validations
 	BypassWebhookValidationsAnnotation = "cassandra.datastax.com/bypass-webhook-validations"
 
+	// FullQueryLoggingEnabledAnnotation is set on pods where the operator has enabled full query logging
+	FullQueryLoggingEnabledAnnotation = "cassandra.datastax.com/fql-enabled"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 

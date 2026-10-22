@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
-	"github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -34,14 +37,18 @@ var (
 	httpResponseFullQueryDisabled string = `{"entity": false}`
 )
 
-func setupPodList(rc *ReconciliationContext) {
-	podIP := "192.168.101.11"
+func fqlTestPod(name, namespace string, labels map[string]string) *corev1.Pod {
+	podLabels := map[string]string{}
+	for k, v := range labels {
+		podLabels[k] = v
+	}
+	podLabels[api.CassNodeState] = stateStarted
 
-	pods := []corev1.Pod{{
+	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-sts-0",
-			Namespace: rc.Datacenter.Namespace,
-			Labels:    rc.Datacenter.GetClusterLabels(),
+			Name:      name,
+			Namespace: namespace,
+			Labels:    podLabels,
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
@@ -49,23 +56,24 @@ func setupPodList(rc *ReconciliationContext) {
 			}},
 		},
 		Status: corev1.PodStatus{
-			PodIP: podIP,
+			PodIP: "192.168.101.11",
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name:  "cassandra",
+				Ready: true,
+				State: corev1.ContainerState{
+					Running: &corev1.ContainerStateRunning{
+						StartedAt: metav1.NewTime(time.Now().Add(-time.Minute)),
+					},
+				},
+			}},
 		},
-	}}
-
-	rc.clusterPods = []*corev1.Pod{
-		&pods[0],
 	}
-	rc.dcPods = []*corev1.Pod{
-		&pods[0],
-	}
+}
 
-	rc.Client = fake.NewClientBuilder().
-		WithScheme(setupScheme()).
-		WithStatusSubresource(rc.Datacenter).
-		WithRuntimeObjects(rc.Datacenter, &pods[0]).
-		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
-		Build()
+func setupPodList(rc *ReconciliationContext) {
+	pod := fqlTestPod("test-sts-0", rc.Datacenter.Namespace, rc.Datacenter.GetDatacenterLabels())
+	rc.clusterPods = []*corev1.Pod{pod}
+	rc.dcPods = []*corev1.Pod{pod}
 }
 
 func fqlFakeMgmtServer(t *testing.T, supportFQL bool, currentEnabled bool) *fakeMgmtApiServer {
@@ -102,71 +110,88 @@ func setupTestEnv() (*ReconciliationContext, func()) {
 }
 
 func attachPods(t *testing.T, rc *ReconciliationContext, server *fakeMgmtApiServer) {
-	server.attachToPod(t, rc.dcPods[0])
-	server.attachToPod(t, rc.clusterPods[0])
+	objs := []runtime.Object{rc.Datacenter}
+	for _, pod := range rc.clusterPods {
+		server.attachToPod(t, pod)
+		objs = append(objs, pod)
+	}
 	rc.Client = fake.NewClientBuilder().
 		WithScheme(setupScheme()).
-		WithStatusSubresource(rc.Datacenter, rc.dcPods[0]).
-		WithRuntimeObjects(rc.Datacenter, rc.dcPods[0]).
+		WithStatusSubresource(rc.Datacenter).
+		WithRuntimeObjects(objs...).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
 		Build()
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
+}
+
+func setFQLEnabledAnnotation(pod *corev1.Pod) {
+	metav1.SetMetaDataAnnotation(&pod.ObjectMeta, api.FullQueryLoggingEnabledAnnotation, "true")
+}
+
+func assertFQLEnabledAnnotation(t *testing.T, rc *ReconciliationContext, pod *corev1.Pod, expected bool) {
+	t.Helper()
+	stored := &corev1.Pod{}
+	require.NoError(t, rc.Client.Get(rc.Ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, stored))
+	require.Equal(t, expected, metav1.HasAnnotation(stored.ObjectMeta, api.FullQueryLoggingEnabledAnnotation))
 }
 
 func TestCheckFullQueryLoggingNoChangeEnabled(t *testing.T) {
 	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
 	server := fqlFakeMgmtServer(t, true, true)
-	for _, pod := range rc.dcPods {
-		server.attachToPod(t, pod)
-	}
-	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
-	// Enable FQL config in the Datacenter
 	rc.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
 	attachPods(t, rc, server)
-	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	r := rc.CheckFullQueryLogging()
-	if r != result.Continue() {
-		t.Fatalf("expected result of result.Continue() but got %s", r)
-	}
+	require.Equal(t, result.Continue(), r)
 	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
 	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 1)
 	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging?enabled=true", 0)
+	assertFQLEnabledAnnotation(t, rc, rc.dcPods[0], true)
 }
 
-func TestCheckFullQueryLoggingNoChangeDisabled(t *testing.T) {
+func TestCheckFullQueryLoggingDisabledWithoutAnnotation(t *testing.T) {
 	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
 	server := fqlFakeMgmtServer(t, true, false)
-
-	// Don't enable FQL config in the Datacenter
-	// rc.Datacenter.Spec.Config = json.RawMessage(fqlDisabledConfig)
 	attachPods(t, rc, server)
-	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	r := rc.CheckFullQueryLogging()
-	if r != result.Continue() {
-		t.Fatalf("expected result of result.Continue() but got %s", r)
-	}
-	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
-	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 1)
-	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging?enabled=false", 0)
+	require.Equal(t, result.Continue(), r)
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 0)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 0)
+	assertFQLEnabledAnnotation(t, rc, rc.dcPods[0], false)
+}
+
+func TestCheckFullQueryLoggingEnabledWithAnnotation(t *testing.T) {
+	rc, cleanupMockScr := setupTestEnv()
+	defer cleanupMockScr()
+	server := fqlFakeMgmtServer(t, true, true)
+
+	rc.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
+	setFQLEnabledAnnotation(rc.dcPods[0])
+	attachPods(t, rc, server)
+
+	r := rc.CheckFullQueryLogging()
+	require.Equal(t, result.Continue(), r)
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 0)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 0)
 }
 
 func TestCheckFullQueryNotSupported(t *testing.T) {
 	rc, cleanupMockScr := setupTestEnv()
 	defer cleanupMockScr()
 	server := fqlFakeMgmtServer(t, false, false)
+
+	setFQLEnabledAnnotation(rc.dcPods[0])
 	attachPods(t, rc, server)
-	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	r := rc.CheckFullQueryLogging()
-	if r != result.Continue() {
-		t.Fatalf("expected result of result.Continue() but got %s", r)
-	}
+	require.Equal(t, result.Continue(), r)
 	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
 	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 0)
+	assertFQLEnabledAnnotation(t, rc, rc.dcPods[0], false)
 }
 
 func TestCheckFullQueryLoggingChangeToEnabled(t *testing.T) {
@@ -174,18 +199,20 @@ func TestCheckFullQueryLoggingChangeToEnabled(t *testing.T) {
 	defer cleanupMockScr()
 	server := fqlFakeMgmtServer(t, true, false)
 
-	// Enable FQL config in the Datacenter
 	rc.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
 	attachPods(t, rc, server)
-	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	r := rc.CheckFullQueryLogging()
-	if r != result.Continue() {
-		t.Fatalf("expected result of result.Continue() but got %s", r)
-	}
+	require.Equal(t, result.Continue(), r)
 	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
 	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 2)
 	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging?enabled=true", 1)
+	assertFQLEnabledAnnotation(t, rc, rc.dcPods[0], true)
+
+	r = rc.CheckFullQueryLogging()
+	require.Equal(t, result.Continue(), r)
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 2)
 }
 
 func TestCheckFullQueryLoggingChangeToDisabled(t *testing.T) {
@@ -193,17 +220,20 @@ func TestCheckFullQueryLoggingChangeToDisabled(t *testing.T) {
 	defer cleanupMockScr()
 	server := fqlFakeMgmtServer(t, true, true)
 
-	// Keep FQL config disabled in the Datacenter
+	setFQLEnabledAnnotation(rc.dcPods[0])
 	attachPods(t, rc, server)
-	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
 	r := rc.CheckFullQueryLogging()
-	if r != result.Continue() {
-		t.Fatalf("expected result of result.Continue() but got %s", r)
-	}
+	require.Equal(t, result.Continue(), r)
 	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
 	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 2)
 	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging?enabled=false", 1)
+	assertFQLEnabledAnnotation(t, rc, rc.dcPods[0], false)
+
+	r = rc.CheckFullQueryLogging()
+	require.Equal(t, result.Continue(), r)
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 2)
 }
 
 func TestCheckFullQueryNotSupportedTriedToUse(t *testing.T) {
@@ -211,24 +241,55 @@ func TestCheckFullQueryNotSupportedTriedToUse(t *testing.T) {
 	defer cleanupMockScr()
 	server := fqlFakeMgmtServer(t, false, false)
 
-	// Enable FQL config in the Datacenter
 	rc.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
 	attachPods(t, rc, server)
-	rc.NodeMgmtClient = server.client(rc.ReqLogger)
 
-	// The error is thrown in handler, but this test bypasses the validation - that's why we take Continue
-	// as correct result.
+	// The webhook rejects this configuration, but this test bypasses the validation
 	r := rc.CheckFullQueryLogging()
 	_, err := r.Output()
 	require.Error(t, err)
 	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
 	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging", 0)
+	assertFQLEnabledAnnotation(t, rc, rc.dcPods[0], false)
+}
+
+func TestCheckFullQueryLoggingOnlyDatacenterPods(t *testing.T) {
+	rc, cleanupMockScr := setupTestEnv()
+	defer cleanupMockScr()
+	server := fqlFakeMgmtServer(t, true, false)
+
+	otherLabels := rc.Datacenter.GetClusterLabels()
+	otherLabels[api.DatacenterLabel] = "other-dc"
+	otherPod := fqlTestPod("other-dc-sts-0", rc.Datacenter.Namespace, otherLabels)
+	rc.clusterPods = append(rc.clusterPods, otherPod)
+
+	notStarted := fqlTestPod("test-sts-1", rc.Datacenter.Namespace, rc.Datacenter.GetDatacenterLabels())
+	notStarted.Labels[api.CassNodeState] = stateReadyToStart
+	rc.clusterPods = append(rc.clusterPods, notStarted)
+	rc.dcPods = append(rc.dcPods, notStarted)
+
+	notReady := fqlTestPod("test-sts-2", rc.Datacenter.Namespace, rc.Datacenter.GetDatacenterLabels())
+	notReady.Status.ContainerStatuses[0].Ready = false
+	rc.clusterPods = append(rc.clusterPods, notReady)
+	rc.dcPods = append(rc.dcPods, notReady)
+
+	rc.Datacenter.Spec.Config = json.RawMessage(fqlEnabledConfig)
+	attachPods(t, rc, server)
+
+	r := rc.CheckFullQueryLogging()
+	require.Equal(t, result.Continue(), r)
+	server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	server.assertCallCount(t, "/api/v0/ops/node/fullquerylogging?enabled=true", 1)
+	assertFQLEnabledAnnotation(t, rc, rc.dcPods[0], true)
+	assertFQLEnabledAnnotation(t, rc, otherPod, false)
+	assertFQLEnabledAnnotation(t, rc, notStarted, false)
+	assertFQLEnabledAnnotation(t, rc, notReady, false)
 }
 
 func TestNotSupportedVersion(t *testing.T) {
 	rc := ReconciliationContext{
-		Datacenter: &v1beta1.CassandraDatacenter{
-			Spec: v1beta1.CassandraDatacenterSpec{},
+		Datacenter: &api.CassandraDatacenter{
+			Spec: api.CassandraDatacenterSpec{},
 		},
 	}
 

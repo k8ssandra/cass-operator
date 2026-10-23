@@ -27,6 +27,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX] [#981](https://github.com/k8ssandra/cass-operator/issues/981) Enforce balance of pod bootstraps per rack even if certain StatefulSets are unable to schedule correctly.
 * [BUGFIX] [#997](https://github.com/k8ssandra/cass-operator/issues/997) Pod labeling could cause delay in the fast path startup, causing certain pods to never start until restarted by the operator (10 minutes timeout)
 * [BUGFIX] [#990](https://github.com/k8ssandra/cass-operator/issues/990) Full query logging was applied to pods of every datacenter in the cluster instead of only the target datacenter and a pod without FQL support stopped processing the remaining pods
+* [BUGFIX] [#998](https://github.com/k8ssandra/cass-operator/issues/998) Do not modify the shared default HTTP client or supplied transports when building mgmt-api clients, propagate the reconcile logger context correctly, and update k8ssandra-client to v0.9.2 and Vector to 0.60.0
 
 ## v1.32.0
 

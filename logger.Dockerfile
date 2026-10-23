@@ -26,6 +26,7 @@ LABEL description="Sidecar to output Cassandra system logs to stdout"
 # Copy our configuration
 COPY ./config/logger/vector_config.toml /etc/vector/vector.toml
 COPY --from=builder /usr/lib64/libstdc++.so.6 /usr/lib64/libstdc++.so.6
+COPY --from=builder /usr/lib64/libz.so.1 /usr/lib64/libz.so.1
 COPY --from=builder /usr/bin/vector /usr/bin/vector
 
 ADD https://raw.githubusercontent.com/vectordotdev/vector/master/LICENSE /licences/LICENSE

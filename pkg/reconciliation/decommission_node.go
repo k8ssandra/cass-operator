@@ -197,15 +197,27 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 			return result.RequeueSoon(5)
 		}
 		if state == stateDecommissioning {
-			if len(epData.Entity) == 0 {
-				return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
+			peerData := epData
+			if len(peerData.Entity) == 0 {
+				if !rc.hasNoPeersToQuery() {
+					return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
+				}
+				if _, found := nodeStatuses[pod.Name]; found {
+					// The last node of a decommissioning datacenter can be the only pod of the cluster this operator sees
+					// (each datacenter in its own Kubernetes cluster), so its own view of the ring stands in for the peers'.
+					localMetadata, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
+					if err != nil {
+						return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata: %w", pod.Name, err))
+					}
+					peerData = localMetadata
+				}
 			}
-			done, err := rc.IsDoneDecommissioning(pod, epData, nodeStatuses)
+			done, err := rc.IsDoneDecommissioning(pod, peerData, nodeStatuses)
 			if err != nil {
 				return result.Error(err)
 			}
 			if !done {
-				if !HasStartedDecommissioning(pod, epData, nodeStatuses) {
+				if !HasStartedDecommissioning(pod, peerData, nodeStatuses) {
 					rc.ReqLogger.V(1).Info("Decommission has not started trying again", "Pod", pod.Name)
 					err := rc.callDecommission(pod)
 					if err != nil {
@@ -240,6 +252,21 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 	}
 
 	return result.Continue()
+}
+
+// hasNoPeersToQuery reports whether the datacenter is being decommissioned and every pod of the cluster
+// visible to this operator is already decommissioning or decommissioned, leaving no pod to ask for the peers' metadata.
+func (rc *ReconciliationContext) hasNoPeersToQuery() bool {
+	if rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) != corev1.ConditionTrue {
+		return false
+	}
+	for _, pod := range rc.clusterPods {
+		state := pod.Labels[api.CassNodeState]
+		if state != stateDecommissioning && state != stateDecommissioned {
+			return false
+		}
+	}
+	return true
 }
 
 func (rc *ReconciliationContext) cleanUpAfterDecommissionedPod(pod *corev1.Pod) result.ReconcileResult {

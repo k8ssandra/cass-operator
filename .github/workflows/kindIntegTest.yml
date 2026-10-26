@@ -262,15 +262,15 @@ jobs:
           - "4.0.21"
           - "4.1.12"
           - "5.0.9"
-          - "6.8.65"
-          - "6.9.25"
+          - "6.8.64"
+          - "6.9.23"
           - "2.0.8"
         integration_test:
           - test_all_the_things
         include:
-          - version: 6.8.65
+          - version: 6.8.64
             serverType: dse
-          - version: 6.9.25
+          - version: 6.9.23
             serverType: dse
           - version: 2.0.8
             serverType: hcd

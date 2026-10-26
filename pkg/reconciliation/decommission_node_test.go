@@ -431,6 +431,7 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 			if tt.noPeerData {
 				epData.Entity = nil
 			}
+			rc.clusterPods = rc.dcPods
 			res := rc.CheckDecommissioningNodes(epData)
 			_, err := res.Output()
 			if tt.wantError {

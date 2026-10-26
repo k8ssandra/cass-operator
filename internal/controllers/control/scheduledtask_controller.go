@@ -104,7 +104,7 @@ func (r *ScheduledTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if nextExecution.Before(now) {
 		if scheduledtask.Spec.TaskDetails.ConcurrencyPolicy == batchv1.ForbidConcurrent {
 			for _, job := range scheduledtask.Spec.TaskDetails.Jobs {
-				if activeTasks, err := r.activeTasks(scheduledtask, dc, job.Command); err != nil {
+				if activeTasks, err := r.activeTasks(ctx, scheduledtask, dc, job.Command); err != nil {
 					r.Log.V(1).Info("failed to get activeTasks", "error", err)
 					return ctrl.Result{}, err
 				} else {
@@ -179,9 +179,9 @@ func getPreviousExecutionTime(scheduledtask *controlapi.ScheduledTask) time.Time
 	return previousExecution.UTC()
 }
 
-func (r *ScheduledTaskReconciler) activeTasks(scheduledtask *controlapi.ScheduledTask, dc *api.CassandraDatacenter, command controlapi.CassandraCommand) (int, error) {
+func (r *ScheduledTaskReconciler) activeTasks(ctx context.Context, scheduledtask *controlapi.ScheduledTask, dc *api.CassandraDatacenter, command controlapi.CassandraCommand) (int, error) {
 	tasks := &controlapi.CassandraTaskList{}
-	if err := r.List(context.Background(), tasks, client.InNamespace(scheduledtask.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
+	if err := r.List(ctx, tasks, client.InNamespace(scheduledtask.Namespace), client.MatchingLabels(dc.GetDatacenterLabels())); err != nil {
 		return 0, err
 	}
 	activeJobs := make([]controlapi.CassandraJob, 0)

@@ -2,6 +2,7 @@ package reconciliation
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -199,12 +200,15 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 		if state == stateDecommissioning {
 			peerData := epData
 			if len(peerData.Entity) == 0 {
-				if !rc.hasNoPeersToQuery() {
+				peersAvailable := slices.ContainsFunc(rc.clusterPods, func(p *corev1.Pod) bool {
+					state := p.Labels[api.CassNodeState]
+					return state != stateDecommissioning && state != stateDecommissioned
+				})
+				if peersAvailable {
 					return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
 				}
 				if _, found := nodeStatuses[pod.Name]; found {
-					// The last node of a decommissioning datacenter can be the only pod of the cluster this operator sees
-					// (each datacenter in its own Kubernetes cluster), so its own view of the ring stands in for the peers'.
+					// No other pod is visible to provide peer metadata, use the node's own view of the ring
 					localMetadata, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
 					if err != nil {
 						return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata: %w", pod.Name, err))
@@ -252,21 +256,6 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 	}
 
 	return result.Continue()
-}
-
-// hasNoPeersToQuery reports whether the datacenter is being decommissioned and every pod of the cluster
-// visible to this operator is already decommissioning or decommissioned, leaving no pod to ask for the peers' metadata.
-func (rc *ReconciliationContext) hasNoPeersToQuery() bool {
-	if rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) != corev1.ConditionTrue {
-		return false
-	}
-	for _, pod := range rc.clusterPods {
-		state := pod.Labels[api.CassNodeState]
-		if state != stateDecommissioning && state != stateDecommissioned {
-			return false
-		}
-	}
-	return true
 }
 
 func (rc *ReconciliationContext) cleanUpAfterDecommissionedPod(pod *corev1.Pod) result.ReconcileResult {

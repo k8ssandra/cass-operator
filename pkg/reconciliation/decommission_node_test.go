@@ -466,22 +466,20 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 
 func TestCheckDecommissioningNodesLastNodeOfDecommissionedDatacenter(t *testing.T) {
 	tests := []struct {
-		name             string
-		localResponse    string
-		localCode        int
-		noDcDecommission bool
-		otherPodVisible  bool
-		wantCleaned      bool
-		wantCalls        int
-		wantRetries      int
-		wantError        string
+		name            string
+		localResponse   string
+		localCode       int
+		otherPodVisible bool
+		wantCleaned     bool
+		wantCalls       int
+		wantRetries     int
+		wantError       string
 	}{
 		{name: "local left completes", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 2},
 		{name: "local leaving waits without retrying", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEAVING"}]}`, wantCalls: 2},
 		{name: "local normal retries decommission", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, wantCalls: 2, wantRetries: 1},
 		{name: "local request fails", localCode: http.StatusInternalServerError, wantCalls: 1, wantError: "cannot check decommissioning node %s without Cassandra metadata: "},
 		{name: "another visible pod is required to provide metadata", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, otherPodVisible: true, wantError: "cannot check decommissioning node %s without Cassandra metadata"},
-		{name: "scale down without datacenter decommission requires metadata", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, noDcDecommission: true, wantError: "cannot check decommissioning node %s without Cassandra metadata"},
 	}
 
 	for _, tt := range tests {
@@ -502,9 +500,7 @@ func TestCheckDecommissioningNodesLastNodeOfDecommissionedDatacenter(t *testing.
 					http.NotFound(w, r)
 				}
 			})
-			if !tt.noDcDecommission {
-				rc.Datacenter.SetCondition(api.DatacenterCondition{Status: corev1.ConditionTrue, Type: api.DatacenterDecommission})
-			}
+			rc.Datacenter.SetCondition(api.DatacenterCondition{Status: corev1.ConditionTrue, Type: api.DatacenterDecommission})
 			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "cassandra", Ready: true}}
 			require.NoError(t, rc.Client.Status().Update(rc.Ctx, pod))
 

@@ -21,7 +21,7 @@ var (
 	testName     = "Delete DC and verify it is correctly decommissioned in multi-dc cluster"
 	opNamespace  = "cass-operator"
 	dc1Namespace = "test-decommission-dc1"
-	dc2Namespace = "test-decommission-dc"
+	dc2Namespace = "test-decommission-dc2"
 	dc1Name      = "dc1"
 	dc2Name      = "dc2"
 	dc1Yaml      = "../testdata/default-two-rack-two-node-dc.yaml"

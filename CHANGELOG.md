@@ -9,6 +9,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 * [BUGFIX]
 ```
 
+## unreleased
+
 ## v1.33.1
 
 * [BUGFIX] [#1000](https://github.com/k8ssandra/cass-operator/issues/1000) Decommissioning a datacenter never finished when its last node was the only pod of the cluster visible to the operator (for example each datacenter in its own Kubernetes cluster), as no peer metadata was available. The last node's own metadata is now used to verify its decommission.

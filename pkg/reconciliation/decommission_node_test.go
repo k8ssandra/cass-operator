@@ -431,6 +431,7 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 			if tt.noPeerData {
 				epData.Entity = nil
 			}
+			rc.clusterPods = rc.dcPods
 			res := rc.CheckDecommissioningNodes(epData)
 			_, err := res.Output()
 			if tt.wantError {
@@ -457,6 +458,81 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 				require.NoError(t, pvcErr)
 			}
 			require.NoError(t, rc.Client.Get(rc.Ctx, types.NamespacedName{Name: "remaining-pvc", Namespace: pod.Namespace}, &corev1.PersistentVolumeClaim{}))
+			server.assertCallCount(t, "/api/v0/metadata/endpoints", tt.wantCalls)
+			server.assertCallCount(t, "/api/v0/metadata/versions/features", tt.wantRetries)
+			server.assertCallCount(t, "/api/v1/ops/node/decommission", tt.wantRetries)
+		})
+	}
+}
+
+func TestCheckDecommissioningNodesLastNodeOfDecommissionedDatacenter(t *testing.T) {
+	tests := []struct {
+		name            string
+		localResponse   string
+		localCode       int
+		otherPodVisible bool
+		wantCleaned     bool
+		wantCalls       int
+		wantRetries     int
+		wantError       string
+	}{
+		{name: "local left completes", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 2},
+		{name: "local leaving waits without retrying", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEAVING"}]}`, wantCalls: 2},
+		{name: "local normal retries decommission", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, wantCalls: 2, wantRetries: 1},
+		{name: "local request fails", localCode: http.StatusInternalServerError, wantCalls: 1, wantError: "cannot check decommissioning node %s without Cassandra metadata: "},
+		{name: "another visible pod is required to provide metadata", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, otherPodVisible: true, wantError: "cannot check decommissioning node %s without Cassandra metadata"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, server, pod, sts := setupDecommissioningPodTest(t, func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/v0/metadata/endpoints":
+					if tt.localCode != 0 {
+						w.WriteHeader(tt.localCode)
+						return
+					}
+					_, _ = w.Write([]byte(tt.localResponse))
+				case "/api/v0/metadata/versions/features":
+					_, _ = w.Write([]byte(`{"cassandra_version":"4.0","features":["async_sstable_tasks"]}`))
+				case "/api/v1/ops/node/decommission":
+					_, _ = w.Write([]byte(`"job-1"`))
+				default:
+					http.NotFound(w, r)
+				}
+			})
+			rc.Datacenter.SetCondition(api.DatacenterCondition{Status: corev1.ConditionTrue, Type: api.DatacenterDecommission})
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "cassandra", Ready: true}}
+			require.NoError(t, rc.Client.Status().Update(rc.Ctx, pod))
+
+			// The decommissioning pod is the only pod of the cluster in this Kubernetes cluster, so
+			// getCassMetadataEndpoints has no pod to query and returns no peer metadata.
+			rc.clusterPods = []*corev1.Pod{pod}
+			if tt.otherPodVisible {
+				rc.clusterPods = rc.dcPods
+			}
+
+			_, err := rc.CheckDecommissioningNodes(httphelper.CassMetadataEndpoints{}).Output()
+			if tt.wantError != "" {
+				require.ErrorContains(t, err, fmt.Sprintf(tt.wantError, pod.Name))
+			} else {
+				require.NoError(t, err)
+			}
+
+			_, remains := rc.Datacenter.Status.NodeStatuses[pod.Name]
+			require.Equal(t, tt.wantCleaned, !remains)
+			require.NoError(t, rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(sts), sts))
+			wantReplicas := int32(2)
+			if tt.wantCleaned {
+				wantReplicas = 1
+			}
+			require.Equal(t, wantReplicas, *sts.Spec.Replicas)
+			pvcErr := rc.Client.Get(rc.Ctx, types.NamespacedName{Name: "target-pvc", Namespace: pod.Namespace}, &corev1.PersistentVolumeClaim{})
+			if tt.wantCleaned {
+				require.True(t, apierrors.IsNotFound(pvcErr))
+			} else {
+				require.NoError(t, pvcErr)
+			}
 			server.assertCallCount(t, "/api/v0/metadata/endpoints", tt.wantCalls)
 			server.assertCallCount(t, "/api/v0/metadata/versions/features", tt.wantRetries)
 			server.assertCallCount(t, "/api/v1/ops/node/decommission", tt.wantRetries)

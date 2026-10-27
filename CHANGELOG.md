@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [BUGFIX] [#1000](https://github.com/k8ssandra/cass-operator/issues/1000) Decommissioning a datacenter never finished when its last node was the only pod of the cluster visible to the operator (for example each datacenter in its own Kubernetes cluster), as no peer metadata was available. The last node's own metadata is now used to verify its decommission.
+
 ## v1.33.0
 
 * [CHANGE] [#969](https://github.com/k8ssandra/cass-operator/issues/969) Pull cass-config-builder from ghcr.io instead of docker.io where its no longer updated

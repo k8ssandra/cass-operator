@@ -2,6 +2,7 @@ package reconciliation
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -197,15 +198,30 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 			return result.RequeueSoon(5)
 		}
 		if state == stateDecommissioning {
-			if len(epData.Entity) == 0 {
-				return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
+			peerData := epData
+			if len(peerData.Entity) == 0 {
+				peersAvailable := slices.ContainsFunc(rc.clusterPods, func(p *corev1.Pod) bool {
+					state := p.Labels[api.CassNodeState]
+					return state != stateDecommissioning && state != stateDecommissioned
+				})
+				if peersAvailable {
+					return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
+				}
+				if _, found := nodeStatuses[pod.Name]; found {
+					// No other pod is visible to provide peer metadata, use the node's own view of the ring
+					localMetadata, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
+					if err != nil {
+						return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata: %w", pod.Name, err))
+					}
+					peerData = localMetadata
+				}
 			}
-			done, err := rc.IsDoneDecommissioning(pod, epData, nodeStatuses)
+			done, err := rc.IsDoneDecommissioning(pod, peerData, nodeStatuses)
 			if err != nil {
 				return result.Error(err)
 			}
 			if !done {
-				if !HasStartedDecommissioning(pod, epData, nodeStatuses) {
+				if !HasStartedDecommissioning(pod, peerData, nodeStatuses) {
 					rc.ReqLogger.V(1).Info("Decommission has not started trying again", "Pod", pod.Name)
 					err := rc.callDecommission(pod)
 					if err != nil {

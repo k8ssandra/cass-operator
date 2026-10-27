@@ -5,7 +5,7 @@ metadata:
 spec:
   datacenter:
     name: dc2
-    namespace: test-decommission-dc
+    namespace: test-decommission-dc2
   jobs:
     - name: rebuild-dc2
       command: rebuild

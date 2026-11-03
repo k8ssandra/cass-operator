@@ -86,6 +86,7 @@ func TestSetDatacenterStatusUpdateProgressState(t *testing.T) {
 		inputMetadataVersion int64
 		inputObservedGen     int64
 		inputGeneration      int64
+		inputStartGeneration int64
 
 		expectedStatusPatch     bool
 		expectedMetadataVersion int64
@@ -96,6 +97,7 @@ func TestSetDatacenterStatusUpdateProgressState(t *testing.T) {
 			inputMetadataVersion: 1,
 			inputObservedGen:     0,
 			inputGeneration:      1,
+			inputStartGeneration: 1,
 
 			expectedStatusPatch:     true,
 			expectedMetadataVersion: 2,
@@ -106,6 +108,7 @@ func TestSetDatacenterStatusUpdateProgressState(t *testing.T) {
 			inputMetadataVersion: 2,
 			inputObservedGen:     1,
 			inputGeneration:      2,
+			inputStartGeneration: 2,
 
 			expectedStatusPatch:     true,
 			expectedMetadataVersion: 2,
@@ -116,10 +119,22 @@ func TestSetDatacenterStatusUpdateProgressState(t *testing.T) {
 			inputMetadataVersion: 2,
 			inputObservedGen:     3,
 			inputGeneration:      3,
+			inputStartGeneration: 3,
 
 			expectedStatusPatch:     false,
 			expectedMetadataVersion: 2,
 			expectedObservedGen:     3,
+		},
+		{
+			name:                 "spec changed during the pass: keeps the generation the pass started from",
+			inputMetadataVersion: 2,
+			inputObservedGen:     1,
+			inputGeneration:      2,
+			inputStartGeneration: 1,
+
+			expectedStatusPatch:     false,
+			expectedMetadataVersion: 2,
+			expectedObservedGen:     1,
 		},
 	}
 
@@ -131,6 +146,7 @@ func TestSetDatacenterStatusUpdateProgressState(t *testing.T) {
 			rc.Datacenter.Status.MetadataVersion = tc.inputMetadataVersion
 			rc.Datacenter.Status.ObservedGeneration = tc.inputObservedGen
 			rc.Datacenter.Generation = tc.inputGeneration
+			rc.startGeneration = tc.inputStartGeneration
 
 			dc := rc.Datacenter
 			runtimeObjs := []runtime.Object{dc}

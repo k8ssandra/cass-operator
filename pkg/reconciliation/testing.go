@@ -172,6 +172,7 @@ func CreateMockReconciliationContext(
 	rc.Scheme = s
 	rc.ReqLogger = reqLogger
 	rc.Datacenter = cassandraDatacenter
+	rc.startGeneration = cassandraDatacenter.Generation
 	rc.Recorder = &events.LoggingEventRecorder{
 		EventRecorderLogger: record.NewFakeRecorder(100),
 		ReqLogger:           reqLogger,

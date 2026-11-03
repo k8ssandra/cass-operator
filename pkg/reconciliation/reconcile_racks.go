@@ -177,7 +177,11 @@ func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
 			if pod == nil {
 				continue
 			}
-			if rc.isPodFailing(pod) {
+			failing, err := rc.isPodFailing(pod)
+			if err != nil {
+				return false, ""
+			}
+			if failing {
 				return true, pod.Labels[api.RackLabel]
 			}
 		}
@@ -188,16 +192,16 @@ func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
 
 // isPodFailing returns true if the pod failed to start Cassandra earlier or is stuck in a state it can't recover
 // from without a change to its StatefulSet.
-func (rc *ReconciliationContext) isPodFailing(pod *corev1.Pod) bool {
+func (rc *ReconciliationContext) isPodFailing(pod *corev1.Pod) (bool, error) {
 	// A FailedStarts entry of a pod that has since started is stale
 	if utils.IndexOfString(rc.Datacenter.Status.FailedStarts, pod.Name) > -1 && !isServerStartedAndReady(pod) {
 		rc.ReqLogger.Info("Found previously failed start", "pod", pod.Name)
-		return true
+		return true, nil
 	}
 
 	if !rc.podMatchesCurrentRackRevision(pod) {
 		// We have an update going on (or some weird Canary state), this isn't expected Pod state in any case
-		return false
+		return false, nil
 	}
 
 	if pod.Status.Phase == corev1.PodPending {
@@ -207,13 +211,13 @@ func (rc *ReconciliationContext) isPodFailing(pod *corev1.Pod) bool {
 			events := &corev1.EventList{}
 			if err := rc.APIReader.List(rc.Ctx, events, &client.ListOptions{Namespace: pod.Namespace, FieldSelector: fields.SelectorFromSet(fields.Set{"involvedObject.name": pod.Name})}); err != nil {
 				rc.ReqLogger.Error(err, "error getting events for pod", "pod", pod.Name)
-				return false
+				return false, err
 			}
 
 			for _, event := range events.Items {
 				if event.Reason == "FailedScheduling" {
 					rc.ReqLogger.Info("Found FailedScheduling event for pod", "pod", pod.Name)
-					return true
+					return true, nil
 				}
 			}
 		}
@@ -229,14 +233,14 @@ func (rc *ReconciliationContext) isPodFailing(pod *corev1.Pod) bool {
 				waitingReason == "ErrImagePull" {
 				rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "reason", waitingReason)
 				// We have a container in a failing state
-				return true
+				return true, nil
 			}
 		}
 		if containerStatus.RestartCount > 0 {
 			if containerStatus.State.Terminated != nil {
 				if containerStatus.State.Terminated.ExitCode != 0 {
 					rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
-					return true
+					return true, nil
 				}
 			}
 		}
@@ -250,24 +254,25 @@ func (rc *ReconciliationContext) isPodFailing(pod *corev1.Pod) bool {
 				waitingReason == "ErrImagePull" {
 				// We have a container in a failing state
 				rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "reason", waitingReason)
-				return true
+				return true, nil
 			}
 		}
 		if containerStatus.RestartCount > 0 {
 			if containerStatus.State.Terminated != nil {
 				if containerStatus.State.Terminated.ExitCode != 0 {
 					rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
-					return true
+					return true, nil
 				}
 			}
 		}
 	}
 
-	return false
+	return false, nil
 }
 
-// notReadyOtherRack returns the name of a rack other than failedRackName whose pods are still coming up, or an empty
-// string if every other rack is ready. Pods that are failing don't count, they won't come up without an update either.
+// notReadyOtherRack returns the name of a rack other than failedRackName that has a Cassandra node still coming
+// back up, or an empty string if there is none. Pods that are failing don't count, as they won't come up without an
+// update either. Neither do pods that have never been part of the cluster, as they can't lose availability.
 func (rc *ReconciliationContext) notReadyOtherRack(failedRackName string) string {
 	for idx := range rc.desiredRackInformation {
 		rackName := rc.desiredRackInformation[idx].RackName
@@ -276,13 +281,24 @@ func (rc *ReconciliationContext) notReadyOtherRack(failedRackName string) string
 		}
 
 		statefulSet := rc.statefulSets[idx]
-		rackPods := rc.rackPods(rackName)
-		if statefulSet.Generation != statefulSet.Status.ObservedGeneration || len(rackPods) < int(*statefulSet.Spec.Replicas) {
+		if statefulSet.Generation != statefulSet.Status.ObservedGeneration {
 			return rackName
 		}
 
-		for _, pod := range rackPods {
-			if !isServerReady(pod) && !rc.isPodFailing(pod) {
+		for ordinal := int32(0); ordinal < *statefulSet.Spec.Replicas; ordinal++ {
+			podName := getStatefulSetPodNameForIdx(statefulSet, ordinal)
+			if _, found := rc.Datacenter.Status.NodeStatuses[podName]; !found {
+				continue
+			}
+
+			pod := rc.getDCPodByName(podName)
+			if pod == nil {
+				return rackName
+			}
+			if isServerReady(pod) {
+				continue
+			}
+			if failing, err := rc.isPodFailing(pod); err != nil || !failing {
 				return rackName
 			}
 		}
@@ -444,10 +460,13 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 }
 
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
-	return rc.CheckRackPodTemplateDetails(false, "")
+	return rc.CheckRackPodTemplateDetails(false, "", false)
 }
 
-func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedRackName string) result.ReconcileResult {
+// CheckRackPodTemplateDetails updates the StatefulSets whose pod template has changed. With force, only the rack
+// failedRackName is updated, and without waiting for its pods to be ready or for UpdateAllowed(). With
+// waitForOtherRacks, a forced update waits until no other rack has a Cassandra node coming back up.
+func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedRackName string, waitForOtherRacks bool) result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
 	logger.Info("reconcile_racks::CheckRackPodTemplate", "force", force)
@@ -521,6 +540,17 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 		}
 
 		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && (force || rc.UpdateAllowed()) {
+			if waitForOtherRacks {
+				// Forcing the update restarts the whole rack, don't do it while another rack is still coming up. The
+				// rest of the reconcile continues, so the nodes of the other rack can be started.
+				if notReadyRack := rc.notReadyOtherRack(rackName); notReadyRack != "" {
+					logger.
+						WithValues("rackName", rackName, "notReadyRack", notReadyRack).
+						Info("statefulset needs a forced update, but waiting for another rack to be ready")
+					return result.Continue()
+				}
+			}
+
 			logger.
 				WithValues("rackName", rackName).
 				Info("statefulset needs an update")
@@ -600,18 +630,12 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 
 	// Datacenter configuration isn't healthy, we allow upgrades here before pods start
 	if failed, rackName := rc.failureModeDetection(); failed {
-		// Forcing the update restarts the whole rack, don't do it while another rack is still coming up. The rest
-		// of the reconcile continues, so the nodes of the other rack can be started.
-		if notReadyRack := rc.notReadyOtherRack(rackName); notReadyRack != "" {
-			logger.Info("Failure detected, but waiting for another rack to be ready before forcing CheckRackPodTemplate()", "rackName", rackName, "notReadyRack", notReadyRack)
-			return result.Continue()
-		}
 		logger.Info("Failure detected, forcing CheckRackPodTemplate()")
-		return rc.CheckRackPodTemplateDetails(true, rackName)
+		return rc.CheckRackPodTemplateDetails(true, rackName, true)
 	}
 
 	for _, rackName := range dc.Spec.ForceUpgradeRacks {
-		if res := rc.CheckRackPodTemplateDetails(true, rackName); res.Completed() {
+		if res := rc.CheckRackPodTemplateDetails(true, rackName, false); res.Completed() {
 			return res
 		}
 	}
@@ -2061,7 +2085,8 @@ func (rc *ReconciliationContext) clearFailedStarts() {
 		return
 	}
 
-	statusPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
+	// The startCassandra goroutine can add an entry concurrently, don't overwrite it
+	statusPatch := client.MergeFromWithOptions(rc.Datacenter.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	rc.Datacenter.Status.FailedStarts = failedStarts
 	if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, statusPatch); err != nil {
 		// Stale entries are ignored by the failure detection and this is retried on the next reconcile,

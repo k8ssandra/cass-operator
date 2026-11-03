@@ -4204,7 +4204,11 @@ func TestFailedStartAllowsCorrectiveStatefulSetUpdateAndIsReset(t *testing.T) {
 	require.NoError(rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(statefulSet), updatedStatefulSet))
 	require.NotEqual(failedHash, updatedStatefulSet.Annotations[utils.ResourceHashAnnotationKey])
 
-	// FailedStarts is cleared only after the replacement Pod starts successfully.
+	// FailedStarts is cleared only after the replacement Pod starts successfully, the failed Pod was deleted
+	rc.dcPods = []*corev1.Pod{}
+	rc.clearFailedStarts()
+	require.Equal([]string{failedPodName}, rc.Datacenter.Status.FailedStarts)
+
 	updatedStatefulSet.Status.UpdateRevision = "revision-2"
 	rc.statefulSets[0] = updatedStatefulSet
 	replacementPod := &corev1.Pod{
@@ -4273,9 +4277,12 @@ func TestCheckRackForceUpgrade(t *testing.T) {
 		name         string
 		failedStarts []int
 		// rack1Pod and rack2Pod modify the pods of the racks, a nil rack2Pod removes its pod
-		rack1Pod    func(*corev1.Pod)
-		rack2Pod    func(*corev1.Pod)
-		forcedRack1 bool
+		rack1Pod func(*corev1.Pod)
+		rack2Pod func(*corev1.Pod)
+		// rack2NeverStarted leaves out the NodeStatuses entry of the rack2 pod
+		rack2NeverStarted bool
+		rack2NotCaughtUp  bool
+		forcedRack1       bool
 	}{
 		{
 			name:         "other rack ready",
@@ -4295,6 +4302,22 @@ func TestCheckRackForceUpgrade(t *testing.T) {
 				pod.Labels[api.CassNodeState] = stateStarting
 			},
 			forcedRack1: false,
+		},
+		{
+			name:         "other rack never started",
+			failedStarts: []int{0},
+			rack2Pod: func(pod *corev1.Pod) {
+				pod.Labels[api.CassNodeState] = stateReadyToStart
+			},
+			rack2NeverStarted: true,
+			forcedRack1:       true,
+		},
+		{
+			name:             "other rack statefulset not caught up",
+			failedStarts:     []int{0},
+			rack2Pod:         readyPod,
+			rack2NotCaughtUp: true,
+			forcedRack1:      false,
 		},
 		{
 			name:         "other rack failing",
@@ -4328,9 +4351,13 @@ func TestCheckRackForceUpgrade(t *testing.T) {
 			require.Equal(result.Continue(), rc.CheckRackCreation())
 
 			rc.dcPods = []*corev1.Pod{}
+			rc.Datacenter.Status.NodeStatuses = api.CassandraStatusMap{}
 			for idx, modify := range []func(*corev1.Pod){tt.rack1Pod, tt.rack2Pod} {
 				statefulSet := rc.statefulSets[idx]
 				statefulSet.Status.ObservedGeneration = statefulSet.Generation
+				if idx == 1 && tt.rack2NotCaughtUp {
+					statefulSet.Status.ObservedGeneration = statefulSet.Generation - 1
+				}
 				statefulSet.Status.UpdateRevision = "revision-1"
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -4340,6 +4367,9 @@ func TestCheckRackForceUpgrade(t *testing.T) {
 							appsv1.ControllerRevisionHashLabelKey: "revision-1",
 						}),
 					},
+				}
+				if idx == 0 || !tt.rack2NeverStarted {
+					rc.Datacenter.Status.NodeStatuses[pod.Name] = api.CassandraNodeStatus{HostID: fmt.Sprintf("host-%d", idx)}
 				}
 				if slices.Contains(tt.failedStarts, idx) {
 					rc.Datacenter.Status.FailedStarts = append(rc.Datacenter.Status.FailedStarts, pod.Name)

@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
+* [BUGFIX] [#1008](https://github.com/k8ssandra/cass-operator/issues/1008) Deleting a CassandraDatacenter no longer gets stuck when `spec.users` secrets or `managementApiAuth.manual` TLS secrets were removed first. Deletions that need the Management API (`decommission-on-delete` or an ongoing scale down) still require them.
 
 ## v1.33.1
 

@@ -95,9 +95,9 @@ jobs:
           - name: rolling_restart
             suites: rolling_restart
           - name: scale_up
-            suites: scale_up mgmt_api_port_change webhook_validation
+            suites: scale_up mgmt_api_port_change
           - name: test_bad_config_and_fix
-            suites: test_bad_config_and_fix additional_serviceoptions
+            suites: test_bad_config_and_fix
           - name: decommission_dc
             suites: decommission_dc internode-encryption-generated config_fql
           - name: scale_up_stop_resume
@@ -109,11 +109,11 @@ jobs:
           - name: seed_selection
             suites: seed_selection config_secret additional_seeds
           - name: scale_down
-            suites: scale_down canary_upgrade
+            suites: scale_down canary_upgrade webhook_validation
           - name: scheduled_task
             suites: scheduled_task superuser-secret-provided podspec_simple superuser-secret-generated
           - name: host_network
-            suites: host_network test_mtls_mgmt_api additional_volumes nodeport_service
+            suites: host_network test_mtls_mgmt_api additional_volumes nodeport_service additional_serviceoptions
           # Disabled suites:
           # - delete_node_terminated_container # This does not test any operator behavior
           # - terminate

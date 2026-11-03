@@ -193,8 +193,7 @@ func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
 // isPodFailing returns true if the pod failed to start Cassandra earlier or is stuck in a state it can't recover
 // from without a change to its StatefulSet.
 func (rc *ReconciliationContext) isPodFailing(pod *corev1.Pod) (bool, error) {
-	// A FailedStarts entry of a pod that has since started is stale
-	if utils.IndexOfString(rc.Datacenter.Status.FailedStarts, pod.Name) > -1 && !isServerStartedAndReady(pod) {
+	if utils.IndexOfString(rc.Datacenter.Status.FailedStarts, pod.Name) > -1 && !isServerReady(pod) {
 		rc.ReqLogger.Info("Found previously failed start", "pod", pod.Name)
 		return true, nil
 	}
@@ -463,9 +462,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
 	return rc.CheckRackPodTemplateDetails(false, "", false)
 }
 
-// CheckRackPodTemplateDetails updates the StatefulSets whose pod template has changed. With force, only the rack
-// failedRackName is updated, and without waiting for its pods to be ready or for UpdateAllowed(). With
-// waitForOtherRacks, a forced update waits until no other rack has a Cassandra node coming back up.
 func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedRackName string, waitForOtherRacks bool) result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
@@ -541,8 +537,6 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 
 		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && (force || rc.UpdateAllowed()) {
 			if waitForOtherRacks {
-				// Forcing the update restarts the whole rack, don't do it while another rack is still coming up. The
-				// rest of the reconcile continues, so the nodes of the other rack can be started.
 				if notReadyRack := rc.notReadyOtherRack(rackName); notReadyRack != "" {
 					logger.
 						WithValues("rackName", rackName, "notReadyRack", notReadyRack).
@@ -2071,12 +2065,10 @@ func (rc *ReconciliationContext) findStartedNotReadyNodes() (bool, error) {
 	return false, nil
 }
 
-// clearFailedStarts removes the FailedStarts entries of pods that have since started, no matter which path
-// started them.
 func (rc *ReconciliationContext) clearFailedStarts() {
 	failedStarts := make([]string, 0, len(rc.Datacenter.Status.FailedStarts))
 	for _, podName := range rc.Datacenter.Status.FailedStarts {
-		if pod := rc.getDCPodByName(podName); pod == nil || !isServerStartedAndReady(pod) {
+		if pod := rc.getDCPodByName(podName); pod == nil || !isServerReady(pod) {
 			failedStarts = append(failedStarts, podName)
 		}
 	}
@@ -2413,10 +2405,6 @@ func didServerLoseReadiness(pod *corev1.Pod) bool {
 		return !isServerReady(pod)
 	}
 	return false
-}
-
-func isServerStartedAndReady(pod *corev1.Pod) bool {
-	return pod.Labels[api.CassNodeState] == stateStarted && isServerReady(pod)
 }
 
 func isServerReady(pod *corev1.Pod) bool {

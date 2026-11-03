@@ -12,7 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
-* [BUGFIX] [#1015](https://github.com/k8ssandra/cass-operator/issues/1015) A pod that failed to start once stayed in `status.failedStarts` after it started successfully, so every later StatefulSet change of its rack was forced without the usual readiness checks. Entries are now removed once the pod has started, and a forced update of a failing rack waits while another rack has a Cassandra node coming back up, so it no longer takes down a second rack while another one is still restarting.
+* [BUGFIX] [#1015](https://github.com/k8ssandra/cass-operator/issues/1015) A pod that failed to start once stayed in `status.failedStarts` after it started successfully, so every later StatefulSet change of its rack was forced without the usual readiness checks.
 
 ## v1.33.1
 

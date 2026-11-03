@@ -6,6 +6,7 @@ package reconciliation
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/events"
@@ -50,13 +51,19 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 		return result.Continue()
 	}
 
+	decommissionOnDelete := false
 	if _, found := rc.Datacenter.Annotations[api.DecommissionOnDeleteAnnotation]; found {
+		decommissionOnDelete = true
 		dcPods, err := rc.listPods(rc.Datacenter.GetDatacenterLabels())
 		if err != nil {
 			rc.ReqLogger.Error(err, "Failed to list pods, unable to proceed with deletion")
 			return result.Error(err)
 		}
 		if len(dcPods) > 0 {
+			if rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionTrue {
+				// Do not revisit the decision, the remaining pods might no longer see the other datacenters
+				return result.Continue()
+			}
 			rc.ReqLogger.V(1).Info("Deletion is being processed by the decommission check")
 			dcs, err := rc.getClusterDatacenters(dcPods)
 			if err != nil {
@@ -65,7 +72,8 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 				return result.Error(err)
 			}
 
-			if len(dcs) > 1 {
+			dcName := rc.Datacenter.DatacenterName()
+			if slices.ContainsFunc(dcs, func(dc string) bool { return dc != dcName }) {
 				if err := rc.setConditionStatus(api.DatacenterDecommission, corev1.ConditionTrue); err != nil {
 					return result.Error(err)
 				}
@@ -74,10 +82,20 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 				// Exiting to let other parts of the process take care of the decommission
 				return result.Continue()
 			}
-			// How could we have pods if we've decommissioned everything?
-			return result.RequeueSoon(5)
+
+			if !slices.Contains(dcs, dcName) {
+				rc.Recorder.Event(rc.Datacenter, corev1.EventTypeWarning, events.DecommissionDatacenter,
+					"Unable to read the cluster topology from any datacenter pod, waiting before decommissioning the datacenter")
+				return result.RequeueSoon(5)
+			}
+
+			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DecommissionDatacenter,
+				"Datacenter is the only datacenter in the cluster, deleting it without decommission")
+			decommissionOnDelete = false
 		}
-	} else {
+	}
+
+	if !decommissionOnDelete {
 		// This is small mini reconcile to make everything 0 sized before we finish deletion, but do not run decommission in Cassandra
 		rc.ReqLogger.Info("Proceeding with deletion, setting all StatefulSets to 0 replicas")
 		if err := rc.CalculateRackInformation(); err != nil {

@@ -38,6 +38,11 @@ linters:
       enable-all: true
     gocyclo:
       min-complexity: 40
+    staticcheck:
+      # Ginkgo and Gomega are meant to be dot imported, it keeps the tests readable
+      dot-import-whitelist:
+        - github.com/onsi/ginkgo/v2
+        - github.com/onsi/gomega
     nolintlint:
       allow-unused: false
     revive:
@@ -91,8 +96,6 @@ linters:
       - linters:
           - unparam
         path: pkg/reconciliation/testing.go
-      - path: tests/util/ginkgo/lib.go
-        text: "ST1001: should not use dot imports"
     paths:
       - third_party$
       - builtin$

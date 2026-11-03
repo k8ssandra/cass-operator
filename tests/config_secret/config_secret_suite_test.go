@@ -52,6 +52,10 @@ var _ = Describe(testName, func() {
 			k = kubectl.ApplyFiles(testFile)
 			ns.ExecAndLog(step, k)
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 420, 30)
+			ns.AssertDatacenterInvariants(dcName)
+
+			before := ns.GetDatacenterState(dcName)
+			sampler := ns.SampleAvailability(dcName)
 
 			step = "update config secret"
 			testUpdatedSecretFile, err := ginkgo_util.CreateTestSecretsConfig(updatedSecretYaml)
@@ -66,6 +70,17 @@ var _ = Describe(testName, func() {
 			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
 			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout: 10000ms", 60)
 
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
+			for _, pod := range ns.GetDatacenterPodNames(dcName) {
+				ns.ExpectCassandraSetting(pod, "cluster1", "read_request_timeout", `(?m)^\s*10000ms\s*$`)
+			}
+
+			before = ns.GetDatacenterState(dcName)
+			sampler = ns.SampleAvailability(dcName)
+
 			step = "stop using config secret"
 			json := ginkgo_util.CreateTestJson(`[{"op": "remove", "path": "/spec/configSecret"}, {"op": "add", "path": "/spec/config", "value": {"cassandra-yaml": {"read_request_timeout": "25000ms"}, "jvm-server-options": {"initial_heap_size": "512M", "max_heap_size": "512M"}}}]`)
 			k = kubectl.PatchJson(dcResource, json)
@@ -78,6 +93,17 @@ var _ = Describe(testName, func() {
 			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
 			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout: 25000ms", 120)
 
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
+			for _, pod := range ns.GetDatacenterPodNames(dcName) {
+				ns.ExpectCassandraSetting(pod, "cluster1", "read_request_timeout", `(?m)^\s*25000ms\s*$`)
+			}
+
+			before = ns.GetDatacenterState(dcName)
+			sampler = ns.SampleAvailability(dcName)
+
 			step = "use config secret again"
 			json = `{"spec": {"config": null, "configSecret": "test-config"}}`
 			k = kubectl.PatchMerge(dcResource, json)
@@ -89,6 +115,14 @@ var _ = Describe(testName, func() {
 			step = "checking cassandra.yaml"
 			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
 			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout: 10000ms", 120)
+
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
+			for _, pod := range ns.GetDatacenterPodNames(dcName) {
+				ns.ExpectCassandraSetting(pod, "cluster1", "read_request_timeout", `(?m)^\s*10000ms\s*$`)
+			}
 		})
 	})
 })

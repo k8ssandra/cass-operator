@@ -50,6 +50,7 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForSuperUserUpserted(dcName, 600)
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "check recorded host IDs"
 			ns.Log(step)
@@ -62,6 +63,9 @@ var _ = Describe(testName, func() {
 			json := "{\"spec\": {\"canaryUpgrade\": true, \"canaryUpgradeCount\": 1}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
+
+			before := ns.GetDatacenterState(dcName)
+			sampler := ns.SampleAvailability(dcName)
 
 			step = "perform canary upgrade"
 			json = "{\"spec\": {\"serverVersion\": \"4.0.7\"}}"
@@ -87,6 +91,24 @@ var _ = Describe(testName, func() {
 			}
 			ns.WaitForCassandraImages(dcName, images, 300)
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 600)
+			// Only the canary pod is on the update revision
+			ns.AssertDatacenterInvariants(dcName, ginkgo_util.SkipStatefulSetRevisionCheck())
+			sampler.Stop()
+
+			step = "checking that only the canary pod was restarted"
+			ns.Log(step)
+			afterCanary := ns.GetDatacenterState(dcName)
+			restarted := []string{}
+			for pod, uid := range before.PodUIDs {
+				if afterCanary.PodUIDs[pod] != uid {
+					restarted = append(restarted, pod)
+				}
+			}
+			Expect(restarted).To(HaveLen(1), "pods restarted by the canary upgrade: %v", restarted)
+			ns.ExpectSameHostIDs(dcName, before)
+
+			sampler = ns.SampleAvailability(dcName)
 
 			// TODO Verify that after the canary upgrade we can issue upgrades to the rest of the nodes
 			step = "remove canary upgrade"
@@ -103,10 +125,15 @@ var _ = Describe(testName, func() {
 				strings.Replace(updated, "docker.io/", "ghcr.io/", 1),
 			}
 			ns.WaitForCassandraImages(dcName, images, 300)
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(dcYaml)
 			ns.ExecAndLog(step, k)
+			ns.AssertDatacenterDeleted(dcName)
 
 			step = "checking that the dc no longer exists"
 			json = "jsonpath={.items}"

@@ -45,6 +45,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 		})
 		Specify("user is able to expand the existing server-data", func() {
 			step := "retrieve the persistent volume claim"
@@ -70,6 +71,7 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterCondition(dcName, "ResizingVolumes", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 			ns.WaitForDatacenterCondition(dcName, "ResizingVolumes", string(corev1.ConditionFalse))
 
 			step = "find the PV volume size"

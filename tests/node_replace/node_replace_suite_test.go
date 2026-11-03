@@ -108,6 +108,11 @@ func verifyAllPodsAreCorrect() {
 			}
 		}
 	}
+
+	// The node was killed on purpose, the Warning events until the replacement finished are expected
+	ns.ResetEventCheckpoint(dcName)
+	ns.WaitForDatacenterReady(dcName)
+	ns.AssertDatacenterInvariants(dcName)
 }
 
 var _ = Describe(testName, func() {
@@ -127,6 +132,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 		})
 		Specify("the operator can replace a defunct cassandra node on pod start", func() {
 			step := "ensure we actually recorded the host IDs for our cassandra nodes"
@@ -283,6 +289,9 @@ var _ = Describe(testName, func() {
 				Expect(oldPvByPod[podName]).ToNot(Equal(newPvByPod[podName]),
 					"Expected PV volume to be different after rack replace for pod %s", podName)
 			}
+
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 		})
 	})
 })

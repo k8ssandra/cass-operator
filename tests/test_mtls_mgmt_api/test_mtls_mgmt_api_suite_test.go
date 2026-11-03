@@ -55,6 +55,7 @@ var _ = Describe(testName, func() {
 
 			// This takes a while sometimes in my dev environment
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 120)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "scale up to 2 nodes"
 			json := "{\"spec\": {\"size\": 2}}"
@@ -63,6 +64,7 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			// Verify the server-system-logger and cassandra container have different mount paths for certs
 			step = "verifying cert volume mount paths"
@@ -92,6 +94,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
+			ns.AssertDatacenterDeleted(dcName)
 
 			// TODO FIXME: re-enable this when the following issue is fixed:
 			// https://github.com/datastax/management-api-for-apache-cassandra/issues/42

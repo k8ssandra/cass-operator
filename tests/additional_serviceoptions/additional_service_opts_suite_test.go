@@ -45,6 +45,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 120)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "verify service has additional label and annotation"
 			k = kubectl.Get("svc").WithLabel("test=additional-serviceoptions").FormatOutput(`jsonpath={.items[0].metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}`)
@@ -53,6 +54,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
+			ns.AssertDatacenterDeleted(dcName)
 
 			step = "checking that the dc no longer exists"
 			json := "jsonpath={.items}"

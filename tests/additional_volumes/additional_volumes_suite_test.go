@@ -46,6 +46,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 120)
+			ns.AssertDatacenterInvariants(dcName)
 
 			// Verify the volumes are actually there
 			step = "retrieve the persistent volume claim"
@@ -63,6 +64,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
+			ns.AssertDatacenterDeleted(dcName)
 
 			step = "checking that the dc no longer exists"
 			json = "jsonpath={.items}"

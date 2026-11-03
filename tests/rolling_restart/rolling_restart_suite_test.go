@@ -49,8 +49,13 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 		})
 		Specify("the operator can perform a rolling restart with rollingRestartRequested spec change", func() {
+			before := ns.GetDatacenterState(dcName)
+			lastRollingRestart := ns.GetDatacenter(dcName).Status.LastRollingRestart
+			sampler := ns.SampleAvailability(dcName)
+
 			step := "trigger restart"
 			json := `{"spec": {"rollingRestartRequested": true}}`
 			k := kubectl.PatchMerge(dcResource, json)
@@ -74,14 +79,25 @@ var _ = Describe(testName, func() {
 			Expect(ns.OutputAndLog(step, k)).To(Equal("true true"))
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
+			Expect(ns.GetDatacenter(dcName).Status.LastRollingRestart.After(lastRollingRestart.Time)).To(BeTrue(), "status.lastRollingRestart did not advance")
 		})
 		Specify("cassandratask can be used to do rolling restart of the cluster", func() {
+			before := ns.GetDatacenterState(dcName)
+			sampler := ns.SampleAvailability(dcName)
+
 			step := "creating a cassandra task to do rolling restart"
 			k := kubectl.ApplyFiles(taskYaml)
 			ns.ExecAndLog(step, k)
 
 			// Wait for the task to be completed
 			ns.WaitForCompleteTask("rolling-restart")
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
 
 			// Verify each pod does have the annotation..
 			json := `jsonpath={.items[0].metadata.annotations.control\.k8ssandra\.io/restartedAt}`
@@ -98,6 +114,11 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, kubectl.PatchMerge(dcResource, json))
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+
+			before := ns.GetDatacenterState(dcName)
+			// The fast path restarts a whole rack (2 pods) at once, but never more than one rack
+			sampler := ns.SampleAvailabilityWithMaxUnavailable(dcName, 2)
 
 			step = "creating a cassandra task to do rolling restart (fast)"
 			ns.ExecAndLog(step, kubectl.ApplyFiles(fastTaskYaml))
@@ -105,6 +126,9 @@ var _ = Describe(testName, func() {
 			// Wait for the task to be completed
 			ns.WaitForCompleteTask("rolling-restart-fast")
 			ns.WaitForDatacenterReady(dcName) // Should be instant check
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
 
 			step = "verify all pods have restartedAt annotation"
 			ns.Log(step)

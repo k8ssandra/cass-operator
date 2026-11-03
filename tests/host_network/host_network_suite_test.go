@@ -47,6 +47,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "ensure pod has host networking enabled"
 			json := `jsonpath={.spec.hostNetwork}`

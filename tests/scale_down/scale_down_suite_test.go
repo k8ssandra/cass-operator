@@ -50,6 +50,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "run easy-stress job"
 			k = kubectl.ApplyFiles(easyStressJobYaml)
@@ -74,6 +75,9 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
 			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
 			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 360)
+			ns.AssertDatacenterInvariants(dcName)
+
+			replicas := ginkgo_util.SampleDecommissionReplicas(ns, dcName, 4)
 
 			step = "scale down to 3 nodes"
 			json = "{\"spec\": {\"size\": 3}}"
@@ -83,7 +87,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "ScalingDown", string(corev1.ConditionTrue))
 
 			podWithDecommissionedNode := "cluster1-dc1-r1-sts-1"
-			podPvcName := "server-data-cluster2-dc1-r1-sts-1"
+			podPvcName := "server-data-cluster1-dc1-r1-sts-1"
 
 			step = "check node status set to decommissioning"
 			json = "jsonpath={.items[*].metadata.name}"
@@ -95,6 +99,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 30)
 			ns.WaitForDatacenterCondition(dcName, "ScalingDown", string(corev1.ConditionFalse))
 			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 360)
+			replicas.Stop()
 
 			step = "check that the decomm'd pod got terminated"
 			json = "jsonpath={.items}"
@@ -117,10 +122,12 @@ var _ = Describe(testName, func() {
 
 			nodeInfos := ns.RetrieveStatusFromNodetool("cluster1-dc1-r1-sts-0")
 			Expect(nodeInfos).To(HaveLen(3), "Expect nodetool to return info on exactly 3 nodes")
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
+			ns.AssertDatacenterDeleted(dcName)
 
 			step = "checking that the dc no longer exists"
 			json = "jsonpath={.items}"

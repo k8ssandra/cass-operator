@@ -48,6 +48,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "scale up to 3 nodes"
 			json := `{"spec": {"size": 3}}`
@@ -56,6 +57,10 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+
+			before := ns.GetDatacenterState(dcName)
+			sampler := ns.SampleAvailability(dcName)
 
 			step = "change the config"
 			json = "{\"spec\": {\"config\": {\"cassandra-yaml\": {\"roles_validity\": \"256000ms\", \"materialized_views_enabled\": \"true\"}}}}"
@@ -73,6 +78,15 @@ var _ = Describe(testName, func() {
 				FormatOutput(json)
 			ns.WaitForOutputContainsAndLog(step, k, "\"roles_validity\":\"256000ms\"", 30)
 
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
+			for _, pod := range ns.GetDatacenterPodNames(dcName) {
+				ns.ExpectCassandraSetting(pod, clusterName, "materialized_views_enabled", `(?m)^\s*true\s*$`)
+				ns.ExpectCassandraSetting(pod, clusterName, "roles_validity", `(?m)^\s*(256000ms|256s)\s*$`)
+			}
+
 			step = "checking that statefulsets have the right owner reference"
 			json = "jsonpath={.metadata.ownerReferences[0].name}"
 			k = kubectl.Get(fmt.Sprintf("sts/%s-%s-r1-sts", clusterName, dcName)).
@@ -82,6 +96,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
+			ns.AssertDatacenterDeleted(dcName)
 
 			step = "checking that the cassdc no longer exists"
 			json = "jsonpath={.items}"

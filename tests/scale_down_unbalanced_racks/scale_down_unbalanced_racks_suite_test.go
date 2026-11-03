@@ -49,6 +49,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1800, 1800)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "scale up second rack to 3 nodes"
 			json := "{\"spec\": {\"replicas\": 3}}"
@@ -106,6 +107,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
+			ns.AssertDatacenterDeleted(dcName)
 
 			step = "checking that the dc no longer exists"
 			json = "jsonpath={.items}"

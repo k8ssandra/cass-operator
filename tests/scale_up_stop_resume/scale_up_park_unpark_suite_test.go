@@ -46,6 +46,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "scale up to 4 nodes"
 			json := "{\"spec\": {\"size\": 4}}"
@@ -61,6 +62,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "true true true true", 1200)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "scale up to 5 nodes"
 			json = "{\"spec\": {\"size\": 5}}"
@@ -76,6 +78,9 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "true true true true true", 1200)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+
+			beforeStop := ns.GetDatacenterState(dcName)
 
 			step = "stopping the dc"
 			json = "{\"spec\": {\"stopped\": true}}"
@@ -88,7 +93,10 @@ var _ = Describe(testName, func() {
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "5", 20)
 
+			ns.WaitForDatacenterCondition(dcName, "Stopped", "True")
+			ns.WaitForDatacenterCondition(dcName, "Ready", "False")
 			ns.WaitForDatacenterToHaveNoPods(dcName)
+			ns.ExpectStoppedDatacenterKeepsStorage(dcName, 5)
 
 			step = "resume the dc"
 			json = "{\"spec\": {\"stopped\": false}}"
@@ -108,9 +116,15 @@ var _ = Describe(testName, func() {
 			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
 			Expect(nodeStatusesHostIds).To(HaveLen(5))
 
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			// No node may bootstrap again after a resume
+			ns.ExpectSameHostIDs(dcName, beforeStop)
+
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
+			ns.AssertDatacenterDeleted(dcName)
 
 			step = "checking that the dc no longer exists"
 			json = "jsonpath={.items}"

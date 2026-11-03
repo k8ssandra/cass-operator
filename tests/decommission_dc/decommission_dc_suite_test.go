@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -85,6 +86,7 @@ var _ = Describe(testName, func() {
 			ns1.ExecAndLog(step, k)
 
 			ns1.WaitForDatacenterReady(dc1Name)
+			ns1.AssertDatacenterInvariants(dc1Name)
 
 			By("get seed node IP address")
 			json := "jsonpath={.items[0].status.podIP}"
@@ -120,6 +122,7 @@ var _ = Describe(testName, func() {
 			ns2.ExecAndLog(step, k)
 
 			ns2.WaitForDatacenterReady(dc2Name)
+			ns2.AssertDatacenterInvariants(dc2Name)
 
 			// We need to verify that reconciliation has stopped for both dcs
 			ns1.ExpectDoneReconciling(dc1Name)
@@ -144,10 +147,43 @@ var _ = Describe(testName, func() {
 			k = kubectl.Annotate("cassdc", dc2Name, "cassandra.datastax.com/decommission-on-delete", "true")
 			ns2.ExecAndLog(step, k)
 
+			dc1Before := ns1.GetDatacenterState(dc1Name)
+			dc1Sampler := ns1.SampleAvailability(dc1Name)
+
+			// The Decommission condition must be visible on dc2 while it is being deleted
+			decommissionSeen := make(chan bool, 1)
+			stopWatching := make(chan struct{})
+			go func() {
+				defer GinkgoRecover()
+				seen := false
+				defer func() { decommissionSeen <- seen }()
+				json := "jsonpath={.status.conditions[?(.type=='Decommission')].status}"
+				for {
+					if out, err := ns2.Output(kubectl.Get("CassandraDatacenter", dc2Name).FormatOutput(json)); err == nil && out == "True" {
+						seen = true
+						return
+					}
+					select {
+					case <-stopWatching:
+						return
+					case <-time.After(time.Second):
+					}
+				}
+			}()
+
 			// Time to remove the dc2 and verify it has been correctly cleaned up
 			step = "deleting the dc2"
 			k = kubectl.DeleteFromFiles(testFile2)
 			ns2.ExecAndLog(step, k)
+			ns2.AssertDatacenterDeleted(dc2Name)
+			close(stopWatching)
+			Expect(<-decommissionSeen).To(BeTrue(), "the Decommission condition of dc2 was never True during its deletion")
+
+			step = "checking that a DecommissionDatacenter event was emitted for dc2"
+			k = kubectl.Get("events").
+				WithFlag("field-selector", fmt.Sprintf("involvedObject.kind=CassandraDatacenter,involvedObject.name=%s,reason=DecommissionDatacenter", dc2Name)).
+				FormatOutput("name")
+			Expect(ns2.OutputAndLog(step, k)).ToNot(BeEmpty())
 
 			step = "checking that the dc2 no longer exists"
 			json = "jsonpath={.items}"
@@ -168,10 +204,19 @@ var _ = Describe(testName, func() {
 				return fmt.Sprintf("Expected to find 1 datacenter in nodetool status but found %v", dcs)
 			})
 
+			// dc1 must not have been restarted and must not show any node of dc2
+			dc1Sampler.Stop()
+			ns1.AssertDatacenterInvariants(dc1Name)
+			Expect(ns1.GetDatacenterState(dc1Name).PodUIDs).To(Equal(dc1Before.PodUIDs), "dc1 pods were restarted by the deletion of dc2")
+			for dc, nodes := range ns1.RetrieveDatacenterStatusFromNodetool(podNames[0]) {
+				Expect(dc).To(Equal(dc1Name), "nodetool status on dc1 still lists datacenter %s: %v", dc, nodes)
+			}
+
 			// Delete the remaining DC and expect it to finish correctly (it should not be decommissioned - that will hang the process and fail)
 			step = "deleting the dc1"
 			k = kubectl.DeleteFromFiles(testFile1)
 			ns1.ExecAndLog(step, k)
+			ns1.AssertDatacenterDeleted(dc1Name)
 
 			step = "checking that the dc1 no longer exists"
 			json = "jsonpath={.items}"

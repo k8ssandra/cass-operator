@@ -675,6 +675,60 @@ func TestCallDurationMetricError(t *testing.T) {
 	require.Equal(before+1, after)
 }
 
+func TestRequestDeadline(t *testing.T) {
+	tests := []struct {
+		name    string
+		call    func(*NodeMgmtClient) error
+		timeout time.Duration
+	}{
+		{
+			name: "FeatureSet uses the default timeout",
+			call: func(c *NodeMgmtClient) error {
+				_, err := c.FeatureSet(goodPod)
+				return err
+			},
+			timeout: defaultNodeMgmtRequestTimeout,
+		},
+		{
+			name: "JobDetails uses the default timeout",
+			call: func(c *NodeMgmtClient) error {
+				_, err := c.JobDetails(goodPod, "job1")
+				return err
+			},
+			timeout: defaultNodeMgmtRequestTimeout,
+		},
+		{
+			name: "synchronous cleanup keeps a long timeout",
+			call: func(c *NodeMgmtClient) error {
+				return c.CallKeyspaceCleanupEndpoint(goodPod, -1, "ks", nil)
+			},
+			timeout: 24 * time.Hour,
+		},
+		{
+			name: "explicit timeout is kept",
+			call: func(c *NodeMgmtClient) error {
+				return c.CallDrainEndpoint(goodPod)
+			},
+			timeout: 2 * time.Minute,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			start := time.Now()
+			httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+				deadline, ok := req.Context().Deadline()
+				require.True(ok, "request has no deadline")
+				require.WithinDuration(start.Add(tt.timeout), deadline, 5*time.Second)
+			}, func() *http.Response {
+				return newHttpResponse([]byte(`{"cassandra_version": "4.0.0", "features": []}`), http.StatusOK)
+			})
+			require.NoError(tt.call(newMockMgmtClient(httpClient)))
+		})
+	}
+}
+
 type httpClientDoFunc func(*http.Request) (*http.Response, error)
 
 func (f httpClientDoFunc) Do(req *http.Request) (*http.Response, error) {

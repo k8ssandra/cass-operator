@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
+* [BUGFIX] [#1010](https://github.com/k8ssandra/cass-operator/issues/1010) Management API calls without their own timeout (feature set, job details) could block the reconcile worker forever when a pod's Management API accepted the connection but never answered. They now time out after 60 seconds, and the synchronous v0 keyspace cleanup after 24 hours
 
 ## v1.33.1
 

@@ -54,6 +54,8 @@ type NodeMgmtClient struct {
 	Protocol string
 }
 
+const defaultNodeMgmtRequestTimeout = 60 * time.Second
+
 type nodeMgmtRequest struct {
 	endpoint string
 	host     string
@@ -564,6 +566,9 @@ func (client *NodeMgmtClient) CallKeyspaceCleanupEndpoint(pod *corev1.Pod, jobs 
 	if err != nil {
 		return err
 	}
+
+	// The v0 cleanup is synchronous and can legitimately run for hours on large nodes
+	req.timeout = 24 * time.Hour
 
 	_, err = callNodeMgmtEndpoint(client, *req, "application/json")
 	return err
@@ -1361,11 +1366,13 @@ func callNodeMgmtEndpoint(client *NodeMgmtClient, request nodeMgmtRequest, conte
 	}
 	req.Close = true
 
-	if request.timeout > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), request.timeout)
-		defer cancel()
-		req = req.WithContext(ctx)
+	timeout := request.timeout
+	if timeout <= 0 {
+		timeout = defaultNodeMgmtRequestTimeout
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	req = req.WithContext(ctx)
 
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)

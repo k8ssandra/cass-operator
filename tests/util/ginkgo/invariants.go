@@ -32,7 +32,7 @@ const (
 // invariantOptions changes what AssertDatacenterInvariants checks. The defaults are strict, an option only relaxes a
 // check that is known not to hold in that step of a test.
 type invariantOptions struct {
-	allowedWarningReasons map[string]bool
+	allowedWarningActions map[string]bool
 	skipRevisionCheck     bool
 	skipRingCheck         bool
 	skipQuietCheck        bool
@@ -40,12 +40,12 @@ type invariantOptions struct {
 
 type InvariantOption func(*invariantOptions)
 
-// AllowWarningEvents allows Warning events with the given reasons since the last checkpoint, for steps that break the
-// datacenter on purpose.
-func AllowWarningEvents(reasons ...string) InvariantOption {
+// AllowWarningEvents allows Warning events with the given actions (the event constants of pkg/events) since the last
+// checkpoint, for steps that break the datacenter on purpose.
+func AllowWarningEvents(actions ...string) InvariantOption {
 	return func(o *invariantOptions) {
-		for _, reason := range reasons {
-			o.allowedWarningReasons[reason] = true
+		for _, action := range actions {
+			o.allowedWarningActions[action] = true
 		}
 	}
 }
@@ -180,7 +180,7 @@ func (ns NsWrapper) ExpectSameHostIDs(dcName string, before DatacenterState) {
 // AssertDatacenterInvariants checks what must hold for a datacenter that is Ready and not changing: conditions,
 // status fields, pods, StatefulSets, the ring, Warning events since the last check and a quiet reconcile loop.
 func (ns NsWrapper) AssertDatacenterInvariants(dcName string, opts ...InvariantOption) {
-	o := &invariantOptions{allowedWarningReasons: map[string]bool{}}
+	o := &invariantOptions{allowedWarningActions: map[string]bool{}}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -284,8 +284,8 @@ func (ns NsWrapper) AssertDatacenterInvariants(dcName string, opts ...InvariantO
 	warnings := ns.WarningEventsSince(dcName, checkpoint)
 	unexpected := []string{}
 	for _, event := range warnings {
-		if !o.allowedWarningReasons[event.Reason] {
-			unexpected = append(unexpected, fmt.Sprintf("%s: %s", event.Reason, event.Message))
+		if !o.allowedWarningActions[EventAction(&event)] && !isStartupRequeue(&event) {
+			unexpected = append(unexpected, fmt.Sprintf("%s: %s", EventAction(&event), EventText(&event)))
 		}
 	}
 	Expect(unexpected).To(BeEmpty(), "Warning events for %s since %s", dcName, checkpoint.Format(time.RFC3339))
@@ -307,11 +307,53 @@ func eventTime(event *corev1.Event) time.Time {
 	return t
 }
 
+// EventAction returns the event constant (pkg/events) of an operator event. The operator's recorder stores it in the
+// action of the event and the message in the reason, events of other components have the constant in the reason.
+func EventAction(event *corev1.Event) string {
+	if event.Action != "" {
+		return event.Action
+	}
+	return event.Reason
+}
+
+// EventText returns the message of an operator event, which the operator's recorder stores in the reason
+func EventText(event *corev1.Event) string {
+	if event.Action == "" {
+		return event.Message
+	}
+	return strings.TrimSpace(event.Reason + " " + event.Message)
+}
+
+// startupRequeueErrors are the errors with which the operator requeues while the StatefulSet controller creates the
+// pods of a new or scaled up rack. The operator reports them as ReconcileFailed Warning events in every test that
+// creates or scales up a datacenter.
+var startupRequeueErrors = []*regexp.Regexp{
+	regexp.MustCompile(`^pod \S+: pod not found, most likely statefulset controller has not caught up yet$`),
+	regexp.MustCompile(`^no pods were ready to be started in any rack$`),
+}
+
+func isStartupRequeue(event *corev1.Event) bool {
+	if EventAction(event) != "ReconcileFailed" {
+		return false
+	}
+	for _, re := range startupRequeueErrors {
+		if re.MatchString(EventText(event)) {
+			return true
+		}
+	}
+	return false
+}
+
 // WarningEventsSince returns the Warning events of the CassandraDatacenter that happened after the given time
 func (ns NsWrapper) WarningEventsSince(dcName string, since time.Time) []corev1.Event {
+	return ns.EventsSince(dcName, corev1.EventTypeWarning, since)
+}
+
+// EventsSince returns the events of the given type of the CassandraDatacenter that happened after the given time
+func (ns NsWrapper) EventsSince(dcName, eventType string, since time.Time) []corev1.Event {
 	events := &corev1.EventList{}
 	ns.getJson(events, kubectl.Get("events").
-		WithFlag("field-selector", fmt.Sprintf("involvedObject.kind=CassandraDatacenter,involvedObject.name=%s,type=Warning", dcName)))
+		WithFlag("field-selector", fmt.Sprintf("involvedObject.kind=CassandraDatacenter,involvedObject.name=%s,type=%s", dcName, eventType)))
 
 	result := []corev1.Event{}
 	for i := range events.Items {
@@ -323,19 +365,19 @@ func (ns NsWrapper) WarningEventsSince(dcName string, since time.Time) []corev1.
 	return result
 }
 
-// WaitForWarningEvent waits for a Warning event of the CassandraDatacenter with the given reason and a message
-// matching the pattern, after the given time.
-func (ns NsWrapper) WaitForWarningEvent(dcName string, since time.Time, reason, messagePattern string, timeout time.Duration) {
-	ginkgo.By(fmt.Sprintf("waiting for a %s Warning event for %s", reason, dcName))
+// WaitForWarningEvent waits for a Warning event of the CassandraDatacenter with the given action (an event constant
+// of pkg/events) and a message matching the pattern, after the given time.
+func (ns NsWrapper) WaitForWarningEvent(dcName string, since time.Time, action, messagePattern string, timeout time.Duration) {
+	ginkgo.By(fmt.Sprintf("waiting for a %s Warning event for %s", action, dcName))
 	re := regexp.MustCompile(messagePattern)
 	Eventually(func() bool {
 		for _, event := range ns.WarningEventsSince(dcName, since) {
-			if event.Reason == reason && re.MatchString(event.Message) {
+			if EventAction(&event) == action && re.MatchString(EventText(&event)) {
 				return true
 			}
 		}
 		return false
-	}).WithTimeout(timeout).WithPolling(5*time.Second).Should(BeTrue(), "no %s Warning event matching %q", reason, messagePattern)
+	}).WithTimeout(timeout).WithPolling(5*time.Second).Should(BeTrue(), "no %s Warning event matching %q", action, messagePattern)
 }
 
 // RetrieveDatacenterStatusFromNodetool runs nodetool status on the pod and returns the nodes per datacenter

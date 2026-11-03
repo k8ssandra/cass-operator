@@ -9,7 +9,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 
+	"github.com/k8ssandra/cass-operator/pkg/events"
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
 	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
@@ -179,11 +181,12 @@ var _ = Describe(testName, func() {
 			close(stopWatching)
 			Expect(<-decommissionSeen).To(BeTrue(), "the Decommission condition of dc2 was never True during its deletion")
 
-			step = "checking that a DecommissionDatacenter event was emitted for dc2"
-			k = kubectl.Get("events").
-				WithFlag("field-selector", fmt.Sprintf("involvedObject.kind=CassandraDatacenter,involvedObject.name=%s,reason=DecommissionDatacenter", dc2Name)).
-				FormatOutput("name")
-			Expect(ns2.OutputAndLog(step, k)).ToNot(BeEmpty())
+			By("checking that a DecommissionDatacenter event was emitted for dc2")
+			actions := []string{}
+			for _, event := range ns2.EventsSince(dc2Name, corev1.EventTypeNormal, time.Time{}) {
+				actions = append(actions, ginkgo_util.EventAction(&event))
+			}
+			Expect(actions).To(ContainElement(events.DecommissionDatacenter))
 
 			step = "checking that the dc2 no longer exists"
 			json = "jsonpath={.items}"

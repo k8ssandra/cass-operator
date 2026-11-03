@@ -166,6 +166,9 @@ func (rc *ReconciliationContext) callDecommission(pod *corev1.Pod) error {
 			return err
 		} else {
 			rc.ReqLogger.V(1).Info(fmt.Sprintf("Decommission requested, returned jobId: %s", jobId))
+			if err := rc.setDecommissionJobID(pod, jobId); err != nil {
+				return err
+			}
 		}
 	} else {
 		// Fallback to older code
@@ -177,6 +180,27 @@ func (rc *ReconciliationContext) callDecommission(pod *corev1.Pod) error {
 		}(pod)
 	}
 
+	return nil
+}
+
+// setDecommissionJobID records the Management API job id on the pod so a later reconcile can tell
+// whether the decommission is still announcing LEFT or has actually finished.
+func (rc *ReconciliationContext) setDecommissionJobID(pod *corev1.Pod, jobID string) error {
+	// The Management API answers with a JSON string and CallDecommissionNode returns that body
+	// verbatim, so the id still carries its quotes. Unquote it before it reaches an annotation or
+	// a jobDetails query parameter.
+	if unquoted, err := strconv.Unquote(jobID); err == nil {
+		jobID = unquoted
+	}
+	if jobID == "" || pod.Annotations[api.DecommissionJobIDAnnotation] == jobID {
+		return nil
+	}
+	patch := client.MergeFromWithOptions(pod.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	annotated := pod.DeepCopy()
+	metav1.SetMetaDataAnnotation(&annotated.ObjectMeta, api.DecommissionJobIDAnnotation, jobID)
+	if err := rc.Client.Patch(rc.Ctx, annotated, patch); err != nil {
+		return fmt.Errorf("cannot record decommission job id %s on pod %s: %w", jobID, pod.Name, err)
+	}
 	return nil
 }
 
@@ -199,6 +223,7 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 		}
 		if state == stateDecommissioning {
 			peerData := epData
+			localMetadataOnly := false
 			if len(peerData.Entity) == 0 {
 				peersAvailable := slices.ContainsFunc(rc.clusterPods, func(p *corev1.Pod) bool {
 					state := p.Labels[api.CassNodeState]
@@ -214,14 +239,19 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 						return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata: %w", pod.Name, err))
 					}
 					peerData = localMetadata
+					localMetadataOnly = true
 				}
 			}
-			done, err := rc.IsDoneDecommissioning(pod, peerData, nodeStatuses)
+			done, err := rc.IsDoneDecommissioning(pod, peerData, nodeStatuses, localMetadataOnly)
 			if err != nil {
 				return result.Error(err)
 			}
 			if !done {
-				if !HasStartedDecommissioning(pod, peerData, nodeStatuses) {
+				// The decommission request already went to the Management API and its job has
+				// not finished. Asking again would restart the decommission on a node that has
+				// already announced LEFT.
+				decommissionRequested := localMetadataOnly && pod.Annotations[api.DecommissionJobIDAnnotation] != ""
+				if !HasStartedDecommissioning(pod, peerData, nodeStatuses) && !decommissionRequested {
 					rc.ReqLogger.V(1).Info("Decommission has not started trying again", "Pod", pod.Name)
 					err := rc.callDecommission(pod)
 					if err != nil {
@@ -309,7 +339,7 @@ func HasStartedDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEn
 	return false
 }
 
-func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap) (bool, error) {
+func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap, localMetadataOnly bool) (bool, error) {
 	if _, found := nodeStatuses[pod.Name]; !found {
 		// Pod has never joined the ring
 		return true, nil
@@ -343,6 +373,18 @@ func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData h
 				rc.ReqLogger.V(1).Info("Waiting for local metadata to report LEFT", "Pod", pod.Name)
 				return false, nil
 			}
+			if localMetadataOnly {
+				finished, err := rc.isLocalDecommissionJobFinished(pod)
+				if err != nil {
+					return false, err
+				}
+				if !finished {
+					// Cassandra reports LEFT at the start of its announce window. Removing the pod
+					// now kills it before gossip carries the state to the other datacenters.
+					rc.ReqLogger.V(1).Info("Waiting for the local decommission job to finish", "Pod", pod.Name)
+					return false, nil
+				}
+			}
 			done := isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses, rc.Datacenter.Spec.ServerType)
 			if !done {
 				rc.ReqLogger.V(1).Info("Waiting for peer metadata to report LEFT", "Pod", pod.Name)
@@ -352,6 +394,26 @@ func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData h
 	}
 	rc.ReqLogger.V(1).Info("Waiting for local metadata to report LEFT", "Pod", pod.Name)
 	return false, nil
+}
+
+// isLocalDecommissionJobFinished reports whether the decommission job this operator issued for
+// the pod has finished. When no job id was recorded the pod's own LEFT state is the only signal
+// available, so the previous behaviour is kept instead of blocking the datacenter forever.
+func (rc *ReconciliationContext) isLocalDecommissionJobFinished(pod *corev1.Pod) (bool, error) {
+	jobID := pod.Annotations[api.DecommissionJobIDAnnotation]
+	if jobID == "" {
+		return true, nil
+	}
+	details, err := rc.NodeMgmtClient.JobDetails(pod, jobID)
+	if err != nil {
+		return false, fmt.Errorf("cannot check decommission job %s for pod %s: %w", jobID, pod.Name, err)
+	}
+	if details.Id == "" {
+		// The job record is gone, so its result cannot be replayed. Cassandra already reports LEFT.
+		rc.ReqLogger.V(1).Info("Decommission job record is no longer available, using local metadata", "Pod", pod.Name, "JobID", jobID)
+		return true, nil
+	}
+	return details.Status == "COMPLETED", nil
 }
 
 func isDoneDecommissioningInPeerMetadata(pod *corev1.Pod, epData httphelper.CassMetadataEndpoints, nodeStatuses api.CassandraStatusMap, serverType string) bool {

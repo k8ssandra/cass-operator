@@ -973,3 +973,90 @@ func TestDecommissionPeerMetadataPrefersHostID(t *testing.T) {
 	require.False(t, isDoneDecommissioningInPeerMetadata(pod, epData, nodeStatuses, "hcd"))
 	require.False(t, HasStartedDecommissioning(pod, epData, nodeStatuses))
 }
+
+func TestCheckDecommissioningNodesWaitsForLocalOnlyDecommissionJob(t *testing.T) {
+	tests := []struct {
+		name          string
+		jobResponse   string
+		jobFound      bool
+		noJobID       bool
+		wantCleaned   bool
+		wantJobLookup int
+	}{
+		{name: "job still running holds the last visible node", jobResponse: `{"id":"job-1","status":"RUNNING"}`, jobFound: true, wantJobLookup: 1},
+		{name: "completed job releases the last visible node", jobResponse: `{"id":"job-1","status":"COMPLETED"}`, jobFound: true, wantCleaned: true, wantJobLookup: 1},
+		{name: "expired job record falls back to local metadata", jobFound: false, wantCleaned: true, wantJobLookup: 1},
+		{name: "no recorded job id keeps the previous behaviour", noJobID: true, wantCleaned: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rc, server, pod, sts := setupDecommissioningPodTest(t, func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/v0/metadata/endpoints":
+					_, _ = w.Write([]byte(`{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`))
+				case "/api/v0/ops/executor/job":
+					if !test.jobFound {
+						http.NotFound(w, r)
+						return
+					}
+					_, _ = w.Write([]byte(test.jobResponse))
+				default:
+					http.NotFound(w, r)
+				}
+			})
+
+			// No peer pod is visible: every pod in the cluster is already decommissioning.
+			rc.clusterPods = []*corev1.Pod{pod}
+
+			if !test.noJobID {
+				pod.Annotations = map[string]string{api.DecommissionJobIDAnnotation: "job-1"}
+				require.NoError(t, rc.Client.Update(rc.Ctx, pod))
+			}
+
+			_, err := rc.CheckDecommissioningNodes(httphelper.CassMetadataEndpoints{}).Output()
+			require.NoError(t, err)
+
+			require.NoError(t, rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(sts), sts))
+			if test.wantCleaned {
+				require.Equal(t, int32(1), *sts.Spec.Replicas, "expected the last visible node to be scaled away")
+			} else {
+				require.Equal(t, int32(2), *sts.Spec.Replicas, "expected the node to be held until the decommission job finishes")
+			}
+			server.assertCallCount(t, "/api/v0/ops/executor/job", test.wantJobLookup)
+		})
+	}
+}
+
+func TestCheckDecommissioningNodesRecordsDecommissionJobID(t *testing.T) {
+	rc, server, pod, sts := setupDecommissioningPodTest(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v0/metadata/endpoints":
+			_, _ = w.Write([]byte(`{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`))
+		case "/api/v0/metadata/versions/features":
+			_, _ = w.Write([]byte(`{"cassandra_version":"4.0","features":["async_sstable_tasks"]}`))
+		case "/api/v1/ops/node/decommission":
+			_, _ = w.Write([]byte(`"job-42"`))
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	rc.Datacenter.SetCondition(api.DatacenterCondition{Status: corev1.ConditionTrue, Type: api.DatacenterDecommission})
+	pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "cassandra", Ready: true}}
+	require.NoError(t, rc.Client.Status().Update(rc.Ctx, pod))
+
+	// The decommissioning pod is the only pod visible in this cluster.
+	rc.clusterPods = []*corev1.Pod{pod}
+
+	_, err := rc.CheckDecommissioningNodes(httphelper.CassMetadataEndpoints{}).Output()
+	require.NoError(t, err)
+
+	require.NoError(t, rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(pod), pod))
+	require.Equal(t, "job-42", pod.Annotations[api.DecommissionJobIDAnnotation],
+		"expected the decommission job id to be recorded on the pod")
+	server.assertCallCount(t, "/api/v1/ops/node/decommission", 1)
+
+	// The node has not reported LEFT yet, so nothing may be removed.
+	require.NoError(t, rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(sts), sts))
+	require.Equal(t, int32(2), *sts.Spec.Replicas)
+}

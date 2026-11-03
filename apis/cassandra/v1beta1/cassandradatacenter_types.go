@@ -98,6 +98,11 @@ const (
 	// FullQueryLoggingEnabledAnnotation is set on pods where the operator has enabled full query logging
 	FullQueryLoggingEnabledAnnotation = "cassandra.datastax.com/fql-enabled"
 
+	// DecommissionJobIDAnnotation records the Management API job id of the decommission
+	// request issued for this pod. It is used to confirm the job has finished before the
+	// pod is removed when no peer pod is available to report the LEFT state.
+	DecommissionJobIDAnnotation = "cassandra.datastax.com/decommission-job-id"
+
 	AllowUpdateAlways AllowUpdateType = "always"
 	AllowUpdateOnce   AllowUpdateType = "once"
 

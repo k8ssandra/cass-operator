@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
+
 ## v1.33.1
 
 * [BUGFIX] [#1000](https://github.com/k8ssandra/cass-operator/issues/1000) Decommissioning a datacenter never finished when its last node was the only pod of the cluster visible to the operator (for example each datacenter in its own Kubernetes cluster), as no peer metadata was available. The last node's own metadata is now used to verify its decommission.

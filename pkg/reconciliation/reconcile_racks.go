@@ -4,6 +4,7 @@
 package reconciliation
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -20,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -43,6 +45,8 @@ var (
 
 	errPodNotFound = fmt.Errorf("pod not found, most likely statefulset controller has not caught up yet")
 )
+
+const failedStartCleanupTimeout = time.Minute
 
 const (
 	stateReadyToStart    = "Ready-to-Start"
@@ -2042,42 +2046,63 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 		}
 	}
 
+	// The goroutine outlives this reconcile pass, so it must not touch rc.Datacenter, rc.Ctx or the
+	// pod object the main goroutine keeps updating.
+	dcSnapshot := dc.DeepCopy()
 	go func(pod *corev1.Pod) {
 		var err error
 		if shouldReplacePod && replaceAddress != "" {
 			// If we have a replace address that means the cassandra node did
 			// join the ring previously and is marked for replacement, so we
 			// start it accordingly
-			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.StartingCassandraAndReplacingNode,
+			rc.Recorder.Event(dcSnapshot, corev1.EventTypeNormal, events.StartingCassandraAndReplacingNode,
 				fmt.Sprintf("Starting Cassandra for pod %s to replace Cassandra node with address %s", pod.Name, replaceAddress))
 			err = rc.NodeMgmtClient.CallLifecycleStartEndpointWithReplaceIp(pod, replaceAddress)
 		} else {
 			// Either we are not replacing this pod or the relevant cassandra node
 			// never joined the ring in the first place and can be started normally
-			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.StartingCassandra,
+			rc.Recorder.Event(dcSnapshot, corev1.EventTypeNormal, events.StartingCassandra,
 				fmt.Sprintf("Starting Cassandra for pod %s", pod.Name))
 			err = rc.NodeMgmtClient.CallLifecycleStartEndpoint(pod)
 		}
 
 		if err != nil {
-			// Pod was unable to start. Most likely this is not a recoverable error, so lets kill the pod and
-			// try again.
-			if deleteErr := rc.Client.Delete(rc.Ctx, pod); deleteErr != nil {
-				rc.ReqLogger.Error(err, "Unable to delete the pod, pod has failed to start", "Pod", pod.Name)
-			}
-			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeWarning, events.StartingCassandra,
-				fmt.Sprintf("Failed to start pod %s, deleting it", pod.Name))
-			// Update rc.Datacenter.Status
-			statusPatch := client.MergeFrom(dc.DeepCopy())
-			rc.Datacenter.Status.FailedStarts = utils.AppendValuesToStringArrayIfNotPresent(rc.Datacenter.Status.FailedStarts, pod.Name)
-			err = rc.Client.Status().Patch(rc.Ctx, dc, statusPatch)
-			if err != nil {
-				rc.ReqLogger.Error(err, "Failed to update CassandraDatacenter status with failed start", "Pod", pod.Name)
-			}
+			rc.recordFailedStart(dcSnapshot, pod, err)
 		}
-	}(pod)
+	}(pod.DeepCopy())
 
 	return rc.labelServerPodStarting(pod)
+}
+
+// recordFailedStart deletes a pod whose Cassandra failed to start and adds it to Status.FailedStarts.
+// It runs after the reconcile pass that started the pod has returned.
+func (rc *ReconciliationContext) recordFailedStart(dc *api.CassandraDatacenter, pod *corev1.Pod, startErr error) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(rc.Ctx), failedStartCleanupTimeout)
+	defer cancel()
+
+	// Most likely this is not a recoverable error, so delete the pod and let the StatefulSet recreate it.
+	// The UID precondition prevents deleting a pod that was recreated with the same name in the meantime.
+	if err := rc.Client.Delete(ctx, pod, client.Preconditions{UID: &pod.UID}); err != nil && !errors.IsNotFound(err) {
+		rc.ReqLogger.Error(err, "Unable to delete the pod, pod has failed to start", "Pod", pod.Name, "StartError", startErr.Error())
+	}
+	rc.Recorder.Event(dc, corev1.EventTypeWarning, events.StartingCassandra,
+		fmt.Sprintf("Failed to start pod %s, deleting it", pod.Name))
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current := &api.CassandraDatacenter{}
+		if err := rc.Client.Get(ctx, client.ObjectKeyFromObject(dc), current); err != nil {
+			return err
+		}
+		if utils.IndexOfString(current.Status.FailedStarts, pod.Name) > -1 {
+			return nil
+		}
+		patch := client.MergeFromWithOptions(current.DeepCopy(), client.MergeFromWithOptimisticLock{})
+		current.Status.FailedStarts = append(current.Status.FailedStarts, pod.Name)
+		return rc.Client.Status().Patch(ctx, current, patch)
+	})
+	if err != nil {
+		rc.ReqLogger.Error(err, "Failed to update CassandraDatacenter status with failed start", "Pod", pod.Name)
+	}
 }
 
 // startOneNodePerRack starts the first pod in each rack in a deterministic order, dictated by the

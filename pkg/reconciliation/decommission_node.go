@@ -20,6 +20,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+const (
+	decommissionJobAnnotation = "cassandra.datastax.com/decommission-job-id"
+
+	jobStatusCompleted = "COMPLETED"
+	jobStatusError     = "ERROR"
+)
+
 func (rc *ReconciliationContext) CalculateRackInfoForDecomm(currentSize int) ([]*RackInformation, error) {
 	racks := rc.Datacenter.GetRacks()
 	rackCount := len(racks)
@@ -128,13 +135,17 @@ func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData 
 				return err
 			}
 
-			if err := rc.callDecommission(pod); err != nil {
+			jobId, err := rc.callDecommission(pod)
+			if err != nil {
 				return err
 			}
 
 			rc.ReqLogger.V(1).Info("Marking node as decommissioning")
 			patch := client.MergeFrom(pod.DeepCopy())
 			metav1.SetMetaDataLabel(&pod.ObjectMeta, api.CassNodeState, stateDecommissioning)
+			if jobId != "" {
+				metav1.SetMetaDataAnnotation(&pod.ObjectMeta, decommissionJobAnnotation, jobId)
+			}
 			if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
 				return err
 			}
@@ -151,22 +162,24 @@ func (rc *ReconciliationContext) DecommissionNodeOnRack(rackName string, epData 
 	return fmt.Errorf("could not find pod to decommission on rack %s", rackName)
 }
 
-func (rc *ReconciliationContext) callDecommission(pod *corev1.Pod) error {
+// callDecommission returns the job ID of the decommission, or an empty string if the Management API does not run it as a job
+func (rc *ReconciliationContext) callDecommission(pod *corev1.Pod) (string, error) {
 	if !isPodUp(pod) {
 		// The pod must be started before it can be decommissioned
 		rc.ReqLogger.V(1).Info("Error while trying to decommission, pod isn't running.", "Pod", pod)
-		return nil
+		return "", nil
 	}
 
 	features, err := rc.NodeMgmtClient.FeatureSet(pod)
 	if err != nil {
-		return err
+		return "", err
 	} else if features.Supports(httphelper.AsyncSSTableTasks) {
-		if jobId, err := rc.NodeMgmtClient.CallDecommissionNode(pod, true); err != nil {
-			return err
-		} else {
-			rc.ReqLogger.V(1).Info(fmt.Sprintf("Decommission requested, returned jobId: %s", jobId))
+		jobId, err := rc.NodeMgmtClient.CallDecommissionNode(pod, true)
+		if err != nil {
+			return "", err
 		}
+		rc.ReqLogger.V(1).Info(fmt.Sprintf("Decommission requested, returned jobId: %s", jobId))
+		return jobId, nil
 	} else {
 		// Fallback to older code
 		pod := pod
@@ -177,7 +190,22 @@ func (rc *ReconciliationContext) callDecommission(pod *corev1.Pod) error {
 		}(pod)
 	}
 
-	return nil
+	return "", nil
+}
+
+// isDecommissionJobFinished reports whether the decommission job of the pod has returned. Cassandra marks the
+// node LEFT before it announces that to its peers for RING_DELAY, and the job returns only after the announcement.
+func (rc *ReconciliationContext) isDecommissionJobFinished(pod *corev1.Pod) (bool, error) {
+	jobId := pod.Annotations[decommissionJobAnnotation]
+	if jobId == "" {
+		return true, nil
+	}
+	details, err := rc.NodeMgmtClient.JobDetails(pod, jobId)
+	if err != nil {
+		return false, fmt.Errorf("cannot check decommission job %s on pod %s: %w", jobId, pod.Name, err)
+	}
+	// A job that is not found was lost in a Management API restart, which also ended the announcement
+	return details.Id == "" || details.Status == jobStatusCompleted || details.Status == jobStatusError, nil
 }
 
 // Wait for decommissioning nodes to finish before continuing to reconcile
@@ -199,6 +227,7 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 		}
 		if state == stateDecommissioning {
 			peerData := epData
+			ownMetadataAsPeer := false
 			if len(peerData.Entity) == 0 {
 				peersAvailable := slices.ContainsFunc(rc.clusterPods, func(p *corev1.Pod) bool {
 					state := p.Labels[api.CassNodeState]
@@ -214,18 +243,38 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 						return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata: %w", pod.Name, err))
 					}
 					peerData = localMetadata
+					ownMetadataAsPeer = true
 				}
 			}
 			done, err := rc.IsDoneDecommissioning(pod, peerData, nodeStatuses)
 			if err != nil {
 				return result.Error(err)
 			}
+			if done && ownMetadataAsPeer {
+				// No peer confirms the LEFT state, so wait until the node has finished announcing it
+				done, err = rc.isDecommissionJobFinished(pod)
+				if err != nil {
+					return result.Error(err)
+				}
+				if !done {
+					rc.ReqLogger.V(1).Info("Waiting for the decommission job to finish", "Pod", pod.Name)
+					rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DecommissioningNode, fmt.Sprintf("Decommissioning node %s", pod.Name))
+					return result.RequeueSoon(5)
+				}
+			}
 			if !done {
 				if !HasStartedDecommissioning(pod, peerData, nodeStatuses) {
 					rc.ReqLogger.V(1).Info("Decommission has not started trying again", "Pod", pod.Name)
-					err := rc.callDecommission(pod)
+					jobId, err := rc.callDecommission(pod)
 					if err != nil {
 						return result.Error(err)
+					}
+					if jobId != "" {
+						patch := client.MergeFrom(pod.DeepCopy())
+						metav1.SetMetaDataAnnotation(&pod.ObjectMeta, decommissionJobAnnotation, jobId)
+						if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
+							return result.Error(err)
+						}
 					}
 				}
 			} else {

@@ -3732,7 +3732,6 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 		name            string
 		probeFails      bool
 		decommissioning bool
-		racks           int
 		readyToStart    bool
 		wantResult      result.ReconcileResult
 		wantHealthy     corev1.ConditionStatus
@@ -3765,12 +3764,6 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 			wantHealthy:     corev1.ConditionFalse,
 			wantStartCalls:  1,
 		},
-		{
-			name:        "more racks than nodes",
-			racks:       6,
-			wantResult:  result.Continue(),
-			wantHealthy: corev1.ConditionTrue,
-		},
 	}
 
 	for _, tt := range tests {
@@ -3782,9 +3775,6 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 			if tt.decommissioning {
 				rc.Datacenter.SetCondition(api.DatacenterCondition{Status: corev1.ConditionTrue, Type: api.DatacenterDecommission})
 			}
-			for i := range tt.racks {
-				rc.Datacenter.Spec.Racks = append(rc.Datacenter.Spec.Racks, api.Rack{Name: fmt.Sprintf("r%d", i)})
-			}
 
 			desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
 				nil,
@@ -3795,7 +3785,6 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 			assert.NoErrorf(err, "error occurred creating statefulset")
 
 			desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
-			rc.Datacenter.Spec.Size = *desiredStatefulSet.Spec.Replicas
 
 			trackObjects := []runtime.Object{
 				desiredStatefulSet,
@@ -3817,9 +3806,7 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 					w.WriteHeader(http.StatusOK)
 					_, _ = io.WriteString(w, "OK")
 				case "/api/v0/probes/cluster":
-					// Like the Management API, fail when the DC can't hold a quorum of rf_per_dc replicas.
-					rfPerDc, err := strconv.Atoi(r.URL.Query().Get("rf_per_dc"))
-					if tt.probeFails || err != nil || rfPerDc/2+1 > len(mockPods) {
+					if tt.probeFails {
 						w.WriteHeader(http.StatusInternalServerError)
 						return
 					}

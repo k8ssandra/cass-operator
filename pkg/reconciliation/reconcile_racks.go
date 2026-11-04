@@ -1500,10 +1500,9 @@ func (rc *ReconciliationContext) deleteStuckNodes() (bool, error) {
 func (rc *ReconciliationContext) isClusterHealthy() bool {
 	pods := FilterPodListByCassNodeState(rc.clusterPods, stateStarted)
 
-	// A DC with fewer nodes than racks can never hold numRacks replicas.
-	rfPerDc := min(len(rc.Datacenter.GetRacks()), int(rc.Datacenter.Spec.Size))
+	numRacks := len(rc.Datacenter.GetRacks())
 	for _, pod := range pods {
-		err := rc.NodeMgmtClient.CallProbeClusterEndpoint(pod, "LOCAL_QUORUM", rfPerDc)
+		err := rc.NodeMgmtClient.CallProbeClusterEndpoint(pod, "LOCAL_QUORUM", numRacks)
 		if err != nil {
 			reason := fmt.Sprintf("Pod %s failed the LOCAL_QUORUM check", pod.Name)
 			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeWarning, events.UnhealthyDatacenter,

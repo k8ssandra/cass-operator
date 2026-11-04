@@ -177,84 +177,133 @@ func (rc *ReconciliationContext) failureModeDetection() (bool, string) {
 			if pod == nil {
 				continue
 			}
-			rackName := pod.Labels[api.RackLabel]
-			if utils.IndexOfString(rc.Datacenter.Status.FailedStarts, pod.Name) > -1 {
-				rc.ReqLogger.Info("Found previously failed start", "pod", pod.Name)
-				return true, rackName
+			failing, err := rc.isPodFailing(pod)
+			if err != nil {
+				return false, ""
 			}
-
-			if !rc.podMatchesCurrentRackRevision(pod) {
-				// We have an update going on (or some weird Canary state), this isn't expected Pod state in any case
-				continue
-			}
-
-			if pod.Status.Phase == corev1.PodPending {
-				if pod.Status.StartTime == nil || hasBeenXMinutes(5, pod.Status.StartTime.Time) {
-					// Pod has been over 5 minutes in Pending state. This can be normal, but lets see
-					// if we have some detected failures events like FailedScheduling
-					events := &corev1.EventList{}
-					if err := rc.APIReader.List(rc.Ctx, events, &client.ListOptions{Namespace: pod.Namespace, FieldSelector: fields.SelectorFromSet(fields.Set{"involvedObject.name": pod.Name})}); err != nil {
-						rc.ReqLogger.Error(err, "error getting events for pod", "pod", pod.Name)
-						return false, ""
-					}
-
-					for _, event := range events.Items {
-						if event.Reason == "FailedScheduling" {
-							rc.ReqLogger.Info("Found FailedScheduling event for pod", "pod", pod.Name)
-							// We have a failed scheduling event, get the rack name
-							return true, rackName
-						}
-					}
-				}
-			}
-
-			// Pod could also be running / terminated, we need to find if any container is in crashing state
-			// Sadly, this state is ephemeral, so it can change between reconciliations
-			for _, containerStatus := range pod.Status.ContainerStatuses {
-				if containerStatus.State.Waiting != nil {
-					waitingReason := containerStatus.State.Waiting.Reason
-					if waitingReason == "CrashLoopBackOff" ||
-						waitingReason == "ImagePullBackOff" ||
-						waitingReason == "ErrImagePull" {
-						rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "reason", waitingReason)
-						// We have a container in a failing state
-						return true, rackName
-					}
-				}
-				if containerStatus.RestartCount > 0 {
-					if containerStatus.State.Terminated != nil {
-						if containerStatus.State.Terminated.ExitCode != 0 {
-							rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
-							return true, rackName
-						}
-					}
-				}
-			}
-			// Check the same for initContainers
-			for _, containerStatus := range pod.Status.InitContainerStatuses {
-				if containerStatus.State.Waiting != nil {
-					waitingReason := containerStatus.State.Waiting.Reason
-					if waitingReason == "CrashLoopBackOff" ||
-						waitingReason == "ImagePullBackOff" ||
-						waitingReason == "ErrImagePull" {
-						// We have a container in a failing state
-						rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "reason", waitingReason)
-						return true, rackName
-					}
-				}
-				if containerStatus.RestartCount > 0 {
-					if containerStatus.State.Terminated != nil {
-						if containerStatus.State.Terminated.ExitCode != 0 {
-							rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
-							return true, rackName
-						}
-					}
-				}
+			if failing {
+				return true, pod.Labels[api.RackLabel]
 			}
 		}
 	}
 
 	return false, ""
+}
+
+// isPodFailing returns true if the pod failed to start Cassandra earlier or is stuck in a state it can't recover
+// from without a change to its StatefulSet.
+func (rc *ReconciliationContext) isPodFailing(pod *corev1.Pod) (bool, error) {
+	if utils.IndexOfString(rc.Datacenter.Status.FailedStarts, pod.Name) > -1 && !isServerReady(pod) {
+		rc.ReqLogger.Info("Found previously failed start", "pod", pod.Name)
+		return true, nil
+	}
+
+	if !rc.podMatchesCurrentRackRevision(pod) {
+		// We have an update going on (or some weird Canary state), this isn't expected Pod state in any case
+		return false, nil
+	}
+
+	if pod.Status.Phase == corev1.PodPending {
+		if pod.Status.StartTime == nil || hasBeenXMinutes(5, pod.Status.StartTime.Time) {
+			// Pod has been over 5 minutes in Pending state. This can be normal, but lets see
+			// if we have some detected failures events like FailedScheduling
+			events := &corev1.EventList{}
+			if err := rc.APIReader.List(rc.Ctx, events, &client.ListOptions{Namespace: pod.Namespace, FieldSelector: fields.SelectorFromSet(fields.Set{"involvedObject.name": pod.Name})}); err != nil {
+				rc.ReqLogger.Error(err, "error getting events for pod", "pod", pod.Name)
+				return false, err
+			}
+
+			for _, event := range events.Items {
+				if event.Reason == "FailedScheduling" {
+					rc.ReqLogger.Info("Found FailedScheduling event for pod", "pod", pod.Name)
+					return true, nil
+				}
+			}
+		}
+	}
+
+	// Pod could also be running / terminated, we need to find if any container is in crashing state
+	// Sadly, this state is ephemeral, so it can change between reconciliations
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.State.Waiting != nil {
+			waitingReason := containerStatus.State.Waiting.Reason
+			if waitingReason == "CrashLoopBackOff" ||
+				waitingReason == "ImagePullBackOff" ||
+				waitingReason == "ErrImagePull" {
+				rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "reason", waitingReason)
+				// We have a container in a failing state
+				return true, nil
+			}
+		}
+		if containerStatus.RestartCount > 0 {
+			if containerStatus.State.Terminated != nil {
+				if containerStatus.State.Terminated.ExitCode != 0 {
+					rc.ReqLogger.Info("Failing container state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
+					return true, nil
+				}
+			}
+		}
+	}
+	// Check the same for initContainers
+	for _, containerStatus := range pod.Status.InitContainerStatuses {
+		if containerStatus.State.Waiting != nil {
+			waitingReason := containerStatus.State.Waiting.Reason
+			if waitingReason == "CrashLoopBackOff" ||
+				waitingReason == "ImagePullBackOff" ||
+				waitingReason == "ErrImagePull" {
+				// We have a container in a failing state
+				rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "reason", waitingReason)
+				return true, nil
+			}
+		}
+		if containerStatus.RestartCount > 0 {
+			if containerStatus.State.Terminated != nil {
+				if containerStatus.State.Terminated.ExitCode != 0 {
+					rc.ReqLogger.Info("Failing initcontainer state for pod", "pod", pod.Name, "exitCode", containerStatus.State.Terminated.ExitCode)
+					return true, nil
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// notReadyOtherRack returns the name of a rack other than failedRackName that has a Cassandra node still coming
+// back up, or an empty string if there is none. Pods that are failing don't count, as they won't come up without an
+// update either. Neither do pods that have never been part of the cluster, as they can't lose availability.
+func (rc *ReconciliationContext) notReadyOtherRack(failedRackName string) string {
+	for idx := range rc.desiredRackInformation {
+		rackName := rc.desiredRackInformation[idx].RackName
+		if rackName == failedRackName {
+			continue
+		}
+
+		statefulSet := rc.statefulSets[idx]
+		if statefulSet.Generation != statefulSet.Status.ObservedGeneration {
+			return rackName
+		}
+
+		for ordinal := int32(0); ordinal < *statefulSet.Spec.Replicas; ordinal++ {
+			podName := getStatefulSetPodNameForIdx(statefulSet, ordinal)
+			if _, found := rc.Datacenter.Status.NodeStatuses[podName]; !found {
+				continue
+			}
+
+			pod := rc.getDCPodByName(podName)
+			if pod == nil {
+				return rackName
+			}
+			if isServerReady(pod) {
+				continue
+			}
+			if failing, err := rc.isPodFailing(pod); err != nil || !failing {
+				return rackName
+			}
+		}
+	}
+
+	return ""
 }
 
 func (rc *ReconciliationContext) UpdateAllowed() bool {
@@ -410,10 +459,10 @@ func (rc *ReconciliationContext) CheckVolumeClaimSizes(statefulSet, desiredSts *
 }
 
 func (rc *ReconciliationContext) CheckRackPodTemplate() result.ReconcileResult {
-	return rc.CheckRackPodTemplateDetails(false, "")
+	return rc.CheckRackPodTemplateDetails(false, "", false)
 }
 
-func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedRackName string) result.ReconcileResult {
+func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedRackName string, waitForOtherRacks bool) result.ReconcileResult {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
 	logger.Info("reconcile_racks::CheckRackPodTemplate", "force", force)
@@ -487,6 +536,15 @@ func (rc *ReconciliationContext) CheckRackPodTemplateDetails(force bool, failedR
 		}
 
 		if !utils.ResourcesHaveSameHash(statefulSet, desiredSts) && (force || rc.UpdateAllowed()) {
+			if waitForOtherRacks {
+				if notReadyRack := rc.notReadyOtherRack(rackName); notReadyRack != "" {
+					logger.
+						WithValues("rackName", rackName, "notReadyRack", notReadyRack).
+						Info("statefulset needs a forced update, but waiting for another rack to be ready")
+					return result.Continue()
+				}
+			}
+
 			logger.
 				WithValues("rackName", rackName).
 				Info("statefulset needs an update")
@@ -567,11 +625,11 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 	// Datacenter configuration isn't healthy, we allow upgrades here before pods start
 	if failed, rackName := rc.failureModeDetection(); failed {
 		logger.Info("Failure detected, forcing CheckRackPodTemplate()")
-		return rc.CheckRackPodTemplateDetails(true, rackName)
+		return rc.CheckRackPodTemplateDetails(true, rackName, true)
 	}
 
 	for _, rackName := range dc.Spec.ForceUpgradeRacks {
-		if res := rc.CheckRackPodTemplateDetails(true, rackName); res.Completed() {
+		if res := rc.CheckRackPodTemplateDetails(true, rackName, false); res.Completed() {
 			return res
 		}
 	}
@@ -753,6 +811,8 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	// successes where we want to end this reconcile loop, we generally also want to wait a bit
 	// because stuff is happening concurrently in k8s (getting pods from pending to running)
 	// or Cassandra (getting a node bootstrapped and ready), so we use ResultShouldRequeueSoon to try again soon
+
+	rc.clearFailedStarts()
 
 	// step 0 - see if any nodes lost their readiness
 	// or gained it back
@@ -1998,22 +2058,33 @@ func (rc *ReconciliationContext) findStartedNotReadyNodes() (bool, error) {
 				if err := rc.labelServerPodStarted(pod); err != nil {
 					return false, err
 				}
-
-				if utils.IndexOfString(rc.Datacenter.Status.FailedStarts, pod.Name) > -1 {
-					statusPatch := client.MergeFrom(rc.Datacenter.DeepCopy())
-					rc.Datacenter.Status.FailedStarts = utils.RemoveValueFromStringArray(rc.Datacenter.Status.FailedStarts, pod.Name)
-					err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, statusPatch)
-					if err != nil {
-						// This does not impact the starting process, it only messes up the start sequence the next time this pod is restarted
-						// thus we only log this error
-						rc.ReqLogger.Info("Failed to update CassandraDatacenter status to remove failed start", "Pod", pod.Name)
-					}
-				}
 				return false, nil
 			}
 		}
 	}
 	return false, nil
+}
+
+func (rc *ReconciliationContext) clearFailedStarts() {
+	failedStarts := make([]string, 0, len(rc.Datacenter.Status.FailedStarts))
+	for _, podName := range rc.Datacenter.Status.FailedStarts {
+		if pod := rc.getDCPodByName(podName); pod == nil || !isServerReady(pod) {
+			failedStarts = append(failedStarts, podName)
+		}
+	}
+
+	if len(failedStarts) == len(rc.Datacenter.Status.FailedStarts) {
+		return
+	}
+
+	// The startCassandra goroutine can add an entry concurrently, don't overwrite it
+	statusPatch := client.MergeFromWithOptions(rc.Datacenter.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	rc.Datacenter.Status.FailedStarts = failedStarts
+	if err := rc.Client.Status().Patch(rc.Ctx, rc.Datacenter, statusPatch); err != nil {
+		// Stale entries are ignored by the failure detection and this is retried on the next reconcile,
+		// thus we only log this error
+		rc.ReqLogger.Info("Failed to update CassandraDatacenter status to remove failed starts", "error", err.Error())
+	}
 }
 
 func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMetadataEndpoints, pod *corev1.Pod) error {

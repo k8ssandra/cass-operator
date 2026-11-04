@@ -3967,7 +3967,7 @@ func TestUpdateStatusReplacedPodHostID(t *testing.T) {
 	rc.Datacenter.Status.NodeReplacements = []string{"pod-a"}
 	rc.Datacenter.Status.NodeStatuses = api.CassandraStatusMap{
 		"pod-a": {HostID: "replaced-host-id"},
-		"pod-b": {HostID: "host-id-b"},
+		"pod-b": {},
 	}
 	require.NoError(t, rc.Client.Status().Update(rc.Ctx, rc.Datacenter))
 
@@ -4027,16 +4027,18 @@ func TestUpdateStatusReplacedPodHostID(t *testing.T) {
 		assert.Equal(t, hostIdB, stored.Status.NodeStatuses["pod-b"].HostID)
 	}
 
-	// Neither node answers when the replacement finishes: the pass continues and the
-	// replaced node's old HostID is not kept.
+	// Neither node answers when the replacement finishes: the pass continues, the
+	// replaced node's old HostID is not kept and each node is called once.
 	require.Equal(t, result.Continue(), rc.UpdateStatus())
-	assertStoredHostIDs(t, "", "host-id-b")
+	assertStoredHostIDs(t, "", "")
+	serverA.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	serverB.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
 
 	// The replaced node answers on a later pass, the other node is still down.
 	podAAvailable.Store(true)
 	require.Equal(t, result.Continue(), rc.UpdateStatus())
-	assertStoredHostIDs(t, "new-host-id-a", "host-id-b")
-	serverB.assertCallCount(t, "/api/v0/metadata/versions/features", 0)
+	assertStoredHostIDs(t, "new-host-id-a", "")
+	serverB.assertCallCount(t, "/api/v0/metadata/versions/features", 2)
 }
 
 func TestFailureDetection(t *testing.T) {

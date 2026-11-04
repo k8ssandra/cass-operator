@@ -1243,7 +1243,6 @@ func (rc *ReconciliationContext) updateCurrentReplacePodsProgress() {
 							nodeStatus.HostID = ""
 							dc.Status.NodeStatuses[pod.Name] = nodeStatus
 						}
-						rc.UpdateCassandraNodeStatus()
 					}
 				}
 			}
@@ -1288,21 +1287,17 @@ func (rc *ReconciliationContext) startReplacePodsIfReplacePodsSpecified() error 
 	return nil
 }
 
-func (rc *ReconciliationContext) UpdateStatusForUserActions() error {
-	rc.updateCurrentReplacePodsProgress()
-
-	return rc.startReplacePodsIfReplacePodsSpecified()
-}
-
 func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 	dc := rc.Datacenter
 	oldDc := rc.Datacenter.DeepCopy()
 
+	// Clears the replaced pods' HostIDs, so it runs before they are fetched.
+	rc.updateCurrentReplacePodsProgress()
+
 	rc.ReqLogger.Info("Setting pod statuses")
 	rc.UpdateCassandraNodeStatus()
 
-	err := rc.UpdateStatusForUserActions()
-	if err != nil {
+	if err := rc.startReplacePodsIfReplacePodsSpecified(); err != nil {
 		return result.Error(err)
 	}
 

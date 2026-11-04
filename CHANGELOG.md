@@ -13,6 +13,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
 * [CHANGE] [#1035](https://github.com/k8ssandra/cass-operator/issues/1035) Raise the host inotify limits before creating kind clusters in CI, as Ubuntu 26.04 runners don't apply them at boot
+* [BUGFIX] [#1011](https://github.com/k8ssandra/cass-operator/issues/1011) Stop starting more nodes while the cluster fails its `LOCAL_QUORUM` health check. Since v1.26.0 the check only updated the `Healthy` condition and the remaining nodes were started anyway. The check now holds only node starts, so a fully started datacenter keeps reconciling while it is unhealthy.
 
 ## v1.33.1
 

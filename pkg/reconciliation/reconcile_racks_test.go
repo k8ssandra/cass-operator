@@ -3728,76 +3728,141 @@ func TestCheckRackLabels(t *testing.T) {
 }
 
 func TestCheckPodsReadyAllStarted(t *testing.T) {
-	rc, _, cleanupMockScr := setupTest()
-	defer cleanupMockScr()
-	assert := assert.New(t)
-
-	desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
-		nil,
-		"default",
-		rc.Datacenter,
-		3,
-		imageRegistry)
-	assert.NoErrorf(err, "error occurred creating statefulset")
-
-	desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
-
-	trackObjects := []runtime.Object{
-		desiredStatefulSet,
-		rc.Datacenter,
+	tests := []struct {
+		name            string
+		probeFails      bool
+		decommissioning bool
+		readyToStart    bool
+		wantResult      result.ReconcileResult
+		wantHealthy     corev1.ConditionStatus
+		wantStartCalls  int
+	}{
+		{
+			name:        "cluster healthy",
+			wantResult:  result.Continue(),
+			wantHealthy: corev1.ConditionTrue,
+		},
+		{
+			name:         "cluster unhealthy with a node to start",
+			probeFails:   true,
+			readyToStart: true,
+			wantResult:   result.RequeueSoon(5),
+			wantHealthy:  corev1.ConditionFalse,
+		},
+		{
+			name:        "cluster unhealthy with no node to start",
+			probeFails:  true,
+			wantResult:  result.Continue(),
+			wantHealthy: corev1.ConditionFalse,
+		},
+		{
+			name:            "cluster unhealthy while decommissioning",
+			probeFails:      true,
+			decommissioning: true,
+			readyToStart:    true,
+			wantResult:      result.RequeueSoon(2),
+			wantHealthy:     corev1.ConditionFalse,
+			wantStartCalls:  1,
+		},
 	}
 
-	mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
-	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/api/v0/ops/seeds/reload", "/api/v0/probes/cluster":
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, "OK")
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	for idx := range mockPods {
-		mp := mockPods[idx]
-		server.attachToPod(t, mp)
-		metav1.SetMetaDataLabel(&mp.ObjectMeta, api.SeedNodeLabel, "true")
-		trackObjects = append(trackObjects, mp)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, cleanupMockScr := setupTest()
+			defer cleanupMockScr()
+			assert := assert.New(t)
+
+			if tt.decommissioning {
+				rc.Datacenter.SetCondition(api.DatacenterCondition{Status: corev1.ConditionTrue, Type: api.DatacenterDecommission})
+			}
+
+			desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
+				nil,
+				"default",
+				rc.Datacenter,
+				3,
+				imageRegistry)
+			assert.NoErrorf(err, "error occurred creating statefulset")
+
+			desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
+
+			trackObjects := []runtime.Object{
+				desiredStatefulSet,
+				rc.Datacenter,
+			}
+
+			mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
+			if tt.readyToStart {
+				notStarted := mockPods[len(mockPods)-1]
+				notStarted.Labels[api.CassNodeState] = stateReadyToStart
+				notStarted.Status.ContainerStatuses[0].Ready = false
+				notStarted.Status.ContainerStatuses[0].State.Running = &corev1.ContainerStateRunning{
+					StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
+				}
+			}
+			server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/v0/ops/seeds/reload", "/api/v0/lifecycle/start":
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, "OK")
+				case "/api/v0/probes/cluster":
+					if tt.probeFails {
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, "OK")
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			for idx := range mockPods {
+				mp := mockPods[idx]
+				server.attachToPod(t, mp)
+				metav1.SetMetaDataLabel(&mp.ObjectMeta, api.SeedNodeLabel, "true")
+				trackObjects = append(trackObjects, mp)
+			}
+
+			rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
+
+			nextRack := &RackInformation{}
+			nextRack.RackName = desiredStatefulSet.Labels[api.RackLabel]
+			nextRack.NodeCount = int(*desiredStatefulSet.Spec.Replicas)
+			nextRack.SeedCount = 1
+
+			rackInfo := []*RackInformation{nextRack}
+
+			rc.desiredRackInformation = rackInfo
+			rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
+			rc.statefulSets[0] = desiredStatefulSet
+
+			rc.clusterPods = mockPods
+			rc.dcPods = mockPods
+
+			epData := httphelper.CassMetadataEndpoints{
+				Entity: []httphelper.EndpointState{},
+			}
+
+			for i := 0; i < int(*desiredStatefulSet.Spec.Replicas); i++ {
+				ep := httphelper.EndpointState{
+					RpcAddress: mockPods[i].Status.PodIP,
+					Status:     "UN",
+				}
+				epData.Entity = append(epData.Entity, ep)
+			}
+
+			rc.NodeMgmtClient = server.client(rc.ReqLogger)
+
+			recRes := rc.CheckPodsReady(epData)
+			assert.Equal(tt.wantResult, recRes)
+			assert.Equal(tt.wantHealthy, rc.Datacenter.Status.GetConditionStatus(api.DatacenterHealthy))
+			server.assertCallCount(t, "/api/v0/lifecycle/start", tt.wantStartCalls)
+			if !tt.probeFails {
+				server.assertCallCount(t, "/api/v0/ops/seeds/reload", len(epData.Entity))
+				server.assertCallCount(t, "/api/v0/probes/cluster", len(epData.Entity))
+			}
+		})
 	}
-
-	rc.Client = fake.NewClientBuilder().WithScheme(setupScheme()).WithStatusSubresource(rc.Datacenter).WithRuntimeObjects(trackObjects...).Build()
-
-	nextRack := &RackInformation{}
-	nextRack.RackName = desiredStatefulSet.Labels[api.RackLabel]
-	nextRack.NodeCount = int(*desiredStatefulSet.Spec.Replicas)
-	nextRack.SeedCount = 1
-
-	rackInfo := []*RackInformation{nextRack}
-
-	rc.desiredRackInformation = rackInfo
-	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
-	rc.statefulSets[0] = desiredStatefulSet
-
-	rc.clusterPods = mockPods
-	rc.dcPods = mockPods
-
-	epData := httphelper.CassMetadataEndpoints{
-		Entity: []httphelper.EndpointState{},
-	}
-
-	for i := 0; i < int(*desiredStatefulSet.Spec.Replicas); i++ {
-		ep := httphelper.EndpointState{
-			RpcAddress: mockPods[i].Status.PodIP,
-			Status:     "UN",
-		}
-		epData.Entity = append(epData.Entity, ep)
-	}
-
-	rc.NodeMgmtClient = server.client(rc.ReqLogger)
-
-	recRes := rc.CheckPodsReady(epData)
-	assert.Equal(result.Continue(), recRes) // All pods should be up, no need to call anything
-	server.assertCallCount(t, "/api/v0/ops/seeds/reload", len(epData.Entity))
-	server.assertCallCount(t, "/api/v0/probes/cluster", len(epData.Entity))
 }
 
 func TestShouldUseFastPath(t *testing.T) {

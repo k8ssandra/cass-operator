@@ -217,6 +217,8 @@ func TestProcessDeletion_DecommissionOnDelete(t *testing.T) {
 		firstPodNotReady   bool
 		noPods             bool
 		decommissioning    bool
+		scaledDown         bool
+		stopped            bool
 		want               result.ReconcileResult
 		wantErr            bool
 		wantDecommission   bool
@@ -235,6 +237,8 @@ func TestProcessDeletion_DecommissionOnDelete(t *testing.T) {
 		{name: "no topology waits", responses: [2]string{noEndpoints, noEndpoints}, want: result.RequeueSoon(5), wantReplicas: 2, wantCalls: [2]int{1, 1}, wantEventSubstring: "Unable to read the cluster topology"},
 		{name: "ongoing decommission is not reevaluated", responses: [2]string{singleDc, singleDc}, decommissioning: true, want: result.Continue(), wantDecommission: true, wantReplicas: 2},
 		{name: "decommissioned datacenter is deleted", noPods: true, decommissioning: true, want: result.Done(), wantDecommission: true, wantReplicas: 2},
+		{name: "terminating pods are not queried after deletion without decommission", responses: [2]string{multiDc, multiDc}, scaledDown: true, want: result.Done()},
+		{name: "stopped datacenter is still queried", responses: [2]string{multiDc, multiDc}, scaledDown: true, stopped: true, want: result.Continue(), wantDecommission: true, wantCalls: [2]int{1, 0}},
 	}
 
 	for _, tt := range tests {
@@ -249,7 +253,12 @@ func TestProcessDeletion_DecommissionOnDelete(t *testing.T) {
 			if tt.decommissioning {
 				rc.Datacenter.SetCondition(api.DatacenterCondition{Type: api.DatacenterDecommission, Status: corev1.ConditionTrue})
 			}
-			sts, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, 2, imageRegistry)
+			rc.Datacenter.Spec.Stopped = tt.stopped
+			replicas := 2
+			if tt.scaledDown {
+				replicas = 0
+			}
+			sts, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, replicas, imageRegistry)
 			require.NoError(t, err)
 
 			objs := []runtime.Object{rc.Datacenter, sts}

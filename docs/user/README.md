@@ -557,6 +557,32 @@ give them the same `clusterName` in the `spec`.
 _Note that multi-region clusters and advanced workloads are not supported, which
 makes many multi-DC use-cases inappropriate for the operator._
 
+### Removing a datacenter
+
+By default, deleting a `CassandraDatacenter` scales its StatefulSets to 0 and
+removes it without a Cassandra decommission. To decommission the datacenter's
+nodes first, set the annotation
+`cassandra.datastax.com/decommission-on-delete: "true"` before deleting it.
+In a multi-datacenter cluster, first remove the datacenter from the
+replication settings of every keyspace.
+
+With the annotation set, the operator reads the ring metadata from one of the
+datacenter's ready pods:
+
+* If any other datacenter has nodes in the ring, including nodes that are down
+  or unreachable, the operator sets the `Decommission` condition, decommissions
+  every node of the datacenter and then deletes it.
+* If the metadata lists only this datacenter, there is nothing to decommission
+  into. The operator emits a Normal `DecommissionDatacenter` event and deletes
+  the datacenter without a decommission.
+* If no pod can report the metadata, for example because no pod is ready, the
+  operator emits a Warning `DecommissionDatacenter` event and retries. The
+  deletion continues once a pod becomes ready. If the datacenter never joined
+  the cluster, remove the annotation to delete it without a decommission. In a
+  multi-datacenter cluster, removing the annotation leaves the datacenter's
+  nodes in the ring: remove them with `nodetool removenode` from another
+  datacenter.
+
 # Maintaining Your Cluster
 
 ## Data Repair

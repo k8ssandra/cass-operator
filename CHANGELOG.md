@@ -12,7 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
-* [ENHANCEMENT] [#1009](https://github.com/k8ssandra/cass-operator/issues/1009) Emit a `DecommissionNotVerified` Warning event when the operator cannot verify that a decommissioning node has finished, including when the node has no known HostID, and document how to finish or abandon a decommission that cannot complete
+* [ENHANCEMENT] [#1009](https://github.com/k8ssandra/cass-operator/issues/1009) Emit a Warning event with reason `Cannot verify decommission` (action `DecommissionNotVerified`) when the operator cannot verify that a decommissioning node has finished, including when the node has no known HostID, and document how to finish or restart a decommission that cannot complete
 
 ## v1.33.1
 

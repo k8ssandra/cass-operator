@@ -828,10 +828,16 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 	}
 
 	if !clusterHealthy && rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) != corev1.ConditionTrue {
-		rc.ReqLogger.Info(
-			"cluster isn't healthy",
-		)
-		return result.RequeueSoon(5)
+		podsToStart, err := rc.createStartSequence()
+		if err != nil {
+			return result.Error(err)
+		}
+		if len(podsToStart) > 0 {
+			rc.ReqLogger.Info(
+				"cluster isn't healthy",
+			)
+			return result.RequeueSoon(5)
+		}
 	}
 
 	// step 4 - make sure all nodes are ready
@@ -1494,9 +1500,10 @@ func (rc *ReconciliationContext) deleteStuckNodes() (bool, error) {
 func (rc *ReconciliationContext) isClusterHealthy() bool {
 	pods := FilterPodListByCassNodeState(rc.clusterPods, stateStarted)
 
-	numRacks := len(rc.Datacenter.GetRacks())
+	// A DC with fewer nodes than racks can never hold numRacks replicas.
+	rfPerDc := min(len(rc.Datacenter.GetRacks()), int(rc.Datacenter.Spec.Size))
 	for _, pod := range pods {
-		err := rc.NodeMgmtClient.CallProbeClusterEndpoint(pod, "LOCAL_QUORUM", numRacks)
+		err := rc.NodeMgmtClient.CallProbeClusterEndpoint(pod, "LOCAL_QUORUM", rfPerDc)
 		if err != nil {
 			reason := fmt.Sprintf("Pod %s failed the LOCAL_QUORUM check", pod.Name)
 			rc.Recorder.Event(rc.Datacenter, corev1.EventTypeWarning, events.UnhealthyDatacenter,

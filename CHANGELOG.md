@@ -12,7 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
-* [BUGFIX] [#1011](https://github.com/k8ssandra/cass-operator/issues/1011) Stop starting more nodes while the cluster fails its `LOCAL_QUORUM` health check. Since v1.26.0 the check only updated the `Healthy` condition and the remaining nodes were started anyway.
+* [BUGFIX] [#1011](https://github.com/k8ssandra/cass-operator/issues/1011) Stop starting more nodes while the cluster fails its `LOCAL_QUORUM` health check. Since v1.26.0 the check only updated the `Healthy` condition and the remaining nodes were started anyway. The check now holds only node starts, so a fully started datacenter keeps reconciling while it is unhealthy, and it uses at most as many replicas per datacenter as the datacenter has nodes, so a datacenter with more racks than nodes can pass it.
 
 ## v1.33.1
 

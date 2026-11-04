@@ -3730,29 +3730,46 @@ func TestCheckRackLabels(t *testing.T) {
 func TestCheckPodsReadyAllStarted(t *testing.T) {
 	tests := []struct {
 		name            string
-		probeStatus     int
+		probeFails      bool
 		decommissioning bool
+		racks           int
+		readyToStart    bool
 		wantResult      result.ReconcileResult
 		wantHealthy     corev1.ConditionStatus
+		wantStartCalls  int
 	}{
 		{
 			name:        "cluster healthy",
-			probeStatus: http.StatusOK,
 			wantResult:  result.Continue(),
 			wantHealthy: corev1.ConditionTrue,
 		},
 		{
-			name:        "cluster unhealthy",
-			probeStatus: http.StatusInternalServerError,
-			wantResult:  result.RequeueSoon(5),
+			name:         "cluster unhealthy with a node to start",
+			probeFails:   true,
+			readyToStart: true,
+			wantResult:   result.RequeueSoon(5),
+			wantHealthy:  corev1.ConditionFalse,
+		},
+		{
+			name:        "cluster unhealthy with no node to start",
+			probeFails:  true,
+			wantResult:  result.Continue(),
 			wantHealthy: corev1.ConditionFalse,
 		},
 		{
 			name:            "cluster unhealthy while decommissioning",
-			probeStatus:     http.StatusInternalServerError,
+			probeFails:      true,
 			decommissioning: true,
-			wantResult:      result.Continue(),
+			readyToStart:    true,
+			wantResult:      result.RequeueSoon(2),
 			wantHealthy:     corev1.ConditionFalse,
+			wantStartCalls:  1,
+		},
+		{
+			name:        "more racks than nodes",
+			racks:       6,
+			wantResult:  result.Continue(),
+			wantHealthy: corev1.ConditionTrue,
 		},
 	}
 
@@ -3765,6 +3782,9 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 			if tt.decommissioning {
 				rc.Datacenter.SetCondition(api.DatacenterCondition{Status: corev1.ConditionTrue, Type: api.DatacenterDecommission})
 			}
+			for i := range tt.racks {
+				rc.Datacenter.Spec.Racks = append(rc.Datacenter.Spec.Racks, api.Rack{Name: fmt.Sprintf("r%d", i)})
+			}
 
 			desiredStatefulSet, err := newStatefulSetForCassandraDatacenter(
 				nil,
@@ -3775,6 +3795,7 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 			assert.NoErrorf(err, "error occurred creating statefulset")
 
 			desiredStatefulSet.Status.ReadyReplicas = *desiredStatefulSet.Spec.Replicas
+			rc.Datacenter.Spec.Size = *desiredStatefulSet.Spec.Replicas
 
 			trackObjects := []runtime.Object{
 				desiredStatefulSet,
@@ -3782,14 +3803,28 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 			}
 
 			mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
+			if tt.readyToStart {
+				notStarted := mockPods[len(mockPods)-1]
+				notStarted.Labels[api.CassNodeState] = stateReadyToStart
+				notStarted.Status.ContainerStatuses[0].Ready = false
+				notStarted.Status.ContainerStatuses[0].State.Running = &corev1.ContainerStateRunning{
+					StartedAt: metav1.Time{Time: time.Now().Add(-time.Minute)},
+				}
+			}
 			server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/api/v0/ops/seeds/reload":
+				case "/api/v0/ops/seeds/reload", "/api/v0/lifecycle/start":
 					w.WriteHeader(http.StatusOK)
 					_, _ = io.WriteString(w, "OK")
 				case "/api/v0/probes/cluster":
-					w.WriteHeader(tt.probeStatus)
-					_, _ = io.WriteString(w, http.StatusText(tt.probeStatus))
+					// Like the Management API, fail when the DC can't hold a quorum of rf_per_dc replicas.
+					rfPerDc, err := strconv.Atoi(r.URL.Query().Get("rf_per_dc"))
+					if tt.probeFails || err != nil || rfPerDc/2+1 > len(mockPods) {
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, "OK")
 				default:
 					http.NotFound(w, r)
 				}
@@ -3834,11 +3869,10 @@ func TestCheckPodsReadyAllStarted(t *testing.T) {
 			recRes := rc.CheckPodsReady(epData)
 			assert.Equal(tt.wantResult, recRes)
 			assert.Equal(tt.wantHealthy, rc.Datacenter.Status.GetConditionStatus(api.DatacenterHealthy))
-			server.assertCallCount(t, "/api/v0/ops/seeds/reload", len(epData.Entity))
-			if tt.probeStatus == http.StatusOK {
+			server.assertCallCount(t, "/api/v0/lifecycle/start", tt.wantStartCalls)
+			if !tt.probeFails {
+				server.assertCallCount(t, "/api/v0/ops/seeds/reload", len(epData.Entity))
 				server.assertCallCount(t, "/api/v0/probes/cluster", len(epData.Entity))
-			} else {
-				server.assertCallCount(t, "/api/v0/probes/cluster", 1)
 			}
 		})
 	}

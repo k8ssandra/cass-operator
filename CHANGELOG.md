@@ -12,6 +12,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 ## unreleased
 
 * [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
+* [CHANGE] [#1035](https://github.com/k8ssandra/cass-operator/issues/1035) Raise the host inotify limits before creating kind clusters in CI, as Ubuntu 26.04 runners don't apply them at boot
 * [BUGFIX] [#1015](https://github.com/k8ssandra/cass-operator/issues/1015) A pod that failed to start once stayed in `status.failedStarts` after it started successfully, so every later StatefulSet change of its rack was forced without the usual readiness checks.
 
 ## v1.33.1

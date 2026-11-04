@@ -745,9 +745,19 @@ type NodetoolNodeInfo struct {
 }
 
 func (ns NsWrapper) RetrieveStatusFromNodetool(podName string) []NodetoolNodeInfo {
+	nodeInfo, err := ns.TryRetrieveStatusFromNodetool(podName)
+	Expect(err).ToNot(HaveOccurred())
+	return nodeInfo
+}
+
+// TryRetrieveStatusFromNodetool is like RetrieveStatusFromNodetool but returns the exec error
+// instead of failing, so it can be polled.
+func (ns NsWrapper) TryRetrieveStatusFromNodetool(podName string) ([]NodetoolNodeInfo, error) {
 	k := kubectl.KCmd{Command: "exec", Args: []string{podName, "-i", "-c", "cassandra", "--namespace", ns.Namespace, "--", "nodetool", "status"}}
 	output, err := k.Output()
-	Expect(err).ToNot(HaveOccurred())
+	if err != nil {
+		return nil, err
+	}
 
 	getFullName := func(s string) string {
 		status, ok := map[string]string{
@@ -779,7 +789,7 @@ func (ns NsWrapper) RetrieveStatusFromNodetool(podName string) []NodetoolNodeInf
 				Rack:    comps[len(comps)-1],
 			})
 	}
-	return nodeInfo
+	return nodeInfo, nil
 }
 
 func (ns NsWrapper) RetrieveSuperuserCreds(clusterName string) (string, string) {

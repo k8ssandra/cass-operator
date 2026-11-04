@@ -5,6 +5,7 @@ package reconciliation
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -2053,6 +2054,139 @@ func TestFailedStart(t *testing.T) {
 	// Should have 2 events, one to indicate Cassandra is starting, one to indicate it failed to start
 	assert.Equal(t, 2, len(fakeRecorder.Events))
 	server.assertCallCount(t, "/api/v0/lifecycle/start", 1)
+}
+
+// TestStartReplaceRemovesStaleJoiner verifies that a dead earlier attempt to replace the same node is
+// removed from gossip before the replacing pod is started, and that the start happens even if that fails.
+func TestStartReplaceRemovesStaleJoiner(t *testing.T) {
+	const (
+		replacedIP   = "10.0.0.1"
+		staleJoiner  = "10.0.0.9"
+		assassinate  = "/api/v0/ops/node/assassinate?address=" + staleJoiner
+		startReplace = "/api/v0/lifecycle/start?replace_ip=" + replacedIP
+	)
+
+	replaced := httphelper.EndpointState{EndpointIP: replacedIP, HostID: "replaced-host", IsAlive: "false", StatusWithPort: "NORMAL,1"}
+	peerNode := httphelper.EndpointState{EndpointIP: "10.0.0.2", HostID: "peer-host", IsAlive: "true", StatusWithPort: "NORMAL,2"}
+	joiner := httphelper.EndpointState{EndpointIP: staleJoiner, HostID: "joiner-host", IsAlive: "false", StatusWithPort: "BOOT_REPLACE," + replacedIP + ":7000"}
+	withJoiner := httphelper.CassMetadataEndpoints{Entity: []httphelper.EndpointState{replaced, peerNode, joiner}}
+	withoutJoiner := httphelper.CassMetadataEndpoints{Entity: []httphelper.EndpointState{replaced, peerNode}}
+
+	tests := []struct {
+		name              string
+		assassinateStatus int
+		epData            httphelper.CassMetadataEndpoints
+		peerView          httphelper.CassMetadataEndpoints
+		peerReady         bool
+		podAtJoinerIP     bool
+		removedByCall     bool
+		expectAssassinate int
+		expectFailure     bool
+	}{
+		{name: "stale joiner removed", assassinateStatus: http.StatusOK, epData: withJoiner, peerView: withJoiner, peerReady: true, removedByCall: true, expectAssassinate: 1},
+		{name: "start even if removal fails", assassinateStatus: http.StatusInternalServerError, epData: withJoiner, peerView: withJoiner, peerReady: true, expectAssassinate: 1, expectFailure: true},
+		{name: "error but node is gone", assassinateStatus: http.StatusInternalServerError, epData: withJoiner, peerView: withJoiner, peerReady: true, removedByCall: true, expectAssassinate: 1},
+		{name: "no ready peer", assassinateStatus: http.StatusOK, epData: withJoiner, peerView: withJoiner, peerReady: false},
+		{name: "no stale joiner", assassinateStatus: http.StatusOK, epData: withoutJoiner, peerView: withoutJoiner, peerReady: true},
+		{name: "peer does not see a stale joiner", assassinateStatus: http.StatusOK, epData: withJoiner, peerView: withoutJoiner, peerReady: true},
+		{name: "address now used by a cluster pod", assassinateStatus: http.StatusOK, epData: withJoiner, peerView: withJoiner, peerReady: true, podAtJoinerIP: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, cleanupMockScr := setupTest()
+			defer cleanupMockScr()
+
+			var mu sync.Mutex
+			var order []string
+			peerView := tt.peerView
+
+			peerServer := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				defer mu.Unlock()
+				switch {
+				case r.URL.RequestURI() == "/api/v0/metadata/endpoints" && r.Method == http.MethodGet:
+					_ = json.NewEncoder(w).Encode(peerView)
+				case r.URL.RequestURI() == assassinate && r.Method == http.MethodPost:
+					order = append(order, "assassinate")
+					if tt.removedByCall {
+						peerView = withoutJoiner
+					}
+					w.WriteHeader(tt.assassinateStatus)
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			podServer := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.RequestURI() != startReplace || r.Method != http.MethodPost {
+					http.NotFound(w, r)
+					return
+				}
+				mu.Lock()
+				order = append(order, "start")
+				mu.Unlock()
+				w.WriteHeader(http.StatusCreated)
+			}))
+			rc.NodeMgmtClient = podServer.client(rc.ReqLogger)
+
+			pod := makeReloadTestPod()
+			podServer.attachToPod(t, pod)
+
+			peer := makeReloadTestPod()
+			peer.Name = "peer"
+			peerServer.attachToPod(t, peer)
+			peer.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "cassandra", Ready: tt.peerReady}}
+			rc.dcPods = []*corev1.Pod{pod, peer}
+			rc.clusterPods = rc.dcPods
+
+			if tt.podAtJoinerIP {
+				other := makeReloadTestPod()
+				other.Name = "other"
+				other.Status.PodIP = staleJoiner
+				rc.clusterPods = append(rc.clusterPods, other)
+			}
+
+			rc.Datacenter.Status.NodeReplacements = []string{pod.Name}
+			rc.Datacenter.Status.NodeStatuses = api.CassandraStatusMap{pod.Name: {HostID: "replaced-host"}}
+
+			rc.Client = fake.NewClientBuilder().
+				WithScheme(setupScheme()).
+				WithStatusSubresource(rc.Datacenter).
+				WithRuntimeObjects(runtimeObjectHelper(rc, nil, []*corev1.Pod{pod})...).
+				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+				Build()
+			fakeRecorder := record.NewFakeRecorder(10)
+			rc.Recorder = &events.LoggingEventRecorder{
+				EventRecorderLogger: fakeRecorder,
+				ReqLogger:           rc.ReqLogger,
+			}
+
+			require.NoError(t, rc.startCassandra(tt.epData, pod))
+
+			require.Eventually(t, func() bool { return podServer.callCount(startReplace) == 1 }, 2*time.Second, 10*time.Millisecond)
+			peerServer.assertCallCount(t, assassinate, tt.expectAssassinate)
+
+			mu.Lock()
+			defer mu.Unlock()
+			if tt.expectAssassinate > 0 {
+				assert.Equal(t, []string{"assassinate", "start"}, order)
+			} else {
+				assert.Equal(t, []string{"start"}, order)
+			}
+
+			var failed bool
+		drain:
+			for {
+				select {
+				case event := <-fakeRecorder.Events:
+					failed = failed || strings.Contains(event, "Failed to remove dead node")
+				default:
+					break drain
+				}
+			}
+			assert.Equal(t, tt.expectFailure, failed)
+		})
+	}
 }
 
 func TestStartBootstrappedNodes(t *testing.T) {

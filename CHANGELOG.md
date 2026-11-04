@@ -11,6 +11,8 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 ## unreleased
 
+* [BUGFIX] [#1037](https://github.com/k8ssandra/cass-operator/issues/1037) A replace never finished if the replacing pod was killed while it bootstrapped: the killed attempt stayed in gossip as a dead joining node and Cassandra refused to bootstrap the next pod. Before starting a replace, dead nodes that were replacing the same address are now removed from gossip with the management API assassinate endpoint.
+
 ## v1.33.1
 
 * [BUGFIX] [#1000](https://github.com/k8ssandra/cass-operator/issues/1000) Decommissioning a datacenter never finished when its last node was the only pod of the cluster visible to the operator (for example each datacenter in its own Kubernetes cluster), as no peer metadata was available. The last node's own metadata is now used to verify its decommission.

@@ -547,6 +547,23 @@ func TestCreateRole(t *testing.T) {
 	require.NoError(err)
 }
 
+func TestCallAssassinateEndpoint(t *testing.T) {
+	require := require.New(t)
+	httpClient := newAssertingHttpClient(t, func(req *http.Request) {
+		require.Equal(http.MethodPost, req.Method)
+		require.Equal("/api/v0/ops/node/assassinate", req.URL.Path)
+		require.Equal("10.0.0.7", req.URL.Query().Get("address"))
+	}, func() *http.Response {
+		return newHttpResponse([]byte("OK"), http.StatusOK)
+	})
+
+	mgmtClient := newMockMgmtClient(httpClient)
+	require.NoError(mgmtClient.CallAssassinateEndpoint(goodPod, "10.0.0.7"))
+
+	mgmtClient = newMockMgmtClient(newMockHttpClient(newHttpResponse([]byte("Endpoint still alive"), http.StatusInternalServerError), nil))
+	require.Error(mgmtClient.CallAssassinateEndpoint(goodPod, "10.0.0.7"))
+}
+
 func TestDropRole(t *testing.T) {
 	require := require.New(t)
 	httpClient := newAssertingHttpClient(t, func(req *http.Request) {

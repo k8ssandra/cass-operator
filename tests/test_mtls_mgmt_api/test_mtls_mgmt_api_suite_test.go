@@ -89,7 +89,14 @@ var _ = Describe(testName, func() {
 			// 	defer wg.Done()
 			// }()
 
-			step = "deleting the dc"
+			step = "deleting the mtls secrets"
+			k = kubectl.DeleteFromFiles(
+				"../testdata/mtls-certs-server.yaml",
+				"../testdata/mtls-certs-client.yaml",
+			).InNamespace(namespace)
+			ns.ExecAndLog(step, k)
+
+			step = "deleting the dc with its mtls secrets missing"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
 

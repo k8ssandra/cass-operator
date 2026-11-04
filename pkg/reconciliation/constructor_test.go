@@ -136,6 +136,17 @@ func TestSetDatacenterStatusUpdateProgressState(t *testing.T) {
 			expectedMetadataVersion: 2,
 			expectedObservedGen:     1,
 		},
+		{
+			name:                 "spec changed during a pass that had a pending change: records the start generation",
+			inputMetadataVersion: 2,
+			inputObservedGen:     1,
+			inputGeneration:      3,
+			inputStartGeneration: 2,
+
+			expectedStatusPatch:     true,
+			expectedMetadataVersion: 2,
+			expectedObservedGen:     2,
+		},
 	}
 
 	for _, tc := range tt {

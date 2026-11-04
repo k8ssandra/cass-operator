@@ -126,6 +126,12 @@ var _ = Describe("CassandraDatacenter tests", func() {
 				waitForDatacenterCondition(ctx, dcName, cassdcapi.DatacenterReady, corev1.ConditionTrue).Should(Succeed())
 				waitForDatacenterCondition(ctx, dcName, cassdcapi.DatacenterInitialized, corev1.ConditionTrue).Should(Succeed())
 
+				Eventually(func(g Gomega) {
+					dc := cassdcapi.CassandraDatacenter{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: testNamespaceName, Name: dcName}, &dc)).To(Succeed())
+					g.Expect(dc.Status.ObservedGeneration).To(Equal(dc.Generation))
+				}).WithTimeout(20 * time.Second).WithPolling(pollingTime).WithContext(ctx).Should(Succeed())
+
 				deleteDatacenter(ctx, dcName)
 				verifyDatacenterDeleted(ctx, dcName).Should(Succeed())
 			})

@@ -51,8 +51,6 @@ type ReconciliationContext struct {
 	dcPods                 []*corev1.Pod
 	clusterPods            []*corev1.Pod
 
-	// startGeneration is the Datacenter generation this pass reconciles. Status patches refresh
-	// rc.Datacenter, which can carry a newer generation that this pass has not applied.
 	startGeneration int64
 }
 

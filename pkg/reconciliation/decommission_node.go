@@ -205,20 +205,20 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 					return state != stateDecommissioning && state != stateDecommissioned
 				})
 				if peersAvailable {
-					return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
+					return rc.decommissionNotVerified(pod, fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata", pod.Name))
 				}
 				if _, found := nodeStatuses[pod.Name]; found {
 					// No other pod is visible to provide peer metadata, use the node's own view of the ring
 					localMetadata, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
 					if err != nil {
-						return result.Error(fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata: %w", pod.Name, err))
+						return rc.decommissionNotVerified(pod, fmt.Errorf("cannot check decommissioning node %s without Cassandra metadata: %w", pod.Name, err))
 					}
 					peerData = localMetadata
 				}
 			}
 			done, err := rc.IsDoneDecommissioning(pod, peerData, nodeStatuses)
 			if err != nil {
-				return result.Error(err)
+				return rc.decommissionNotVerified(pod, err)
 			}
 			if !done {
 				if !HasStartedDecommissioning(pod, peerData, nodeStatuses) {
@@ -256,6 +256,12 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 	}
 
 	return result.Continue()
+}
+
+func (rc *ReconciliationContext) decommissionNotVerified(pod *corev1.Pod, err error) result.ReconcileResult {
+	rc.Recorder.Eventf(rc.Datacenter, nil, corev1.EventTypeWarning, "Cannot verify decommission", events.DecommissionNotVerified,
+		"Cannot verify that node %s has finished decommissioning, scale down is blocked until it can: %v", pod.Name, err)
+	return result.Error(err)
 }
 
 func (rc *ReconciliationContext) cleanUpAfterDecommissionedPod(pod *corev1.Pod) result.ReconcileResult {
@@ -333,8 +339,7 @@ func (rc *ReconciliationContext) IsDoneDecommissioning(pod *corev1.Pod, epData h
 		hostID = nodeStatus.HostID
 	}
 	if hostID == "" {
-		rc.ReqLogger.V(1).Info("Cannot verify decommission without a known HostID", "Pod", pod.Name)
-		return false, nil
+		return false, fmt.Errorf("cannot verify decommissioned state on pod %s without a known HostID", pod.Name)
 	}
 
 	for _, endpoint := range localMetadata.Entity {

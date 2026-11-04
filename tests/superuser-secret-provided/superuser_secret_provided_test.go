@@ -125,7 +125,11 @@ var _ = Describe(testName, func() {
 			k = kubectl.Delete("secret", superuserSecretName)
 			ns.ExecAndLog(step, k)
 
-			step = "delete datacenter with its superuser secret missing"
+			step = "delete the user secret"
+			k = kubectl.Delete("secret", "bobby-secret")
+			ns.ExecAndLog(step, k)
+
+			step = "delete datacenter with its superuser and user secrets missing"
 			k = kubectl.Delete("CassandraDatacenter", dcName).WithFlag("wait", "false")
 			ns.ExecAndLog(step, k)
 

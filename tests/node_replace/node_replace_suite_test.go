@@ -240,6 +240,72 @@ var _ = Describe(testName, func() {
 			Expect(err).ToNot(HaveOccurred(), "Failed to get PV name for PVC %s: %v", pvcName, err)
 			Expect(pvName).ToNot(Equal(newPvName), "Expected PV volume to be different after node replace")
 		})
+		Specify("a replace finishes when the replacing pod is killed while it bootstraps", func() {
+			peerPod := "cluster1-dc1-r1-sts-0"
+
+			step := "delete the previous replace task"
+			ns.ExecAndLog(step, kubectl.Delete("cassandratask", "replace-node"))
+
+			ns.KillCassandra(podNameToReplace)
+
+			step = "creating a cassandra task to replace a node"
+			ns.ExecAndLog(step, kubectl.ApplyFiles(taskYaml))
+			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionTrue))
+
+			// Poll nodetool tolerating exec errors, and look for a joiner in the given state.
+			findJoiner := func(status string) string {
+				nodeInfos, err := ns.TryRetrieveStatusFromNodetool(peerPod)
+				if err != nil {
+					return ""
+				}
+				for _, nodeInfo := range nodeInfos {
+					if nodeInfo.Status == status && nodeInfo.State == "joining" {
+						return nodeInfo.Address
+					}
+				}
+				return ""
+			}
+
+			By("wait for the replacing node to show up as joining")
+			joinerIP := ""
+			Eventually(func() string {
+				joinerIP = findJoiner("up")
+				return joinerIP
+			}).WithTimeout(10 * time.Minute).WithPolling(2 * time.Second).ShouldNot(BeEmpty())
+
+			// The killed attempt stays in gossip as a dead joining node. Cassandra refuses to
+			// bootstrap the next pod while it is there, so the operator has to remove it.
+			step = "kill the replacing pod while it bootstraps"
+			ns.ExecAndLog(step, kubectl.Delete("pod", podNameToReplace).WithFlag("grace-period", "0").WithFlag("force", "true"))
+
+			By("wait for the killed attempt to show up as a dead joining node")
+			Eventually(func() string {
+				return findJoiner("down")
+			}).WithTimeout(2 * time.Minute).WithPolling(2 * time.Second).Should(Equal(joinerIP))
+
+			ns.WaitForCompleteTask("replace-node")
+			ns.WaitForDatacenterCondition(dcName, "ReplacingNodes", string(corev1.ConditionFalse))
+			Expect(ns.GetDatacenterReadyPodNames(dcName)).To(HaveLen(6))
+
+			step = "wait for the pod to return to life"
+			json := "jsonpath={.status.containerStatuses[?(.name=='cassandra')].ready}"
+			k := kubectl.Get("pod", podNameToReplace).FormatOutput(json)
+			ns.WaitForOutputAndLog(step, k, "true", 1200)
+
+			verifyAllPodsAreCorrect()
+
+			podIP, err := ns.Output(kubectl.Get("pod", podNameToReplace).FormatOutput("jsonpath={.status.podIP}"))
+			Expect(err).ToNot(HaveOccurred())
+			if podIP == joinerIP {
+				Skip("the replacing pod got the address of the killed attempt, the stale joiner was not exercised")
+			}
+
+			step = "verify the killed attempt was removed from gossip"
+			k = kubectl.Get("events").
+				WithFlag("field-selector", "reason=RemovingStaleReplaceNode").
+				FormatOutput("jsonpath={.items[*].message}")
+			Expect(ns.OutputAndLog(step, k)).To(ContainSubstring("Removing dead node " + joinerIP))
+		})
 		Specify("cassandratask can be used to replace a rack", func() {
 			rackPodNames := []string{"cluster1-dc1-r1-sts-0", "cluster1-dc1-r1-sts-1"}
 			oldPvByPod := make(map[string]string, len(rackPodNames))

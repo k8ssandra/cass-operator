@@ -102,6 +102,8 @@ const (
 	StatusLeft    EndpointStateStatus = "LEFT"
 	StatusMoving  EndpointStateStatus = "MOVING"
 	StatusRemoved EndpointStateStatus = "removed"
+
+	StatusBootReplace EndpointStateStatus = "BOOT_REPLACE"
 )
 
 func (e *EndpointState) HasStatus(status EndpointStateStatus) bool {
@@ -1165,6 +1167,33 @@ func (client *NodeMgmtClient) CallReloadSeedsEndpoint(pod *corev1.Pod) error {
 
 	request := nodeMgmtRequest{
 		endpoint: "/api/v0/ops/seeds/reload",
+		host:     podHost,
+		port:     podPort,
+		method:   http.MethodPost,
+		timeout:  60 * time.Second,
+	}
+
+	_, err = callNodeMgmtEndpoint(client, request, "")
+	return err
+}
+
+// CallAssassinateEndpoint asks the Cassandra node in pod to remove address from gossip with
+// Gossiper.assassinateEndpoint. Cassandra waits about RING_DELAY (30s) inside the call, while the
+// Management API gives up on a request after 30s, so an error does not mean the removal failed.
+func (client *NodeMgmtClient) CallAssassinateEndpoint(pod *corev1.Pod, address string) error {
+	client.Log.Info(
+		"calling Management API assassinate - POST /api/v0/ops/node/assassinate",
+		"pod", pod.Name,
+		"address", address,
+	)
+
+	podHost, podPort, err := BuildPodHostFromPod(pod)
+	if err != nil {
+		return err
+	}
+
+	request := nodeMgmtRequest{
+		endpoint: buildEndpoint("/api/v0/ops/node/assassinate", "address", address),
 		host:     podHost,
 		port:     podPort,
 		method:   http.MethodPost,

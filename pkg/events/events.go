@@ -28,6 +28,7 @@ const (
 	FinishedReplaceNode               string = "FinishedReplaceNode"
 	ReplacingNode                     string = "ReplacingNode"
 	StartingCassandraAndReplacingNode string = "StartingCassandraAndReplacingNode"
+	RemovingStaleReplaceNode          string = "RemovingStaleReplaceNode"
 	StartingCassandra                 string = "StartingCassandra"
 	DecommissionDatacenter            string = "DecommissionDatacenter"
 	DecommissioningNode               string = "DecommissioningNode"

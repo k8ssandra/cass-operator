@@ -5,6 +5,8 @@ package reconciliation
 import (
 	"fmt"
 	"net"
+	"slices"
+	"strings"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/pkg/httphelper"
@@ -70,6 +72,53 @@ func FindIpForHostId(endpointData httphelper.CassMetadataEndpoints, hostId strin
 	// This indicates the cassandra node with the given hostId never
 	// actually joined the ring
 	return "", nil
+}
+
+// findStaleReplaceJoiners returns the addresses of dead nodes that were replacing replaceAddress.
+// These are earlier incarnations of the pod about to start: when a replacing pod is killed, its
+// endpoint stays in gossip as a down node with status BOOT_REPLACE. Cassandra then refuses to
+// start the next replace attempt ("Other bootstrapping/leaving/moving nodes detected") and the
+// dead pending replica makes QUORUM writes fail. Alive endpoints, replaceAddress itself and the
+// excluded addresses (held by Cassandra pods that exist now) are never returned.
+func findStaleReplaceJoiners(endpointData httphelper.CassMetadataEndpoints, replaceAddress string, excluded []string) []string {
+	replaceIP := net.ParseIP(replaceAddress)
+	if replaceIP == nil {
+		return nil
+	}
+
+	var stale []string
+	for _, ep := range endpointData.Entity {
+		if ep.IsAlive != "false" {
+			continue
+		}
+		address := ep.EndpointAddress()
+		ip := net.ParseIP(address)
+		if ip == nil || ip.Equal(replaceIP) || slices.ContainsFunc(excluded, func(e string) bool { return ip.Equal(net.ParseIP(e)) }) {
+			continue
+		}
+		if target := bootReplaceTarget(ep); target != nil && target.Equal(replaceIP) {
+			stale = append(stale, address)
+		}
+	}
+	return stale
+}
+
+// bootReplaceTarget returns the address an endpoint is replacing, or nil if its status is not
+// BOOT_REPLACE. STATUS_WITH_PORT ("BOOT_REPLACE,10.0.0.1:7000") is used when present, STATUS
+// ("BOOT_REPLACE,10.0.0.1") otherwise.
+func bootReplaceTarget(ep httphelper.EndpointState) net.IP {
+	status := ep.StatusWithPort
+	if status == "" {
+		status = ep.Status
+	}
+	target, found := strings.CutPrefix(status, string(httphelper.StatusBootReplace)+",")
+	if !found {
+		return nil
+	}
+	if host, _, err := net.SplitHostPort(target); err == nil {
+		target = host
+	}
+	return net.ParseIP(target)
 }
 
 func findHostIdForIpFromEndpointsData(endpointsData []httphelper.EndpointState, ip string) (bool, string) {

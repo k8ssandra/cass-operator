@@ -6,6 +6,7 @@ package reconciliation
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -2023,6 +2024,9 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 	shouldReplacePod := utils.IndexOfString(dc.Status.NodeReplacements, pod.Name) > -1
 
 	replaceAddress := ""
+	var staleJoiners []string
+	var gossipPod *corev1.Pod
+	var heldAddresses []string
 
 	if shouldReplacePod {
 		// Get the HostID for pod if it has one
@@ -2040,10 +2044,25 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 				return fmt.Errorf("failed to start replace of cassandra node %s for pod %s due to error: %w", hostId, pod.Name, err)
 			}
 		}
+
+		if replaceAddress != "" {
+			heldAddresses = rc.podAddresses(pod)
+			staleJoiners = findStaleReplaceJoiners(endpointData, replaceAddress, heldAddresses)
+			if len(staleJoiners) > 0 {
+				gossipPod = rc.findReadyPeerPod(pod)
+				if gossipPod == nil {
+					rc.ReqLogger.Info("No ready pod to remove dead replacing nodes from gossip", "pod", pod.Name, "addresses", staleJoiners)
+				}
+			}
+		}
 	}
 
 	go func(pod *corev1.Pod) {
 		var err error
+		if gossipPod != nil {
+			rc.removeStaleReplaceJoiners(gossipPod, pod, replaceAddress, staleJoiners, heldAddresses)
+		}
+
 		if shouldReplacePod && replaceAddress != "" {
 			// If we have a replace address that means the cassandra node did
 			// join the ring previously and is marked for replacement, so we
@@ -2078,6 +2097,86 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 	}(pod)
 
 	return rc.labelServerPodStarting(pod)
+}
+
+// podAddresses returns the pod and host IPs of pod and of all Cassandra pods in the cluster. With
+// host networking or node ports a pod can broadcast its host IP, so both are collected.
+func (rc *ReconciliationContext) podAddresses(pod *corev1.Pod) []string {
+	var addresses []string
+	for _, p := range append([]*corev1.Pod{pod}, rc.clusterPods...) {
+		for _, address := range []string{p.Status.PodIP, p.Status.HostIP} {
+			if address != "" {
+				addresses = append(addresses, address)
+			}
+		}
+	}
+	return addresses
+}
+
+// removeStaleReplaceJoiners removes dead earlier attempts to replace replaceAddress from gossip.
+// Cassandra will not bootstrap while they are there. Each candidate is checked again against the
+// view of gossipPod, which runs the removal. Errors are only reported: the start that follows is
+// attempted in any case, as before this check existed.
+func (rc *ReconciliationContext) removeStaleReplaceJoiners(gossipPod, pod *corev1.Pod, replaceAddress string, candidates, heldAddresses []string) {
+	isStale := func(address string) (bool, error) {
+		endpointData, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(gossipPod)
+		if err != nil {
+			return false, err
+		}
+		return slices.Contains(findStaleReplaceJoiners(endpointData, replaceAddress, heldAddresses), address), nil
+	}
+
+	for _, address := range candidates {
+		if stale, err := isStale(address); err != nil {
+			rc.ReqLogger.Error(err, "Failed to check dead replacing node in gossip", "pod", pod.Name, "address", address)
+			continue
+		} else if !stale {
+			rc.ReqLogger.Info("Not removing node from gossip, it is not a dead replacing node on the peer", "pod", pod.Name, "address", address)
+			continue
+		}
+
+		rc.Recorder.Event(rc.Datacenter, corev1.EventTypeWarning, events.RemovingStaleReplaceNode,
+			fmt.Sprintf("Removing dead node %s, an earlier attempt to replace %s, from gossip before starting pod %s", address, replaceAddress, pod.Name))
+		err := rc.NodeMgmtClient.CallAssassinateEndpoint(gossipPod, address)
+		if err == nil {
+			continue
+		}
+
+		// The mgmt-api gives up on a request after 30s, but Cassandra needs about as long
+		// to assassinate, so an error here does not mean the removal failed.
+		if stale, checkErr := isStale(address); checkErr == nil && !stale {
+			rc.ReqLogger.Info("Assassinate returned an error but the node is gone from gossip", "pod", pod.Name, "address", address, "error", err.Error())
+			continue
+		}
+		rc.ReqLogger.Error(err, "Failed to remove dead replacing node from gossip", "pod", pod.Name, "address", address)
+		rc.Recorder.Event(rc.Datacenter, corev1.EventTypeWarning, events.RemovingStaleReplaceNode,
+			fmt.Sprintf("Failed to remove dead node %s from gossip: %v", address, err))
+	}
+}
+
+// findReadyPeerPod returns a ready Cassandra pod of this datacenter other than pod, or nil. A pod
+// in the rack of pod is preferred: the node running the removal is briefly unresponsive, and
+// the rack of a replaced node is already missing one replica.
+func (rc *ReconciliationContext) findReadyPeerPod(pod *corev1.Pod) *corev1.Pod {
+	var other *corev1.Pod
+	for _, p := range rc.dcPods {
+		if p.Name == pod.Name && p.Namespace == pod.Namespace {
+			continue
+		}
+		if p.Labels[api.CassNodeState] == stateDecommissioning || p.Labels[api.CassNodeState] == stateDecommissioned {
+			continue
+		}
+		if !isServerReady(p) {
+			continue
+		}
+		if p.Labels[api.RackLabel] == pod.Labels[api.RackLabel] {
+			return p
+		}
+		if other == nil {
+			other = p
+		}
+	}
+	return other
 }
 
 // startOneNodePerRack starts the first pod in each rack in a deterministic order, dictated by the

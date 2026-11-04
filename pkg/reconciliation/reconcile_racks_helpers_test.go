@@ -277,3 +277,62 @@ func TestMapPodsToEndpointDataByName(t *testing.T) {
 		require.Contains(t, result, "sts-0")
 	})
 }
+
+func TestFindStaleReplaceJoiners(t *testing.T) {
+	const replaced = "10.0.0.1"
+	const starting = "10.0.0.20"
+
+	endpoint := func(ip, alive, status, statusWithPort string) httphelper.EndpointState {
+		return httphelper.EndpointState{EndpointIP: ip, IsAlive: alive, Status: status, StatusWithPort: statusWithPort}
+	}
+
+	testCases := []struct {
+		name     string
+		ep       httphelper.EndpointState
+		expected []string
+	}{
+		{"dead joiner replacing the node", endpoint("10.0.0.9", "false", "BOOT_REPLACE,10.0.0.1", "BOOT_REPLACE,10.0.0.1:7000"), []string{"10.0.0.9"}},
+		{"dead joiner, STATUS only", endpoint("10.0.0.9", "false", "BOOT_REPLACE,10.0.0.1", ""), []string{"10.0.0.9"}},
+		{"alive joiner", endpoint("10.0.0.9", "true", "BOOT_REPLACE,10.0.0.1", "BOOT_REPLACE,10.0.0.1:7000"), nil},
+		{"liveness unknown", endpoint("10.0.0.9", "", "BOOT_REPLACE,10.0.0.1", "BOOT_REPLACE,10.0.0.1:7000"), nil},
+		{"dead joiner replacing another node", endpoint("10.0.0.9", "false", "BOOT_REPLACE,10.0.0.2", "BOOT_REPLACE,10.0.0.2:7000"), nil},
+		{"replaced node itself", endpoint(replaced, "false", "NORMAL,123", "NORMAL,123"), nil},
+		{"dead normal node", endpoint("10.0.0.9", "false", "NORMAL,123", "NORMAL,123"), nil},
+		{"dead bootstrapping node", endpoint("10.0.0.9", "false", "BOOT,123", "BOOT,123"), nil},
+		{"already assassinated", endpoint("10.0.0.9", "false", "LEFT,123,1794052525869", "LEFT,123,1794052525869"), nil},
+		{"same address as the starting pod", endpoint(starting, "false", "BOOT_REPLACE,10.0.0.1", "BOOT_REPLACE,10.0.0.1:7000"), nil},
+		{"address held by another cluster pod", endpoint("10.0.0.2", "false", "BOOT_REPLACE,10.0.0.1", "BOOT_REPLACE,10.0.0.1:7000"), nil},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			epData := httphelper.CassMetadataEndpoints{Entity: []httphelper.EndpointState{
+				endpoint("10.0.0.2", "true", "NORMAL,456", "NORMAL,456"),
+				tc.ep,
+			}}
+			assert.Equal(t, tc.expected, findStaleReplaceJoiners(epData, replaced, []string{starting, "10.0.0.2"}))
+		})
+	}
+
+	t.Run("IPv6", func(t *testing.T) {
+		epData := httphelper.CassMetadataEndpoints{Entity: []httphelper.EndpointState{
+			endpoint("fd00::9", "false", "BOOT_REPLACE,fd00::1", "BOOT_REPLACE,[fd00::1]:7000"),
+		}}
+		assert.Equal(t, []string{"fd00::9"}, findStaleReplaceJoiners(epData, "fd00:0::1", []string{"fd00::20"}))
+	})
+
+	t.Run("several dead joiners", func(t *testing.T) {
+		epData := httphelper.CassMetadataEndpoints{Entity: []httphelper.EndpointState{
+			endpoint("10.0.0.8", "false", "", "BOOT_REPLACE,10.0.0.1:7000"),
+			endpoint("10.0.0.9", "false", "", "BOOT_REPLACE,10.0.0.1:7000"),
+		}}
+		assert.Equal(t, []string{"10.0.0.8", "10.0.0.9"}, findStaleReplaceJoiners(epData, replaced, []string{starting}))
+	})
+
+	t.Run("no replace address", func(t *testing.T) {
+		epData := httphelper.CassMetadataEndpoints{Entity: []httphelper.EndpointState{
+			endpoint("10.0.0.9", "false", "", "BOOT_REPLACE,10.0.0.1:7000"),
+		}}
+		assert.Empty(t, findStaleReplaceJoiners(epData, "", []string{starting}))
+	})
+}

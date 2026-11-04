@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr/funcr"
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
@@ -400,7 +401,7 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 					return
 				}
 				if r.URL.Path == "/api/v1/ops/node/decommission" {
-					_, _ = w.Write([]byte(`"job-1"`))
+					_, _ = w.Write([]byte(`job-1`))
 					return
 				}
 				http.NotFound(w, r)
@@ -471,6 +472,7 @@ func TestCheckDecommissioningNodesLastNodeOfDecommissionedDatacenter(t *testing.
 		localResponse   string
 		localCode       int
 		otherPodVisible bool
+		seededJobId     string
 		jobStatus       string
 		jobCode         int
 		wantCleaned     bool
@@ -481,13 +483,13 @@ func TestCheckDecommissioningNodesLastNodeOfDecommissionedDatacenter(t *testing.
 		wantError       string
 	}{
 		{name: "local left without a known job completes", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 2},
-		{name: "local left waits for the decommission job", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, jobStatus: "WAITING", wantCalls: 2, wantJobCalls: 1, wantJobId: "job-0"},
-		{name: "local left with a completed job completes", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, jobStatus: "COMPLETED", wantCleaned: true, wantCalls: 2, wantJobCalls: 1},
-		{name: "local left with a failed job completes", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, jobStatus: "ERROR", wantCleaned: true, wantCalls: 2, wantJobCalls: 1},
-		{name: "local left with a lost job completes", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, jobCode: http.StatusNotFound, wantCleaned: true, wantCalls: 2, wantJobCalls: 1},
-		{name: "job request fails", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, jobCode: http.StatusInternalServerError, wantCalls: 2, wantJobCalls: 1, wantJobId: "job-0", wantError: "cannot check decommission job job-0 on pod %s"},
+		{name: "local left waits for the decommission job", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, seededJobId: "job-0", jobStatus: "WAITING", wantCalls: 2, wantJobCalls: 1, wantJobId: "job-0"},
+		{name: "local left with a completed job completes", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, seededJobId: "job-0", jobStatus: "COMPLETED", wantCleaned: true, wantCalls: 2, wantJobCalls: 1},
+		{name: "local left with a failed job completes", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, seededJobId: "job-0", jobStatus: "ERROR", wantCleaned: true, wantCalls: 2, wantJobCalls: 1},
+		{name: "local left with a lost job completes", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, seededJobId: "job-0", jobCode: http.StatusNotFound, wantCleaned: true, wantCalls: 2, wantJobCalls: 1},
+		{name: "job request fails", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, seededJobId: "job-0", jobCode: http.StatusInternalServerError, wantCalls: 2, wantJobCalls: 1, wantJobId: "job-0", wantError: "cannot check decommission job job-0 on pod %s"},
 		{name: "local leaving waits without retrying", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEAVING"}]}`, wantCalls: 2},
-		{name: "local normal retries decommission", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, jobStatus: "WAITING", wantCalls: 2, wantRetries: 1, wantJobId: `"job-1"`},
+		{name: "local normal retries decommission", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, wantCalls: 2, wantRetries: 1, wantJobId: "job-1"},
 		{name: "local request fails", localCode: http.StatusInternalServerError, wantCalls: 1, wantError: "cannot check decommissioning node %s without Cassandra metadata: "},
 		{name: "another visible pod is required to provide metadata", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, otherPodVisible: true, wantError: "cannot check decommissioning node %s without Cassandra metadata"},
 	}
@@ -505,7 +507,7 @@ func TestCheckDecommissioningNodesLastNodeOfDecommissionedDatacenter(t *testing.
 				case "/api/v0/metadata/versions/features":
 					_, _ = w.Write([]byte(`{"cassandra_version":"4.0","features":["async_sstable_tasks"]}`))
 				case "/api/v1/ops/node/decommission":
-					_, _ = w.Write([]byte(`"job-1"`))
+					_, _ = w.Write([]byte(`job-1`))
 				case "/api/v0/ops/executor/job":
 					if tt.jobCode != 0 {
 						w.WriteHeader(tt.jobCode)
@@ -519,8 +521,8 @@ func TestCheckDecommissioningNodesLastNodeOfDecommissionedDatacenter(t *testing.
 			rc.Datacenter.SetCondition(api.DatacenterCondition{Status: corev1.ConditionTrue, Type: api.DatacenterDecommission})
 			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "cassandra", Ready: true}}
 			require.NoError(t, rc.Client.Status().Update(rc.Ctx, pod))
-			if tt.jobStatus != "" || tt.jobCode != 0 {
-				metav1.SetMetaDataAnnotation(&pod.ObjectMeta, decommissionJobAnnotation, "job-0")
+			if tt.seededJobId != "" {
+				metav1.SetMetaDataAnnotation(&pod.ObjectMeta, decommissionJobAnnotation, tt.seededJobId)
 				require.NoError(t, rc.Client.Update(rc.Ctx, pod))
 			}
 
@@ -861,6 +863,27 @@ func TestEnsurePodsCanAbsorbDecommDataAllowsCompleteEndpointData(t *testing.T) {
 	}
 
 	require.NoError(t, rc.EnsurePodsCanAbsorbDecommData(decommPod, epData))
+
+	server := newFakeMgmtApiServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v0/metadata/versions/features":
+			_, _ = w.Write([]byte(`{"cassandra_version":"4.0","features":["async_sstable_tasks"]}`))
+		case "/api/v1/ops/node/decommission":
+			_, _ = w.Write([]byte(`job-1`))
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	rc.NodeMgmtClient = server.client(rc.ReqLogger)
+	server.attachToPod(t, decommPod)
+	decommPod.Status.ContainerStatuses[0].State.Running = &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(time.Now().Add(-time.Minute))}
+
+	require.NoError(t, rc.DecommissionNodeOnRack("default", epData, decommPod.Name))
+	livePod := &corev1.Pod{}
+	require.NoError(t, rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(decommPod), livePod))
+	require.Equal(t, stateDecommissioning, livePod.Labels[api.CassNodeState])
+	require.Equal(t, "job-1", livePod.Annotations[decommissionJobAnnotation])
+	server.assertCallCount(t, "/api/v1/ops/node/decommission", 1)
 }
 
 func TestEnsurePodsCanAbsorbDecommDataWithoutRemainingPods(t *testing.T) {

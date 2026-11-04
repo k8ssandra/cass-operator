@@ -53,6 +53,10 @@ runs:
         printf 'FROM %s\nCOPY --chmod=755 entrypoint /usr/local/bin/entrypoint\n' "$base_image" > "$build_dir/Dockerfile"
         docker build -t "$patched_image" "$build_dir"
         echo "KIND_NODE_IMAGE=$patched_image" >> "$GITHUB_ENV"
+    - name: Raise inotify limits
+      shell: bash
+      # Ubuntu 26.04 runners don't apply the image's sysctl.conf: https://github.com/actions/runner-images/issues/15108
+      run: sudo sysctl -w fs.inotify.max_user_instances=1280 fs.inotify.max_user_watches=655360
     - name: Create kind cluster
       id: cluster
       shell: bash

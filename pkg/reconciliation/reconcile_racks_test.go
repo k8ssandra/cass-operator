@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -2029,6 +2030,7 @@ func TestFailedStart(t *testing.T) {
 
 	pod := makeReloadTestPod()
 	server.attachToPod(t, pod)
+	var concurrentUpdate sync.Once
 	rc.Client = fake.NewClientBuilder().
 		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
@@ -2052,10 +2054,26 @@ func TestFailedStart(t *testing.T) {
 				if err := ctx.Err(); err != nil {
 					return err
 				}
+				// A status change made between the failed start's read and its patch must not be overwritten.
+				if dc, ok := obj.(*api.CassandraDatacenter); ok && slices.Contains(dc.Status.FailedStarts, pod.Name) {
+					var updateErr error
+					concurrentUpdate.Do(func() {
+						storedDc := &api.CassandraDatacenter{}
+						if updateErr = c.Get(ctx, client.ObjectKeyFromObject(dc), storedDc); updateErr != nil {
+							return
+						}
+						storedDc.Status.FailedStarts = []string{"other-pod"}
+						updateErr = c.Status().Update(ctx, storedDc)
+					})
+					if updateErr != nil {
+						return updateErr
+					}
+				}
 				return c.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
 			},
 		}).
 		Build()
+	rc.APIReader = rc.Client
 
 	fakeRecorder := record.NewFakeRecorder(5)
 	rc.Recorder = &events.LoggingEventRecorder{
@@ -2069,12 +2087,6 @@ func TestFailedStart(t *testing.T) {
 
 	// controller-runtime cancels the reconcile context when Reconcile returns
 	cancelReconcile()
-
-	// A status change made after this pass must not be overwritten.
-	storedDc := &api.CassandraDatacenter{}
-	require.NoError(t, rc.Client.Get(context.Background(), client.ObjectKeyFromObject(rc.Datacenter), storedDc))
-	storedDc.Status.FailedStarts = []string{"other-pod"}
-	require.NoError(t, rc.Client.Status().Update(context.Background(), storedDc))
 
 	close(failStart)
 

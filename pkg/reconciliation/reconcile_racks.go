@@ -2088,9 +2088,9 @@ func (rc *ReconciliationContext) recordFailedStart(dc *api.CassandraDatacenter, 
 	rc.Recorder.Event(dc, corev1.EventTypeWarning, events.StartingCassandra,
 		fmt.Sprintf("Failed to start pod %s, deleting it", pod.Name))
 
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		current := &api.CassandraDatacenter{}
-		if err := rc.Client.Get(ctx, client.ObjectKeyFromObject(dc), current); err != nil {
+		if err := rc.APIReader.Get(ctx, client.ObjectKeyFromObject(dc), current); err != nil {
 			return err
 		}
 		if utils.IndexOfString(current.Status.FailedStarts, pod.Name) > -1 {

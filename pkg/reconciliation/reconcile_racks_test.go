@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -3856,6 +3857,7 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 	testCases := []struct {
 		name              string
 		supportAsyncFlush bool
+		endpointsFail     bool
 		expectedHostID    string
 	}{
 		{
@@ -3867,6 +3869,12 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 			name:              "Legacy version without AsyncFlush feature",
 			supportAsyncFlush: false,
 			expectedHostID:    "test-host-id",
+		},
+		{
+			name:              "Metadata endpoints call fails",
+			supportAsyncFlush: true,
+			endpointsFail:     true,
+			expectedHostID:    "",
 		},
 	}
 
@@ -3896,6 +3904,10 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 					w.WriteHeader(http.StatusOK)
 					_, _ = w.Write(featuresJson)
 				case "/api/v0/metadata/endpoints":
+					if tc.endpointsFail {
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
 					w.WriteHeader(http.StatusOK)
 					_, _ = w.Write(endpointsJson)
 				default:
@@ -3931,15 +3943,102 @@ func TestUpdateCassandraNodeStatus_HostIDExtraction(t *testing.T) {
 			rc.NodeMgmtClient = server.client(rc.ReqLogger)
 			rc.dcPods = []*corev1.Pod{pod}
 
-			err := rc.UpdateCassandraNodeStatus(false)
+			rc.UpdateCassandraNodeStatus()
 
-			assert.NoError(t, err, "Unexpected error")
 			assert.Contains(t, rc.Datacenter.Status.NodeStatuses, podName, "Node status not added")
+			assert.Equal(t, pod.Status.PodIP, rc.Datacenter.Status.NodeStatuses[podName].IP, "IP not set")
 			assert.Equal(t, tc.expectedHostID, rc.Datacenter.Status.NodeStatuses[podName].HostID, "Host ID not correctly set")
 			server.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
 			server.assertCallCount(t, "/api/v0/metadata/endpoints", 1)
 		})
 	}
+}
+
+func TestUpdateStatusReplacedPodHostID(t *testing.T) {
+	rc, _, cleanupMockScr := setupTest()
+	defer cleanupMockScr()
+
+	replaceStarted := metav1.NewTime(time.Now().Add(-5 * time.Minute).Truncate(time.Second))
+	rc.Datacenter.SetCondition(api.DatacenterCondition{
+		Type:               api.DatacenterReplacingNodes,
+		Status:             corev1.ConditionTrue,
+		LastTransitionTime: replaceStarted,
+	})
+	rc.Datacenter.Status.NodeReplacements = []string{"pod-a"}
+	rc.Datacenter.Status.NodeStatuses = api.CassandraStatusMap{
+		"pod-a": {HostID: "replaced-host-id"},
+		"pod-b": {},
+	}
+	require.NoError(t, rc.Client.Status().Update(rc.Ctx, rc.Datacenter))
+
+	mgmtApiServer := func(hostId string, available *atomic.Bool) *fakeMgmtApiServer {
+		return newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !available.Load() {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			switch r.URL.Path {
+			case "/api/v0/metadata/versions/features":
+				_, _ = io.WriteString(w, `{"cassandra_version": "4.0.0", "features": ["async_flush_task"]}`)
+			case "/api/v0/metadata/endpoints":
+				_, _ = fmt.Fprintf(w, `{"entity": [{"HOST_ID": %q, "STATUS": "NORMAL", "IS_LOCAL": "true"}]}`, hostId)
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+	}
+	var podAAvailable, podBAvailable atomic.Bool
+	serverA := mgmtApiServer("new-host-id-a", &podAAvailable)
+	serverB := mgmtApiServer("host-id-b", &podBAvailable)
+
+	startedPod := func(name string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              name,
+				CreationTimestamp: metav1.NewTime(replaceStarted.Add(time.Minute)),
+				Labels: map[string]string{
+					api.RackLabel:     "default",
+					api.CassNodeState: stateStarted,
+				},
+			},
+			Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "cassandra"}}},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{{
+					Name: "cassandra",
+					State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{
+						StartedAt: metav1.NewTime(time.Now().Add(-time.Minute)),
+					}},
+				}},
+			},
+		}
+	}
+	podA, podB := startedPod("pod-a"), startedPod("pod-b")
+	serverA.attachToPod(t, podA)
+	serverB.attachToPod(t, podB)
+	rc.dcPods = []*corev1.Pod{podA, podB}
+	rc.NodeMgmtClient = serverA.client(rc.ReqLogger)
+
+	assertStoredHostIDs := func(t *testing.T, hostIdA, hostIdB string) {
+		t.Helper()
+		stored := &api.CassandraDatacenter{}
+		require.NoError(t, rc.Client.Get(rc.Ctx, types.NamespacedName{Name: rc.Datacenter.Name, Namespace: rc.Datacenter.Namespace}, stored))
+		assert.Empty(t, stored.Status.NodeReplacements)
+		assert.Equal(t, hostIdA, stored.Status.NodeStatuses["pod-a"].HostID)
+		assert.Equal(t, hostIdB, stored.Status.NodeStatuses["pod-b"].HostID)
+	}
+
+	// Neither node answers when the replacement finishes: the pass continues, the
+	// replaced node's old HostID is not kept and each node is called once.
+	require.Equal(t, result.Continue(), rc.UpdateStatus())
+	assertStoredHostIDs(t, "", "")
+	serverA.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+	serverB.assertCallCount(t, "/api/v0/metadata/versions/features", 1)
+
+	// The replaced node answers on a later pass, the other node is still down.
+	podAAvailable.Store(true)
+	require.Equal(t, result.Continue(), rc.UpdateStatus())
+	assertStoredHostIDs(t, "new-host-id-a", "")
+	serverB.assertCallCount(t, "/api/v0/metadata/versions/features", 2)
 }
 
 func TestFailureDetection(t *testing.T) {

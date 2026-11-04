@@ -13,6 +13,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
 * [CHANGE] [#1035](https://github.com/k8ssandra/cass-operator/issues/1035) Raise the host inotify limits before creating kind clusters in CI, as Ubuntu 26.04 runners don't apply them at boot
+* [BUGFIX] [#1012](https://github.com/k8ssandra/cass-operator/issues/1012) Reconciliation stopped at the status update on every pass when the management API of a started node failed to return its HostID, so a crashed node was never recovered. The failure is now logged and the HostID fetched again on a later pass. After a node replacement only the replaced node's HostID is fetched again.
 
 ## v1.33.1
 

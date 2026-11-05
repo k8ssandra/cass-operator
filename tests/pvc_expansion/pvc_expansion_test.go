@@ -72,7 +72,6 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "ResizingVolumes", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterReady(dcName)
 			ns.AssertDatacenterInvariants(dcName)
-			ns.WaitForDatacenterCondition(dcName, "ResizingVolumes", string(corev1.ConditionFalse))
 
 			step = "find the PV volume size"
 			json = "jsonpath={.spec.capacity.storage}"

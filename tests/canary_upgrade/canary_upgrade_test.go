@@ -13,8 +13,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
@@ -27,7 +25,6 @@ var (
 	dcName     = "dc1"
 	dcYaml     = "../testdata/oss-upgrade-dc.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -51,13 +48,6 @@ var _ = Describe(testName, func() {
 			ns.WaitForSuperUserUpserted(dcName, 600)
 			ns.WaitForDatacenterReady(dcName)
 			ns.AssertDatacenterInvariants(dcName)
-
-			step = "check recorded host IDs"
-			ns.Log(step)
-			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
-			Expect(nodeStatusesHostIds).To(HaveLen(3))
-
-			ns.WaitForDatacenterCondition(dcName, "Initialized", string(corev1.ConditionTrue))
 
 			step = "prepare for canary upgrade"
 			json := "{\"spec\": {\"canaryUpgrade\": true, \"canaryUpgradeCount\": 1}}"
@@ -134,13 +124,6 @@ var _ = Describe(testName, func() {
 			k = kubectl.DeleteFromFiles(dcYaml)
 			ns.ExecAndLog(step, k)
 			ns.AssertDatacenterDeleted(dcName)
-
-			step = "checking that the dc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
 		})
 	})
 })

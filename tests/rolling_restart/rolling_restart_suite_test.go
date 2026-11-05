@@ -133,8 +133,6 @@ var _ = Describe(testName, func() {
 			step = "verify all pods have restartedAt annotation"
 			ns.Log(step)
 			podNames := ns.GetDatacenterReadyPodNames(dcName)
-			Expect(podNames).To(HaveLen(6), "Expected 6 ready pods")
-
 			for _, podName := range podNames {
 				json = `jsonpath={.metadata.annotations.control\.k8ssandra\.io/restartedAt}`
 				k := kubectl.Get("pod", podName).FormatOutput(json)

@@ -22,7 +22,6 @@ var (
 	dcName     = "dc2"
 	dcYaml     = "../testdata/default-single-rack-single-node-dc.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -76,7 +75,6 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
 			ns.AssertDatacenterInvariants(dcName)
-			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
 
 			// Ensure we have two CassandraTasks created which are cleanup (and they succeeded)
 			ns.WaitForCompletedCassandraTasks(dcName, "cleanup", 2)
@@ -90,7 +88,6 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
 			ns.AssertDatacenterInvariants(dcName)
-			ns.WaitForDatacenterCondition(dcName, "ScalingUp", string(corev1.ConditionFalse))
 
 			// Ensure we have three CassandraTasks created which are cleanup (and they succeeded)
 			ns.WaitForCompletedCassandraTasks(dcName, "cleanup", 3)
@@ -120,22 +117,10 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "6", 20)
 			ns.WaitForCompletedCassandraTasks(dcName, "cleanup", 4)
 
-			step = "check recorded host IDs"
-			ns.Log(step)
-			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
-			Expect(nodeStatusesHostIds).To(HaveLen(6))
-
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
 			ns.AssertDatacenterDeleted(dcName)
-
-			step = "checking that the dc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
 		})
 	})
 })

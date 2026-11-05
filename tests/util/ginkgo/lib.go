@@ -530,17 +530,6 @@ func (ns *NsWrapper) WaitForSuperUserUpserted(dcName string, timeout int) {
 	Expect(execErr).ToNot(HaveOccurred())
 }
 
-func (ns *NsWrapper) GetNodeStatusesHostIds(dcName string) []string {
-	json := "jsonpath={.status.nodeStatuses['*'].hostID}"
-	k := kubectl.Get("CassandraDatacenter", dcName).
-		FormatOutput(json)
-
-	output := ns.OutputPanic(k)
-	hostIds := strings.Split(output, " ")
-
-	return hostIds
-}
-
 func (ns *NsWrapper) WaitForDatacenterReadyPodCount(dcName string, count int) {
 	ns.WaitForDatacenterReadyPodCountWithTimeout(dcName, count, 600)
 }
@@ -781,18 +770,22 @@ func (ns NsWrapper) CountReconcileLoops(dcName string, since time.Time) (int, er
 }
 
 type NodetoolNodeInfo struct {
-	Status  string
-	State   string
-	Address string
-	HostId  string
-	Rack    string
+	Datacenter string
+	Status     string
+	State      string
+	Address    string
+	HostId     string
+	Rack       string
 }
 
 func (ns NsWrapper) RetrieveStatusFromNodetool(podName string) []NodetoolNodeInfo {
 	k := kubectl.KCmd{Command: "exec", Args: []string{podName, "-i", "-c", "cassandra", "--namespace", ns.Namespace, "--", "nodetool", "status"}}
 	output, err := k.Output()
 	Expect(err).ToNot(HaveOccurred())
+	return parseNodetoolStatus(output)
+}
 
+func parseNodetoolStatus(output string) []NodetoolNodeInfo {
 	getFullName := func(s string) string {
 		status, ok := map[string]string{
 			"U": "up",
@@ -810,17 +803,28 @@ func (ns NsWrapper) RetrieveStatusFromNodetool(podName string) []NodetoolNodeInf
 		return status
 	}
 
-	nodeTexts := regexp.MustCompile(`(?m)^.*(([0-9a-fA-F]+-){4}([0-9a-fA-F]+)).*$`).FindAllString(output, -1)
+	datacenterLine := regexp.MustCompile(`^Datacenter:\s*(\S+)`)
+	nodeLine := regexp.MustCompile(`^.*(([0-9a-fA-F]+-){4}([0-9a-fA-F]+)).*$`)
+	datacenter := ""
 	nodeInfo := []NodetoolNodeInfo{}
-	for _, nodeText := range nodeTexts {
-		comps := regexp.MustCompile(`[[:space:]]+`).Split(strings.TrimSpace(nodeText), -1)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if m := datacenterLine.FindStringSubmatch(line); m != nil {
+			datacenter = m[1]
+			continue
+		}
+		if !nodeLine.MatchString(line) {
+			continue
+		}
+		comps := regexp.MustCompile(`[[:space:]]+`).Split(line, -1)
 		nodeInfo = append(nodeInfo,
 			NodetoolNodeInfo{
-				Status:  getFullName(string(comps[0][0])),
-				State:   getFullName(string(comps[0][1])),
-				Address: comps[1],
-				HostId:  comps[len(comps)-2],
-				Rack:    comps[len(comps)-1],
+				Datacenter: datacenter,
+				Status:     getFullName(string(comps[0][0])),
+				State:      getFullName(string(comps[0][1])),
+				Address:    comps[1],
+				HostId:     comps[len(comps)-2],
+				Rack:       comps[len(comps)-1],
 			})
 	}
 	return nodeInfo
@@ -849,15 +853,18 @@ func (ns NsWrapper) RetrieveSuperuserCreds(clusterName string) (string, string) 
 	return string(usernameDecoded), string(passwordDecoded)
 }
 
-func (ns NsWrapper) CqlExecute(podName string, stepDesc string, cql string, user string, pw string) {
-	k := kubectl.ExecOnPod(
+func cqlsh(podName string, cql string, user string, pw string) kubectl.KCmd {
+	return kubectl.ExecOnPod(
 		podName, "--", "cqlsh",
 		"--user", user,
 		"--password", pw,
 		"-e", cql).
 		WithFlag("container", "cassandra")
+}
+
+func (ns NsWrapper) CqlExecute(podName string, stepDesc string, cql string, user string, pw string) {
 	ginkgo.By(stepDesc)
-	ns.ExecVPanic(k)
+	ns.ExecVPanic(cqlsh(podName, cql, user, pw))
 }
 
 func (ns *NsWrapper) CheckForCassandraTasks(dcName, command string, completed bool, count int) {

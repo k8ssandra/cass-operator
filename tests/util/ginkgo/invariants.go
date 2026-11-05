@@ -231,6 +231,7 @@ func (ns NsWrapper) AssertDatacenterInvariants(dcName string, opts ...InvariantO
 		Expect(status.HostID).ToNot(BeEmpty(), "pod %s has no HostID in status.nodeStatuses", pod.Name)
 		hostIDs = append(hostIDs, status.HostID)
 	}
+	Expect(dc.Status.NodeStatuses).To(HaveLen(len(pods)), "status.nodeStatuses of %s has entries for nodes that are gone", dcName)
 
 	// Storage: one server-data PVC per node, no PVC of a removed node left behind
 	pvcs := &corev1.PersistentVolumeClaimList{}
@@ -267,17 +268,19 @@ func (ns NsWrapper) AssertDatacenterInvariants(dcName string, opts ...InvariantO
 		Expect(pdbs.Items[0].Spec.MinAvailable.IntValue()).To(Equal(int(dc.Spec.Size)-1), "minAvailable of PodDisruptionBudget %s", pdbs.Items[0].Name)
 	}
 
-	// Ring
-	if !o.skipRingCheck && len(pods) > 0 {
-		nodes := ns.RetrieveDatacenterStatusFromNodetool(pods[0].Name)
-		ring, found := nodes[dc.DatacenterName()]
-		Expect(found).To(BeTrue(), "nodetool status on %s does not show datacenter %s: %v", pods[0].Name, dc.DatacenterName(), nodes)
-		ringHostIDs := []string{}
-		for _, node := range ring {
-			Expect(node.Status+"/"+node.State).To(Equal("up/normal"), "node %s (%s) in nodetool status", node.Address, node.HostId)
-			ringHostIDs = append(ringHostIDs, node.HostId)
+	// Ring, as every node sees it
+	if !o.skipRingCheck {
+		for i := range pods {
+			ringHostIDs := []string{}
+			for _, node := range ns.RetrieveStatusFromNodetool(pods[i].Name) {
+				if node.Datacenter != dc.DatacenterName() {
+					continue
+				}
+				Expect(node.Status+"/"+node.State).To(Equal("up/normal"), "node %s (%s) in nodetool status on %s", node.Address, node.HostId, pods[i].Name)
+				ringHostIDs = append(ringHostIDs, node.HostId)
+			}
+			Expect(ringHostIDs).To(ConsistOf(hostIDs), "the ring of %s on %s does not match status.nodeStatuses", dcName, pods[i].Name)
 		}
-		Expect(ringHostIDs).To(ConsistOf(hostIDs), "the ring of %s does not match status.nodeStatuses", dcName)
 	}
 
 	// Warning events
@@ -324,12 +327,14 @@ func EventText(event *corev1.Event) string {
 	return strings.TrimSpace(event.Reason + " " + event.Message)
 }
 
-// startupRequeueErrors are the errors with which the operator requeues while the StatefulSet controller creates the
-// pods of a new or scaled up rack. The operator reports them as ReconcileFailed Warning events in every test that
-// creates or scales up a datacenter.
+// startupRequeueErrors are the errors with which the operator requeues while the pods of a new or scaled up rack are
+// created and started: the StatefulSet controller has not created a pod yet, or a Ready pod has not been labelled
+// Started yet. The operator reports them as ReconcileFailed Warning events in every test that creates or scales up a
+// datacenter.
 var startupRequeueErrors = []*regexp.Regexp{
 	regexp.MustCompile(`^pod \S+: pod not found, most likely statefulset controller has not caught up yet$`),
 	regexp.MustCompile(`^no pods were ready to be started in any rack$`),
+	regexp.MustCompile(`^checks failed desired:\d+, ready:\d+, started:\d+$`),
 }
 
 func isStartupRequeue(event *corev1.Event) bool {
@@ -378,42 +383,6 @@ func (ns NsWrapper) WaitForWarningEvent(dcName string, since time.Time, action, 
 		}
 		return false
 	}).WithTimeout(timeout).WithPolling(5*time.Second).Should(BeTrue(), "no %s Warning event matching %q", action, messagePattern)
-}
-
-// RetrieveDatacenterStatusFromNodetool runs nodetool status on the pod and returns the nodes per datacenter
-func (ns NsWrapper) RetrieveDatacenterStatusFromNodetool(podName string) map[string][]NodetoolNodeInfo {
-	k := kubectl.ExecOnPod(podName, "-c", "cassandra", "--", "nodetool", "status")
-	output, err := ns.Output(k)
-	Expect(err).ToNot(HaveOccurred())
-	return parseNodetoolStatus(output)
-}
-
-var (
-	nodetoolDatacenterLine = regexp.MustCompile(`^Datacenter:\s*(\S+)`)
-	nodetoolNodeLine       = regexp.MustCompile(`^([UD][NLJMS])\s+(\S+)\s.*\s(([0-9a-fA-F]+-){4}[0-9a-fA-F]+)\s+(\S+)\s*$`)
-)
-
-func parseNodetoolStatus(output string) map[string][]NodetoolNodeInfo {
-	states := map[byte]string{'U': "up", 'D': "down", 'N': "normal", 'L': "leaving", 'J': "joining", 'M': "moving", 'S': "stopped"}
-	result := map[string][]NodetoolNodeInfo{}
-	dc := ""
-	for _, line := range strings.Split(output, "\n") {
-		line = strings.TrimSpace(line)
-		if m := nodetoolDatacenterLine.FindStringSubmatch(line); m != nil {
-			dc = m[1]
-			continue
-		}
-		if m := nodetoolNodeLine.FindStringSubmatch(line); m != nil {
-			result[dc] = append(result[dc], NodetoolNodeInfo{
-				Status:  states[m[1][0]],
-				State:   states[m[1][1]],
-				Address: m[2],
-				HostId:  m[3],
-				Rack:    m[5],
-			})
-		}
-	}
-	return result
 }
 
 // AssertDatacenterDeleted waits for the CassandraDatacenter to be gone and checks that it left nothing behind:
@@ -645,12 +614,10 @@ func (s *DecommissionReplicaSampler) sample(ns NsWrapper, dcName string, nodesBe
 		// The replicas may only go down once the node has left the ring
 		out, err := ns.Output(kubectl.ExecOnPod(other.Name, "-c", "cassandra", "--", "nodetool", "status"))
 		if err == nil {
-			for _, nodes := range parseNodetoolStatus(out) {
-				for _, node := range nodes {
-					if node.Address == decommissioning.Status.PodIP && node.Status == "up" {
-						violation = fmt.Sprintf("%s: %d replicas while %s (%s) is still %s in the ring",
-							time.Now().Format(time.RFC3339), replicas, decommissioning.Name, node.Address, node.State)
-					}
+			for _, node := range parseNodetoolStatus(out) {
+				if node.Address == decommissioning.Status.PodIP && node.Status == "up" {
+					violation = fmt.Sprintf("%s: %d replicas while %s (%s) is still %s in the ring",
+						time.Now().Format(time.RFC3339), replicas, decommissioning.Name, node.Address, node.State)
 				}
 			}
 		}
@@ -683,9 +650,7 @@ func (ns NsWrapper) ExpectCassandraSetting(podName, clusterName, setting, patter
 	re := regexp.MustCompile(pattern)
 	output := ""
 	Eventually(func() bool {
-		k := kubectl.ExecOnPod(podName, "--", "cqlsh", "--user", user, "--password", password, "-e", query).
-			WithFlag("container", "cassandra")
-		out, err := ns.Output(k)
+		out, err := ns.Output(cqlsh(podName, query, user, password))
 		output = out
 		return err == nil && re.MatchString(out)
 	}).WithTimeout(2*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), func() string {

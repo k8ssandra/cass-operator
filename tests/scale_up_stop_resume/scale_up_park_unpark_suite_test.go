@@ -111,11 +111,6 @@ var _ = Describe(testName, func() {
 				FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, "true true true true true", 1200)
 
-			step = "check recorded host IDs"
-			ns.Log(step)
-			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
-			Expect(nodeStatusesHostIds).To(HaveLen(5))
-
 			ns.WaitForDatacenterReady(dcName)
 			ns.AssertDatacenterInvariants(dcName)
 			// No node may bootstrap again after a resume
@@ -125,13 +120,6 @@ var _ = Describe(testName, func() {
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
 			ns.AssertDatacenterDeleted(dcName)
-
-			step = "checking that the dc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
 		})
 	})
 })

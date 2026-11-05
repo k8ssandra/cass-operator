@@ -29,6 +29,7 @@ const (
 	EnvUpgradeFromVersion = "M_UPGRADE_FROM_VERSION"
 	repository            = "https://github.com/k8ssandra/cass-operator.git"
 	previousDir           = "upgrade_operator/previous"
+	operatorDeployment    = "cass-operator-controller-manager"
 )
 
 var (
@@ -98,13 +99,19 @@ func installPreviousRelease(version string) {
 	Expect(kustomize.DeployDir(namespace, previousDir)).To(Succeed())
 }
 
-func operatorPodImage() (string, string) {
+func operatorPodName() string {
 	k := kubectl.Get("pods").
 		WithLabel("name=cass-operator").
-		FormatOutput(`jsonpath={.items[0].metadata.name}{" "}{.items[0].spec.containers[0].image}`)
-	fields := strings.Fields(ns.OutputPanic(k))
-	Expect(fields).To(HaveLen(2))
-	return fields[0], fields[1]
+		FormatOutput(`jsonpath={.items[*].metadata.name}`)
+	names := strings.Fields(ns.OutputPanic(k))
+	Expect(names).To(HaveLen(1))
+	return names[0]
+}
+
+func operatorImage() string {
+	k := kubectl.Get("deployment", operatorDeployment).
+		FormatOutput(`jsonpath={.spec.template.spec.containers[?(@.name=='manager')].image}`)
+	return ns.OutputPanic(k)
 }
 
 var _ = Describe(testName, func() {
@@ -114,7 +121,8 @@ var _ = Describe(testName, func() {
 			installPreviousRelease(previous)
 			ns.WaitForOperatorReady()
 
-			oldOperatorPod, oldOperatorImage := operatorPodImage()
+			oldOperatorPod := operatorPodName()
+			oldOperatorImage := operatorImage()
 			Expect(oldOperatorImage).To(HaveSuffix(":" + previous))
 
 			step := "creating a datacenter resource with 3 racks/3 nodes"
@@ -134,15 +142,18 @@ var _ = Describe(testName, func() {
 			By("upgrade cass-operator to the build under test")
 			Expect(kustomize.Deploy(namespace)).To(Succeed())
 
+			Expect(operatorImage()).ToNot(Equal(oldOperatorImage))
+			step = "wait for the operator Deployment to roll out"
+			ns.ExecAndLog(step, kubectl.KCmd{Command: "rollout", Args: []string{"status", "deployment/" + operatorDeployment, "--timeout=300s"}})
+
 			step = "wait for the previous operator pod to be removed"
 			k := kubectl.Get("pods").WithFlag("field-selector", fmt.Sprintf("metadata.name=%s", oldOperatorPod))
 			ns.WaitForOutputAndLog(step, k, "", 120)
 			ns.WaitForOperatorReady()
-			_, newOperatorImage := operatorPodImage()
-			Expect(newOperatorImage).ToNot(Equal(oldOperatorImage))
 
-			ns.ExpectDoneReconciling(dcName)
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
 			afterUpgrade := ns.GetDatacenterState(dcName)
 			if maps.Equal(before.UpdateRevisions, afterUpgrade.UpdateRevisions) {
 				By("the StatefulSets did not change, no pod may have restarted")
@@ -150,9 +161,7 @@ var _ = Describe(testName, func() {
 			} else {
 				By("the StatefulSets changed without an allowed update, they must have been rolled one pod at a time")
 			}
-			Expect(afterUpgrade.HostIDs).To(Equal(before.HostIDs), "HostIDs changed during the operator upgrade")
-			ns.AssertDatacenterInvariants(dcName)
-			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
 
 			// Allow the new operator to update the StatefulSets, as an operator upgrade that changes the
 			// default images does

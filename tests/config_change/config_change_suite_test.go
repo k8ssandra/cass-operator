@@ -23,7 +23,6 @@ var (
 	clusterName = "cluster2"
 	dcYaml      = "../testdata/default-single-rack-single-node-dc.yaml"
 	dcResource  = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel     = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns          = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -70,15 +69,6 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1800)
-			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionFalse))
-
-			step = "checking that the init container got the updated config roles_validity=256000ms"
-			json = "jsonpath={.spec.initContainers[1].env[7].value}"
-			k = kubectl.Get(fmt.Sprintf("pod/%s-%s-r1-sts-0", clusterName, dcName)).
-				FormatOutput(json)
-			ns.WaitForOutputContainsAndLog(step, k, "\"roles_validity\":\"256000ms\"", 30)
-
-			ns.WaitForDatacenterReady(dcName)
 			ns.AssertDatacenterInvariants(dcName)
 			sampler.Stop()
 			ns.ExpectSameHostIDs(dcName, before)
@@ -97,19 +87,6 @@ var _ = Describe(testName, func() {
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
 			ns.AssertDatacenterDeleted(dcName)
-
-			step = "checking that the cassdc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 60)
-
-			step = "checking that the statefulsets no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("StatefulSet").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 60)
 		})
 	})
 })

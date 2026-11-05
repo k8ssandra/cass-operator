@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
-	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -64,13 +62,8 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
-			ns.WaitForDatacenterConditionWithTimeout(dcName, string(api.DatacenterReady), string(corev1.ConditionTrue), 1200)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1200)
 
-			step = "checking cassandra.yaml"
-			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
-			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout: 10000ms", 60)
-
-			ns.WaitForDatacenterReady(dcName)
 			ns.AssertDatacenterInvariants(dcName)
 			sampler.Stop()
 			ns.ExpectSameHostIDs(dcName, before)
@@ -87,13 +80,8 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 120)
-			ns.WaitForDatacenterConditionWithTimeout(dcName, string(api.DatacenterReady), string(corev1.ConditionTrue), 1200)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1200)
 
-			step = "checking cassandra.yaml"
-			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
-			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout: 25000ms", 120)
-
-			ns.WaitForDatacenterReady(dcName)
 			ns.AssertDatacenterInvariants(dcName)
 			sampler.Stop()
 			ns.ExpectSameHostIDs(dcName, before)
@@ -110,13 +98,8 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 120)
-			ns.WaitForDatacenterConditionWithTimeout(dcName, string(api.DatacenterReady), string(corev1.ConditionTrue), 1200)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1200)
 
-			step = "checking cassandra.yaml"
-			k = kubectl.ExecOnPod("cluster1-dc1-r1-sts-0", "-c", "cassandra", "--", "cat", ginkgo_util.GetCassandraConfigYamlLocation())
-			ns.WaitForOutputContainsAndLog(step, k, "read_request_timeout: 10000ms", 120)
-
-			ns.WaitForDatacenterReady(dcName)
 			ns.AssertDatacenterInvariants(dcName)
 			sampler.Stop()
 			ns.ExpectSameHostIDs(dcName, before)

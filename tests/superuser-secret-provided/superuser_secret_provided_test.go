@@ -135,17 +135,6 @@ var _ = Describe(testName, func() {
 			k = kubectl.Delete("CassandraDatacenter", dcName).WithFlag("wait", "false")
 			ns.ExecAndLog(step, k)
 			ns.AssertDatacenterDeleted(dcName)
-
-			step = "checking that the dc2 no longer exists"
-			json := "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
-
-			step = "checking that no dc stateful sets remain"
-			k = kubectl.Get("statefulsets").
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
 		})
 	})
 })

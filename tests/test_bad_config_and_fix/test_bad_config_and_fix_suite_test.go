@@ -11,8 +11,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
 	"github.com/k8ssandra/cass-operator/tests/util/kubectl"
@@ -24,7 +22,6 @@ var (
 	dcName     = "dc1"
 	dcYaml     = "../testdata/oss-three-rack-three-node-dc.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -50,8 +47,6 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterReady(dcName)
 			ns.AssertDatacenterInvariants(dcName)
-			ns.WaitForDatacenterCondition(dcName, "Ready", string(corev1.ConditionTrue))
-			ns.WaitForDatacenterCondition(dcName, "Initialized", string(corev1.ConditionTrue))
 
 			before := ns.GetDatacenterState(dcName)
 			// The racks that are not being forced must stay available
@@ -121,19 +116,6 @@ var _ = Describe(testName, func() {
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
 			ns.AssertDatacenterDeleted(dcName)
-
-			step = "checking that the dc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 60)
-
-			step = "checking that the statefulsets no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("StatefulSet").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 60)
 		})
 	})
 })

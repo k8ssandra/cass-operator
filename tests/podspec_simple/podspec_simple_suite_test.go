@@ -76,34 +76,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
-
-			step = "checking that the dc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
-
-			step = "checking that no dc pods remain"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("pods").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
-
-			step = "checking that no dc services remain"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("services").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
-
-			step = "checking that no dc stateful sets remain"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("statefulsets").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
+			ns.AssertDatacenterDeleted(dcName)
 		})
 	})
 })

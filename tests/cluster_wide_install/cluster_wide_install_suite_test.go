@@ -83,7 +83,9 @@ var _ = Describe(testName, func() {
 			ns2.ExecAndLog(step, k)
 
 			ns1.WaitForDatacenterReady(dc1Name)
+			ns1.AssertDatacenterInvariants(dc1Name)
 			ns2.WaitForDatacenterReady(dc2Name)
+			ns2.AssertDatacenterInvariants(dc2Name)
 
 			step = "scale first dc up to 2 nodes"
 			json := `{"spec": {"size": 2}}`
@@ -92,6 +94,7 @@ var _ = Describe(testName, func() {
 
 			ns1.WaitForDatacenterOperatorProgress(dc1Name, "Updating", 30)
 			ns1.WaitForDatacenterReady(dc1Name)
+			ns1.AssertDatacenterInvariants(dc1Name)
 
 			step = "scale second dc up to 2 nodes"
 			json = `{"spec": {"size": 2}}`
@@ -100,6 +103,7 @@ var _ = Describe(testName, func() {
 
 			ns2.WaitForDatacenterOperatorProgress(dc2Name, "Updating", 30)
 			ns2.WaitForDatacenterReady(dc2Name)
+			ns2.AssertDatacenterInvariants(dc2Name)
 
 			By("deleting a namespace for the first dc")
 			err = kubectl.DeleteNamespace(dcNamespace1).ExecV()

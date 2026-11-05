@@ -24,7 +24,6 @@ var (
 	dcName     = "dc1"
 	dcYaml     = "../testdata/default-two-rack-four-node-dc.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -49,6 +48,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1800, 1800)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "scale up second rack to 3 nodes"
 			json := "{\"spec\": {\"replicas\": 3}}"
@@ -106,13 +106,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
-
-			step = "checking that the dc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
+			ns.AssertDatacenterDeleted(dcName)
 		})
 	})
 })

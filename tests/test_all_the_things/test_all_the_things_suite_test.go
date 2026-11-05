@@ -27,7 +27,6 @@ var (
 	dcName     = "dc1"
 	dcYaml     = "../testdata/default-two-rack-two-node-dc.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", api.CleanLabelValue(dcName))
 	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -53,15 +52,8 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForSuperUserUpserted(dcName, 600)
 
-			step = "check recorded host IDs"
-			ns.Log(step)
-			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
-			Expect(nodeStatusesHostIds).To(HaveLen(2))
-
 			ns.WaitForDatacenterReady(dcName)
-			ns.WaitForDatacenterCondition(dcName, "Ready", string(corev1.ConditionTrue))
-			ns.WaitForDatacenterCondition(dcName, "Initialized", string(corev1.ConditionTrue))
-			ns.ExpectDoneReconciling(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "scale up to 4 nodes"
 			json := "{\"spec\": {\"size\": 4}}"
@@ -74,13 +66,15 @@ var _ = Describe(testName, func() {
 			// Ensure that when 'ScaleUp' becomes 'false' that our pods are in fact up and running
 			Expect(ns.GetDatacenterReadyPodNames(api.CleanLabelValue(dcName))).To(HaveLen(4))
 
-			ns.ExpectDoneReconciling(dcName)
 			ns.WaitForDatacenterReady(dcName)
 
 			ns.ExpectDatacenterNameStatusUpdated(dcName, dcName)
 
 			// Ensure we have a single CassandraTask created which is a cleanup (and it succeeded)
 			ns.WaitForCompletedCassandraTasks(dcName, "cleanup", 1)
+			ns.AssertDatacenterInvariants(dcName)
+
+			beforeStop := ns.GetDatacenterState(dcName)
 
 			step = "stopping the dc"
 			json = "{\"spec\": {\"stopped\": true}}"
@@ -98,6 +92,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForOutputAndLog(step, k, "4", 20)
 
 			ns.WaitForDatacenterToHaveNoPods(api.CleanLabelValue(dcName))
+			ns.ExpectStoppedDatacenterKeepsStorage(dcName, 4)
 
 			step = "resume the dc"
 			json = "{\"spec\": {\"stopped\": false}}"
@@ -109,7 +104,9 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "Resuming", string(corev1.ConditionTrue))
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 1800, 1800)
-			ns.ExpectDoneReconciling(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			// No node may bootstrap again after a resume
+			ns.ExpectSameHostIDs(dcName, beforeStop)
 
 			logOutput := ""
 			wg := &sync.WaitGroup{}
@@ -140,33 +137,7 @@ var _ = Describe(testName, func() {
 			// Check the log contains node/drain..
 			Expect(regexp.MatchString("node/drain status=200 OK", logOutput)).To(BeTrue())
 
-			step = "checking that the dc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
-
-			step = "checking that no dc pods remain"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("pods").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 600)
-
-			step = "checking that no dc services remain"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("services").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 600)
-
-			step = "checking that no dc stateful sets remain"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("statefulsets").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 600)
+			ns.AssertDatacenterDeleted(dcName)
 		})
 	})
 })

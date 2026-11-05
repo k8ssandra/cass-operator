@@ -530,17 +530,6 @@ func (ns *NsWrapper) WaitForSuperUserUpserted(dcName string, timeout int) {
 	Expect(execErr).ToNot(HaveOccurred())
 }
 
-func (ns *NsWrapper) GetNodeStatusesHostIds(dcName string) []string {
-	json := "jsonpath={.status.nodeStatuses['*'].hostID}"
-	k := kubectl.Get("CassandraDatacenter", dcName).
-		FormatOutput(json)
-
-	output := ns.OutputPanic(k)
-	hostIds := strings.Split(output, " ")
-
-	return hostIds
-}
-
 func (ns *NsWrapper) WaitForDatacenterReadyPodCount(dcName string, count int) {
 	ns.WaitForDatacenterReadyPodCountWithTimeout(dcName, count, 600)
 }
@@ -716,39 +705,87 @@ func (ns NsWrapper) ExpectKeyValues(actual map[string]any, expected map[string]s
 	}
 }
 
+const (
+	// reconcileQuietWindow is how long the operator logs are watched for reconcile loops of a datacenter
+	reconcileQuietWindow = 30 * time.Second
+	// reconcileSettleTimeout is how long a datacenter may take to become quiet
+	reconcileSettleTimeout = 3 * time.Minute
+	// reconcileQuietAllowance is the number of reconcile loops a quiet datacenter may still run in one window,
+	// to allow for a single periodic requeue (for example a task poll) without allowing a requeue loop.
+	reconcileQuietAllowance = 1
+)
+
+// ExpectDoneReconciling waits until the operator stops reconciling the datacenter. It counts the completed reconcile
+// loops of the datacenter in the operator logs. A loop that only requeues (and writes nothing to the
+// CassandraDatacenter) is counted too, which comparing resourceVersions would miss.
 func (ns NsWrapper) ExpectDoneReconciling(dcName string) {
 	ginkgo.By(fmt.Sprintf("ensure %s is done reconciling", dcName))
-	time.Sleep(1 * time.Minute)
 
-	json := `jsonpath={.metadata.resourceVersion}`
-	k := kubectl.Get("CassandraDatacenter", dcName).
-		FormatOutput(json)
-	resourceVersion := ns.OutputPanic(k)
+	deadline := time.Now().Add(reconcileSettleTimeout)
+	for {
+		windowStart := time.Now()
+		time.Sleep(reconcileQuietWindow)
+		loops, err := ns.CountReconcileLoops(dcName, windowStart)
+		Expect(err).ToNot(HaveOccurred())
+		if loops <= reconcileQuietAllowance {
+			return
+		}
+		if time.Now().After(deadline) {
+			ginkgo.Fail(fmt.Sprintf("CassandraDatacenter %s is still being reconciled: %d reconcile loops in the last %s, %s after the check started",
+				dcName, loops, reconcileQuietWindow, reconcileSettleTimeout))
+		}
+	}
+}
 
-	time.Sleep(1 * time.Minute)
+// CountReconcileLoops counts the "Reconcile loop completed" log lines of the datacenter in all cass-operator pods
+// since the given time.
+func (ns NsWrapper) CountReconcileLoops(dcName string, since time.Time) (int, error) {
+	pods, err := kubectl.Get("pods").
+		WithFlag("all-namespaces", "true").
+		WithLabel("name=cass-operator").
+		FormatOutput(`jsonpath={range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}`).
+		Output()
+	if err != nil {
+		return 0, err
+	}
 
-	json = `jsonpath={.metadata.resourceVersion}`
-	k = kubectl.Get("CassandraDatacenter", dcName).
-		FormatOutput(json)
-	newResourceVersion := ns.OutputPanic(k)
-
-	Expect(newResourceVersion).To(Equal(resourceVersion),
-		"CassandraDatacenter %s is still being reconciled as the resource version is changing", dcName)
+	loopLine := regexp.MustCompile(`Reconcile loop completed.*"requestNamespace":\s*"` + regexp.QuoteMeta(ns.Namespace) +
+		`",\s*"requestName":\s*"` + regexp.QuoteMeta(dcName) + `"`)
+	count := 0
+	for _, line := range strings.Split(strings.TrimSpace(pods), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		logs, err := kubectl.Logs(fields[1]).
+			InNamespace(fields[0]).
+			WithFlag("since-time", since.UTC().Format(time.RFC3339)).
+			Output()
+		if err != nil {
+			return 0, err
+		}
+		count += len(loopLine.FindAllString(logs, -1))
+	}
+	return count, nil
 }
 
 type NodetoolNodeInfo struct {
-	Status  string
-	State   string
-	Address string
-	HostId  string
-	Rack    string
+	Datacenter string
+	Status     string
+	State      string
+	Address    string
+	HostId     string
+	Rack       string
 }
 
 func (ns NsWrapper) RetrieveStatusFromNodetool(podName string) []NodetoolNodeInfo {
 	k := kubectl.KCmd{Command: "exec", Args: []string{podName, "-i", "-c", "cassandra", "--namespace", ns.Namespace, "--", "nodetool", "status"}}
 	output, err := k.Output()
 	Expect(err).ToNot(HaveOccurred())
+	return parseNodetoolStatus(output)
+}
 
+func parseNodetoolStatus(output string) []NodetoolNodeInfo {
 	getFullName := func(s string) string {
 		status, ok := map[string]string{
 			"U": "up",
@@ -766,17 +803,28 @@ func (ns NsWrapper) RetrieveStatusFromNodetool(podName string) []NodetoolNodeInf
 		return status
 	}
 
-	nodeTexts := regexp.MustCompile(`(?m)^.*(([0-9a-fA-F]+-){4}([0-9a-fA-F]+)).*$`).FindAllString(output, -1)
+	datacenterLine := regexp.MustCompile(`^Datacenter:\s*(\S+)`)
+	nodeLine := regexp.MustCompile(`^.*(([0-9a-fA-F]+-){4}([0-9a-fA-F]+)).*$`)
+	datacenter := ""
 	nodeInfo := []NodetoolNodeInfo{}
-	for _, nodeText := range nodeTexts {
-		comps := regexp.MustCompile(`[[:space:]]+`).Split(strings.TrimSpace(nodeText), -1)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if m := datacenterLine.FindStringSubmatch(line); m != nil {
+			datacenter = m[1]
+			continue
+		}
+		if !nodeLine.MatchString(line) {
+			continue
+		}
+		comps := regexp.MustCompile(`[[:space:]]+`).Split(line, -1)
 		nodeInfo = append(nodeInfo,
 			NodetoolNodeInfo{
-				Status:  getFullName(string(comps[0][0])),
-				State:   getFullName(string(comps[0][1])),
-				Address: comps[1],
-				HostId:  comps[len(comps)-2],
-				Rack:    comps[len(comps)-1],
+				Datacenter: datacenter,
+				Status:     getFullName(string(comps[0][0])),
+				State:      getFullName(string(comps[0][1])),
+				Address:    comps[1],
+				HostId:     comps[len(comps)-2],
+				Rack:       comps[len(comps)-1],
 			})
 	}
 	return nodeInfo
@@ -805,15 +853,18 @@ func (ns NsWrapper) RetrieveSuperuserCreds(clusterName string) (string, string) 
 	return string(usernameDecoded), string(passwordDecoded)
 }
 
-func (ns NsWrapper) CqlExecute(podName string, stepDesc string, cql string, user string, pw string) {
-	k := kubectl.ExecOnPod(
+func cqlsh(podName string, cql string, user string, pw string) kubectl.KCmd {
+	return kubectl.ExecOnPod(
 		podName, "--", "cqlsh",
 		"--user", user,
 		"--password", pw,
 		"-e", cql).
 		WithFlag("container", "cassandra")
+}
+
+func (ns NsWrapper) CqlExecute(podName string, stepDesc string, cql string, user string, pw string) {
 	ginkgo.By(stepDesc)
-	ns.ExecVPanic(k)
+	ns.ExecVPanic(cqlsh(podName, cql, user, pw))
 }
 
 func (ns *NsWrapper) CheckForCassandraTasks(dcName, command string, completed bool, count int) {

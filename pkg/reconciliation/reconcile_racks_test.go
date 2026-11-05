@@ -733,9 +733,12 @@ func TestReconcileRacks(t *testing.T) {
 		rc.Datacenter,
 	}
 
+	// The mock pods must reach a mgmt-api, otherwise every call waits for a dial timeout
+	server := defaultFakeMgmtApiServer()
 	mockPods := mockReadyPodsForStatefulSet(desiredStatefulSet, rc.Datacenter.Spec.ClusterName, rc.Datacenter.Name)
 	for idx := range mockPods {
 		mp := mockPods[idx]
+		server.attachToPod(t, mp)
 		trackObjects = append(trackObjects, mp)
 	}
 
@@ -752,10 +755,12 @@ func TestReconcileRacks(t *testing.T) {
 	rc.desiredRackInformation = rackInfo
 	rc.statefulSets = make([]*appsv1.StatefulSet, len(rackInfo))
 
+	start := time.Now()
 	result, err := rc.ReconcileAllRacks()
 
 	assert.NoErrorf(t, err, "Should not have returned an error")
 	assert.NotNil(t, result, "Result should not be nil")
+	assert.Less(t, time.Since(start), 30*time.Second, "ReconcileAllRacks should not wait for unreachable mgmt-api endpoints")
 }
 
 func TestReconcileRacks_GetStatefulsetError(t *testing.T) {

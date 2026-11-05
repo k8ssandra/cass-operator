@@ -4,7 +4,6 @@
 package additional_volumes
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -21,7 +20,6 @@ var (
 	namespace = "test-additional-volumes"
 	dcName    = "dc2"
 	dcYaml    = "../testdata/default-single-rack-single-node-addtional-volumes-dc.yaml"
-	dcLabel   = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns        = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -46,6 +44,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 120)
+			ns.AssertDatacenterInvariants(dcName)
 
 			// Verify the volumes are actually there
 			step = "retrieve the persistent volume claim"
@@ -63,13 +62,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
-
-			step = "checking that the dc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
+			ns.AssertDatacenterDeleted(dcName)
 		})
 	})
 })

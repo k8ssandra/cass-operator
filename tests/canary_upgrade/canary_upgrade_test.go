@@ -13,8 +13,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/k8ssandra/cass-operator/pkg/images"
 	"github.com/k8ssandra/cass-operator/tests/kustomize"
 	ginkgo_util "github.com/k8ssandra/cass-operator/tests/util/ginkgo"
@@ -27,7 +25,6 @@ var (
 	dcName     = "dc1"
 	dcYaml     = "../testdata/oss-upgrade-dc.yaml"
 	dcResource = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel    = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns         = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -50,18 +47,15 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForSuperUserUpserted(dcName, 600)
 			ns.WaitForDatacenterReady(dcName)
-
-			step = "check recorded host IDs"
-			ns.Log(step)
-			nodeStatusesHostIds := ns.GetNodeStatusesHostIds(dcName)
-			Expect(nodeStatusesHostIds).To(HaveLen(3))
-
-			ns.WaitForDatacenterCondition(dcName, "Initialized", string(corev1.ConditionTrue))
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "prepare for canary upgrade"
 			json := "{\"spec\": {\"canaryUpgrade\": true, \"canaryUpgradeCount\": 1}}"
 			k = kubectl.PatchMerge(dcResource, json)
 			ns.ExecAndLog(step, k)
+
+			before := ns.GetDatacenterState(dcName)
+			sampler := ns.SampleAvailability(dcName)
 
 			step = "perform canary upgrade"
 			json = "{\"spec\": {\"serverVersion\": \"4.0.7\"}}"
@@ -87,6 +81,24 @@ var _ = Describe(testName, func() {
 			}
 			ns.WaitForCassandraImages(dcName, images, 300)
 			ns.WaitForDatacenterReadyPodCount(dcName, 3)
+			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 600)
+			// Only the canary pod is on the update revision
+			ns.AssertDatacenterInvariants(dcName, ginkgo_util.SkipStatefulSetRevisionCheck())
+			sampler.Stop()
+
+			step = "checking that only the canary pod was restarted"
+			ns.Log(step)
+			afterCanary := ns.GetDatacenterState(dcName)
+			restarted := []string{}
+			for pod, uid := range before.PodUIDs {
+				if afterCanary.PodUIDs[pod] != uid {
+					restarted = append(restarted, pod)
+				}
+			}
+			Expect(restarted).To(HaveLen(1), "pods restarted by the canary upgrade: %v", restarted)
+			ns.ExpectSameHostIDs(dcName, before)
+
+			sampler = ns.SampleAvailability(dcName)
 
 			// TODO Verify that after the canary upgrade we can issue upgrades to the rest of the nodes
 			step = "remove canary upgrade"
@@ -103,17 +115,15 @@ var _ = Describe(testName, func() {
 				strings.Replace(updated, "docker.io/", "ghcr.io/", 1),
 			}
 			ns.WaitForCassandraImages(dcName, images, 300)
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
 
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(dcYaml)
 			ns.ExecAndLog(step, k)
-
-			step = "checking that the dc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
+			ns.AssertDatacenterDeleted(dcName)
 		})
 	})
 })

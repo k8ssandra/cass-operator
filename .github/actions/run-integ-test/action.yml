@@ -4,8 +4,20 @@ name: run-integration-test
 description: "Run integration test"
 inputs:
   integration_test:
-    description: "M_INTEG_DIR value"
+    description: "M_INTEG_DIR value, or a space-separated list of them to run one after another on the same kind cluster"
     required: true
+  gatekeeper:
+    description: "Install the gatekeeper policies before the tests (default: false)"
+    required: false
+    default: "false"
+  free_disk:
+    description: "Remove unused preinstalled packages to free disk space, needed for the large DSE/HCD images (default: false)"
+    required: false
+    default: "false"
+  artifact_name:
+    description: "Suffix of the uploaded log artifacts (default: the suites joined with '-')"
+    required: false
+    default: ""
   serverVersion:
     description: "Override server version used in the test file"
     required: false
@@ -20,6 +32,7 @@ runs:
   using: "composite"
   steps:
     - name: Free diskspace by removing unused packages
+      if: ${{ inputs.free_disk == 'true' }}
       shell: bash
       run: |
         sudo rm -rf /usr/local/lib/android
@@ -142,7 +155,7 @@ runs:
           done
         done
     - name: Install gatekeeper rules
-      if: ${{ !env.SKIP_GATEKEEPER }}
+      if: ${{ inputs.gatekeeper == 'true' }}
       shell: bash
       run: |
         hack/gatekeeper.sh
@@ -188,7 +201,40 @@ runs:
         proxy_logger="localhost:5001/${LOGGER_IMAGE#docker.io/}"
         docker tag "$LOGGER_IMAGE" "$proxy_logger"
         kind load docker-image --name=kind "$proxy_logger"
-    - name: Run integration test ( ${{ inputs.integration_test }} )
+    - name: Run integration tests ( ${{ inputs.integration_test }} )
+      shell: bash
+      env:
+        SUITES: ${{ inputs.integration_test }}
+        IMG: ${{ steps.load.outputs.operator_img }}
+      run: |
+        hack/run-integ-suites.sh $SUITES
+    - name: Show disk usage
+      if: ${{ always() }}
       shell: bash
       run: |
-        IMG=${{ steps.load.outputs.operator_img }} make integ-test
+        df -h / /var/lib/docker 2>/dev/null || df -h /
+    - name: Set artifact name
+      if: ${{ failure() }}
+      id: artifact
+      shell: bash
+      env:
+        NAME: ${{ inputs.artifact_name }}
+        SUITES: ${{ inputs.integration_test }}
+      run: |
+        if [ -z "$NAME" ]; then
+          NAME=$(echo $SUITES | tr ' ' '-')
+        fi
+        echo "name=$NAME" >> "$GITHUB_OUTPUT"
+    - name: Archive k8s logs
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: k8s-logs-${{ steps.artifact.outputs.name }}
+        path: ./build/kubectl_dump
+    - name: Archive support bundle
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: support-bundle-${{ steps.artifact.outputs.name }}
+        path: ./build/kubectl_dump/**/support-bundle/**
+        if-no-files-found: ignore

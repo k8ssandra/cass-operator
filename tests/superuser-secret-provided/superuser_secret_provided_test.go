@@ -64,6 +64,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			podNames := ns.GetDatacenterPodNames(dcName)
 
@@ -105,12 +106,17 @@ var _ = Describe(testName, func() {
 			err = ns.ExecV(k)
 			Expect(err).To(HaveOccurred())
 
+			upsertedBefore := ns.GetDatacenter(dcName).Status.SuperUserUpserted
+
 			step = "check change superuser secret updates user"
 			k = kubectl.ApplyFiles(secretChangedYaml)
 			ns.ExecAndLog(step, k)
 
-			// Give the operator a few seconds to respond to the change
-			time.Sleep(30 * time.Second)
+			step = "checking that status.superUserUpserted advanced after the secret change"
+			ns.Log(step)
+			Eventually(func() bool {
+				return ns.GetDatacenter(dcName).Status.SuperUserUpserted.After(upsertedBefore.Time)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(BeTrue(), "status.superUserUpserted did not advance")
 
 			step = "verify new credentials work"
 			k = kubectl.ExecOnPod(
@@ -128,17 +134,7 @@ var _ = Describe(testName, func() {
 			step = "delete datacenter with its superuser secret missing"
 			k = kubectl.Delete("CassandraDatacenter", dcName).WithFlag("wait", "false")
 			ns.ExecAndLog(step, k)
-
-			step = "checking that the dc2 no longer exists"
-			json := "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
-
-			step = "checking that no dc stateful sets remain"
-			k = kubectl.Get("statefulsets").
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
+			ns.AssertDatacenterDeleted(dcName)
 		})
 	})
 })

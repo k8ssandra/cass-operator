@@ -48,6 +48,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = fmt.Sprintf("changing the management API port to %d", managementApiPort)
 			patch := fmt.Sprintf(`{"spec":{"podTemplateSpec":{"spec":{"containers":[{"name":"cassandra","ports":[{"name":"mgmt-api-http","containerPort":%d}]}]}}}}`, managementApiPort)
@@ -56,6 +57,7 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "checking the management API container port on the running pod"
 			json := `jsonpath={.spec.containers[?(@.name=='cassandra')].ports[?(@.name=='mgmt-api-http')].containerPort}`
@@ -66,6 +68,13 @@ var _ = Describe(testName, func() {
 			json = `jsonpath={.spec.containers[?(@.name=='cassandra')].env[?(@.name=='MGMT_API_LISTEN_TCP_PORT')].value}`
 			k = kubectl.Get(fmt.Sprintf("pod/%s", podName)).FormatOutput(json)
 			ns.WaitForOutputAndLog(step, k, fmt.Sprintf("%d", managementApiPort), 30)
+
+			for _, probe := range []string{"readinessProbe", "livenessProbe"} {
+				step = fmt.Sprintf("checking the %s port of the cassandra container", probe)
+				json = fmt.Sprintf(`jsonpath={.spec.containers[?(@.name=='cassandra')].%s.httpGet.port}`, probe)
+				k = kubectl.Get(fmt.Sprintf("pod/%s", podName)).FormatOutput(json)
+				ns.WaitForOutputAndLog(step, k, fmt.Sprintf("%d", managementApiPort), 30)
+			}
 
 			step = fmt.Sprintf("calling the management API on port %d", managementApiPort)
 			k = kubectl.ExecOnPod(

@@ -50,8 +50,13 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 		})
 		Specify("the operator can perform a rolling restart with rollingRestartRequested spec change", func() {
+			before := ns.GetDatacenterState(dcName)
+			lastRollingRestart := ns.GetDatacenter(dcName).Status.LastRollingRestart
+			sampler := ns.SampleAvailability(dcName)
+
 			step := "trigger restart"
 			json := `{"spec": {"rollingRestartRequested": true}}`
 			k := kubectl.PatchMerge(dcResource, json)
@@ -75,14 +80,25 @@ var _ = Describe(testName, func() {
 			Expect(ns.OutputAndLog(step, k)).To(Equal("true true"))
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
+			Expect(ns.GetDatacenter(dcName).Status.LastRollingRestart.After(lastRollingRestart.Time)).To(BeTrue(), "status.lastRollingRestart did not advance")
 		})
 		Specify("cassandratask can be used to do rolling restart of the cluster", func() {
+			before := ns.GetDatacenterState(dcName)
+			sampler := ns.SampleAvailability(dcName)
+
 			step := "creating a cassandra task to do rolling restart"
 			k := kubectl.ApplyFiles(taskYaml)
 			ns.ExecAndLog(step, k)
 
 			// Wait for the task to be completed
 			ns.WaitForCompleteTask("rolling-restart")
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
 
 			// Verify each pod does have the annotation..
 			json := `jsonpath={.items[0].metadata.annotations.control\.k8ssandra\.io/restartedAt}`

@@ -1,0 +1,38 @@
+name: Nightly Kubernetes Version Tests
+# Runs the smoke test on master against every supported Kubernetes version
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+jobs:
+  build_docker_images:
+    name: Build Docker Images
+    uses: ./.github/workflows/buildTestImages.yml
+  kind_smoke_tests:
+    name: kind_smoke_tests (Kubernetes ${{ matrix.kubernetes }})
+    needs: build_docker_images
+    strategy:
+      matrix:
+        # The supported Kubernetes versions. The node images are the ones listed in the release notes of the kind
+        # version on the runners (https://github.com/kubernetes-sigs/kind/releases), currently v0.33.0.
+        include:
+          - kubernetes: "1.35"
+            nodeImage: kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
+          - kubernetes: "1.36"
+            nodeImage: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+          - kubernetes: "1.37"
+            nodeImage: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+      fail-fast: false
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      M_SERVER_VERSION: "5.0.9"
+      # Read by hack/cluster.sh
+      KIND_NODE_IMAGE: ${{ matrix.nodeImage }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/run-integ-test
+        with:
+          integration_test: test_all_the_things
+          gatekeeper: "true"
+          artifact_name: smoke_test-k8s-${{ matrix.kubernetes }}

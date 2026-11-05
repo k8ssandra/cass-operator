@@ -67,6 +67,27 @@ func TestCassandraDatacenter_allPodsServiceLabels(t *testing.T) {
 	}
 }
 
+func TestCassandraDatacenter_allPodsServicePromMetricsLabelWithoutMcac(t *testing.T) {
+	dc := &api.CassandraDatacenter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dc1",
+		},
+		Spec: api.CassandraDatacenterSpec{
+			ClusterName:   "bob",
+			ServerType:    "cassandra",
+			ServerVersion: "5.0.6",
+		},
+	}
+	if dc.IsMcacEnabled() {
+		t.Fatal("expected MCAC to be disabled for Cassandra 5.0")
+	}
+
+	service := newAllPodsServiceForCassandraDatacenter(dc)
+	if got := service.Labels[api.PromMetricsLabel]; got != "true" {
+		t.Errorf("allPodsService %s label = %q, want %q", api.PromMetricsLabel, got, "true")
+	}
+}
+
 func TestServiceNameGeneration(t *testing.T) {
 	dc := &api.CassandraDatacenter{
 		ObjectMeta: metav1.ObjectMeta{

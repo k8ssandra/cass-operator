@@ -245,10 +245,8 @@ func newNodePortServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *core
 func newAllPodsServiceForCassandraDatacenter(dc *api.CassandraDatacenter) *corev1.Service {
 	service := makeGenericHeadlessService(dc)
 	service.Name = dc.GetAllPodsServiceName()
+	service.Labels[api.PromMetricsLabel] = "true"
 	service.Spec.PublishNotReadyAddresses = true
-	if dc.IsMcacEnabled() {
-		service.Labels[api.PromMetricsLabel] = "true"
-	}
 
 	ports := servicePortsForCassandraDatacenter(dc)
 	service.Spec.Ports = ports

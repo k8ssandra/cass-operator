@@ -50,6 +50,8 @@ type ReconciliationContext struct {
 	statefulSets           []*appsv1.StatefulSet
 	dcPods                 []*corev1.Pod
 	clusterPods            []*corev1.Pod
+
+	startGeneration int64
 }
 
 // CreateReconciliationContext gathers all information needed for computeReconciliationActions into a struct.
@@ -87,6 +89,7 @@ func CreateReconciliationContext(
 		return nil, err
 	}
 	rc.Datacenter = dc
+	rc.startGeneration = dc.Generation
 
 	// workaround for kubernetes having problems with zero-value and nil Times
 	if rc.Datacenter.Status.SuperUserUpserted.IsZero() {

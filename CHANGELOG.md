@@ -13,6 +13,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
 * [CHANGE] [#1035](https://github.com/k8ssandra/cass-operator/issues/1035) Raise the host inotify limits before creating kind clusters in CI, as Ubuntu 26.04 runners don't apply them at boot
+* [BUGFIX] [#1031](https://github.com/k8ssandra/cass-operator/issues/1031) A `CassandraDatacenter` spec change made while a reconcile was running could be marked as observed without being applied, which left the StatefulSets on the old spec. `status.observedGeneration` now records the generation the reconcile started from.
 
 ## v1.33.1
 

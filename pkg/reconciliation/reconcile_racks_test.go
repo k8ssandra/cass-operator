@@ -2030,7 +2030,10 @@ func TestFailedStart(t *testing.T) {
 
 	pod := makeReloadTestPod()
 	server.attachToPod(t, pod)
-	var concurrentUpdate sync.Once
+	var concurrentUpdate, transientDeleteFailure sync.Once
+	originalDeleteBackoff := failedStartDeleteBackoff
+	failedStartDeleteBackoff.Duration = 10 * time.Millisecond
+	defer func() { failedStartDeleteBackoff = originalDeleteBackoff }()
 	rc.Client = fake.NewClientBuilder().
 		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
@@ -2047,6 +2050,14 @@ func TestFailedStart(t *testing.T) {
 			Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
 				if err := ctx.Err(); err != nil {
 					return err
+				}
+				// The first delete fails with a transient error and must be retried.
+				var deleteErr error
+				transientDeleteFailure.Do(func() {
+					deleteErr = apierrors.NewServiceUnavailable("transient delete failure")
+				})
+				if deleteErr != nil {
+					return deleteErr
 				}
 				return c.Delete(ctx, obj, opts...)
 			},

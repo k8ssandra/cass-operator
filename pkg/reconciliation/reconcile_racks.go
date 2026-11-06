@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -47,6 +48,9 @@ var (
 )
 
 const failedStartCleanupTimeout = time.Minute
+
+// failedStartDeleteBackoff retries the pod delete for about 30 seconds, within failedStartCleanupTimeout.
+var failedStartDeleteBackoff = wait.Backoff{Duration: time.Second, Factor: 2, Steps: 5}
 
 const (
 	stateReadyToStart    = "Ready-to-Start"
@@ -2074,21 +2078,32 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 	return rc.labelServerPodStarting(pod)
 }
 
-// recordFailedStart deletes a pod whose Cassandra failed to start and adds it to Status.FailedStarts.
-// It runs after the reconcile pass that started the pod has returned.
+// recordFailedStart tries to delete a pod whose Cassandra failed to start and adds it to Status.FailedStarts.
+// It runs after the reconcile pass that started the pod has returned. If the delete keeps failing, the
+// FailedStarts entry still lets failureModeDetection and later reconciles see the failed pod.
 func (rc *ReconciliationContext) recordFailedStart(dc *api.CassandraDatacenter, pod *corev1.Pod, startErr error) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(rc.Ctx), failedStartCleanupTimeout)
 	defer cancel()
 
 	// Most likely this is not a recoverable error, so delete the pod and let the StatefulSet recreate it.
-	// The UID precondition prevents deleting a pod that was recreated with the same name in the meantime.
-	if err := rc.Client.Delete(ctx, pod, client.Preconditions{UID: &pod.UID}); err != nil && !errors.IsNotFound(err) {
+	// The UID precondition prevents deleting a pod that was recreated with the same name in the meantime;
+	// that precondition failure is a Conflict and is not retried.
+	retriable := func(err error) bool {
+		return ctx.Err() == nil && !errors.IsConflict(err)
+	}
+	err := retry.OnError(failedStartDeleteBackoff, retriable, func() error {
+		if err := rc.Client.Delete(ctx, pod, client.Preconditions{UID: &pod.UID}); err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		rc.ReqLogger.Error(err, "Unable to delete the pod, pod has failed to start", "Pod", pod.Name, "StartError", startErr.Error())
 	}
 	rc.Recorder.Event(dc, corev1.EventTypeWarning, events.StartingCassandra,
 		fmt.Sprintf("Failed to start pod %s, deleting it", pod.Name))
 
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		current := &api.CassandraDatacenter{}
 		if err := rc.APIReader.Get(ctx, client.ObjectKeyFromObject(dc), current); err != nil {
 			return err

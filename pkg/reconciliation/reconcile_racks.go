@@ -49,7 +49,6 @@ var (
 
 const failedStartCleanupTimeout = time.Minute
 
-// failedStartDeleteBackoff retries the pod delete for about 30 seconds, within failedStartCleanupTimeout.
 var failedStartDeleteBackoff = wait.Backoff{Duration: time.Second, Factor: 2, Steps: 5}
 
 const (
@@ -2078,16 +2077,10 @@ func (rc *ReconciliationContext) startCassandra(endpointData httphelper.CassMeta
 	return rc.labelServerPodStarting(pod)
 }
 
-// recordFailedStart tries to delete a pod whose Cassandra failed to start and adds it to Status.FailedStarts.
-// It runs after the reconcile pass that started the pod has returned. If the delete keeps failing, the
-// FailedStarts entry still lets failureModeDetection and later reconciles see the failed pod.
 func (rc *ReconciliationContext) recordFailedStart(dc *api.CassandraDatacenter, pod *corev1.Pod, startErr error) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(rc.Ctx), failedStartCleanupTimeout)
 	defer cancel()
 
-	// Most likely this is not a recoverable error, so delete the pod and let the StatefulSet recreate it.
-	// The UID precondition prevents deleting a pod that was recreated with the same name in the meantime;
-	// that precondition failure is a Conflict and is not retried.
 	retriable := func(err error) bool {
 		return ctx.Err() == nil && !errors.IsConflict(err)
 	}

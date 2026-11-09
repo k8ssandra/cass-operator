@@ -13,6 +13,7 @@ Changelog for Cass Operator, new PRs should update the `main / unreleased` secti
 
 * [CHANGE] [#1017](https://github.com/k8ssandra/cass-operator/issues/1017) Run the unit test, build and kind integration test workflows also for PRs targeting `1.*.x` release branches
 * [CHANGE] [#1035](https://github.com/k8ssandra/cass-operator/issues/1035) Raise the host inotify limits before creating kind clusters in CI, as Ubuntu 26.04 runners don't apply them at boot
+* [BUGFIX] [#1006](https://github.com/k8ssandra/cass-operator/issues/1006) A failed Cassandra start no longer leaves the pod stuck in `Starting` when `--reconciliation-timeout` is enabled (the default since v1.33.0). The pod is deleted and recorded in `Status.FailedStarts` again, which also re-enables the failed scale-up recovery that force-applies pod templates to racks with failed starts.
 * [BUGFIX] [#1008](https://github.com/k8ssandra/cass-operator/issues/1008) Deleting a CassandraDatacenter no longer gets stuck when `spec.users` secrets or `managementApiAuth.manual` TLS secrets were removed first. Deletions that need the Management API (`decommission-on-delete` or an ongoing scale down) still require them.
 
 ## v1.33.1

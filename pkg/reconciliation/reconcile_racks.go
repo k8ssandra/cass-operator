@@ -834,11 +834,17 @@ func (rc *ReconciliationContext) CheckPodsReady(endpointData httphelper.CassMeta
 		return result.Error(err)
 	}
 
-	if !clusterHealthy && rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionFalse {
-		rc.ReqLogger.Info(
-			"cluster isn't healthy",
-		)
-		return result.RequeueSoon(5)
+	if !clusterHealthy && rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) != corev1.ConditionTrue {
+		podsToStart, err := rc.createStartSequence()
+		if err != nil {
+			return result.Error(err)
+		}
+		if len(podsToStart) > 0 {
+			rc.ReqLogger.Info(
+				"cluster isn't healthy",
+			)
+			return result.RequeueSoon(5)
+		}
 	}
 
 	// step 4 - make sure all nodes are ready

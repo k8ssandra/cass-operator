@@ -301,6 +301,10 @@ func (rc *ReconciliationContext) validateSuperuserSecret() []error {
 }
 
 func (rc *ReconciliationContext) validateCassandraUserSecrets() []error {
+	if rc.deletionNeedsOnlyKubernetes() {
+		return nil
+	}
+
 	users := rc.Datacenter.Spec.Users
 	dc := rc.Datacenter
 	errs := []error{}

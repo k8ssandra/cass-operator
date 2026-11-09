@@ -31,6 +31,7 @@ const (
 	StartingCassandra                 string = "StartingCassandra"
 	DecommissionDatacenter            string = "DecommissionDatacenter"
 	DecommissioningNode               string = "DecommissioningNode"
+	DecommissionNotVerified           string = "DecommissionNotVerified"
 	UnhealthyDatacenter               string = "UnhealthyDatacenter"
 	RecreatingStatefulSet             string = "RecreatingStatefulSet"
 	InvalidDatacenterSpec             string = "InvalidDatacenterSpec"

@@ -1132,7 +1132,7 @@ func getRpcAddress(dc *api.CassandraDatacenter, pod *corev1.Pod) string {
 	return pod.Status.PodIP
 }
 
-func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
+func (rc *ReconciliationContext) UpdateCassandraNodeStatus() {
 	logger := rc.ReqLogger
 	dc := rc.Datacenter
 
@@ -1161,40 +1161,42 @@ func (rc *ReconciliationContext) UpdateCassandraNodeStatus(force bool) error {
 			// Getting the HostID requires a call to the node management API which is
 			// moderately expensive, so if we already have a HostID, don't bother. This
 			// would only change if something has gone horribly horribly wrong.
-			if force || nodeStatus.HostID == "" {
-				features, err := rc.NodeMgmtClient.FeatureSet(pod)
+			if nodeStatus.HostID == "" {
+				// A failure here must not end the pass: a crashed node is only recovered by later checks.
+				hostId, err := rc.fetchHostId(pod, ip)
 				if err != nil {
-					logger.Error(err, "error getting feature set for pod", "pod", pod.Name)
-					return err
-				}
-				endpointsResponse, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
-				if err != nil {
-					logger.Error(err, "error getting metadata endpoints for pod", "pod", pod.Name)
-					return err
-				}
-
-				if features.Supports(httphelper.AsyncFlush) {
-					// Versions older than mgmt-api v0.1.69 do not support this and async_flush matches that version
-					hostId := findHostIdFromEndpointsData(endpointsResponse.Entity)
-					if hostId != "" {
-						nodeStatus.HostID = hostId
-					}
+					logger.Error(err, "error getting host ID for pod", "pod", pod.Name)
+				} else if hostId == "" {
+					logger.Info("Failed to find host ID", "pod", pod.Name)
 				} else {
-					ready, hostId := findHostIdForIpFromEndpointsData(endpointsResponse.Entity, ip)
-					if nodeStatus.HostID == "" {
-						logger.Info("Failed to find host ID", "pod", pod.Name)
-					}
-					if ready {
-						nodeStatus.HostID = hostId
-					}
+					nodeStatus.HostID = hostId
 				}
 			}
 		}
 
 		dc.Status.NodeStatuses[pod.Name] = nodeStatus
 	}
+}
 
-	return nil
+func (rc *ReconciliationContext) fetchHostId(pod *corev1.Pod, ip string) (string, error) {
+	features, err := rc.NodeMgmtClient.FeatureSet(pod)
+	if err != nil {
+		return "", fmt.Errorf("error getting feature set: %w", err)
+	}
+	endpointsResponse, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
+	if err != nil {
+		return "", fmt.Errorf("error getting metadata endpoints: %w", err)
+	}
+
+	if features.Supports(httphelper.AsyncFlush) {
+		// Versions older than mgmt-api v0.1.69 do not support this and async_flush matches that version
+		return findHostIdFromEndpointsData(endpointsResponse.Entity), nil
+	}
+	ready, hostId := findHostIdForIpFromEndpointsData(endpointsResponse.Entity, ip)
+	if !ready {
+		return "", nil
+	}
+	return hostId, nil
 }
 
 func getTimePodCreated(pod *corev1.Pod) metav1.Time {
@@ -1210,7 +1212,7 @@ func getTimeStartedReplacingNodes(dc *api.CassandraDatacenter) (metav1.Time, boo
 	}
 }
 
-func (rc *ReconciliationContext) updateCurrentReplacePodsProgress() error {
+func (rc *ReconciliationContext) updateCurrentReplacePodsProgress() {
 	dc := rc.Datacenter
 	logger := rc.ReqLogger
 	startedPods := ListAllStartedPods(rc.dcPods)
@@ -1242,16 +1244,17 @@ func (rc *ReconciliationContext) updateCurrentReplacePodsProgress() error {
 							fmt.Sprintf("Finished replacing pod %s", pod.Name))
 
 						dc.Status.NodeReplacements = utils.RemoveValueFromStringArray(dc.Status.NodeReplacements, pod.Name)
-						if err := rc.UpdateCassandraNodeStatus(true); err != nil {
-							return err
+						// The recorded HostID is the replaced node's. An empty HostID is
+						// refetched on every pass until the management API answers.
+						if nodeStatus, found := dc.Status.NodeStatuses[pod.Name]; found {
+							nodeStatus.HostID = ""
+							dc.Status.NodeStatuses[pod.Name] = nodeStatus
 						}
 					}
 				}
 			}
 		}
 	}
-
-	return nil
 }
 
 func (rc *ReconciliationContext) startReplacePodsIfReplacePodsSpecified() error {
@@ -1291,34 +1294,17 @@ func (rc *ReconciliationContext) startReplacePodsIfReplacePodsSpecified() error 
 	return nil
 }
 
-func (rc *ReconciliationContext) UpdateStatusForUserActions() error {
-	var err error
-
-	err = rc.updateCurrentReplacePodsProgress()
-	if err != nil {
-		return err
-	}
-
-	err = rc.startReplacePodsIfReplacePodsSpecified()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (rc *ReconciliationContext) UpdateStatus() result.ReconcileResult {
 	dc := rc.Datacenter
 	oldDc := rc.Datacenter.DeepCopy()
 
-	rc.ReqLogger.Info("Setting pod statuses")
-	err := rc.UpdateCassandraNodeStatus(false)
-	if err != nil {
-		return result.Error(err)
-	}
+	// Clears the replaced pods' HostIDs, so it runs before they are fetched.
+	rc.updateCurrentReplacePodsProgress()
 
-	err = rc.UpdateStatusForUserActions()
-	if err != nil {
+	rc.ReqLogger.Info("Setting pod statuses")
+	rc.UpdateCassandraNodeStatus()
+
+	if err := rc.startReplacePodsIfReplacePodsSpecified(); err != nil {
 		return result.Error(err)
 	}
 

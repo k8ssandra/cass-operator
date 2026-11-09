@@ -2003,16 +2003,22 @@ func TestNodereplacements(t *testing.T) {
 	assert.Equal(0, len(rc.Datacenter.Spec.DeprecatedReplaceNodes))
 }
 
-// TestFailedStart verifies the pod is deleted if nodeMgmtClient start fails
+// TestFailedStart verifies the pod is deleted and recorded in FailedStarts if nodeMgmtClient start fails,
+// even when the start fails after the reconcile context has been cancelled.
 func TestFailedStart(t *testing.T) {
 	rc, _, cleanupMockScr := setupTest()
 	defer cleanupMockScr()
 
+	reconcileCtx, cancelReconcile := context.WithCancel(rc.Ctx)
+	rc.Ctx = reconcileCtx
+
+	failStart := make(chan struct{})
 	server := newFakeMgmtApiServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RequestURI() != "/api/v0/lifecycle/start" || r.Method != http.MethodPost {
 			http.NotFound(w, r)
 			return
 		}
+		<-failStart
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = io.WriteString(w, "OK")
 	}))
@@ -2024,12 +2030,61 @@ func TestFailedStart(t *testing.T) {
 
 	pod := makeReloadTestPod()
 	server.attachToPod(t, pod)
+	var concurrentUpdate, transientDeleteFailure sync.Once
+	originalDeleteBackoff := failedStartDeleteBackoff
+	failedStartDeleteBackoff.Duration = 10 * time.Millisecond
+	defer func() { failedStartDeleteBackoff = originalDeleteBackoff }()
 	rc.Client = fake.NewClientBuilder().
 		WithScheme(setupScheme()).
 		WithStatusSubresource(rc.Datacenter).
 		WithRuntimeObjects(runtimeObjectHelper(rc, nil, []*corev1.Pod{pod})...).
 		WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+		// The fake client ignores context cancellation, the real one does not.
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+			Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				// The first delete fails with a transient error and must be retried.
+				var deleteErr error
+				transientDeleteFailure.Do(func() {
+					deleteErr = apierrors.NewServiceUnavailable("transient delete failure")
+				})
+				if deleteErr != nil {
+					return deleteErr
+				}
+				return c.Delete(ctx, obj, opts...)
+			},
+			SubResourcePatch: func(ctx context.Context, c client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				// A status change made between the failed start's read and its patch must not be overwritten.
+				if dc, ok := obj.(*api.CassandraDatacenter); ok && slices.Contains(dc.Status.FailedStarts, pod.Name) {
+					var updateErr error
+					concurrentUpdate.Do(func() {
+						storedDc := &api.CassandraDatacenter{}
+						if updateErr = c.Get(ctx, client.ObjectKeyFromObject(dc), storedDc); updateErr != nil {
+							return
+						}
+						storedDc.Status.FailedStarts = []string{"other-pod"}
+						updateErr = c.Status().Update(ctx, storedDc)
+					})
+					if updateErr != nil {
+						return updateErr
+					}
+				}
+				return c.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+			},
+		}).
 		Build()
+	rc.APIReader = rc.Client
 
 	fakeRecorder := record.NewFakeRecorder(5)
 	rc.Recorder = &events.LoggingEventRecorder{
@@ -2041,13 +2096,20 @@ func TestFailedStart(t *testing.T) {
 	// The start is async method, so the error is not returned here
 	assert.Nil(t, err)
 
+	// controller-runtime cancels the reconcile context when Reconcile returns
+	cancelReconcile()
+
+	close(failStart)
+
 	require.Eventually(t, func() bool {
 		currentPod := &corev1.Pod{}
-		err := rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(pod), currentPod)
+		err := rc.Client.Get(context.Background(), client.ObjectKeyFromObject(pod), currentPod)
 		return apierrors.IsNotFound(err)
 	}, 2*time.Second, 20*time.Millisecond, "expected pod delete after failed start")
-	require.Eventually(t, func() bool {
-		return len(rc.Datacenter.Status.FailedStarts) == 1 && rc.Datacenter.Status.FailedStarts[0] == pod.Name
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		currentDc := &api.CassandraDatacenter{}
+		require.NoError(c, rc.Client.Get(context.Background(), client.ObjectKeyFromObject(rc.Datacenter), currentDc))
+		assert.Equal(c, []string{"other-pod", pod.Name}, currentDc.Status.FailedStarts)
 	}, 2*time.Second, 20*time.Millisecond, "expected failed start status update")
 
 	close(fakeRecorder.Events)

@@ -357,7 +357,9 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 		noNodeStatus  bool
 		noPeerData    bool
 		serverType    string
+		seededJobId   string
 	}{
+		{name: "peer left does not wait for the decommission job", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, seededJobId: "job-0", wantCleaned: true, wantCalls: 1},
 		{name: "peer left and local left", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
 		{name: "peer left but local normal", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, wantCalls: 1},
 		{name: "peer left but local still leaving", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEAVING"}]}`, podReady: true, wantCalls: 1, wantRetries: 1},
@@ -404,8 +406,16 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 					_, _ = w.Write([]byte(`job-1`))
 					return
 				}
+				if r.URL.Path == "/api/v0/ops/executor/job" {
+					_, _ = w.Write([]byte(`{"id":"job-0","type":"decommission","status":"WAITING"}`))
+					return
+				}
 				http.NotFound(w, r)
 			})
+			if tt.seededJobId != "" {
+				metav1.SetMetaDataAnnotation(&pod.ObjectMeta, decommissionJobAnnotation, tt.seededJobId)
+				require.NoError(t, rc.Client.Update(rc.Ctx, pod))
+			}
 			if tt.serverType != "" {
 				rc.Datacenter.Spec.ServerType = tt.serverType
 			}
@@ -462,6 +472,7 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 			server.assertCallCount(t, "/api/v0/metadata/endpoints", tt.wantCalls)
 			server.assertCallCount(t, "/api/v0/metadata/versions/features", tt.wantRetries)
 			server.assertCallCount(t, "/api/v1/ops/node/decommission", tt.wantRetries)
+			server.assertCallCount(t, "/api/v0/ops/executor/job", 0)
 		})
 	}
 }
@@ -472,6 +483,7 @@ func TestCheckDecommissioningNodesLastNodeOfDecommissionedDatacenter(t *testing.
 		localResponse   string
 		localCode       int
 		otherPodVisible bool
+		patchFailures   int
 		seededJobId     string
 		jobStatus       string
 		jobCode         int
@@ -490,6 +502,8 @@ func TestCheckDecommissioningNodesLastNodeOfDecommissionedDatacenter(t *testing.
 		{name: "job request fails", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, seededJobId: "job-0", jobCode: http.StatusInternalServerError, wantCalls: 2, wantJobCalls: 1, wantJobId: "job-0", wantError: "cannot check decommission job job-0 on pod %s"},
 		{name: "local leaving waits without retrying", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEAVING"}]}`, wantCalls: 2},
 		{name: "local normal retries decommission", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, wantCalls: 2, wantRetries: 1, wantJobId: "job-1"},
+		{name: "retry stores the job ID after a failed patch", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, patchFailures: 1, wantCalls: 2, wantRetries: 1, wantJobId: "job-1"},
+		{name: "retry reports a job ID that cannot be stored", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, patchFailures: 100, wantCalls: 2, wantRetries: 1, wantError: "patch of pod %s failed"},
 		{name: "local request fails", localCode: http.StatusInternalServerError, wantCalls: 1, wantError: "cannot check decommissioning node %s without Cassandra metadata: "},
 		{name: "another visible pod is required to provide metadata", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, otherPodVisible: true, wantError: "cannot check decommissioning node %s without Cassandra metadata"},
 	}
@@ -525,6 +539,16 @@ func TestCheckDecommissioningNodesLastNodeOfDecommissionedDatacenter(t *testing.
 				metav1.SetMetaDataAnnotation(&pod.ObjectMeta, decommissionJobAnnotation, tt.seededJobId)
 				require.NoError(t, rc.Client.Update(rc.Ctx, pod))
 			}
+			failures := tt.patchFailures
+			rc.Client = interceptor.NewClient(rc.Client.(client.WithWatch), interceptor.Funcs{
+				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+					if _, isPod := obj.(*corev1.Pod); isPod && failures > 0 {
+						failures--
+						return fmt.Errorf("patch of pod %s failed", obj.GetName())
+					}
+					return c.Patch(ctx, obj, patch, opts...)
+				},
+			})
 
 			// The decommissioning pod is the only pod of the cluster in this Kubernetes cluster, so
 			// getCassMetadataEndpoints has no pod to query and returns no peer metadata.

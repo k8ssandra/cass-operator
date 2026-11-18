@@ -18,6 +18,7 @@ import (
 	"github.com/k8ssandra/cass-operator/pkg/monitoring"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -272,7 +273,11 @@ func (rc *ReconciliationContext) CheckDecommissioningNodes(epData httphelper.Cas
 					if jobId != "" {
 						patch := client.MergeFrom(pod.DeepCopy())
 						metav1.SetMetaDataAnnotation(&pod.ObjectMeta, decommissionJobAnnotation, jobId)
-						if err := rc.Client.Patch(rc.Ctx, pod, patch); err != nil {
+						// The node is LEAVING after this call, so a later pass cannot replace a stale job ID
+						err := retry.OnError(retry.DefaultRetry, func(error) bool { return true }, func() error {
+							return rc.Client.Patch(rc.Ctx, pod, patch)
+						})
+						if err != nil {
 							return result.Error(err)
 						}
 					}

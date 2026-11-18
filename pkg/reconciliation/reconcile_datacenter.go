@@ -22,6 +22,20 @@ import (
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
 )
 
+// deletionNeedsOnlyKubernetes reports whether ProcessDeletion finishes the deletion without the management API
+// or ReconcileAllRacks, so secrets only a running datacenter needs may already be gone.
+func (rc *ReconciliationContext) deletionNeedsOnlyKubernetes() bool {
+	dc := rc.Datacenter
+	if dc.GetDeletionTimestamp() == nil {
+		return false
+	}
+	if _, found := dc.Annotations[api.DecommissionOnDeleteAnnotation]; found {
+		return false
+	}
+	return dc.Status.GetConditionStatus(api.DatacenterScalingDown) != corev1.ConditionTrue &&
+		dc.Status.GetConditionStatus(api.DatacenterDecommission) != corev1.ConditionTrue
+}
+
 // ProcessDeletion ...
 func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 	if rc.Datacenter.GetDeletionTimestamp() == nil {

@@ -108,6 +108,10 @@ func CreateReconciliationContext(
 	var err error
 	rc.NodeMgmtClient, err = httphelper.NewMgmtClient(rc.Ctx, cli, apiReader, dc, nil)
 	if err != nil {
+		if rc.deletionNeedsOnlyKubernetes() {
+			rc.ReqLogger.Info("Continuing deletion without NodeMgmtClient", "error", err.Error())
+			return rc, nil
+		}
 		rc.ReqLogger.Error(err, "failed to build NodeMgmtClient")
 		return nil, err
 	}

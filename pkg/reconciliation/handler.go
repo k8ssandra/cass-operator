@@ -107,7 +107,9 @@ func (rc *ReconciliationContext) IsValid(dc *api.CassandraDatacenter) error {
 	errs = append(errs, apiwebhook.ValidateServiceLabelsAndAnnotations(dc))
 
 	// Validate Management API config
-	errs = append(errs, httphelper.ValidateManagementApiConfig(dc, rc.Client, rc.Ctx)...)
+	if !rc.deletionNeedsOnlyKubernetes() {
+		errs = append(errs, httphelper.ValidateManagementApiConfig(dc, rc.Client, rc.Ctx)...)
+	}
 
 	// Check that the datacenter name override hasn't been changed
 	errs = append(errs, rc.validateDatacenterNameOverride()...)

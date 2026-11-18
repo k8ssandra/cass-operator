@@ -9,11 +9,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	record "k8s.io/client-go/tools/events"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -197,6 +199,76 @@ func TestProcessDeletion(t *testing.T) {
 	storedDC := &api.CassandraDatacenter{}
 	getErr := rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(rc.Datacenter), storedDC)
 	assert.True(apierrors.IsNotFound(getErr))
+}
+
+func TestProcessDeletionWithMissingSecrets(t *testing.T) {
+	tests := []struct {
+		name                 string
+		deleting             bool
+		decommissionOnDelete bool
+		scalingDown          bool
+		manualTLS            bool
+		wantErr              bool
+	}{
+		{name: "active datacenter with missing user secret", wantErr: true},
+		{name: "active datacenter with missing TLS secrets", manualTLS: true, wantErr: true},
+		{name: "deletion with missing user secret", deleting: true},
+		{name: "deletion with missing TLS secrets", deleting: true, manualTLS: true},
+		{name: "decommission on delete with missing user secret", deleting: true, decommissionOnDelete: true, wantErr: true},
+		{name: "decommission on delete with missing TLS secrets", deleting: true, decommissionOnDelete: true, manualTLS: true, wantErr: true},
+		{name: "deletion while scaling down with missing TLS secrets", deleting: true, scalingDown: true, manualTLS: true, wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+			mockRc, _, cleanupMockScr := setupTest()
+			defer cleanupMockScr()
+
+			dc := mockRc.Datacenter
+			dc.SetFinalizers([]string{api.Finalizer})
+			dc.Spec.Users = []api.CassandraUser{{SecretName: "missing-user"}}
+			if test.manualTLS {
+				dc.Spec.ManagementApiAuth.Manual = &api.ManagementApiAuthManualConfig{
+					ClientSecretName: "missing-client", ServerSecretName: "missing-server",
+				}
+			}
+			if test.deleting {
+				now := metav1.Now()
+				dc.SetDeletionTimestamp(&now)
+			}
+			if test.decommissionOnDelete {
+				metav1.SetMetaDataAnnotation(&dc.ObjectMeta, api.DecommissionOnDeleteAnnotation, "true")
+			}
+			if test.scalingDown {
+				dc.SetCondition(*api.NewDatacenterCondition(api.DatacenterScalingDown, corev1.ConditionTrue))
+			}
+			sts, err := newStatefulSetForCassandraDatacenter(nil, "default", dc, 0, imageRegistry)
+			require.NoError(err)
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(setupScheme()).
+				WithStatusSubresource(dc).
+				WithRuntimeObjects(dc, sts).
+				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+				Build()
+
+			rc, err := CreateReconciliationContext(mockRc.Ctx, mockRc.Request, fakeClient, fakeClient, mockRc.Scheme,
+				record.NewFakeRecorder(100), dynamicwatch.NewDynamicSecretWatches(fakeClient), mockRc.ImageRegistry, false)
+			if err == nil {
+				err = rc.IsValid(rc.Datacenter)
+			}
+			if test.wantErr {
+				require.Error(err)
+				return
+			}
+			require.NoError(err)
+
+			_, err = rc.CalculateReconciliationActions()
+			require.NoError(err)
+			getErr := fakeClient.Get(rc.Ctx, client.ObjectKeyFromObject(dc), &api.CassandraDatacenter{})
+			require.True(apierrors.IsNotFound(getErr), "datacenter should be deleted, got %v", getErr)
+		})
+	}
 }
 
 // TestProcessDeletion_NoFinalizer verifies that the removal of finalizer means cass-operator will do nothing

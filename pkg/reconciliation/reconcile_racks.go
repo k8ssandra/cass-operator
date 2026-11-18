@@ -629,16 +629,16 @@ func (rc *ReconciliationContext) CheckRackForceUpgrade() result.ReconcileResult 
 	logger := rc.ReqLogger
 	logger.Info("reconcile_racks::CheckRackForceUpgrade")
 
-	// Datacenter configuration isn't healthy, we allow upgrades here before pods start
-	if failed, rackName := rc.failureModeDetection(); failed {
-		logger.Info("Failure detected, forcing CheckRackPodTemplate()")
-		return rc.CheckRackPodTemplateDetails(true, rackName, true)
-	}
-
 	for _, rackName := range dc.Spec.ForceUpgradeRacks {
 		if res := rc.CheckRackPodTemplateDetails(true, rackName, false); res.Completed() {
 			return res
 		}
+	}
+
+	// Datacenter configuration isn't healthy, we allow upgrades here before pods start
+	if failed, rackName := rc.failureModeDetection(); failed {
+		logger.Info("Failure detected, forcing CheckRackPodTemplate()")
+		return rc.CheckRackPodTemplateDetails(true, rackName, true)
 	}
 
 	return result.Continue()

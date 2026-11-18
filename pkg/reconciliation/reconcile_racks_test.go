@@ -4344,7 +4344,9 @@ func TestCheckRackForceUpgrade(t *testing.T) {
 		// rack2NeverStarted leaves out the NodeStatuses entry of the rack2 pod
 		rack2NeverStarted bool
 		rack2NotCaughtUp  bool
+		forceUpgradeRacks []string
 		forcedRack1       bool
+		forcedRack2       bool
 	}{
 		{
 			name:         "other rack ready",
@@ -4364,6 +4366,24 @@ func TestCheckRackForceUpgrade(t *testing.T) {
 				pod.Labels[api.CassNodeState] = stateStarting
 			},
 			forcedRack1: false,
+		},
+		{
+			name:         "other rack starting with forceUpgradeRacks of the failed rack",
+			failedStarts: []int{0},
+			rack2Pod: func(pod *corev1.Pod) {
+				pod.Labels[api.CassNodeState] = stateStarting
+			},
+			forceUpgradeRacks: []string{"rack1"},
+			forcedRack1:       true,
+		},
+		{
+			name:         "other rack starting with forceUpgradeRacks of the other rack",
+			failedStarts: []int{0},
+			rack2Pod: func(pod *corev1.Pod) {
+				pod.Labels[api.CassNodeState] = stateStarting
+			},
+			forceUpgradeRacks: []string{"rack2"},
+			forcedRack2:       true,
 		},
 		{
 			name:         "other rack never started",
@@ -4451,14 +4471,16 @@ func TestCheckRackForceUpgrade(t *testing.T) {
 			}
 
 			rc.Datacenter.Spec.ServerVersion = "6.8.44"
+			rc.Datacenter.Spec.ForceUpgradeRacks = tt.forceUpgradeRacks
 			res := rc.CheckRackForceUpgrade()
-			require.Equal(tt.forcedRack1, res.Completed())
+			require.Equal(tt.forcedRack1 || tt.forcedRack2, res.Completed())
 
 			for idx, statefulSet := range rc.statefulSets {
 				updatedStatefulSet := &appsv1.StatefulSet{}
 				require.NoError(rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(statefulSet), updatedStatefulSet))
 				updated := hashes[idx] != updatedStatefulSet.Annotations[utils.ResourceHashAnnotationKey]
-				require.Equal(tt.forcedRack1 && idx == 0, updated, "rack %d", idx+1)
+				forced := []bool{tt.forcedRack1, tt.forcedRack2}[idx]
+				require.Equal(forced, updated, "rack %d", idx+1)
 			}
 		})
 	}

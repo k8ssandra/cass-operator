@@ -62,6 +62,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "creating a ScheduledTask for cleanup"
 			k = kubectl.ApplyFiles(scheduledTaskYaml)
@@ -125,13 +126,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the datacenter"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
-
-			step = "checking that the datacenter no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
+			ns.AssertDatacenterDeleted(dcName)
 		})
 
 	})

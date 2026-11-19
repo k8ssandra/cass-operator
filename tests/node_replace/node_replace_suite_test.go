@@ -84,30 +84,14 @@ func DeleteIgnoreFinalizersAndLog(description string, resourceName string) {
 	wg.Wait()
 }
 
+// verifyAllPodsAreCorrect checks on every node that the ring has exactly the nodes of status.nodeStatuses with their
+// HostIDs. A replaced pod started without the replace flag joins as an additional node, and a stale HostID in
+// status.nodeStatuses breaks the next replace.
 func verifyAllPodsAreCorrect() {
-	step := "verify in nodetool that we still have the right number of cassandra nodes and correct HostID is reflected in CRD"
-	By(step)
-	for _, podName := range podNames {
-		nodeInfos := ns.RetrieveStatusFromNodetool(podName)
-		Expect(nodeInfos).To(HaveLen(len(podNames)), "Expect nodetool to return info on exactly %d nodes", len(podNames))
-
-		for _, nodeInfo := range nodeInfos {
-			Expect(nodeInfo.Status).To(Equal("up"), "Expected all nodes to be up, but node %s was down", nodeInfo.HostId)
-			Expect(nodeInfo.State).To(Equal("normal"), "Expected all nodes to have a state of normal, but node %s was %s", nodeInfo.HostId, nodeInfo.State)
-
-			// Make sure that NodeStatus reflects the HostID for the replacement pod. Otherwise subsequent replaces will fail as the CassandraDatacenter has stale information
-			k := kubectl.Get("pod", podNameToReplace).FormatOutput("jsonpath={.status.podIP}")
-			// step = "get podIP"
-			podIP, err := ns.Output(k)
-			Expect(err).ToNot(HaveOccurred(), "Failed to get pod IP for pod %s: %v", podNameToReplace, err)
-			if podName == podNameToReplace && podIP == nodeInfo.Address {
-				step = "verify nodeStatus HostID is up to date"
-				json := fmt.Sprintf("jsonpath={.status.nodeStatuses['%s'].hostID}", podNameToReplace)
-				hostIdInCassandraDatacenter := ns.OutputAndLog(step, kubectl.Get("cassandradatacenter", dcName).FormatOutput(json))
-				Expect(nodeInfo.HostId).To(Equal(hostIdInCassandraDatacenter), "Expected HostId to be %s but got %s in CassandraDatacenter CRD", nodeInfo.HostId, hostIdInCassandraDatacenter)
-			}
-		}
-	}
+	// The node was killed on purpose, the Warning events until the replacement finished are expected
+	ns.ResetEventCheckpoint(dcName)
+	ns.WaitForDatacenterReady(dcName)
+	ns.AssertDatacenterInvariants(dcName)
 }
 
 var _ = Describe(testName, func() {
@@ -127,6 +111,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 		})
 		Specify("the operator can replace a defunct cassandra node on pod start", func() {
 			step := "ensure we actually recorded the host IDs for our cassandra nodes"
@@ -283,6 +268,9 @@ var _ = Describe(testName, func() {
 				Expect(oldPvByPod[podName]).ToNot(Equal(newPvByPod[podName]),
 					"Expected PV volume to be different after rack replace for pod %s", podName)
 			}
+
+			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 		})
 	})
 })

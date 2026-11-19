@@ -4,7 +4,6 @@
 package additional_serviceoptions
 
 import (
-	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -20,7 +19,6 @@ var (
 	namespace = "test-additional-service-options"
 	dcName    = "dc2"
 	dcYaml    = "../testdata/additional-service-annotations-and-labels.yaml"
-	dcLabel   = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns        = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -45,6 +43,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReadyWithTimeouts(dcName, 600, 120)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "verify service has additional label and annotation"
 			k = kubectl.Get("svc").WithLabel("test=additional-serviceoptions").FormatOutput(`jsonpath={.items[0].metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}`)
@@ -53,13 +52,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
-
-			step = "checking that the dc no longer exists"
-			json := "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
+			ns.AssertDatacenterDeleted(dcName)
 		})
 	})
 })

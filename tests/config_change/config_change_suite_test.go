@@ -23,7 +23,6 @@ var (
 	clusterName = "cluster2"
 	dcYaml      = "../testdata/default-single-rack-single-node-dc.yaml"
 	dcResource  = fmt.Sprintf("CassandraDatacenter/%s", dcName)
-	dcLabel     = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns          = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -48,6 +47,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 
 			step = "scale up to 3 nodes"
 			json := `{"spec": {"size": 3}}`
@@ -56,6 +56,10 @@ var _ = Describe(testName, func() {
 
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
+
+			before := ns.GetDatacenterState(dcName)
+			sampler := ns.SampleAvailability(dcName)
 
 			step = "change the config"
 			json = "{\"spec\": {\"config\": {\"cassandra-yaml\": {\"roles_validity\": \"256000ms\", \"materialized_views_enabled\": \"true\"}}}}"
@@ -65,13 +69,13 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterOperatorProgress(dcName, "Updating", 60)
 			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1800)
-			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionFalse))
-
-			step = "checking that the init container got the updated config roles_validity=256000ms"
-			json = "jsonpath={.spec.initContainers[1].env[7].value}"
-			k = kubectl.Get(fmt.Sprintf("pod/%s-%s-r1-sts-0", clusterName, dcName)).
-				FormatOutput(json)
-			ns.WaitForOutputContainsAndLog(step, k, "\"roles_validity\":\"256000ms\"", 30)
+			ns.AssertDatacenterInvariants(dcName)
+			sampler.Stop()
+			ns.ExpectSameHostIDs(dcName, before)
+			for _, pod := range ns.GetDatacenterPodNames(dcName) {
+				ns.ExpectCassandraSetting(pod, clusterName, "materialized_views_enabled", `(?m)^\s*true\s*$`)
+				ns.ExpectCassandraSetting(pod, clusterName, "roles_validity", `(?m)^\s*(256000ms|256s)\s*$`)
+			}
 
 			step = "checking that statefulsets have the right owner reference"
 			json = "jsonpath={.metadata.ownerReferences[0].name}"
@@ -82,19 +86,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
-
-			step = "checking that the cassdc no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 60)
-
-			step = "checking that the statefulsets no longer exists"
-			json = "jsonpath={.items}"
-			k = kubectl.Get("StatefulSet").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 60)
+			ns.AssertDatacenterDeleted(dcName)
 		})
 	})
 })

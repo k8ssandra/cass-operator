@@ -265,7 +265,8 @@ func waitForOutputPattern(k KCmd, pattern string, seconds int) error {
 
 	go func() {
 		printedRerunMsg := false
-		for !re.MatchString(actual) {
+		// Run the command at least once, the initial empty output matches a wait for no output
+		for counter == 0 || !re.MatchString(actual) {
 			select {
 			case <-cquit:
 				fmt.Println("")

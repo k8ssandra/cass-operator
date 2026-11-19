@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	record "k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -356,6 +357,7 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 		noNodeStatus  bool
 		noPeerData    bool
 		serverType    string
+		relabeled     bool
 	}{
 		{name: "peer left and local left", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, wantCleaned: true, wantCalls: 1},
 		{name: "peer left but local normal", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, wantCalls: 1},
@@ -376,12 +378,13 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 		{name: "override does not bypass local normal", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, annotation: "true", wantCalls: 1},
 		{name: "local left belongs to a different host", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"other-host","STATUS":"LEFT"}]}`, wantCalls: 1},
 		{name: "local left has no host ID", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"LEFT"}]}`, wantCalls: 1},
-		{name: "empty host IDs cannot prove identity", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"LEFT"}]}`, unknownHostID: true, wantCalls: 1},
+		{name: "empty host IDs cannot prove identity", peerStatus: "LEFT", localResponse: `{"entity":[{"IS_LOCAL":"true","STATUS":"LEFT"}]}`, unknownHostID: true, wantCalls: 1, wantError: true},
 		{name: "local left cannot use empty peer metadata", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"LEFT"}]}`, noPeerData: true, podReady: true, wantError: true},
 		{name: "empty peer metadata must not retry decommission", localResponse: `{"entity":[{"IS_LOCAL":"true","HOST_ID":"target-host","STATUS":"NORMAL"}]}`, noPeerData: true, podReady: true, wantError: true},
 		{name: "fallback cannot use empty peer metadata", localCode: http.StatusInternalServerError, annotation: "true", noPeerData: true, podReady: true, wantError: true},
 		{name: "never bootstrapped pod needs no local metadata", noNodeStatus: true, localCode: http.StatusInternalServerError, wantCleaned: true},
 		{name: "never bootstrapped pod still requires fetched metadata", noNodeStatus: true, localCode: http.StatusInternalServerError, noPeerData: true, wantError: true},
+		{name: "pod relabeled as decommissioned is removed without verification", peerStatus: "LEAVING", localCode: http.StatusInternalServerError, relabeled: true, wantCleaned: true},
 	}
 
 	for _, tt := range tests {
@@ -417,6 +420,10 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 			if tt.noNodeStatus {
 				delete(rc.Datacenter.Status.NodeStatuses, pod.Name)
 				require.NoError(t, rc.Client.Status().Update(rc.Ctx, rc.Datacenter))
+			}
+			if tt.relabeled {
+				pod.Labels[api.CassNodeState] = stateDecommissioned
+				require.NoError(t, rc.Client.Update(rc.Ctx, pod))
 			}
 			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "cassandra", Ready: tt.podReady}}
 			require.NoError(t, rc.Client.Status().Update(rc.Ctx, pod))
@@ -461,6 +468,22 @@ func TestCheckDecommissioningNodesRequiresLocalLeft(t *testing.T) {
 			server.assertCallCount(t, "/api/v0/metadata/endpoints", tt.wantCalls)
 			server.assertCallCount(t, "/api/v0/metadata/versions/features", tt.wantRetries)
 			server.assertCallCount(t, "/api/v1/ops/node/decommission", tt.wantRetries)
+
+			fakeRecorder := rc.Recorder.EventRecorderLogger.(*record.FakeRecorder)
+			close(fakeRecorder.Events)
+			var warnings []string
+			for event := range fakeRecorder.Events {
+				if strings.HasPrefix(event, corev1.EventTypeWarning) {
+					warnings = append(warnings, event)
+				}
+			}
+			if tt.wantError {
+				require.Len(t, warnings, 1)
+				require.Contains(t, warnings[0], fmt.Sprintf("Cannot verify that node %s has finished decommissioning", pod.Name))
+				require.Contains(t, warnings[0], err.Error())
+			} else {
+				require.Empty(t, warnings)
+			}
 		})
 	}
 }

@@ -539,6 +539,32 @@ The fetched ring metadata must also report `LEFT` for the target, including
 when the annotation is set. An absent target entry does not confirm completion.
 Remove the annotation after the affected pod has been removed.
 
+While the operator cannot verify a decommission, it emits a Warning event with
+reason `Cannot verify decommission` (action `DecommissionNotVerified`) on the
+`CassandraDatacenter` and keeps the `ScalingDown` condition `True`. While that
+condition is `True`, `size` cannot be changed and deleting the
+`CassandraDatacenter` waits. The operator never removes a node from the ring by
+itself. If the node can't finish its decommission, for example because it was
+lost before it reached `LEFT`, you can finish or restart the decommission
+manually:
+
+* **Finish it.** From a healthy node, remove the node from the ring with
+  `nodetool removenode <hostID>`. Use `nodetool assassinate <ip>` only as a
+  last resort. Then label the pod as decommissioned:
+  `kubectl label pod <pod> cassandra.datastax.com/node-state=Decommissioned --overwrite`.
+  The operator then deletes the pod's PVCs, removes the pod from the
+  datacenter status and reduces the StatefulSet's replica count, without
+  querying the node again. Only label the pod the operator marked as
+  `Decommissioning`, which is always the highest ordinal pod of its
+  StatefulSet. If the pod stays in `Terminating`, force-delete it.
+* **Restart it.** If the node is still part of the ring and its Management API
+  is reachable again, remove the label with
+  `kubectl label pod <pod> cassandra.datastax.com/node-state-`. The operator
+  starts the scale down again from the beginning on the same pod. This does
+  not cancel the scale down. It also does not help when the event says the
+  pod has no known HostID, because the HostID is not looked up again for that
+  pod; use "Finish it" in that case.
+
 Just like with scaling up, the size should be reduced to a number that can be
 divided evenly into the number of racks so that they can act effectively as a
 fault-containment zone.

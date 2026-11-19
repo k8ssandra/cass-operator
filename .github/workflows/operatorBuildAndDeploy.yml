@@ -5,7 +5,9 @@ on:
       - master
       - '1.*.x'
   pull_request:
-    branches: [ master ]
+    branches:
+      - master
+      - '1.*.x'
 jobs:
   testing:
     name: Run unit tests

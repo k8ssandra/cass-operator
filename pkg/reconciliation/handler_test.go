@@ -6,14 +6,17 @@ package reconciliation
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	record "k8s.io/client-go/tools/events"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -22,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	api "github.com/k8ssandra/cass-operator/apis/cassandra/v1beta1"
+	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/dynamicwatch"
 )
 
@@ -197,6 +201,140 @@ func TestProcessDeletion(t *testing.T) {
 	storedDC := &api.CassandraDatacenter{}
 	getErr := rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(rc.Datacenter), storedDC)
 	assert.True(apierrors.IsNotFound(getErr))
+}
+
+func TestProcessDeletion_DecommissionOnDelete(t *testing.T) {
+	const (
+		singleDc    = `{"entity":[{"DC":"cassandradatacenter-example","STATUS":"NORMAL","IS_ALIVE":"true"},{"DC":"dc2","STATUS":"LEFT","IS_ALIVE":"false"}]}`
+		multiDc     = `{"entity":[{"DC":"cassandradatacenter-example","STATUS":"NORMAL","IS_ALIVE":"true"},{"DC":"dc2","STATUS":"NORMAL","IS_ALIVE":"true"}]}`
+		otherDcDown = `{"entity":[{"DC":"cassandradatacenter-example","STATUS":"NORMAL","IS_ALIVE":"true"},{"DC":"dc2","STATUS":"NORMAL","IS_ALIVE":"false"}]}`
+		noEndpoints = `{"entity":[]}`
+	)
+	tests := []struct {
+		name               string
+		responses          [2]string
+		firstPodState      string
+		firstPodNotReady   bool
+		noPods             bool
+		decommissioning    bool
+		scaledDown         bool
+		stopped            bool
+		want               result.ReconcileResult
+		wantErr            bool
+		wantDecommission   bool
+		wantReplicas       int32
+		wantCalls          [2]int
+		wantEventSubstring string
+	}{
+		{name: "multiple datacenters are decommissioned", responses: [2]string{multiDc, multiDc}, want: result.Continue(), wantDecommission: true, wantReplicas: 2, wantCalls: [2]int{1, 0}},
+		{name: "down datacenter is still decommissioned", responses: [2]string{otherDcDown, otherDcDown}, want: result.Continue(), wantDecommission: true, wantReplicas: 2, wantCalls: [2]int{1, 0}},
+		{name: "single datacenter is deleted without decommission", responses: [2]string{singleDc, singleDc}, want: result.RequeueSoon(5), wantReplicas: 0, wantCalls: [2]int{1, 0}, wantEventSubstring: "only datacenter"},
+		{name: "failing pod falls back to next pod", responses: [2]string{"", multiDc}, want: result.Continue(), wantDecommission: true, wantReplicas: 2, wantCalls: [2]int{1, 1}},
+		{name: "empty metadata falls back to next pod", responses: [2]string{noEndpoints, multiDc}, want: result.Continue(), wantDecommission: true, wantReplicas: 2, wantCalls: [2]int{1, 1}},
+		{name: "decommissioning pod is not queried", responses: [2]string{multiDc, singleDc}, firstPodState: stateDecommissioning, want: result.RequeueSoon(5), wantReplicas: 0, wantCalls: [2]int{0, 1}},
+		{name: "not ready pod is not queried", responses: [2]string{multiDc, singleDc}, firstPodNotReady: true, want: result.RequeueSoon(5), wantReplicas: 0, wantCalls: [2]int{0, 1}},
+		{name: "all pods failing returns an error", responses: [2]string{"", ""}, wantErr: true, wantReplicas: 2, wantCalls: [2]int{1, 1}},
+		{name: "no topology waits", responses: [2]string{noEndpoints, noEndpoints}, want: result.RequeueSoon(5), wantReplicas: 2, wantCalls: [2]int{1, 1}, wantEventSubstring: "Unable to read the cluster topology"},
+		{name: "ongoing decommission is not reevaluated", responses: [2]string{singleDc, singleDc}, decommissioning: true, want: result.Continue(), wantDecommission: true, wantReplicas: 2},
+		{name: "decommissioned datacenter is deleted", noPods: true, decommissioning: true, want: result.Done(), wantDecommission: true, wantReplicas: 2},
+		{name: "terminating pods are not queried after deletion without decommission", responses: [2]string{multiDc, multiDc}, scaledDown: true, want: result.Done()},
+		{name: "stopped datacenter is still queried", responses: [2]string{multiDc, multiDc}, scaledDown: true, stopped: true, want: result.Continue(), wantDecommission: true, wantCalls: [2]int{1, 0}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc, _, cleanupMockScr := setupTest()
+			defer cleanupMockScr()
+
+			rc.Datacenter.SetFinalizers([]string{api.Finalizer})
+			rc.Datacenter.Annotations = map[string]string{api.DecommissionOnDeleteAnnotation: "true"}
+			now := metav1.Now()
+			rc.Datacenter.SetDeletionTimestamp(&now)
+			if tt.decommissioning {
+				rc.Datacenter.SetCondition(api.DatacenterCondition{Type: api.DatacenterDecommission, Status: corev1.ConditionTrue})
+			}
+			rc.Datacenter.Spec.Stopped = tt.stopped
+			replicas := 2
+			if tt.scaledDown {
+				replicas = 0
+			}
+			sts, err := newStatefulSetForCassandraDatacenter(nil, "default", rc.Datacenter, replicas, imageRegistry)
+			require.NoError(t, err)
+
+			objs := []runtime.Object{rc.Datacenter, sts}
+			var servers [2]*fakeMgmtApiServer
+			for i, response := range tt.responses {
+				servers[i] = newFakeMgmtApiServer(t, func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path != "/api/v0/metadata/endpoints" || response == "" {
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					_, _ = w.Write([]byte(response))
+				})
+				if tt.noPods {
+					continue
+				}
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      getStatefulSetPodNameForIdx(sts, int32(i)),
+						Namespace: rc.Datacenter.Namespace,
+						Labels:    rc.Datacenter.GetDatacenterLabels(),
+					},
+					Spec:   corev1.PodSpec{Containers: []corev1.Container{{Name: "cassandra"}}},
+					Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "cassandra", Ready: true}}},
+				}
+				pod.Labels[api.CassNodeState] = stateStarted
+				if i == 0 {
+					if tt.firstPodState != "" {
+						pod.Labels[api.CassNodeState] = tt.firstPodState
+					}
+					pod.Status.ContainerStatuses[0].Ready = !tt.firstPodNotReady
+				}
+				servers[i].attachToPod(t, pod)
+				objs = append(objs, pod)
+			}
+			rc.NodeMgmtClient = servers[0].client(rc.ReqLogger)
+			rc.Client = fake.NewClientBuilder().
+				WithScheme(setupScheme()).
+				WithStatusSubresource(rc.Datacenter).
+				WithRuntimeObjects(objs...).
+				WithIndex(&corev1.Pod{}, podPVCClaimNameField, podPVCClaimNames).
+				Build()
+			emptySecretWatcher(rc)
+			require.NoError(t, rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(rc.Datacenter), rc.Datacenter))
+
+			r := rc.ProcessDeletion()
+			if tt.wantErr {
+				require.True(t, r.Completed())
+				_, err := r.Output()
+				require.Error(t, err)
+			} else {
+				require.Equal(t, tt.want, r)
+			}
+
+			storedDC := &api.CassandraDatacenter{}
+			getErr := rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(rc.Datacenter), storedDC)
+			if tt.want == result.Done() {
+				require.True(t, apierrors.IsNotFound(getErr))
+			} else {
+				require.NoError(t, getErr)
+				require.True(t, controllerutil.ContainsFinalizer(storedDC, api.Finalizer))
+				require.Equal(t, tt.wantDecommission, storedDC.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionTrue)
+			}
+
+			require.NoError(t, rc.Client.Get(rc.Ctx, client.ObjectKeyFromObject(sts), sts))
+			require.Equal(t, tt.wantReplicas, *sts.Spec.Replicas)
+			for i, server := range servers {
+				server.assertCallCount(t, "/api/v0/metadata/endpoints", tt.wantCalls[i])
+			}
+
+			recorder := rc.Recorder.EventRecorderLogger.(*record.FakeRecorder)
+			if tt.wantEventSubstring != "" {
+				require.Len(t, recorder.Events, 1)
+				require.Contains(t, <-recorder.Events, tt.wantEventSubstring)
+			}
+		})
+	}
 }
 
 // TestProcessDeletion_NoFinalizer verifies that the removal of finalizer means cass-operator will do nothing

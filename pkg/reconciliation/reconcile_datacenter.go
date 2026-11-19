@@ -6,6 +6,7 @@ package reconciliation
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/k8ssandra/cass-operator/internal/result"
 	"github.com/k8ssandra/cass-operator/pkg/events"
@@ -50,34 +51,61 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 		return result.Continue()
 	}
 
+	decommissionOnDelete := false
 	if _, found := rc.Datacenter.Annotations[api.DecommissionOnDeleteAnnotation]; found {
+		decommissionOnDelete = true
 		dcPods, err := rc.listPods(rc.Datacenter.GetDatacenterLabels())
 		if err != nil {
 			rc.ReqLogger.Error(err, "Failed to list pods, unable to proceed with deletion")
 			return result.Error(err)
 		}
 		if len(dcPods) > 0 {
-			rc.ReqLogger.V(1).Info("Deletion is being processed by the decommission check")
-			dcs, err := rc.getClusterDatacenters(dcPods)
+			if rc.Datacenter.Status.GetConditionStatus(api.DatacenterDecommission) == corev1.ConditionTrue {
+				// Do not revisit the decision, the remaining pods might no longer see the other datacenters
+				return result.Continue()
+			}
+			scaledDown, err := rc.allStatefulSetsScaledDown()
 			if err != nil {
-				rc.ReqLogger.Error(err, "Unable to verify if Cassandra Cluster has multiple datacenters")
-				// We can't continue, we risk corrupting the Datacenter
 				return result.Error(err)
 			}
-
-			if len(dcs) > 1 {
-				if err := rc.setConditionStatus(api.DatacenterDecommission, corev1.ConditionTrue); err != nil {
+			if scaledDown && !rc.Datacenter.Spec.Stopped {
+				// Only the deletion without decommission below scales every StatefulSet to 0, the terminating pods
+				// must not be asked for the topology again
+				decommissionOnDelete = false
+			} else {
+				rc.ReqLogger.V(1).Info("Deletion is being processed by the decommission check")
+				dcs, err := rc.getClusterDatacenters(dcPods)
+				if err != nil {
+					rc.ReqLogger.Error(err, "Unable to verify if Cassandra Cluster has multiple datacenters")
+					// We can't continue, we risk corrupting the Datacenter
 					return result.Error(err)
 				}
 
-				rc.ReqLogger.V(1).Info("Decommissioning the datacenter to 0 nodes first before deletion")
-				// Exiting to let other parts of the process take care of the decommission
-				return result.Continue()
+				dcName := rc.Datacenter.DatacenterName()
+				if slices.ContainsFunc(dcs, func(dc string) bool { return dc != dcName }) {
+					if err := rc.setConditionStatus(api.DatacenterDecommission, corev1.ConditionTrue); err != nil {
+						return result.Error(err)
+					}
+
+					rc.ReqLogger.V(1).Info("Decommissioning the datacenter to 0 nodes first before deletion")
+					// Exiting to let other parts of the process take care of the decommission
+					return result.Continue()
+				}
+
+				if !slices.Contains(dcs, dcName) {
+					rc.Recorder.Event(rc.Datacenter, corev1.EventTypeWarning, events.DecommissionDatacenter,
+						"Unable to read the cluster topology from any datacenter pod, waiting before decommissioning the datacenter. If the datacenter never joined the cluster, remove the decommission-on-delete annotation to delete it without decommission")
+					return result.RequeueSoon(5)
+				}
+
+				rc.Recorder.Event(rc.Datacenter, corev1.EventTypeNormal, events.DecommissionDatacenter,
+					"Datacenter is the only datacenter in the cluster, deleting it without decommission")
+				decommissionOnDelete = false
 			}
-			// How could we have pods if we've decommissioned everything?
-			return result.RequeueSoon(5)
 		}
-	} else {
+	}
+
+	if !decommissionOnDelete {
 		// This is small mini reconcile to make everything 0 sized before we finish deletion, but do not run decommission in Cassandra
 		rc.ReqLogger.Info("Proceeding with deletion, setting all StatefulSets to 0 replicas")
 		if err := rc.CalculateRackInformation(); err != nil {
@@ -133,6 +161,24 @@ func (rc *ReconciliationContext) ProcessDeletion() result.ReconcileResult {
 	}
 
 	return result.Done()
+}
+
+func (rc *ReconciliationContext) allStatefulSetsScaledDown() (bool, error) {
+	if err := rc.CalculateRackInformation(); err != nil {
+		return false, err
+	}
+	found := false
+	for _, rackInfo := range rc.desiredRackInformation {
+		sts, statefulSetFound, err := rc.GetStatefulSetForRack(rackInfo)
+		if err != nil {
+			return false, err
+		}
+		if statefulSetFound && *sts.Spec.Replicas > 0 {
+			return false, nil
+		}
+		found = found || statefulSetFound
+	}
+	return found, nil
 }
 
 func (rc *ReconciliationContext) deletePVCs() error {

@@ -566,11 +566,12 @@ func (rc *ReconciliationContext) getServerDataPvc(pod *corev1.Pod) (*corev1.Pers
 	return pvc, nil
 }
 
+// getClusterDatacenters returns the datacenters that have nodes in the ring, whether or not those nodes are
+// currently alive. It returns nil if none of the pods could be queried.
 func (rc *ReconciliationContext) getClusterDatacenters(pods []*corev1.Pod) ([]string, error) {
-	// We need the result from at least one pod
-	clusterDcs := make(map[string]bool)
+	var lastErr error
 	for _, pod := range pods {
-		if val, found := pod.GetAnnotations()[api.CassNodeState]; found && val == stateDecommissioning {
+		if state := pod.Labels[api.CassNodeState]; state == stateDecommissioning || state == stateDecommissioned {
 			// Do not poll a node that is decommissioning
 			continue
 		}
@@ -581,21 +582,28 @@ func (rc *ReconciliationContext) getClusterDatacenters(pods []*corev1.Pod) ([]st
 
 		metadata, err := rc.NodeMgmtClient.CallMetadataEndpointsEndpoint(pod)
 		if err != nil {
-			return nil, err
+			lastErr = err
+			continue
+		}
+		if len(metadata.Entity) == 0 {
+			continue
 		}
 
+		clusterDcs := make(map[string]bool)
 		for _, ep := range metadata.Entity {
-			if ep.IsAlive == "true" && ep.HasStatus(httphelper.StatusNormal) {
-				clusterDcs[ep.Datacenter] = true
+			// Down or unreachable nodes are still part of the ring, only nodes that have left are not.
+			if ep.HasStatus(httphelper.StatusLeft) || ep.HasStatus(httphelper.StatusRemoved) {
+				continue
 			}
+			clusterDcs[ep.Datacenter] = true
 		}
-		break
+
+		clusterDcList := make([]string, 0, len(clusterDcs))
+		for k := range clusterDcs {
+			clusterDcList = append(clusterDcList, k)
+		}
+		return clusterDcList, nil
 	}
 
-	clusterDcList := make([]string, 0, len(clusterDcs))
-	for k := range clusterDcs {
-		clusterDcList = append(clusterDcList, k)
-	}
-
-	return clusterDcList, nil
+	return nil, lastErr
 }

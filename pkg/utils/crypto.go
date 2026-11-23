@@ -6,13 +6,12 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"math/big"
 	"time"
 
-	"github.com/pavel-v-chernykh/keystore-go"
+	keystore "github.com/pavlo-v-chernykh/keystore-go/v4"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -108,50 +107,37 @@ func GenerateJKS(ca *corev1.Secret, podname, dcname string) (jksblob []byte, err
 		return nil, err
 	}
 
-	if derBytes, err = x509.CreateCertificate(rand.Reader, &newCert, ca_certificate, &priv.PublicKey, ca_key); err == nil {
-		asn1_bytes, err := rsa2pkcs8(priv)
-		if err != nil {
-			return nil, err
-		}
-		buffer := bytes.NewBufferString("")
-		store := keystore.KeyStore{
-			fmt.Sprintf("%s.%s.cassdc", podname, ca.Namespace): &keystore.PrivateKeyEntry{
-				Entry:   keystore.Entry{CreationDate: time.Now()},
-				PrivKey: asn1_bytes,
-				CertChain: []keystore.Certificate{{
-					Type:    "X509",
-					Content: derBytes,
-				}, {
-					Type:    "X509",
-					Content: ca_cert_bytes,
-				}},
-			},
-			"ca": &keystore.TrustedCertificateEntry{
-				Entry: keystore.Entry{CreationDate: time.Now()},
-				Certificate: keystore.Certificate{
-					Type:    "X509",
-					Content: ca_cert_bytes,
-				},
-			},
-		}
-		err = keystore.Encode(buffer, store, []byte(dcname))
-		return buffer.Bytes(), err
+	if derBytes, err = x509.CreateCertificate(rand.Reader, &newCert, ca_certificate, &priv.PublicKey, ca_key); err != nil {
+		return nil, err
 	}
-	return nil, err
-}
 
-type pkcs8Key struct {
-	Version             int
-	PrivateKeyAlgorithm []asn1.ObjectIdentifier
-	PrivateKey          []byte
-}
+	pkcs8Key, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		return nil, err
+	}
 
-func rsa2pkcs8(key *rsa.PrivateKey) ([]byte, error) {
-	var pkey pkcs8Key
-	pkey.Version = 0
-	pkey.PrivateKeyAlgorithm = make([]asn1.ObjectIdentifier, 1)
-	pkey.PrivateKeyAlgorithm[0] = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1} // RSA
-	pkey.PrivateKey = x509.MarshalPKCS1PrivateKey(key)
+	now := time.Now()
+	store := keystore.New()
+	if err = store.SetPrivateKeyEntry(fmt.Sprintf("%s.%s.cassdc", podname, ca.Namespace), keystore.PrivateKeyEntry{
+		CreationTime: now,
+		PrivateKey:   pkcs8Key,
+		CertificateChain: []keystore.Certificate{
+			{Type: "X509", Content: derBytes},
+			{Type: "X509", Content: ca_cert_bytes},
+		},
+	}, []byte(dcname)); err != nil {
+		return nil, err
+	}
+	if err = store.SetTrustedCertificateEntry("ca", keystore.TrustedCertificateEntry{
+		CreationTime: now,
+		Certificate:  keystore.Certificate{Type: "X509", Content: ca_cert_bytes},
+	}); err != nil {
+		return nil, err
+	}
 
-	return asn1.Marshal(pkey)
+	buffer := &bytes.Buffer{}
+	if err = store.Store(buffer, []byte(dcname)); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
 }

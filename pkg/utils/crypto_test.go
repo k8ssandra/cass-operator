@@ -1,13 +1,15 @@
 package utils
 
 import (
+	"bytes"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"os"
 	"testing"
 
+	keystore "github.com/pavlo-v-chernykh/keystore-go/v4"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -74,16 +76,28 @@ func Test_GetJKS(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got an error: %e", err)
 	}
-	if len(jks) == 0 {
-		t.Errorf("JKS blob too small")
-	}
+	require.NotEmpty(t, jks)
 
-	defer func() {
-		_ = os.Remove("test-jks")
-	}()
+	store := keystore.New()
+	require.NoError(t, store.Load(bytes.NewReader(jks), []byte("somedcname")))
+	require.ElementsMatch(t, []string{"somepodname.somedcnamespace.cassdc", "ca"}, store.Aliases())
 
-	err = os.WriteFile("test-jks", jks, 0o644)
-	if err != nil {
-		t.Errorf("WriteFile error: %e", err)
-	}
+	entry, err := store.GetPrivateKeyEntry("somepodname.somedcnamespace.cassdc", []byte("somedcname"))
+	require.NoError(t, err)
+	require.Len(t, entry.CertificateChain, 2)
+
+	key, err := x509.ParsePKCS8PrivateKey(entry.PrivateKey)
+	require.NoError(t, err)
+	require.IsType(t, &rsa.PrivateKey{}, key)
+
+	leaf, err := x509.ParseCertificate(entry.CertificateChain[0].Content)
+	require.NoError(t, err)
+	caCert, err := x509.ParseCertificate(entry.CertificateChain[1].Content)
+	require.NoError(t, err)
+	require.NoError(t, leaf.CheckSignatureFrom(caCert))
+	require.Equal(t, "somepodname.somedcnamespace.cassdc", leaf.Subject.CommonName)
+
+	trusted, err := store.GetTrustedCertificateEntry("ca")
+	require.NoError(t, err)
+	require.Equal(t, entry.CertificateChain[1].Content, trusted.Certificate.Content)
 }

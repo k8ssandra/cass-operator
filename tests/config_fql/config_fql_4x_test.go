@@ -22,7 +22,6 @@ var (
 	namespace = "fql-config"
 	dcName    = "dc1"
 	dcYaml    = "../testdata/config_fql_4x_test.yaml"
-	dcLabel   = fmt.Sprintf("cassandra.datastax.com/datacenter=%s", dcName)
 	ns        = ginkgo_util.NewWrapper(testName, namespace)
 )
 
@@ -47,6 +46,7 @@ var _ = Describe(testName, func() {
 			ns.ExecAndLog(step, k)
 
 			ns.WaitForDatacenterReady(dcName)
+			ns.AssertDatacenterInvariants(dcName)
 			lsCmd := kubectl.KCmd{
 				Command: "exec",
 				Args:    []string{"cluster1-dc1-default-sts-0", "--", "ls", "/var/log/cassandra/fql"},
@@ -64,13 +64,7 @@ var _ = Describe(testName, func() {
 			step = "deleting the dc"
 			k = kubectl.DeleteFromFiles(testFile)
 			ns.ExecAndLog(step, k)
-
-			step = "checking that the dc no longer exists"
-			json := "jsonpath={.items}"
-			k = kubectl.Get("CassandraDatacenter").
-				WithLabel(dcLabel).
-				FormatOutput(json)
-			ns.WaitForOutputAndLog(step, k, "[]", 300)
+			ns.AssertDatacenterDeleted(dcName)
 		})
 	})
 })

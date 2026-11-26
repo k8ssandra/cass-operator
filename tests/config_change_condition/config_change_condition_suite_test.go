@@ -67,7 +67,7 @@ var _ = Describe(testName, func() {
 			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionTrue))
 			ns.WaitForDatacenterCondition(dcName, "Updating", string(corev1.ConditionFalse))
 			ns.WaitForDatacenterReady(dcName)
-			ns.WaitForDatacenterOperatorProgress(dcName, "Ready", 1800)
+			ns.AssertDatacenterInvariants(dcName)
 		})
 	})
 })

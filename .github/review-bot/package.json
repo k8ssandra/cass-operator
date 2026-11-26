@@ -1,0 +1,7 @@
+{
+  "name": "review-bot-agent",
+  "private": true,
+  "dependencies": {
+    "@ibm/bob": "2.1.0"
+  }
+}

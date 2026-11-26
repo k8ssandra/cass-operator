@@ -1,0 +1,8 @@
+{
+  "agents": {
+    "bob": {
+      "command": "/usr/local/bin/node",
+      "args": ["/agent/node_modules/@ibm/bob/dist/bob.js", "acp", "--accept-license", "--disable-mcp", "--log-level", "warn"]
+    }
+  }
+}

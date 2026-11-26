@@ -1,0 +1,234 @@
+# Automated pull request review (review-bot), with bob as the reviewing
+# agent over ACP. Posts one review and the ai-review/main check as
+# github-actions[bot]. The check is non-blocking: it reports whether the
+# review ran, not what it found.
+#
+# PRs from authors with write access are reviewed automatically; others
+# after a maintainer adds the ai-review/approved label, which is removed
+# again on the author's next push.
+#
+# Jobs: gate (no secret), remove-label, prepare (no secret), setup (no
+# secret, no token permissions; installs bob from npm as pinned in
+# .github/review-bot/settings.json, install scripts off), review
+# (BOB_API_KEY; reviews the prepared snapshot). pull_request_target runs this
+# file from the base branch; no job checks out or runs code from the PR.
+#
+# Needs the repository secret BOB_API_KEY. Review instructions come from
+# burmanm/review-process (pilot/cass-operator).
+name: review-bot
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize, labeled]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number to review
+        required: true
+        type: number
+
+permissions: {}
+
+# One run per PR; a newer event cancels the one in flight. Label events for
+# other labels get a group of their own so they cancel nothing.
+concurrency:
+  group: >-
+    ${{ github.event.action == 'labeled'
+        && github.event.label.name != 'ai-review/approved'
+        && format('review-bot-ignored-{0}', github.run_id)
+        || format('review-bot-{0}', github.event.pull_request.number || inputs.pr) }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    if: >-
+      (github.event_name == 'pull_request_target'
+        && (github.event.action != 'labeled'
+            || github.event.label.name == 'ai-review/approved'))
+      || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # the agent directory
+      pull-requests: read
+      checks: write # complete ai-review/main as skipped
+    outputs:
+      review: ${{ steps.gate.outputs.review }}
+      remove-label: ${{ steps.gate.outputs.remove-label }}
+      pr: ${{ steps.gate.outputs.pr }}
+      head-sha: ${{ steps.gate.outputs.head-sha }}
+      base-sha: ${{ steps.gate.outputs.base-sha }}
+      label: ${{ steps.gate.outputs.label }}
+      waiting: ${{ steps.gate.outputs.waiting }}
+    steps:
+      - name: Authorize
+        id: gate
+        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        with:
+          command: gate
+          token: ${{ github.token }}
+          agent-dir: .github/review-bot
+          knowledge: burmanm/review-process:pilot/cass-operator
+          knowledge-guidelines: shared/go-operator-guidelines.md
+          ci-require: "off"
+          pr: ${{ inputs.pr }}
+          image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
+      - name: Hand the agent directory to the setup job
+        if: steps.gate.outputs.review == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-bot-agent-dir
+          path: ${{ runner.temp }}/review-bot/agent/dir
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
+          overwrite: true
+      - name: Upload gate run records
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-bot-record-gate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/review-bot/gate-out/records/*.json
+          if-no-files-found: ignore
+          retention-days: 90
+      - name: Complete the check if the gate failed
+        if: failure() && github.event.pull_request.head.sha != ''
+        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        with:
+          command: complete-check
+          image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
+          token: ${{ github.token }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          outcome: failure
+
+  remove-label:
+    needs: gate
+    if: needs.gate.outputs.remove-label == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write # remove the authorization label
+    steps:
+      - name: Remove the authorization label
+        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        with:
+          command: remove-label
+          image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
+          token: ${{ github.token }}
+          pr: ${{ needs.gate.outputs.pr }}
+          auth-label: ${{ needs.gate.outputs.label }}
+
+  prepare:
+    needs: gate
+    if: needs.gate.outputs.review == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read # tarballs of the base and head commits
+    steps:
+      - name: Fetch trees and prepare the Go module cache
+        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        with:
+          command: prepare
+          image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
+          token: ${{ github.token }}
+          pr: ${{ needs.gate.outputs.pr }}
+          base-sha: ${{ needs.gate.outputs.base-sha }}
+          head-sha: ${{ needs.gate.outputs.head-sha }}
+      - name: Upload the snapshot
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-bot-snapshot
+          path: ${{ runner.temp }}/review-bot/out/snapshot.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: true
+
+  setup:
+    needs: gate
+    if: needs.gate.outputs.review == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # No token permissions and no secret: installs bob from npm, install
+    # scripts off.
+    permissions: {}
+    steps:
+      - name: Download the agent directory (fetched by the gate, never from the PR)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: review-bot-agent-dir
+          path: ${{ runner.temp }}/review-bot/agent/dir
+      - name: Install bob
+        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        with:
+          command: setup
+          image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
+          agent-dir: .github/review-bot
+      - name: Hand the installed agent directory to the review job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-bot-agent-installed
+          path: ${{ runner.temp }}/review-bot/agent-out/agent-dir.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: true
+
+  review:
+    needs: [gate, prepare, setup]
+    # Runs when prepare or setup failed too, so the check is completed.
+    if: ${{ !cancelled() && needs.gate.outputs.review == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      pull-requests: write # the review, thread replies, thread resolution
+      checks: write # ai-review/main
+    steps:
+      - name: Download the snapshot
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: review-bot-snapshot
+          path: ${{ runner.temp }}/review-bot/in
+      - name: Download the agent directory with bob (from the setup job)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: review-bot-agent-installed
+          path: ${{ runner.temp }}/review-bot/agent-in
+      - name: Review
+        id: review
+        timeout-minutes: 15
+        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        env:
+          BOB_API_KEY: ${{ secrets.BOB_API_KEY }}
+        with:
+          command: review
+          token: ${{ github.token }}
+          pr: ${{ needs.gate.outputs.pr }}
+          agent-dir: .github/review-bot
+          knowledge: burmanm/review-process:pilot/cass-operator
+          acp-config: acp.json
+          models: |
+            reviewer=acp/bob
+            verifier=acp/bob
+          provider-env: BOB_API_KEY
+          timeout-minutes: "15"
+          waiting: ${{ needs.gate.outputs.waiting }}
+          image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
+      - name: Complete the check if the review did not
+        if: always()
+        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        with:
+          command: complete-check
+          image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
+          token: ${{ github.token }}
+          head-sha: ${{ needs.gate.outputs.head-sha }}
+          outcome: ${{ steps.review.outcome }}
+      - name: Upload the run record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-bot-record-pr${{ needs.gate.outputs.pr }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/review-bot/runs/*/*.json
+          if-no-files-found: warn
+          retention-days: 90

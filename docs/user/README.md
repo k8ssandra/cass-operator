@@ -565,6 +565,12 @@ manually:
   pod has no known HostID, because the HostID is not looked up again for that
   pod; use "Finish it" in that case.
 
+The operator doesn't watch pods, and it retries a failed verification with a
+growing delay of up to about 16 minutes. A label change is noticed only on the
+next retry. To make the operator act on it right away, change any annotation
+on the `CassandraDatacenter`, for example
+`kubectl annotate cassdc <dc> touched-at="$(date +%s)" --overwrite`.
+
 Just like with scaling up, the size should be reduced to a number that can be
 divided evenly into the number of racks so that they can act effectively as a
 fault-containment zone.

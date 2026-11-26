@@ -1,3 +1,12 @@
 {
+  "packages": [
+    {
+      "source": "npm:@ibm/bob@2.1.0",
+      "extensions": [],
+      "skills": [],
+      "prompts": [],
+      "themes": []
+    }
+  ],
   "reviewBot": {}
 }

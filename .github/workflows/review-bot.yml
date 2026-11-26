@@ -63,7 +63,7 @@ jobs:
     steps:
       - name: Authorize
         id: gate
-        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        uses: burmanm/bobbie-bot/action@bf6e1700db00c3a0bf91e01ae8826fae0979a169 # review-bot bf6e170
         with:
           command: gate
           token: ${{ github.token }}
@@ -93,7 +93,7 @@ jobs:
           retention-days: 90
       - name: Complete the check if the gate failed
         if: failure() && github.event.pull_request.head.sha != ''
-        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        uses: burmanm/bobbie-bot/action@bf6e1700db00c3a0bf91e01ae8826fae0979a169 # review-bot bf6e170
         with:
           command: complete-check
           image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
@@ -110,7 +110,7 @@ jobs:
       pull-requests: write # remove the authorization label
     steps:
       - name: Remove the authorization label
-        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        uses: burmanm/bobbie-bot/action@bf6e1700db00c3a0bf91e01ae8826fae0979a169 # review-bot bf6e170
         with:
           command: remove-label
           image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
@@ -127,7 +127,7 @@ jobs:
       contents: read # tarballs of the base and head commits
     steps:
       - name: Fetch trees and prepare the Go module cache
-        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        uses: burmanm/bobbie-bot/action@bf6e1700db00c3a0bf91e01ae8826fae0979a169 # review-bot bf6e170
         with:
           command: prepare
           image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
@@ -160,7 +160,7 @@ jobs:
           name: review-bot-agent-dir
           path: ${{ runner.temp }}/review-bot/agent/dir
       - name: Install bob
-        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        uses: burmanm/bobbie-bot/action@bf6e1700db00c3a0bf91e01ae8826fae0979a169 # review-bot bf6e170
         with:
           command: setup
           image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
@@ -198,7 +198,7 @@ jobs:
       - name: Review
         id: review
         timeout-minutes: 15
-        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        uses: burmanm/bobbie-bot/action@bf6e1700db00c3a0bf91e01ae8826fae0979a169 # review-bot bf6e170
         env:
           BOB_API_KEY: ${{ secrets.BOB_API_KEY }}
         with:
@@ -217,7 +217,7 @@ jobs:
           image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
       - name: Complete the check if the review did not
         if: always()
-        uses: burmanm/bobbie-bot/action@f35e648e5a527f6b20504f7d94d46f82b1f4a73e # review-bot f35e648
+        uses: burmanm/bobbie-bot/action@bf6e1700db00c3a0bf91e01ae8826fae0979a169 # review-bot bf6e170
         with:
           command: complete-check
           image: ghcr.io/burmanm/review-bot-action@sha256:c065f8509c8911a39aa7aa436402929b10d93b90a1151821146ea27f4dc4d6aa
